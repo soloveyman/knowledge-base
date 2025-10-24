@@ -15,9 +15,12 @@ import {
   Plus,
   LogOut,
   Building2,
-  Upload
+  Upload,
+  BookOpen,
+  TestTube
 } from "lucide-react"
 import { signOut } from "next-auth/react"
+import DocumentImport from "@/components/import/document-import"
 
 export default function ManagerPage() {
   const { data: session, status } = useSession()
@@ -135,8 +138,10 @@ export default function ManagerPage() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="training">Training Management</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="modules">Modules</TabsTrigger>
+            <TabsTrigger value="import">Import</TabsTrigger>
+            <TabsTrigger value="tests">Tests</TabsTrigger>
+            <TabsTrigger value="assignments">Assignments</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
@@ -201,47 +206,74 @@ export default function ManagerPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="training" className="space-y-6">
+          <TabsContent value="modules" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>Training Management</CardTitle>
-                    <CardDescription>Manage training programs and assignments</CardDescription>
+                    <CardTitle>Training Modules</CardTitle>
+                    <CardDescription>Manage your training content and modules</CardDescription>
                   </div>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
-                    Create Training
+                    Create Module
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-gray-500">
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>Module management features will be implemented here</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="import" className="space-y-6">
+            <DocumentImport />
+          </TabsContent>
+
+          <TabsContent value="tests" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Test Management</CardTitle>
+                    <CardDescription>Create and manage tests and assessments</CardDescription>
+                  </div>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Test
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-gray-500">
+                  <TestTube className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>Test management features will be implemented here</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="assignments" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Assignments</CardTitle>
+                    <CardDescription>Assign training modules and tests to employees</CardDescription>
+                  </div>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Assignment
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-gray-500">
                   <ClipboardList className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Training management features will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="documents" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Document Management</CardTitle>
-                    <CardDescription>Upload and organize training materials</CardDescription>
-                  </div>
-                  <Button>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Document
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Document management features will be implemented here</p>
+                  <p>Assignment management features will be implemented here</p>
                 </div>
               </CardContent>
             </Card>
