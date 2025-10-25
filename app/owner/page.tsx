@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsersPage } from "@/components/pages/users-page"
 import { AppBar } from "@/components/common/app-bar"
+import UserProgressReport from "@/components/reports/user-progress-report"
 import { 
   Users, 
   FileText, 
@@ -37,6 +38,7 @@ interface SavedAssignment {
   createdAt: string
   createdBy: string
   status: string
+  testScore?: number
 }
 
 interface SavedDocument {
@@ -67,7 +69,6 @@ export default function OwnerPage() {
       const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
       const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
       const documents = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
-      const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
       
       // Initialize with some sample documents if none exist
       if (documents.length === 0) {
@@ -212,18 +213,10 @@ export default function OwnerPage() {
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Reports & Analytics</CardTitle>
-                <CardDescription>Comprehensive system analytics and reporting</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Advanced reporting features will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
+            <UserProgressReport 
+              users={savedUsers} 
+              assignments={savedAssignments} 
+            />
 
           </TabsContent>
 

@@ -17,6 +17,7 @@ import {
 import { TestsPage } from "@/components/pages/tests-page"
 import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
+import UserProgressReport from "@/components/reports/user-progress-report"
 import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
 
 interface SavedTest {
@@ -69,6 +70,16 @@ export default function ManagerPage() {
   const searchParams = useSearchParams()
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
+  const [savedUsers, setSavedUsers] = useState<Array<{
+    id: string
+    name: string
+    job: string
+    email: string
+    role: string
+    createdAt: string
+    createdBy: string
+    status: string
+  }>>([])
   
   // Mock documents data - default documents
   const defaultDocuments = useMemo(() => [
@@ -115,6 +126,10 @@ export default function ManagerPage() {
     // Load saved assignments from localStorage
     const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
     setTimeout(() => setSavedAssignments(assignments), 0)
+    
+    // Load saved users from localStorage
+    const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
+    setTimeout(() => setSavedUsers(users), 0)
     
     // Initialize documents in localStorage if not exists
     const existingDocs = localStorage.getItem('savedDocuments')
@@ -268,18 +283,10 @@ export default function ManagerPage() {
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Reports & Analytics</CardTitle>
-                <CardDescription>Track training progress and performance metrics</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Reporting features will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
+            <UserProgressReport 
+              users={savedUsers} 
+              assignments={savedAssignments} 
+            />
 
           </TabsContent>
 
