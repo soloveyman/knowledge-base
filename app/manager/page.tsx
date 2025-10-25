@@ -15,7 +15,6 @@ import {
   Plus,
   LogOut,
   Building2,
-  BookOpen,
   TestTube,
   X
 } from "lucide-react"
@@ -42,11 +41,36 @@ interface SavedTest {
   createdBy: string
 }
 
+interface SavedAssignment {
+  id: string
+  name: string
+  description: string
+  document: {
+    id: number
+    name: string
+    type: string
+    uploadedAt: string
+  }
+  test: SavedTest
+  assignedUsers: Array<{
+    id: number
+    name: string
+    email: string
+    role: string
+    department: string
+  }>
+  dueDate: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
+
 export default function ManagerPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
+  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
@@ -69,6 +93,10 @@ export default function ManagerPage() {
     // Load saved tests from localStorage
     const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
     setSavedTests(tests)
+    
+    // Load saved assignments from localStorage
+    const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
+    setSavedAssignments(assignments)
   }, [])
 
   const handleSignOut = () => {
@@ -372,16 +400,71 @@ export default function ManagerPage() {
                     <CardTitle>Assignments</CardTitle>
                     <CardDescription>Assign training modules and tests to employees</CardDescription>
                   </div>
-                  <Button className="w-full sm:w-auto">
+                  <Button 
+                    className="w-full sm:w-auto"
+                    onClick={() => router.push('/assignment-builder')}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Assignment
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <ClipboardList className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Assignment management features will be implemented here</p>
+                <div className="space-y-3">
+                  {/* Assignment List */}
+                  <div className="space-y-3">
+                    {savedAssignments.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <ClipboardList className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>No assignments created yet</p>
+                        <p className="text-sm">Create your first assignment using the Assignment Builder</p>
+                      </div>
+                    ) : (
+                      savedAssignments.map((assignment) => (
+                        <div 
+                          key={assignment.id}
+                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                          onClick={() => console.log('Open assignment:', assignment.name)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-900">{assignment.name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {assignment.description || 'No description provided'}
+                            </p>
+                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+                              <span>Document: {assignment.document.name}</span>
+                              <span>Test: {assignment.test.title}</span>
+                              <span>Due: {new Date(assignment.dueDate).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 mt-2">
+                              <Badge variant="outline" className="text-xs">
+                                {assignment.assignedUsers.length} employee(s)
+                              </Badge>
+                              <Badge 
+                                variant={assignment.status === 'active' ? 'default' : 'secondary'} 
+                                className="text-xs"
+                              >
+                                {assignment.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-gray-400 hover:text-gray-600"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const updatedAssignments = savedAssignments.filter(a => a.id !== assignment.id)
+                              setSavedAssignments(updatedAssignments)
+                              localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
