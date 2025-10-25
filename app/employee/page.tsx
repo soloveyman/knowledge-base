@@ -96,23 +96,58 @@ export default function EmployeePage() {
     setUserAssignments(updatedUserAssignments)
   }
 
+  const handleReadDocument = (assignmentId: string) => {
+    // Find the assignment and get the document name
+    const assignment = assignments.find(a => a.id === assignmentId)
+    if (assignment && assignment.document) {
+      // Update assignment status to in_progress when user starts reading
+      const updatedAssignments = assignments.map(a => 
+        a.id === assignmentId 
+          ? { ...a, status: 'in_progress' }
+          : a
+      )
+      setAssignments(updatedAssignments)
+      localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
+      
+      // Update user assignments
+      const updatedUserAssignments = updatedAssignments.filter((a: Assignment) => 
+        a.assignedUsers.some((user: any) => user.email === session?.user?.email)
+      )
+      setUserAssignments(updatedUserAssignments)
+      
+      // Navigate to document reader
+      router.push(`/read/${assignment.document.id}`)
+    }
+  }
+
+  const handleTakeTest = (assignmentId: string) => {
+    // Find the assignment and get the test ID
+    const assignment = assignments.find(a => a.id === assignmentId)
+    if (assignment && assignment.test) {
+      // Navigate to test page
+      router.push(`/test/${assignment.test.id}`)
+    }
+  }
+
   // Transform assignment data for display
   const transformedAssignments = userAssignments.map(assignment => ({
     id: assignment.id,
     title: assignment.name,
-    type: assignment.test ? "test" : "document",
+    type: assignment.test && assignment.document ? "both" : assignment.test ? "test" : "document",
     status: assignment.status === 'active' ? 'pending' : assignment.status,
     progress: assignment.status === 'completed' ? 100 : 0,
     dueDate: new Date(assignment.dueDate).toISOString().split('T')[0],
-    description: assignment.description || `Complete ${assignment.test ? 'test' : 'document review'}`,
-    estimatedTime: assignment.test ? "15 min" : "30 min",
-    score: assignment.status === 'completed' ? Math.floor(Math.random() * 20) + 80 : undefined
+    description: assignment.description || `Complete ${assignment.test && assignment.document ? 'document review and test' : assignment.test ? 'test' : 'document review'}`,
+    estimatedTime: assignment.test && assignment.document ? "45 min" : assignment.test ? "15 min" : "30 min",
+    score: assignment.testScore || (assignment.status === 'completed' ? 85 : assignment.status === 'failed' ? 65 : undefined)
   }))
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-5 w-5 text-green-500" />
+      case 'failed':
+        return <AlertCircle className="h-5 w-5 text-red-500" />
       case 'in_progress':
         return <Clock className="h-5 w-5 text-blue-500" />
       case 'pending':
@@ -126,6 +161,8 @@ export default function EmployeePage() {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'failed':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
       case 'in_progress':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'pending':
@@ -136,6 +173,7 @@ export default function EmployeePage() {
   }
 
   const completedCount = transformedAssignments.filter(a => a.status === 'completed').length
+  const failedCount = transformedAssignments.filter(a => a.status === 'failed').length
   const inProgressCount = transformedAssignments.filter(a => a.status === 'in_progress').length
   const pendingCount = transformedAssignments.filter(a => a.status === 'pending').length
   const totalProgress = transformedAssignments.length > 0 
@@ -180,7 +218,7 @@ export default function EmployeePage() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
@@ -224,9 +262,20 @@ export default function EmployeePage() {
                   <p className="text-xs text-muted-foreground">Not started</p>
                 </CardContent>
               </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Failed</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">{failedCount}</div>
+                  <p className="text-xs text-muted-foreground">Need retake</p>
+                </CardContent>
+              </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Overall Progress</CardTitle>
@@ -246,37 +295,6 @@ export default function EmployeePage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Your latest learning activities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Completed Company Policies Review</p>
-                        <p className="text-xs text-muted-foreground">2 days ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Started Safety Procedures Training</p>
-                        <p className="text-xs text-muted-foreground">1 week ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Passed Data Security Awareness (85%)</p>
-                        <p className="text-xs text-muted-foreground">2 weeks ago</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
@@ -313,16 +331,9 @@ export default function EmployeePage() {
                           {assignment.description}
                         </p>
                         
-                        <div className="space-y-2 mb-4">
-                          <div className="flex justify-between text-sm">
-                            <span>Progress</span>
-                            <span>{assignment.progress}%</span>
-                          </div>
-                          <Progress value={assignment.progress} className="h-2" />
-                        </div>
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-center space-x-1">
                               {getStatusIcon(assignment.status)}
                               <span>Due: {assignment.dueDate}</span>
@@ -339,14 +350,46 @@ export default function EmployeePage() {
                             )}
                           </div>
                           
-                          <Button 
-                            size="sm" 
-                            disabled={assignment.status === 'completed'}
-                            onClick={() => handleCompleteAssignment(assignment.id)}
-                          >
-                            {assignment.status === 'completed' ? 'Completed' : 
-                             assignment.status === 'in_progress' ? 'Continue' : 'Start'}
-                          </Button>
+                          <div className="flex gap-2">
+                            {assignment.type === 'document' ? (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleReadDocument(assignment.id)}
+                                className="flex-1"
+                              >
+                                Read
+                              </Button>
+                            ) : assignment.type === 'test' ? (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleTakeTest(assignment.id)}
+                                className="flex-1"
+                              >
+                                Test
+                              </Button>
+                            ) : (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleReadDocument(assignment.id)}
+                                  className="flex-1"
+                                >
+                                  Read
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleTakeTest(assignment.id)}
+                                  className="flex-1"
+                                >
+                                  Test
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -367,7 +410,7 @@ export default function EmployeePage() {
                   <CardDescription>Your performance and completion rates</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="flex flex-wrap justify-between items-center gap-4">
                     <div className="text-center">
                       <div className="text-3xl font-bold text-green-600">{completedCount}</div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
@@ -379,6 +422,10 @@ export default function EmployeePage() {
                     <div className="text-center">
                       <div className="text-3xl font-bold text-yellow-600">{pendingCount}</div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-red-600">{failedCount}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Failed</div>
                     </div>
                   </div>
                 </CardContent>
