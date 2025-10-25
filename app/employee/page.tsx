@@ -146,7 +146,6 @@ export default function EmployeePage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Badge variant="secondary">Employee</Badge>
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
