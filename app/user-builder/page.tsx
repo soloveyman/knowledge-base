@@ -30,9 +30,7 @@ interface User {
 
 interface UserConfig {
   name: string
-  job: string
   email: string
-  password: string
   role: string
 }
 
@@ -42,9 +40,7 @@ export default function UserBuilderPage() {
   
   const [userConfig, setUserConfig] = useState<UserConfig>({
     name: "",
-    job: "",
     email: "",
-    password: "",
     role: ""
   })
   
@@ -74,18 +70,8 @@ export default function UserBuilderPage() {
 
   const loadUserForEditing = (userId: string) => {
     try {
-      const savedUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]')
-      const userToEdit = savedUsers.find((user: User) => user.id === userId)
-      
-      if (userToEdit) {
-        setUserConfig({
-          name: userToEdit.name,
-          job: userToEdit.job,
-          email: userToEdit.email,
-          password: "", // Don't load password for security
-          role: userToEdit.role
-        })
-      }
+      // TODO: Load user from API instead of localStorage
+      setError('User editing functionality coming soon!')
     } catch (error) {
       console.error('Error loading user for editing:', error)
       setError('Failed to load user for editing')
@@ -104,24 +90,12 @@ export default function UserBuilderPage() {
       setError("Name is required")
       return false
     }
-    if (!userConfig.job.trim()) {
-      setError("Job title is required")
-      return false
-    }
     if (!userConfig.email.trim()) {
       setError("Email is required")
       return false
     }
     if (!userConfig.email.includes('@')) {
       setError("Please enter a valid email address")
-      return false
-    }
-    if (!userConfig.password.trim() && !isEditMode) {
-      setError("Password is required")
-      return false
-    }
-    if (userConfig.password.trim() && userConfig.password.length < 6) {
-      setError("Password must be at least 6 characters")
       return false
     }
     if (!userConfig.role) {
@@ -138,44 +112,28 @@ export default function UserBuilderPage() {
     setError(null)
 
     try {
-      const existingUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]')
-
       if (isEditMode && editingUserId) {
-        // Update existing user
-        const userData = {
-          id: editingUserId,
-          name: userConfig.name,
-          job: userConfig.job,
-          email: userConfig.email,
-          password: userConfig.password || existingUsers.find((u: User) => u.id === editingUserId)?.password || "",
-          role: userConfig.role,
-          createdAt: existingUsers.find((u: User) => u.id === editingUserId)?.createdAt || new Date().toISOString(),
-          createdBy: session?.user?.name || 'Unknown',
-          status: 'active'
-        }
-
-        const updatedUsers = existingUsers.map((user: User) => 
-          user.id === editingUserId ? userData : user
-        )
-        localStorage.setItem('savedUsers', JSON.stringify(updatedUsers))
-
-        alert(`User updated successfully!`)
+        // TODO: Implement user update API
+        alert(`User update functionality coming soon!`)
       } else {
-        // Create new user
-        const userData = {
-          id: Date.now().toString(),
-          name: userConfig.name,
-          job: userConfig.job,
-          email: userConfig.email,
-          password: userConfig.password,
-          role: userConfig.role,
-          createdAt: new Date().toISOString(),
-          createdBy: session?.user?.name || 'Unknown',
-          status: 'active'
-        }
+        // Create new user via API
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: userConfig.name,
+            email: userConfig.email,
+            role: userConfig.role,
+          }),
+        })
 
-        existingUsers.push(userData)
-        localStorage.setItem('savedUsers', JSON.stringify(existingUsers))
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to create user')
+        }
 
         alert(`User created successfully!`)
       }
@@ -276,15 +234,6 @@ export default function UserBuilderPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="job">Job Title *</Label>
-                    <Input
-                      id="job"
-                      value={userConfig.job}
-                      onChange={(e) => handleInputChange('job', e.target.value)}
-                      placeholder="Enter job title"
-                    />
-                  </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address *</Label>
@@ -297,19 +246,6 @@ export default function UserBuilderPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="password">
-                      Password {!isEditMode && '*'}
-                      {isEditMode && <span className="text-sm text-gray-500 ml-1">(leave blank to keep current)</span>}
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={userConfig.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      placeholder={isEditMode ? "Enter new password (optional)" : "Enter password"}
-                    />
-                  </div>
 
                   <div className="space-y-2 md:col-span-1">
                     <Label htmlFor="role">Role *</Label>

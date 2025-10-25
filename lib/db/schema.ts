@@ -349,7 +349,7 @@ export const userGroupMembersRelations = relations(userGroupMembers, ({ one }) =
   }),
 }));
 
-export const assignmentsRelations = relations(assignments, ({ one }) => ({
+export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
   module: one(modules, {
     fields: [assignments.moduleId],
     references: [modules.id],

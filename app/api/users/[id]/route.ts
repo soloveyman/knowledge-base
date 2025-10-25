@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { db, users } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
 export async function DELETE(
   request: Request,
@@ -7,8 +9,17 @@ export async function DELETE(
   try {
     const { id } = params
 
-    // TODO: Replace with actual database delete operation
-    // For now, return success to indicate no mock data
+    // Check if user exists
+    const existingUser = await db.select().from(users).where(eq(users.id, id)).limit(1)
+    if (existingUser.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'User not found'
+      }, { status: 404 })
+    }
+
+    // Delete the user
+    await db.delete(users).where(eq(users.id, id))
 
     return NextResponse.json({
       success: true,
