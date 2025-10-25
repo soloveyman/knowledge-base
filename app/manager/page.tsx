@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,10 +22,32 @@ import {
 import { signOut } from "next-auth/react"
 import DocumentImport from "@/components/import/document-import"
 
+interface SavedTest {
+  id: string
+  title: string
+  type: string
+  difficulty: string
+  locale: string
+  questionCount: number
+  questions: Array<{
+    id: string
+    type: string
+    prompt: string
+    choices?: string[]
+    correct_answer?: string
+    explanation?: string
+  }>
+  sourceDocument: string
+  createdAt: string
+  createdBy: string
+}
+
 export default function ManagerPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [savedTests, setSavedTests] = useState<SavedTest[]>([])
+  
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
     const tab = searchParams.get('tab')
@@ -42,6 +64,12 @@ export default function ManagerPage() {
 
     // Role-based redirects are now handled by middleware
   }, [session, status, router])
+
+  useLayoutEffect(() => {
+    // Load saved tests from localStorage
+    const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
+    setSavedTests(tests)
+  }, [])
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/auth/signin" })
@@ -294,115 +322,42 @@ export default function ManagerPage() {
                 <div className="space-y-3">
                   {/* Test List */}
                   <div className="space-y-3">
-                    {/* Sample Test 1 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Open test: Food Safety Assessment')}
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Food Safety Assessment</h3>
-                        <p className="text-sm text-gray-500">Quiz • 15 questions • Created 2 days ago</p>
+                    {savedTests.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <TestTube className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>No tests created yet</p>
+                        <p className="text-sm">Create your first test using the Test Builder</p>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Food Safety Assessment')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Sample Test 2 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Open test: Customer Service Training')}
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Customer Service Training</h3>
-                        <p className="text-sm text-gray-500">Multiple Choice • 20 questions • Created 1 week ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Customer Service Training')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Sample Test 3 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Open test: Workplace Safety Quiz')}
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Workplace Safety Quiz</h3>
-                        <p className="text-sm text-gray-500">True/False • 12 questions • Created 3 days ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Workplace Safety Quiz')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Sample Test 4 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Open test: Company Policies Test')}
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Company Policies Test</h3>
-                        <p className="text-sm text-gray-500">Mixed Format • 25 questions • Created 5 days ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Company Policies Test')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Sample Test 5 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Open test: Data Security Awareness')}
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Data Security Awareness</h3>
-                        <p className="text-sm text-gray-500">Scenario-based • 18 questions • Created 1 day ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Data Security Awareness')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    ) : (
+                      savedTests.map((test) => (
+                        <div 
+                          key={test.id}
+                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                          onClick={() => console.log('Open test:', test.title)}
+                        >
+                          <div>
+                            <h3 className="font-medium text-gray-900">{test.title}</h3>
+                            <p className="text-sm text-gray-500">
+                              {test.type} • {test.questionCount} questions • Created {new Date(test.createdAt).toLocaleDateString()}
+                            </p>
+                            <p className="text-xs text-gray-400">Source: {test.sourceDocument}</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-gray-400 hover:text-gray-600"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const updatedTests = savedTests.filter(t => t.id !== test.id)
+                              setSavedTests(updatedTests)
+                              localStorage.setItem('savedTests', JSON.stringify(updatedTests))
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </CardContent>

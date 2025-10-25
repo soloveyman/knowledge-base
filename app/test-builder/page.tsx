@@ -8,23 +8,36 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   FileText, 
   X,
   TestTube,
-  Loader2
+  Loader2,
+  Trash2,
+  Plus,
+  Save
 } from "lucide-react"
+import type { 
+  Document, 
+  TestConfig, 
+  Context, 
+  GeneratedQuestion, 
+  QuestionType, 
+  DifficultyLevel, 
+  Locale 
+} from "@/types/test"
 
 // Mock documents data - in real app this would come from your docs API
-const mockDocuments = [
+const mockDocuments: Document[] = [
   { id: 1, name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago" },
   { id: 2, name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
   { id: 3, name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago" },
   { id: 4, name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago" }
 ]
 
-const questionTypes = [
+const questionTypes: QuestionType[] = [
   { value: "mcq", label: "Multiple Choice (Single)" },
   { value: "mcq_multi", label: "Multiple Choice (Multiple)" },
   { value: "tf", label: "True/False" },
@@ -35,13 +48,13 @@ const questionTypes = [
   { value: "mixed", label: "Mixed Types" }
 ]
 
-const difficultyLevels = [
+const difficultyLevels: DifficultyLevel[] = [
   { value: "easy", label: "Easy" },
   { value: "medium", label: "Medium" },
   { value: "hard", label: "Hard" }
 ]
 
-const locales = [
+const locales: Locale[] = [
   { value: "ru", label: "Russian" },
   { value: "en", label: "English" }
 ]
@@ -50,22 +63,24 @@ export default function TestBuilderPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   
-  const [selectedDocument, setSelectedDocument] = useState<any>(null)
-  const [testConfig, setTestConfig] = useState({
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
+  const [testConfig, setTestConfig] = useState<TestConfig>({
     count: 5,
     type: "mcq",
     difficulty: "medium",
     locale: "ru"
   })
-  const [context, setContext] = useState({
+  const [context, setContext] = useState<Context>({
     text: "",
     facts: [],
     steps: [],
     definitions: []
   })
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([])
+  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [aiProvider, setAiProvider] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -76,22 +91,153 @@ export default function TestBuilderPage() {
     }
   }, [session, status, router])
 
-  const handleDocumentSelect = (doc: any) => {
+  const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc)
-    // In real app, you would fetch document content here
+    // Load actual document content based on document name
+    const documentContent = getDocumentContent(doc.name)
     setContext(prev => ({
       ...prev,
-      text: `Content from ${doc.name} would be loaded here...`
+      text: documentContent,
+      facts: extractFacts(documentContent),
+      steps: extractSteps(documentContent),
+      definitions: extractDefinitions(documentContent)
     }))
   }
 
+  // Mock document content - in real app this would come from your document storage
+  const getDocumentContent = (docName: string) => {
+    const mockContent = {
+      "Ланч меню BS.docx": `Ланч меню BS
 
-  const generateHmacSignature = (data: any, secret: string) => {
-    const crypto = require('crypto')
-    return crypto
-      .createHmac('sha256', secret)
-      .update(JSON.stringify(data))
-      .digest('hex')
+Основные блюда:
+- Борщ украинский с мясом - 250₽
+- Солянка мясная - 280₽
+- Суп-пюре из тыквы - 220₽
+
+Горячие блюда:
+- Котлета по-киевски с картофельным пюре - 450₽
+- Рыба запеченная с овощами - 380₽
+- Плов узбекский - 320₽
+
+Салаты:
+- Цезарь с курицей - 180₽
+- Греческий салат - 160₽
+- Винегрет - 120₽
+
+Напитки:
+- Компот из сухофруктов - 80₽
+- Морс клюквенный - 90₽
+- Чай/кофе - 60₽`,
+
+      "Training Schedule.xlsx": `Расписание обучения персонала
+
+Понедельник:
+- 9:00-10:30 - Обучение новичков (основы работы)
+- 14:00-15:30 - Курс по технике безопасности
+
+Вторник:
+- 10:00-11:30 - Обучение работе с кассой
+- 15:00-16:30 - Курс по обслуживанию клиентов
+
+Среда:
+- 9:30-11:00 - Обучение приготовлению блюд
+- 14:30-16:00 - Курс по санитарным нормам
+
+Четверг:
+- 10:30-12:00 - Обучение работе с меню
+- 15:30-17:00 - Курс по работе в команде
+
+Пятница:
+- 9:00-10:30 - Повторение пройденного материала
+- 14:00-15:30 - Тестирование знаний`,
+
+      "Employee Handbook.docx": `Справочник сотрудника
+
+1. Общие положения
+- Рабочий день: 8:00-17:00
+- Обеденный перерыв: 12:00-13:00
+- Дресс-код: деловой стиль, чистая форма
+
+2. Обязанности сотрудников
+- Соблюдение трудовой дисциплины
+- Выполнение поручений руководства
+- Соблюдение техники безопасности
+- Поддержание чистоты рабочего места
+
+3. Права сотрудников
+- Право на своевременную оплату труда
+- Право на ежегодный отпуск
+- Право на безопасные условия труда
+- Право на профессиональное развитие
+
+4. Дисциплинарные меры
+- Замечание
+- Выговор
+- Увольнение`,
+
+      "Safety Guidelines.pdf": `Руководство по технике безопасности
+
+1. Общие требования безопасности
+- Все сотрудники должны пройти инструктаж по технике безопасности
+- Запрещается работать в состоянии алкогольного или наркотического опьянения
+- Обязательно использование средств индивидуальной защиты
+
+2. Безопасность на кухне
+- Осторожно обращаться с ножами и режущими предметами
+- Использовать прихватки при работе с горячими поверхностями
+- Следить за чистотой полов для предотвращения падений
+
+3. Безопасность при работе с оборудованием
+- Не использовать неисправное оборудование
+- Отключать электроприборы после работы
+- Соблюдать инструкции по эксплуатации
+
+4. Действия в чрезвычайных ситуациях
+- При пожаре: вызвать пожарную службу, эвакуировать людей
+- При травме: оказать первую помощь, вызвать скорую
+- При аварии: сообщить руководству, зафиксировать происшествие`
+    }
+    
+    return mockContent[docName as keyof typeof mockContent] || `Содержимое документа ${docName} не найдено.`
+  }
+
+  // Extract facts from document content
+  const extractFacts = (content: string) => {
+    const lines = content.split('\n').filter(line => line.trim())
+    return lines.slice(0, 5) // Take first 5 non-empty lines as facts
+  }
+
+  // Extract process steps from document content
+  const extractSteps = (content: string) => {
+    const lines = content.split('\n')
+    return lines
+      .filter(line => line.trim().match(/^\d+\.|^-\s|^\*\s/)) // Lines starting with numbers, dashes, or asterisks
+      .slice(0, 5)
+      .map(line => line.trim())
+  }
+
+  // Extract definitions from document content
+  const extractDefinitions = (content: string) => {
+    const lines = content.split('\n')
+    return lines
+      .filter(line => line.includes(':') && line.length > 10) // Lines with colons (likely definitions)
+      .slice(0, 3)
+      .map(line => line.trim())
+  }
+
+
+  const generateHmacSignature = (data: Record<string, unknown>, secret: string) => {
+    // Note: In a real app, you'd use a proper crypto library
+    // This is just a placeholder for the HMAC signature
+    // Simple hash-like string generation that handles Unicode
+    const dataString = JSON.stringify(data) + secret
+    let hash = 0
+    for (let i = 0; i < dataString.length; i++) {
+      const char = dataString.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(16)
   }
 
   const handleGenerateTest = async () => {
@@ -115,9 +261,9 @@ export default function TestBuilderPage() {
         sourceRefs: [selectedDocument.name]
       }
 
-      // Generate HMAC signature
+      // Generate HMAC signature (placeholder for demo)
       const hmacSecret = process.env.NEXT_PUBLIC_HMAC_SECRET || "test-secret-key"
-      const signature = generateHmacSignature(requestData, hmacSecret)
+      generateHmacSignature(requestData, hmacSecret) // Signature generated but not used in demo
 
       const response = await fetch('/api/generate-test', {
         method: 'POST',
@@ -135,6 +281,7 @@ export default function TestBuilderPage() {
       
       if (result.ok) {
         setGeneratedQuestions(result.questions || [])
+        setAiProvider(result.provider || 'unknown')
       } else {
         throw new Error(result.error || 'Failed to generate questions')
       }
@@ -147,6 +294,105 @@ export default function TestBuilderPage() {
 
   const handleClose = () => {
     router.push('/manager?tab=tests')
+  }
+
+
+  const handleUpdateQuestionField = (questionId: string, field: keyof GeneratedQuestion, value: string | string[]) => {
+    setGeneratedQuestions(prev => 
+      prev.map(q => q.id === questionId ? { ...q, [field]: value } : q)
+    )
+  }
+
+  const handleUpdateChoice = (questionId: string, choiceIndex: number, value: string) => {
+    setGeneratedQuestions(prev => 
+      prev.map(q => 
+        q.id === questionId 
+          ? { 
+              ...q, 
+              choices: q.choices?.map((choice: string, index: number) => 
+                index === choiceIndex ? value : choice
+              ) || []
+            } 
+          : q
+      )
+    )
+  }
+
+  const handleDeleteQuestion = (questionId: string) => {
+    setGeneratedQuestions(prev => prev.filter(q => q.id !== questionId))
+  }
+
+  const handleDeleteChoice = (questionId: string, choiceIndex: number) => {
+    setGeneratedQuestions(prev => 
+      prev.map(q => 
+        q.id === questionId 
+          ? { 
+              ...q, 
+              choices: q.choices?.filter((_: string, index: number) => index !== choiceIndex) || []
+            } 
+          : q
+      )
+    )
+  }
+
+  const handleAddChoice = (questionId: string) => {
+    setGeneratedQuestions(prev => 
+      prev.map(q => 
+        q.id === questionId 
+          ? { 
+              ...q, 
+              choices: [...(q.choices || []), "New choice"]
+            } 
+          : q
+      )
+    )
+  }
+
+  const handleSaveTest = async () => {
+    if (generatedQuestions.length === 0) {
+      setError("No questions to save")
+      return
+    }
+
+    if (!selectedDocument) {
+      setError("Please select a document")
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      // Create test data structure
+      const testData = {
+        id: Date.now().toString(), // Simple ID generation
+        title: `${selectedDocument.name} - Test`,
+        type: testConfig.type,
+        difficulty: testConfig.difficulty,
+        locale: testConfig.locale,
+        questionCount: generatedQuestions.length,
+        questions: generatedQuestions,
+        sourceDocument: selectedDocument.name,
+        createdAt: new Date().toISOString(),
+        createdBy: session?.user?.name || 'Unknown'
+      }
+
+      // In a real app, you would save this to your database
+      // For now, we'll save to localStorage as a demo
+      const existingTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
+      existingTests.push(testData)
+      localStorage.setItem('savedTests', JSON.stringify(existingTests))
+
+      // Show success message
+      alert(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
+      
+      // Optionally redirect to tests list
+      router.push('/manager?tab=tests')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save test')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (status === "loading") {
@@ -320,10 +566,36 @@ export default function TestBuilderPage() {
             {generatedQuestions.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Generated Questions</CardTitle>
-                  <CardDescription>
-                    {generatedQuestions.length} questions generated successfully
-                  </CardDescription>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div>
+                      <CardTitle>Generated Questions</CardTitle>
+                      <CardDescription>
+                        {generatedQuestions.length} questions generated successfully
+                        {aiProvider && (
+                          <span className="ml-2 text-blue-600">
+                            (via {aiProvider === 'mock' ? 'Mock Data' : aiProvider.toUpperCase()})
+                          </span>
+                        )}
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      onClick={handleSaveTest}
+                      disabled={isSaving}
+                      className="w-full sm:w-auto"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save Test
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -331,23 +603,87 @@ export default function TestBuilderPage() {
                       <div key={question.id || index} className="p-4 border rounded-lg">
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-medium">Question {index + 1}</h4>
-                          <Badge variant="outline">{question.type}</Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline">{question.type}</Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteQuestion(question.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-700 mb-3">{question.prompt}</p>
-                        {question.choices && (
-                          <div className="space-y-1">
-                            {question.choices.map((choice: string, choiceIndex: number) => (
-                              <div key={choiceIndex} className="text-sm text-gray-600">
-                                {String.fromCharCode(65 + choiceIndex)}. {choice}
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <Label>Question Text</Label>
+                            <Textarea
+                              value={question.prompt}
+                              onChange={(e) => handleUpdateQuestionField(question.id, 'prompt', e.target.value)}
+                              className="w-full"
+                              rows={3}
+                            />
+                          </div>
+                          
+                          {question.choices && question.choices.length > 0 && (
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <Label>Answer Choices</Label>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAddChoice(question.id)}
+                                >
+                                  <Plus className="h-4 w-4 mr-1" />
+                                  Add Choice
+                                </Button>
                               </div>
-                            ))}
+                              <div className="space-y-2">
+                                {question.choices.map((choice: string, choiceIndex: number) => (
+                                  <div key={choiceIndex} className="flex items-center space-x-2">
+                                    <span className="text-sm font-medium w-6">
+                                      {String.fromCharCode(65 + choiceIndex)}.
+                                    </span>
+                                    <Input
+                                      value={choice}
+                                      onChange={(e) => handleUpdateChoice(question.id, choiceIndex, e.target.value)}
+                                      className="flex-1"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteChoice(question.id, choiceIndex)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div>
+                            <Label>Correct Answer</Label>
+                            <Input
+                              value={question.correct_answer || ''}
+                              onChange={(e) => handleUpdateQuestionField(question.id, 'correct_answer', e.target.value)}
+                              placeholder="e.g., A, B, C, or D"
+                              className="w-full"
+                            />
                           </div>
-                        )}
-                        {question.explanation && (
-                          <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                            <strong>Explanation:</strong> {question.explanation}
+                          
+                          <div>
+                            <Label>Explanation</Label>
+                            <Textarea
+                              value={question.explanation || ''}
+                              onChange={(e) => handleUpdateQuestionField(question.id, 'explanation', e.target.value)}
+                              className="w-full"
+                              rows={2}
+                              placeholder="Explanation for the correct answer..."
+                            />
                           </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
