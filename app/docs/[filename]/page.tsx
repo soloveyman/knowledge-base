@@ -46,9 +46,9 @@ export default function DocumentViewer() {
   }, [session, status, router, filename])
 
   const handleClose = () => {
-    router.back()
+    // Navigate back to the manager page with docs tab active
+    router.push('/manager?tab=docs')
   }
-
 
   if (status === "loading" || loading) {
     return (

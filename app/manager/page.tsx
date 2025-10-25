@@ -1,8 +1,8 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,12 @@ import DocumentImport from "@/components/import/document-import"
 export default function ManagerPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Get initial tab from URL parameter using useMemo to prevent re-renders
+  const defaultTab = useMemo(() => {
+    const tab = searchParams.get('tab')
+    return tab && ['overview', 'import', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
+  }, [searchParams])
 
   useEffect(() => {
     if (status === "loading") return
@@ -86,7 +92,7 @@ export default function ManagerPage() {
 
 
         {/* Main Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="import">Import</TabsTrigger>
