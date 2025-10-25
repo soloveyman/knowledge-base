@@ -2,26 +2,61 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { UsersPage } from "@/components/pages/users-page"
 import { 
   Users, 
   FileText, 
   ClipboardList, 
   BarChart3, 
-  Plus,
   LogOut,
   Settings,
   Crown
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 
+interface SavedUser {
+  id: string
+  name: string
+  job: string
+  email: string
+  role: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
+
+interface SavedAssignment {
+  id: string
+  name: string
+  description: string
+  document: any
+  test: any
+  assignedUsers: any[]
+  dueDate: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
+
+interface SavedDocument {
+  id: string
+  name: string
+  type: string
+  uploadedAt: string
+}
+
 export default function OwnerPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  
+  const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
+  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
+  const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([])
+  const [savedTests, setSavedTests] = useState<any[]>([])
 
   useEffect(() => {
     if (status === "loading") return
@@ -31,8 +66,50 @@ export default function OwnerPage() {
       return
     }
 
+    // Load data from localStorage
+    if (typeof window !== 'undefined') {
+      const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
+      const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
+      const documents = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
+      const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
+      
+      // Initialize with some sample documents if none exist
+      if (documents.length === 0) {
+        const sampleDocuments = [
+          { id: "1", name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "2 hours ago" },
+          { id: "2", name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
+          { id: "3", name: "Safety Guidelines.docx", type: "DOCX", uploadedAt: "3 days ago" }
+        ]
+        localStorage.setItem('savedDocuments', JSON.stringify(sampleDocuments))
+        setSavedDocuments(sampleDocuments)
+      } else {
+        setSavedDocuments(documents)
+      }
+      
+      setSavedUsers(users)
+      setSavedAssignments(assignments)
+      setSavedTests(tests)
+    }
+
     // Role-based redirects are now handled by middleware
   }, [session, status, router])
+
+  // User handlers
+  const handleDeleteUser = (id: string) => {
+    const updatedUsers = savedUsers.filter(u => u.id !== id)
+    setSavedUsers(updatedUsers)
+    localStorage.setItem('savedUsers', JSON.stringify(updatedUsers))
+  }
+
+  const handleViewUser = (id: string) => {
+    console.log('View user:', id)
+  }
+
+  const handleEditUser = (id: string) => {
+    // Store the user ID for editing and redirect to user builder
+    localStorage.setItem('editingUserId', id)
+    router.push('/user-builder')
+  }
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/auth/signin" })
@@ -101,8 +178,10 @@ export default function OwnerPage() {
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">47</div>
-                  <p className="text-xs text-muted-foreground">+3 from last month</p>
+                  <div className="text-2xl font-bold">{savedUsers.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedUsers.filter(u => u.role === 'manager').length} managers, {savedUsers.filter(u => u.role === 'employee').length} employees
+                  </p>
                 </CardContent>
               </Card>
               
@@ -112,8 +191,10 @@ export default function OwnerPage() {
                   <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">12</div>
-                  <p className="text-xs text-muted-foreground">5 completed this week</p>
+                  <div className="text-2xl font-bold">{savedAssignments.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedAssignments.filter(a => a.status === 'active').length} active, {savedAssignments.filter(a => a.status === 'completed').length} completed
+                  </p>
                 </CardContent>
               </Card>
               
@@ -123,8 +204,27 @@ export default function OwnerPage() {
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">342</div>
-                  <p className="text-xs text-muted-foreground">+28 this month</p>
+                  <div className="text-2xl font-bold">{savedDocuments.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedDocuments.filter(d => d.type === 'DOCX').length} DOCX, {savedDocuments.filter(d => d.type === 'XLSX').length} XLSX
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {savedAssignments.length > 0 
+                      ? Math.round((savedAssignments.filter(a => a.status === 'completed').length / savedAssignments.length) * 100)
+                      : 0}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedAssignments.filter(a => a.status === 'completed').length} of {savedAssignments.length} completed
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -145,26 +245,12 @@ export default function OwnerPage() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                  <div>
-                    <CardTitle>User Management</CardTitle>
-                    <CardDescription>Manage all users, roles, and permissions</CardDescription>
-                  </div>
-                  <Button className="w-full sm:w-auto">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add User
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>User management features will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
+            <UsersPage
+              users={savedUsers}
+              onDeleteUser={handleDeleteUser}
+              onViewUser={handleViewUser}
+              onEditUser={handleEditUser}
+            />
           </TabsContent>
 
 

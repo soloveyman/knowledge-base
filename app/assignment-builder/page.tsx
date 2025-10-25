@@ -50,7 +50,7 @@ interface AssignmentConfig {
   name: string
   documentId: string
   testId: string
-  selectedUsers: number[]
+  selectedUsers: string[]
   dueDate: Date | undefined
   description: string
 }
@@ -89,6 +89,7 @@ export default function AssignmentBuilderPage() {
   })
   
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
+  const [savedUsers, setSavedUsers] = useState<any[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
@@ -140,9 +141,13 @@ export default function AssignmentBuilderPage() {
     // Load saved tests from localStorage
     const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
     setSavedTests(tests)
+    
+    // Load saved users from localStorage
+    const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
+    setSavedUsers(users)
   }, [])
 
-  const handleUserToggle = (userId: number) => {
+  const handleUserToggle = (userId: string) => {
     setAssignmentConfig(prev => ({
       ...prev,
       selectedUsers: prev.selectedUsers.includes(userId)
@@ -154,7 +159,7 @@ export default function AssignmentBuilderPage() {
   const handleSelectAllUsers = () => {
     setAssignmentConfig(prev => ({
       ...prev,
-      selectedUsers: mockUsers.map(user => user.id)
+      selectedUsers: savedUsers.map(user => user.id)
     }))
   }
 
@@ -197,7 +202,7 @@ export default function AssignmentBuilderPage() {
     try {
       const selectedDocument = mockDocuments.find(doc => doc.id.toString() === assignmentConfig.documentId)
       const selectedTest = savedTests.find(test => test.id === assignmentConfig.testId)
-      const selectedUsersData = mockUsers.filter(user => assignmentConfig.selectedUsers.includes(user.id))
+      const selectedUsersData = savedUsers.filter(user => assignmentConfig.selectedUsers.includes(user.id))
 
       const existingAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
 
@@ -450,7 +455,7 @@ export default function AssignmentBuilderPage() {
                       variant="outline"
                       size="sm"
                       onClick={handleSelectAllUsers}
-                      disabled={assignmentConfig.selectedUsers.length === mockUsers.length}
+                      disabled={assignmentConfig.selectedUsers.length === savedUsers.length}
                     >
                       Select All
                     </Button>
@@ -467,7 +472,7 @@ export default function AssignmentBuilderPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {mockUsers.map((user) => (
+                  {savedUsers.map((user) => (
                     <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                       <Checkbox
                         id={`user-${user.id}`}
@@ -490,7 +495,7 @@ export default function AssignmentBuilderPage() {
                             {user.role}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            {user.department}
+                            {user.job}
                           </Badge>
                         </div>
                       </div>
