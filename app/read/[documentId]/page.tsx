@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DocumentTypeBadge } from "@/lib/badges"
 import { 
   FileText, 
   X,
@@ -269,9 +270,7 @@ export default function DocumentReaderPage() {
                       {assignmentData.description}
                     </CardDescription>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {documentData.type}
-                  </Badge>
+                  <DocumentTypeBadge type={documentData.type} className="text-xs" />
                 </div>
               </CardHeader>
               <CardContent>

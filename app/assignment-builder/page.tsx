@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DocumentTypeBadge, CountBadge, RoleBadge } from "@/lib/badges"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -343,7 +344,7 @@ export default function AssignmentBuilderPage() {
                           <div className="flex items-center space-x-2">
                             <FileText className="h-4 w-4" />
                             <span>{doc.name}</span>
-                            <Badge variant="outline" className="ml-2">{doc.type}</Badge>
+                            <DocumentTypeBadge type={doc.type} className="ml-2" />
                           </div>
                         </SelectItem>
                       ))}
@@ -369,7 +370,7 @@ export default function AssignmentBuilderPage() {
                             <div className="flex items-center space-x-2">
                               <TestTube className="h-4 w-4" />
                               <span>{test.title}</span>
-                              <Badge variant="outline" className="ml-2">{test.questionCount} questions</Badge>
+                              <CountBadge type="questions" count={test.questionCount} className="ml-2" />
                             </div>
                           </SelectItem>
                         ))
@@ -491,9 +492,7 @@ export default function AssignmentBuilderPage() {
                         </div>
                         <p className="text-xs text-gray-500">{user.email}</p>
                         <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {user.role}
-                          </Badge>
+                          <RoleBadge role={user.role} className="text-xs" />
                           <Badge variant="secondary" className="text-xs">
                             {user.job}
                           </Badge>

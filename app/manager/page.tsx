@@ -189,7 +189,7 @@ export default function ManagerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppBar role="manager" userName={session.user?.name} />
+      <AppBar role="manager" />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -303,7 +303,7 @@ export default function ManagerPage() {
                     >
                       <div>
                         <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                        <p className="text-sm text-gray-500">{doc.type} • Uploaded {doc.uploadedAt}</p>
+                        <p className="text-sm text-gray-500">Uploaded {doc.uploadedAt}</p>
                       </div>
                       <DeleteConfirmation
                         onConfirm={() => handleDeleteDocument(doc.id)}

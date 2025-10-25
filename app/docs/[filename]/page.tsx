@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DocumentTypeBadge } from "@/lib/badges"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { 
   FileText, 
@@ -104,7 +105,7 @@ export default function DocumentViewer() {
                       <div>
                         <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">File Type</label>
                         <div className="mt-1">
-                          <Badge variant="secondary">{documentData?.type}</Badge>
+                          <DocumentTypeBadge type={documentData?.type} />
                         </div>
                       </div>
                       

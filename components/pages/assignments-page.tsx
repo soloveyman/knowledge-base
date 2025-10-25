@@ -60,7 +60,9 @@ export function AssignmentsPage({
       { label: `${assignment.assignedUsers.length} employee(s)`, variant: "outline" as const },
       { 
         label: assignment.status, 
-        variant: assignment.status === 'active' ? "default" as const : "secondary" as const 
+        variant: assignment.status === 'active' ? "default" as const : 
+                assignment.status === 'failed' ? "destructive" as const : 
+                "secondary" as const 
       }
     ],
     onClick: () => onViewAssignment(assignment.id),

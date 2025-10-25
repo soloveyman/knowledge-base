@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { PlanBadge, StatusBadge, InvoiceStatusBadge } from "@/lib/badges"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
@@ -249,15 +250,11 @@ export default function SubscriptionManager({
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Plan:</span>
-                    <Badge className={getPlanColor(currentSubscription.planName)}>
-                      {currentSubscription.planName}
-                    </Badge>
+                    <PlanBadge plan={currentSubscription.planName} />
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Status:</span>
-                    <Badge variant={currentSubscription.status === 'active' ? 'default' : 'secondary'}>
-                      {currentSubscription.status}
-                    </Badge>
+                    <StatusBadge status={currentSubscription.status} />
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Next billing:</span>
@@ -517,9 +514,7 @@ export default function SubscriptionManager({
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="font-medium">{invoice.amount}</div>
-                    <Badge variant="outline" className="bg-green-50 text-green-700">
-                      {invoice.status}
-                    </Badge>
+                    <InvoiceStatusBadge status={invoice.status} />
                   </div>
                   <Button variant="outline" size="sm">
                     <Download className="h-4 w-4" />

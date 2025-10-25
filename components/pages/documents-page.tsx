@@ -29,7 +29,7 @@ export function DocumentsPage({
   const documentItems = documents.map((doc) => ({
     id: doc.id,
     title: doc.name,
-    subtitle: `${doc.type} • Uploaded ${doc.uploadedAt}`,
+    subtitle: `Uploaded ${doc.uploadedAt}`,
     onClick: () => onViewDocument(doc.name),
     onDelete: () => onDeleteDocument(doc.id)
   }))

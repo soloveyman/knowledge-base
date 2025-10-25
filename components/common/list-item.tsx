@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { getStatusBadge, getRoleBadge, getCountBadge, getDifficultyBadge, getLocaleBadge } from "@/lib/badges"
 import { DeleteConfirmation } from "./delete-confirmation"
 import { X, Edit } from "lucide-react"
 
@@ -42,7 +43,7 @@ export function ListItem({
           <p className="text-sm text-gray-500">{subtitle}</p>
         )}
         {metadata.length > 0 && (
-          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 mt-2 text-xs text-gray-400">
             {metadata.map((item, index) => (
               <span key={index}>{item}</span>
             ))}
@@ -50,15 +51,42 @@ export function ListItem({
         )}
         {badges.length > 0 && (
           <div className="flex items-center space-x-2 mt-2">
-            {badges.map((badge, index) => (
-              <Badge 
-                key={index}
-                variant={badge.variant || "outline"} 
-                className="text-xs"
-              >
-                {badge.label}
-              </Badge>
-            ))}
+            {badges.map((badge, index) => {
+              // Try to determine badge type and use appropriate config
+              let config = badge
+              
+              // Check if it's a status badge
+              if (badge.label && ['active', 'inactive', 'failed', 'pending', 'completed', 'draft', 'published', 'archived'].includes(badge.label.toLowerCase())) {
+                config = getStatusBadge(badge.label)
+              }
+              // Check if it's a role badge
+              else if (badge.label && ['employee', 'manager', 'owner', 'admin'].includes(badge.label.toLowerCase())) {
+                config = getRoleBadge(badge.label)
+              }
+              // Check if it's a difficulty badge
+              else if (badge.label && ['easy', 'medium', 'hard'].includes(badge.label.toLowerCase())) {
+                config = getDifficultyBadge(badge.label)
+              }
+              // Check if it's a locale badge
+              else if (badge.label && ['en', 'es', 'fr', 'de', 'english', 'spanish', 'french', 'german'].includes(badge.label.toLowerCase())) {
+                config = getLocaleBadge(badge.label)
+              }
+              // Check if it's a count badge
+              else if (badge.label && badge.label.includes('employee')) {
+                const count = parseInt(badge.label.match(/\d+/)?.[0] || '0')
+                config = getCountBadge('employees', count)
+              }
+              
+              return (
+                <Badge 
+                  key={index}
+                  variant={config.variant || "outline"} 
+                  className="text-xs"
+                >
+                  {config.label}
+                </Badge>
+              )
+            })}
           </div>
         )}
       </div>

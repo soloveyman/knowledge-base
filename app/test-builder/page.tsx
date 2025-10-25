@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DocumentTypeBadge, TestTypeBadge } from "@/lib/badges"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -563,7 +564,7 @@ export default function TestBuilderPage() {
                           <div className="flex items-center space-x-2">
                             <FileText className="h-4 w-4" />
                             <span>{doc.name}</span>
-                            <Badge variant="outline" className="ml-2">{doc.type}</Badge>
+                            <DocumentTypeBadge type={doc.type} className="ml-2" />
                           </div>
                         </SelectItem>
                       ))}
@@ -733,7 +734,7 @@ export default function TestBuilderPage() {
                             )}
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge variant="outline">{question.type}</Badge>
+                            <TestTypeBadge type={question.type} />
                             <Button
                               variant="ghost"
                               size="sm"
