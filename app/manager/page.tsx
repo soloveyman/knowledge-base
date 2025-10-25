@@ -281,16 +281,129 @@ export default function ManagerPage() {
                     <CardTitle>Test Management</CardTitle>
                     <CardDescription>Create and manage tests and assessments</CardDescription>
                   </div>
-                  <Button className="w-full sm:w-auto">
+                  <Button 
+                    className="w-full sm:w-auto"
+                    onClick={() => router.push('/test-builder')}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Test
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <TestTube className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Test management features will be implemented here</p>
+                <div className="space-y-3">
+                  {/* Test List */}
+                  <div className="space-y-3">
+                    {/* Sample Test 1 */}
+                    <div 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => console.log('Open test: Food Safety Assessment')}
+                    >
+                      <div>
+                        <h3 className="font-medium text-gray-900">Food Safety Assessment</h3>
+                        <p className="text-sm text-gray-500">Quiz • 15 questions • Created 2 days ago</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-400 hover:text-gray-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          console.log('Delete: Food Safety Assessment')
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Sample Test 2 */}
+                    <div 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => console.log('Open test: Customer Service Training')}
+                    >
+                      <div>
+                        <h3 className="font-medium text-gray-900">Customer Service Training</h3>
+                        <p className="text-sm text-gray-500">Multiple Choice • 20 questions • Created 1 week ago</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-400 hover:text-gray-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          console.log('Delete: Customer Service Training')
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Sample Test 3 */}
+                    <div 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => console.log('Open test: Workplace Safety Quiz')}
+                    >
+                      <div>
+                        <h3 className="font-medium text-gray-900">Workplace Safety Quiz</h3>
+                        <p className="text-sm text-gray-500">True/False • 12 questions • Created 3 days ago</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-400 hover:text-gray-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          console.log('Delete: Workplace Safety Quiz')
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Sample Test 4 */}
+                    <div 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => console.log('Open test: Company Policies Test')}
+                    >
+                      <div>
+                        <h3 className="font-medium text-gray-900">Company Policies Test</h3>
+                        <p className="text-sm text-gray-500">Mixed Format • 25 questions • Created 5 days ago</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-400 hover:text-gray-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          console.log('Delete: Company Policies Test')
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Sample Test 5 */}
+                    <div 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => console.log('Open test: Data Security Awareness')}
+                    >
+                      <div>
+                        <h3 className="font-medium text-gray-900">Data Security Awareness</h3>
+                        <p className="text-sm text-gray-500">Scenario-based • 18 questions • Created 1 day ago</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-gray-400 hover:text-gray-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          console.log('Delete: Data Security Awareness')
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
