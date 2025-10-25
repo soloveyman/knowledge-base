@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   Users, 
   FileText, 
@@ -15,9 +17,12 @@ import {
   Plus,
   LogOut,
   Building2,
-  Upload,
   BookOpen,
-  TestTube
+  TestTube,
+  Eye,
+  Download,
+  X,
+  RefreshCw
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import DocumentImport from "@/components/import/document-import"
@@ -59,17 +64,17 @@ export default function ManagerPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600 mr-3" />
-              <h1 className="text-xl font-semibold text-gray-900">Manager Dashboard</h1>
+            <div className="flex items-center min-w-0">
+              <Building2 className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Manager Dashboard</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 hidden sm:inline-flex">
                 Manager
               </Badge>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="text-xs sm:text-sm">
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sign Out</span>
               </Button>
             </div>
           </div>
@@ -136,85 +141,59 @@ export default function ManagerPage() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="modules">Modules</TabsTrigger>
             <TabsTrigger value="import">Import</TabsTrigger>
+            <TabsTrigger value="docs">Docs</TabsTrigger>
             <TabsTrigger value="tests">Tests</TabsTrigger>
-            <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            <TabsTrigger value="assignments">Assign</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Latest training activities and updates</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">John Doe completed &quot;Food Safety Training&quot;</p>
-                        <p className="text-xs text-gray-500">2 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">New document uploaded: &quot;Menu Guidelines&quot;</p>
-                        <p className="text-xs text-gray-500">4 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Sarah Wilson started &quot;Customer Service Training&quot;</p>
-                        <p className="text-xs text-gray-500">6 hours ago</p>
-                      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Latest training activities and updates</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">John Doe completed &quot;Food Safety Training&quot;</p>
+                      <p className="text-xs text-gray-500">2 hours ago</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Common management tasks</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Training Material
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create New Test
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Users className="h-4 w-4 mr-2" />
-                    Assign Training
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Reports
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">New document uploaded: &quot;Menu Guidelines&quot;</p>
+                      <p className="text-xs text-gray-500">4 hours ago</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Sarah Wilson started &quot;Customer Service Training&quot;</p>
+                      <p className="text-xs text-gray-500">6 hours ago</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="modules" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>Training Modules</CardTitle>
                     <CardDescription>Manage your training content and modules</CardDescription>
                   </div>
-                  <Button>
+                  <Button className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Module
                   </Button>
@@ -233,15 +212,166 @@ export default function ManagerPage() {
             <DocumentImport />
           </TabsContent>
 
+          <TabsContent value="docs" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                  <div>
+                    <CardTitle>Document Library</CardTitle>
+                    <CardDescription>Manage and view all uploaded documents</CardDescription>
+                  </div>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Upload Document
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search and Filter */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <Input
+                        type="text"
+                        placeholder="Search documents..."
+                      />
+                    </div>
+                    <Select>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all-types">All Types</SelectItem>
+                        <SelectItem value="docx">DOCX</SelectItem>
+                        <SelectItem value="xlsx">XLSX</SelectItem>
+                        <SelectItem value="pdf">PDF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all-status">All Status</SelectItem>
+                        <SelectItem value="parsed">Parsed</SelectItem>
+                        <SelectItem value="processing">Processing</SelectItem>
+                        <SelectItem value="error">Error</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Document List */}
+                  <div className="space-y-3">
+                    {/* Sample Document 1 */}
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-4">
+                        <FileText className="h-8 w-8 text-blue-500" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Ланч меню BS.docx</h3>
+                          <p className="text-sm text-gray-500">DOCX • 14.4 KB • Uploaded 2 hours ago</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Parsed
+                        </Badge>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Sample Document 2 */}
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-4">
+                        <FileText className="h-8 w-8 text-green-500" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Training Schedule.xlsx</h3>
+                          <p className="text-sm text-gray-500">XLSX • 8.2 KB • Uploaded 1 day ago</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Parsed
+                        </Badge>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Sample Document 3 - Processing */}
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-4">
+                        <FileText className="h-8 w-8 text-yellow-500" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Employee Handbook.docx</h3>
+                          <p className="text-sm text-gray-500">DOCX • 2.1 MB • Uploaded 5 minutes ago</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                          Processing
+                        </Badge>
+                        <div className="flex items-center space-x-1">
+                          <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                          <span className="text-sm text-gray-500">Parsing...</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sample Document 4 - Error */}
+                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-4">
+                        <FileText className="h-8 w-8 text-red-500" />
+                        <div>
+                          <h3 className="font-medium text-gray-900">Corrupted File.pdf</h3>
+                          <p className="text-sm text-gray-500">PDF • 1.2 MB • Uploaded 1 hour ago</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="destructive">
+                          Error
+                        </Badge>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Empty State */}
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No documents found matching your criteria</p>
+                    <p className="text-sm">Try adjusting your search or upload a new document</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="tests" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>Test Management</CardTitle>
                     <CardDescription>Create and manage tests and assessments</CardDescription>
                   </div>
-                  <Button>
+                  <Button className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Test
                   </Button>
@@ -259,12 +389,12 @@ export default function ManagerPage() {
           <TabsContent value="assignments" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>Assignments</CardTitle>
                     <CardDescription>Assign training modules and tests to employees</CardDescription>
                   </div>
-                  <Button>
+                  <Button className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Assignment
                   </Button>

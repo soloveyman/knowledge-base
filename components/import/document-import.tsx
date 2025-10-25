@@ -16,6 +16,7 @@ import {
   Download,
   RefreshCw
 } from "lucide-react"
+import { parseDocument, UnsupportedFileTypeError, FileReadError, ParseError, ParsedContent } from "@/lib/parsers"
 
 interface ParsingLog {
   level: 'info' | 'warning' | 'error'
@@ -24,24 +25,6 @@ interface ParsingLog {
   cell?: string
 }
 
-interface ParsedContent {
-  sections: Array<{
-    title: string
-    level: number
-    content: string
-    order: number
-  }>
-  tables: Array<{
-    title: string
-    headers: string[]
-    rows: string[][]
-  }>
-  metadata: {
-    totalSections: number
-    totalTables: number
-    wordCount: number
-  }
-}
 
 interface DocumentImportProps {
   onImportComplete?: (moduleId: string) => void
@@ -127,70 +110,53 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
       }, 200)
 
       // Simulate file upload
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 1000))
       clearInterval(progressInterval)
       setUploadProgress(100)
 
       setParsingStatus('parsing')
       
-      // Simulate parsing process
-      await new Promise(resolve => setTimeout(resolve, 3000))
-
-      // Mock parsed content
-      const mockParsedContent: ParsedContent = {
-        sections: [
-          {
-            title: "Introduction to Food Safety",
-            level: 1,
-            content: "Food safety is a scientific discipline describing handling, preparation, and storage of food in ways that prevent food-borne illness.",
-            order: 1
-          },
-          {
-            title: "Key Principles",
-            level: 2,
-            content: "The four key principles of food safety are: Clean, Separate, Cook, and Chill.",
-            order: 2
-          },
-          {
-            title: "Temperature Control",
-            level: 2,
-            content: "Proper temperature control is essential for preventing bacterial growth.",
-            order: 3
-          }
-        ],
-        tables: [
-          {
-            title: "Temperature Guidelines",
-            headers: ["Food Type", "Minimum Internal Temperature", "Rest Time"],
-            rows: [
-              ["Poultry", "165°F (74°C)", "None"],
-              ["Ground Meat", "160°F (71°C)", "None"],
-              ["Beef, Pork, Veal", "145°F (63°C)", "3 minutes"]
-            ]
-          }
-        ],
-        metadata: {
-          totalSections: 3,
-          totalTables: 1,
-          wordCount: 150
-        }
-      }
-
-      const mockParsingLog: ParsingLog[] = [
+      // Add parsing log entries
+      const logs: ParsingLog[] = [
         { level: 'info', message: 'Document uploaded successfully' },
-        { level: 'info', message: 'Parsing DOCX structure...' },
-        { level: 'warning', message: 'Found 2 images - will be ignored', line: 15 },
-        { level: 'info', message: 'Extracted 3 sections and 1 table' },
-        { level: 'info', message: 'Parsing completed successfully' }
+        { level: 'info', message: `Parsing ${selectedFile.name}...` }
       ]
+      setParsingLog(logs)
 
-      setParsedContent(mockParsedContent)
-      setParsingLog(mockParsingLog)
+      // Parse the document using the real parser
+      console.log('Starting document parse for:', selectedFile.name, 'Size:', selectedFile.size, 'Type:', selectedFile.type)
+      const parsedContent = await parseDocument(selectedFile)
+      console.log('Document parsed successfully:', parsedContent)
+      
+      // Add completion log
+      logs.push(
+        { level: 'info', message: `Extracted ${parsedContent.metadata.totalSections} sections and ${parsedContent.metadata.totalTables} tables` },
+        { level: 'info', message: 'Parsing completed successfully' }
+      )
+
+      setParsedContent(parsedContent)
+      setParsingLog(logs)
       setParsingStatus('completed')
 
     } catch (err) {
-      setError('Failed to parse document. Please try again.')
+      let errorMessage = 'Failed to parse document. Please try again.'
+      
+      if (err instanceof UnsupportedFileTypeError) {
+        errorMessage = `Unsupported file type. Please upload a DOCX or XLSX file.`
+      } else if (err instanceof FileReadError) {
+        errorMessage = `File read error: ${err.message}`
+      } else if (err instanceof ParseError) {
+        errorMessage = `Parse error: ${err.message}`
+      }
+      
+      setError(errorMessage)
       setParsingStatus('error')
+      
+      // Add error to parsing log
+      setParsingLog(prev => [
+        ...prev,
+        { level: 'error', message: errorMessage }
+      ])
     }
   }
 

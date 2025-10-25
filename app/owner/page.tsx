@@ -14,9 +14,7 @@ import {
   BarChart3, 
   Plus,
   LogOut,
-  Upload,
   Settings,
-  Shield,
   Crown
 } from "lucide-react"
 import { signOut } from "next-auth/react"
@@ -58,17 +56,17 @@ export default function OwnerPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Crown className="h-8 w-8 text-yellow-600 mr-3" />
-              <h1 className="text-xl font-semibold text-gray-900">Owner Dashboard</h1>
+            <div className="flex items-center min-w-0">
+              <Crown className="h-8 w-8 text-yellow-600 mr-3 shrink-0" />
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Owner Dashboard</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hidden sm:inline-flex">
                 Owner
               </Badge>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="text-xs sm:text-sm">
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sign Out</span>
               </Button>
             </div>
           </div>
@@ -87,7 +85,7 @@ export default function OwnerPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -120,95 +118,57 @@ export default function OwnerPage() {
               <p className="text-xs text-muted-foreground">+28 this month</p>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">System Health</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">99.9%</div>
-              <p className="text-xs text-muted-foreground">Uptime this month</p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
-            <TabsTrigger value="training">Training System</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto">
+            <TabsList className="w-full min-w-max">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+              <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
+              <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
+              <TabsTrigger value="reports" className="text-xs sm:text-sm">Reports</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Overview</CardTitle>
-                  <CardDescription>Current system status and key metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Active Users</span>
-                      <Badge variant="secondary">47 online</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Training Programs</span>
-                      <Badge variant="secondary">12 active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Storage Used</span>
-                      <Badge variant="secondary">2.3 GB / 10 GB</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Last Backup</span>
-                      <Badge variant="secondary">2 hours ago</Badge>
-                    </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>System Overview</CardTitle>
+                <CardDescription>Current system status and key metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Active Users</span>
+                    <Badge variant="secondary">47 online</Badge>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>System administration tasks</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Users className="h-4 w-4 mr-2" />
-                    Manage Users
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Settings className="h-4 w-4 mr-2" />
-                    System Settings
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Shield className="h-4 w-4 mr-2" />
-                    Security Settings
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Analytics
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Training Programs</span>
+                    <Badge variant="secondary">12 active</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Storage Used</span>
+                    <Badge variant="secondary">2.3 GB / 10 GB</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Last Backup</span>
+                    <Badge variant="secondary">2 hours ago</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="users" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
                     <CardTitle>User Management</CardTitle>
                     <CardDescription>Manage all users, roles, and permissions</CardDescription>
                   </div>
-                  <Button>
+                  <Button className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Add User
                   </Button>
@@ -223,51 +183,6 @@ export default function OwnerPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="training" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Training System</CardTitle>
-                    <CardDescription>Configure and manage the entire training system</CardDescription>
-                  </div>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Program
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <ClipboardList className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Training system management features will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="documents" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Document Management</CardTitle>
-                    <CardDescription>Manage all documents and content</CardDescription>
-                  </div>
-                  <Button>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Document
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Document management features will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
             <Card>
