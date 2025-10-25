@@ -29,14 +29,15 @@ A comprehensive SaaS solution for the HORECA industry (Hotels, Restaurants, and 
 
 - Node.js 18+ 
 - npm or yarn
-- Vercel account (for database and deployment)
+- Docker and Docker Compose (for local development)
+- Vercel account (for production deployment)
 
-### Installation
+### Local Development Setup
 
 1. Clone the repository:
 ```bash
 git clone <your-repo-url>
-cd horeca-saas
+cd knowledge-base
 ```
 
 2. Install dependencies:
@@ -46,35 +47,54 @@ npm install
 
 3. Set up environment variables:
 ```bash
-cp .env.example .env.local
+cp env.example .env.local
 ```
 
 4. Configure your environment variables in `.env.local`:
 ```env
-# Database
-DATABASE_URL="postgresql://..."
-POSTGRES_URL="postgresql://..."
+# Database (local Docker setup)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/knowledge_base"
 
 # Authentication
-NEXTAUTH_SECRET="your-secret-key"
+NEXTAUTH_SECRET="your-secret-key-here"
 NEXTAUTH_URL="http://localhost:3000"
 
-# Vercel KV
-KV_REST_API_URL="https://..."
-KV_REST_API_TOKEN="..."
+# Optional: OAuth providers
+# GOOGLE_CLIENT_ID=""
+# GOOGLE_CLIENT_SECRET=""
 ```
 
-5. Run database migrations:
+5. Start the local database with Docker:
 ```bash
-npm run db:migrate
+npm run docker:up
 ```
 
-6. Start the development server:
+6. Set up the database schema:
+```bash
+npm run db:push
+```
+
+7. Start the development server:
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+### Docker Commands
+
+- `npm run docker:up` - Start the database containers
+- `npm run docker:down` - Stop the database containers
+- `npm run docker:logs` - View container logs
+- `npm run docker:reset` - Reset database (removes all data)
+- `npm run db:setup` - Start database and push schema
+
+### Database Management
+
+- **pgAdmin**: Available at [http://localhost:8080](http://localhost:8080)
+  - Email: `admin@knowledgebase.local`
+  - Password: `admin`
+- **Drizzle Studio**: Run `npm run db:studio` to open the database GUI
 
 ## 📁 Project Structure
 
@@ -93,13 +113,23 @@ horeca-saas/
 
 ## 🗄️ Database
 
-This project uses Drizzle ORM with Vercel Postgres. Database schema and migrations are managed through Drizzle Kit.
+This project uses Drizzle ORM with PostgreSQL. For local development, we use Docker to run PostgreSQL, while production uses Vercel Postgres.
 
-### Available Scripts
+### Database Scripts
 
 - `npm run db:generate` - Generate migration files
 - `npm run db:migrate` - Run migrations
-- `npm run db:studio` - Open Drizzle Studio
+- `npm run db:push` - Push schema changes to database
+- `npm run db:studio` - Open Drizzle Studio (database GUI)
+- `npm run db:setup` - Start Docker database and push schema
+
+### Local Database Features
+
+- **PostgreSQL 15** with Alpine Linux for minimal footprint
+- **pgAdmin** web interface for database management
+- **Health checks** to ensure database is ready before app starts
+- **Persistent volumes** to preserve data between container restarts
+- **UUID extensions** and other useful PostgreSQL extensions
 
 ## 🚀 Deployment
 
