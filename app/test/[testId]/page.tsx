@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
@@ -137,23 +137,6 @@ export default function TestPage() {
     }
   }, [session, status, router, testId])
 
-  // Timer effect
-  useEffect(() => {
-    if (showResults || !testData) return
-
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          handleSubmitTest()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [showResults, testData])
-
   const handleAnswerSelect = (questionId: string, answer: string) => {
     setAnswers(prev => ({
       ...prev,
@@ -173,7 +156,7 @@ export default function TestPage() {
     }
   }
 
-  const handleSubmitTest = () => {
+  const handleSubmitTest = useCallback(() => {
     if (!testData) return
 
     let correctAnswers = 0
@@ -200,7 +183,24 @@ export default function TestPage() {
       return assignment
     })
     localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-  }
+  }, [testData, answers, testId])
+
+  // Timer effect
+  useEffect(() => {
+    if (showResults || !testData) return
+
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          handleSubmitTest()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [showResults, testData, handleSubmitTest])
 
   const handleBack = () => {
     // Check if user has answered any questions
@@ -409,14 +409,14 @@ export default function TestPage() {
                       }`}
                     >
                       <div className="flex items-start space-x-3">
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium flex-shrink-0 ${
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium shrink-0 ${
                           isSelected
                             ? 'border-blue-500 bg-blue-500 text-white'
                             : 'border-gray-300'
                         }`}>
                           {letter}
                         </div>
-                        <span className="flex-1 break-words leading-relaxed">{choice}</span>
+                        <span className="flex-1 break-word leading-relaxed">{choice}</span>
                       </div>
                     </button>
                   )
