@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
@@ -12,8 +11,6 @@ import {
   CheckCircle, 
   AlertCircle, 
   X, 
-  Eye,
-  Download,
   RefreshCw
 } from "lucide-react"
 import { parseDocument, UnsupportedFileTypeError, FileReadError, ParseError, ParsedContent } from "@/lib/parsers"
@@ -244,20 +241,17 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-blue-500" />
-                  <div>
-                    <p className="font-medium">{selectedFile.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" onClick={resetImport}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                 <div>
+                   <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                   <p className="text-sm text-gray-500">
+                     {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                   </p>
+                 </div>
+                 <Button variant="ghost" size="sm" onClick={resetImport} className="text-gray-400 hover:text-gray-600">
+                   <X className="h-4 w-4" />
+                 </Button>
+               </div>
 
               {parsingStatus === 'uploading' && (
                 <div className="space-y-2">
@@ -280,7 +274,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Document parsed successfully! Review the structure below and click "Create Module" to proceed.
+                    Document imported successfully! You can now view it in the Docs section.
                   </AlertDescription>
                 </Alert>
               )}
@@ -293,17 +287,35 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
               )}
 
               <div className="flex gap-2">
-                <Button 
-                  onClick={startImport} 
-                  disabled={parsingStatus === 'uploading' || parsingStatus === 'parsing'}
-                  className="flex-1"
-                >
-                  {parsingStatus === 'idle' ? 'Import Document' : getStatusText()}
-                </Button>
-                {parsingStatus === 'completed' && (
-                  <Button variant="outline" onClick={resetImport}>
-                    Import Another
+                {parsingStatus === 'idle' && (
+                  <Button 
+                    onClick={startImport} 
+                    className="flex-1"
+                  >
+                    Import Document
                   </Button>
+                )}
+                
+                {parsingStatus === 'completed' && (
+                  <>
+                    <Button variant="outline" onClick={resetImport} className="flex-1">
+                      Import Another
+                    </Button>
+                  </>
+                )}
+                
+                {parsingStatus === 'error' && (
+                  <>
+                    <Button 
+                      onClick={startImport} 
+                      className="flex-1"
+                    >
+                      Try Again
+                    </Button>
+                    <Button variant="outline" onClick={resetImport}>
+                      Import Another
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -342,87 +354,6 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
         </Card>
       )}
 
-      {/* Content Preview */}
-      {parsedContent && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Content Structure Preview
-            </CardTitle>
-            <CardDescription>
-              Review the parsed content structure before creating the module
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {/* Metadata */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-3 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {parsedContent.metadata.totalSections}
-                  </div>
-                  <div className="text-sm text-blue-600">Sections</div>
-                </div>
-                <div className="text-center p-3 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {parsedContent.metadata.totalTables}
-                  </div>
-                  <div className="text-sm text-green-600">Tables</div>
-                </div>
-                <div className="text-center p-3 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {parsedContent.metadata.wordCount}
-                  </div>
-                  <div className="text-sm text-purple-600">Words</div>
-                </div>
-              </div>
-
-              {/* Sections Preview */}
-              <div>
-                <h4 className="font-medium mb-3">Document Sections</h4>
-                <div className="space-y-2">
-                  {parsedContent.sections.map((section, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                      <Badge variant="outline" className="text-xs">
-                        H{section.level}
-                      </Badge>
-                      <span className="text-sm font-medium">{section.title}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tables Preview */}
-              {parsedContent.tables.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-3">Tables Found</h4>
-                  <div className="space-y-2">
-                    {parsedContent.tables.map((table, index) => (
-                      <div key={index} className="p-3 bg-gray-50 rounded">
-                        <div className="font-medium text-sm mb-1">{table.title}</div>
-                        <div className="text-xs text-gray-500">
-                          {table.headers.length} columns × {table.rows.length} rows
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-4 border-t">
-                <Button className="flex-1">
-                  Create Module
-                </Button>
-                <Button variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Preview
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

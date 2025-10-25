@@ -174,10 +174,10 @@ export default function ManagerPage() {
                   {/* Document List */}
                   <div className="space-y-3">
                     {/* Sample Document 1 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Preview: Ланч меню BS.docx')}
-                    >
+                     <div 
+                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                       onClick={() => router.push(`/docs/${encodeURIComponent('Ланч меню BS.docx')}`)}
+                     >
                       <div>
                         <h3 className="font-medium text-gray-900">Ланч меню BS.docx</h3>
                         <p className="text-sm text-gray-500">DOCX • Uploaded 2 hours ago</p>
@@ -185,7 +185,7 @@ export default function ManagerPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-red-600 hover:text-red-700"
+                        className="text-gray-400 hover:text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation()
                           console.log('Delete: Ланч меню BS.docx')
@@ -196,10 +196,10 @@ export default function ManagerPage() {
                     </div>
 
                     {/* Sample Document 2 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Preview: Training Schedule.xlsx')}
-                    >
+                     <div 
+                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                       onClick={() => router.push(`/docs/${encodeURIComponent('Training Schedule.xlsx')}`)}
+                     >
                       <div>
                         <h3 className="font-medium text-gray-900">Training Schedule.xlsx</h3>
                         <p className="text-sm text-gray-500">XLSX • Uploaded 1 day ago</p>
@@ -207,7 +207,7 @@ export default function ManagerPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-red-600 hover:text-red-700"
+                        className="text-gray-400 hover:text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation()
                           console.log('Delete: Training Schedule.xlsx')
@@ -218,10 +218,10 @@ export default function ManagerPage() {
                     </div>
 
                     {/* Sample Document 3 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Preview: Employee Handbook.docx')}
-                    >
+                     <div 
+                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                       onClick={() => router.push(`/docs/${encodeURIComponent('Employee Handbook.docx')}`)}
+                     >
                       <div>
                         <h3 className="font-medium text-gray-900">Employee Handbook.docx</h3>
                         <p className="text-sm text-gray-500">DOCX • Uploaded 5 minutes ago</p>
@@ -229,7 +229,7 @@ export default function ManagerPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-red-600 hover:text-red-700"
+                        className="text-gray-400 hover:text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation()
                           console.log('Delete: Employee Handbook.docx')
@@ -240,10 +240,10 @@ export default function ManagerPage() {
                     </div>
 
                     {/* Sample Document 4 */}
-                    <div 
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => console.log('Preview: Safety Guidelines.pdf')}
-                    >
+                     <div 
+                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                       onClick={() => router.push(`/docs/${encodeURIComponent('Safety Guidelines.pdf')}`)}
+                     >
                       <div>
                         <h3 className="font-medium text-gray-900">Safety Guidelines.pdf</h3>
                         <p className="text-sm text-gray-500">PDF • Uploaded 1 hour ago</p>
@@ -251,7 +251,7 @@ export default function ManagerPage() {
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-red-600 hover:text-red-700"
+                        className="text-gray-400 hover:text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation()
                           console.log('Delete: Safety Guidelines.pdf')
