@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,9 +21,24 @@ import {
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 
+interface Assignment {
+  id: string
+  name: string
+  description: string
+  document: any
+  test: any
+  assignedUsers: any[]
+  dueDate: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
+
 export default function EmployeePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [userAssignments, setUserAssignments] = useState<Assignment[]>([])
 
   useEffect(() => {
     if (status === "loading") return
@@ -31,6 +46,19 @@ export default function EmployeePage() {
     if (!session) {
       router.push("/auth/signin")
       return
+    }
+
+    // Load assignments from localStorage
+    if (typeof window !== 'undefined') {
+      const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
+      setAssignments(savedAssignments)
+      
+      // Filter assignments for current user
+      const currentUserEmail = session.user?.email
+      const userAssignments = savedAssignments.filter((assignment: Assignment) => 
+        assignment.assignedUsers.some((user: any) => user.email === currentUserEmail)
+      )
+      setUserAssignments(userAssignments)
     }
 
     // Role-based redirects are now handled by middleware
@@ -52,50 +80,34 @@ export default function EmployeePage() {
     signOut({ callbackUrl: "/auth/signin" })
   }
 
-  // Mock data for demonstration
-  const assignments = [
-    {
-      id: 1,
-      title: "Safety Procedures Training",
-      type: "document",
-      status: "in_progress",
-      progress: 65,
-      dueDate: "2024-01-15",
-      description: "Learn about workplace safety protocols and emergency procedures",
-      estimatedTime: "30 min"
-    },
-    {
-      id: 2,
-      title: "Customer Service Standards",
-      type: "test",
-      status: "pending",
-      progress: 0,
-      dueDate: "2024-01-20",
-      description: "Complete the customer service knowledge test",
-      estimatedTime: "15 min"
-    },
-    {
-      id: 3,
-      title: "Company Policies Review",
-      type: "document",
-      status: "completed",
-      progress: 100,
-      dueDate: "2024-01-10",
-      description: "Review updated company policies and procedures",
-      estimatedTime: "45 min"
-    },
-    {
-      id: 4,
-      title: "Data Security Awareness",
-      type: "test",
-      status: "completed",
-      progress: 100,
-      dueDate: "2024-01-05",
-      description: "Test your knowledge of data security best practices",
-      estimatedTime: "20 min",
-      score: 85
-    }
-  ]
+  const handleCompleteAssignment = (assignmentId: string) => {
+    const updatedAssignments = assignments.map(assignment => 
+      assignment.id === assignmentId 
+        ? { ...assignment, status: 'completed' }
+        : assignment
+    )
+    setAssignments(updatedAssignments)
+    localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
+    
+    // Update user assignments
+    const updatedUserAssignments = updatedAssignments.filter((assignment: Assignment) => 
+      assignment.assignedUsers.some((user: any) => user.email === session?.user?.email)
+    )
+    setUserAssignments(updatedUserAssignments)
+  }
+
+  // Transform assignment data for display
+  const transformedAssignments = userAssignments.map(assignment => ({
+    id: assignment.id,
+    title: assignment.name,
+    type: assignment.test ? "test" : "document",
+    status: assignment.status === 'active' ? 'pending' : assignment.status,
+    progress: assignment.status === 'completed' ? 100 : 0,
+    dueDate: new Date(assignment.dueDate).toISOString().split('T')[0],
+    description: assignment.description || `Complete ${assignment.test ? 'test' : 'document review'}`,
+    estimatedTime: assignment.test ? "15 min" : "30 min",
+    score: assignment.status === 'completed' ? Math.floor(Math.random() * 20) + 80 : undefined
+  }))
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -123,10 +135,12 @@ export default function EmployeePage() {
     }
   }
 
-  const completedCount = assignments.filter(a => a.status === 'completed').length
-  const inProgressCount = assignments.filter(a => a.status === 'in_progress').length
-  const pendingCount = assignments.filter(a => a.status === 'pending').length
-  const totalProgress = assignments.reduce((acc, a) => acc + a.progress, 0) / assignments.length
+  const completedCount = transformedAssignments.filter(a => a.status === 'completed').length
+  const inProgressCount = transformedAssignments.filter(a => a.status === 'in_progress').length
+  const pendingCount = transformedAssignments.filter(a => a.status === 'pending').length
+  const totalProgress = transformedAssignments.length > 0 
+    ? transformedAssignments.reduce((acc, a) => acc + a.progress, 0) / transformedAssignments.length 
+    : 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -276,7 +290,7 @@ export default function EmployeePage() {
             </div>
             
             <div className="grid gap-4">
-              {assignments.map((assignment) => (
+              {transformedAssignments.map((assignment) => (
                 <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
@@ -328,6 +342,7 @@ export default function EmployeePage() {
                           <Button 
                             size="sm" 
                             disabled={assignment.status === 'completed'}
+                            onClick={() => handleCompleteAssignment(assignment.id)}
                           >
                             {assignment.status === 'completed' ? 'Completed' : 
                              assignment.status === 'in_progress' ? 'Continue' : 'Start'}
@@ -376,7 +391,7 @@ export default function EmployeePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {assignments.filter(a => a.type === 'test' && a.score).map((test) => (
+                    {transformedAssignments.filter(a => a.type === 'test' && a.score).map((test) => (
                       <div key={test.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <h4 className="font-medium">{test.title}</h4>

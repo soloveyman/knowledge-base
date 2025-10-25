@@ -33,6 +33,18 @@ export default function DocumentViewer() {
       return
     }
 
+    // Check if document exists in localStorage (mock check)
+    const savedDocuments = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
+    const documentExists = savedDocuments.some((doc: any) => 
+      doc.name === decodeURIComponent(filename)
+    )
+
+    if (!documentExists) {
+      // Document doesn't exist, redirect back to manager docs tab
+      router.push('/manager?tab=docs')
+      return
+    }
+
     // Simulate loading document data
     setLoading(false)
     setDocumentData({

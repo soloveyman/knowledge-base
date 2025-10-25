@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DeleteConfirmation } from "./delete-confirmation"
 import { X, Edit } from "lucide-react"
 
 interface ListItemProps {
@@ -76,17 +77,20 @@ export function ListItem({
           </Button>
         )}
         {showDeleteButton && onDelete && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-gray-400 hover:text-red-600"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <DeleteConfirmation
+            onConfirm={onDelete}
+            itemName={title}
+            trigger={
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-gray-400 hover:text-red-600"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            }
+          />
         )}
       </div>
     </div>

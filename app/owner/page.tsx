@@ -33,9 +33,9 @@ interface SavedAssignment {
   id: string
   name: string
   description: string
-  document: any
-  test: any
-  assignedUsers: any[]
+  document: unknown
+  test: unknown
+  assignedUsers: unknown[]
   dueDate: string
   createdAt: string
   createdBy: string
@@ -56,7 +56,7 @@ export default function OwnerPage() {
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([])
-  const [savedTests, setSavedTests] = useState<any[]>([])
+  const [savedTests, setSavedTests] = useState<unknown[]>([])
 
   useEffect(() => {
     if (status === "loading") return
@@ -81,14 +81,21 @@ export default function OwnerPage() {
           { id: "3", name: "Safety Guidelines.docx", type: "DOCX", uploadedAt: "3 days ago" }
         ]
         localStorage.setItem('savedDocuments', JSON.stringify(sampleDocuments))
-        setSavedDocuments(sampleDocuments)
+        // Use setTimeout to avoid synchronous state updates in effect
+        setTimeout(() => {
+          setSavedDocuments(sampleDocuments)
+        }, 0)
       } else {
-        setSavedDocuments(documents)
+        setTimeout(() => {
+          setSavedDocuments(documents)
+        }, 0)
       }
       
-      setSavedUsers(users)
-      setSavedAssignments(assignments)
-      setSavedTests(tests)
+      setTimeout(() => {
+        setSavedUsers(users)
+        setSavedAssignments(assignments)
+        setSavedTests(tests)
+      }, 0)
     }
 
     // Role-based redirects are now handled by middleware

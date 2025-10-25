@@ -18,6 +18,7 @@ import {
 import { signOut } from "next-auth/react"
 import { TestsPage } from "@/components/pages/tests-page"
 import { AssignmentsPage } from "@/components/pages/assignments-page"
+import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 
 interface SavedTest {
   id: string
@@ -70,13 +71,15 @@ export default function ManagerPage() {
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   
-  // Mock documents data
-  const mockDocuments = [
+  // Mock documents data - default documents
+  const defaultDocuments = useMemo(() => [
     { id: "1", name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago" },
     { id: "2", name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
     { id: "3", name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago" },
     { id: "4", name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago" }
-  ]
+  ], [])
+  
+  const [mockDocuments, setMockDocuments] = useState(defaultDocuments)
   
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
@@ -101,12 +104,22 @@ export default function ManagerPage() {
     
     // Load saved tests from localStorage
     const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-    setSavedTests(tests)
+    setTimeout(() => setSavedTests(tests), 0)
     
     // Load saved assignments from localStorage
     const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-    setSavedAssignments(assignments)
-  }, [])
+    setTimeout(() => setSavedAssignments(assignments), 0)
+    
+    // Initialize documents in localStorage if not exists
+    const existingDocs = localStorage.getItem('savedDocuments')
+    if (!existingDocs) {
+      localStorage.setItem('savedDocuments', JSON.stringify(defaultDocuments))
+    } else {
+      // Load existing documents from localStorage
+      const docs = JSON.parse(existingDocs)
+      setTimeout(() => setMockDocuments(docs), 0)
+    }
+  }, [defaultDocuments])
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/auth/signin" })
@@ -114,7 +127,15 @@ export default function ManagerPage() {
 
   // Document handlers
   const handleDeleteDocument = (id: string) => {
-    console.log('Delete document:', id)
+    const updatedDocuments = mockDocuments.filter(doc => doc.id !== id)
+    setMockDocuments(updatedDocuments)
+    
+    // Update localStorage to keep it in sync
+    localStorage.setItem('savedDocuments', JSON.stringify(updatedDocuments))
+    
+    console.log('Deleted document:', id)
+    // Ensure we stay on the docs tab after deletion
+    router.push('/manager?tab=docs')
   }
 
   const handleViewDocument = (name: string) => {
@@ -305,17 +326,20 @@ export default function ManagerPage() {
                         <h3 className="font-medium text-gray-900">{doc.name}</h3>
                         <p className="text-sm text-gray-500">{doc.type} • Uploaded {doc.uploadedAt}</p>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteDocument(doc.id)
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <DeleteConfirmation
+                        onConfirm={() => handleDeleteDocument(doc.id)}
+                        itemName={doc.name}
+                        trigger={
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-gray-400 hover:text-gray-600"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        }
+                      />
                     </div>
                   ))}
                 </div>
