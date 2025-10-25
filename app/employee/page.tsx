@@ -11,6 +11,7 @@ import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
+import { EmptyState } from "@/components/common/empty-state"
 import { 
   BookOpen, 
   ClipboardList, 
@@ -63,6 +64,34 @@ export default function EmployeePage() {
   const [userAssignments, setUserAssignments] = useState<Assignment[]>([])
   const [currentTab, setCurrentTab] = useState('overview')
 
+  // Load assignments from API
+  const loadAssignments = async () => {
+    try {
+      const response = await fetch('/api/assignments')
+      const result = await response.json()
+      
+      if (result.success) {
+        const allAssignments = result.data.assignments
+        setAssignments(allAssignments)
+        
+        // Filter assignments for current user
+        const currentUserEmail = session?.user?.email
+        const userAssignments = allAssignments.filter((assignment: Assignment) => 
+          assignment.assignedUsers.some((user: AssignedUser) => user.email === currentUserEmail)
+        )
+        setUserAssignments(userAssignments)
+      } else {
+        console.error('Failed to load assignments:', result.message)
+        setAssignments([])
+        setUserAssignments([])
+      }
+    } catch (error) {
+      console.error('Error loading assignments:', error)
+      setAssignments([])
+      setUserAssignments([])
+    }
+  }
+
   useEffect(() => {
     if (status === "loading") return
     
@@ -77,18 +106,8 @@ export default function EmployeePage() {
       setCurrentTab(tabFromUrl)
     }
 
-    // Load assignments from localStorage
-    if (typeof window !== 'undefined') {
-      const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      setAssignments(savedAssignments)
-      
-      // Filter assignments for current user
-      const currentUserEmail = session.user?.email
-      const userAssignments = savedAssignments.filter((assignment: Assignment) => 
-        assignment.assignedUsers.some((user: AssignedUser) => user.email === currentUserEmail)
-      )
-      setUserAssignments(userAssignments)
-    }
+    // Load assignments from API
+    loadAssignments()
 
     // Role-based redirects are now handled by middleware
   }, [session, status, router, searchParams])
@@ -113,40 +132,42 @@ export default function EmployeePage() {
   }
 
 
-  const handleCompleteAssignment = (assignmentId: string) => {
-    const updatedAssignments = assignments.map(assignment => 
-      assignment.id === assignmentId 
-        ? { ...assignment, status: 'completed' }
-        : assignment
-    )
-    setAssignments(updatedAssignments)
-    localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-    
-    // Update user assignments
-    const updatedUserAssignments = updatedAssignments.filter((assignment: Assignment) => 
-      assignment.assignedUsers.some((user: AssignedUser) => user.email === session?.user?.email)
-    )
-    setUserAssignments(updatedUserAssignments)
+  const handleCompleteAssignment = async (assignmentId: string) => {
+    try {
+      const response = await fetch(`/api/assignments/${assignmentId}/complete`, {
+        method: 'POST'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        // Reload assignments to get updated data
+        await loadAssignments()
+      } else {
+        console.error('Failed to complete assignment:', result.message)
+      }
+    } catch (error) {
+      console.error('Error completing assignment:', error)
+    }
   }
 
-  const handleReadDocument = (assignmentId: string) => {
+  const handleReadDocument = async (assignmentId: string) => {
     // Find the assignment and get the document name
     const assignment = assignments.find(a => a.id === assignmentId)
     if (assignment && assignment.document) {
-      // Update assignment status to in_progress when user starts reading
-      const updatedAssignments = assignments.map(a => 
-        a.id === assignmentId 
-          ? { ...a, status: 'in_progress' }
-          : a
-      )
-      setAssignments(updatedAssignments)
-      localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-      
-      // Update user assignments
-      const updatedUserAssignments = updatedAssignments.filter((a: Assignment) => 
-        a.assignedUsers.some((user: AssignedUser) => user.email === session?.user?.email)
-      )
-      setUserAssignments(updatedUserAssignments)
+      try {
+        // Update assignment status to in_progress when user starts reading
+        const response = await fetch(`/api/assignments/${assignmentId}/start`, {
+          method: 'POST'
+        })
+        const result = await response.json()
+        
+        if (result.success) {
+          // Reload assignments to get updated data
+          await loadAssignments()
+        }
+      } catch (error) {
+        console.error('Error starting assignment:', error)
+      }
       
       // Navigate to document reader
       router.push(`/read/${assignment.document.id}`)
@@ -318,8 +339,15 @@ export default function EmployeePage() {
 
           {/* Assignments Tab */}
           <TabsContent value="assignments" className="space-y-6">
-            <div className="grid gap-4">
-              {transformedAssignments.map((assignment) => (
+            {transformedAssignments.length === 0 ? (
+              <EmptyState
+                icon={<ClipboardList className="h-12 w-12" />}
+                title="No assignments yet"
+                description="You don't have any assignments at the moment. Check back later or contact your manager if you're expecting assignments."
+              />
+            ) : (
+              <div className="grid gap-4">
+                {transformedAssignments.map((assignment) => (
                 <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
@@ -404,8 +432,9 @@ export default function EmployeePage() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* Progress Tab */}

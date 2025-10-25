@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
+import { EmptyState } from "@/components/common/empty-state"
 import { 
   Users, 
   ClipboardList, 
@@ -81,15 +82,12 @@ export default function ManagerPage() {
     status: string
   }>>([])
   
-  // Mock documents data - default documents
-  const defaultDocuments = useMemo(() => [
-    { id: "1", name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago" },
-    { id: "2", name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
-    { id: "3", name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago" },
-    { id: "4", name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago" }
-  ], [])
-  
-  const [mockDocuments, setMockDocuments] = useState(defaultDocuments)
+  const [documents, setDocuments] = useState<Array<{
+    id: string
+    name: string
+    type: string
+    uploadedAt: string
+  }>>([])
   
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
@@ -115,45 +113,67 @@ export default function ManagerPage() {
     // Role-based redirects are now handled by middleware
   }, [session, status, router])
 
+  // Load data from APIs
+  const loadData = async () => {
+    try {
+      // Load users
+      const usersResponse = await fetch('/api/users')
+      const usersResult = await usersResponse.json()
+      if (usersResult.success) {
+        setSavedUsers(usersResult.data.users)
+      }
+
+      // Load assignments
+      const assignmentsResponse = await fetch('/api/assignments')
+      const assignmentsResult = await assignmentsResponse.json()
+      if (assignmentsResult.success) {
+        setSavedAssignments(assignmentsResult.data.assignments)
+      }
+
+      // Load tests
+      const testsResponse = await fetch('/api/tests')
+      const testsResult = await testsResponse.json()
+      if (testsResult.success) {
+        setSavedTests(testsResult.data.tests)
+      }
+
+      // Load documents
+      const documentsResponse = await fetch('/api/documents')
+      const documentsResult = await documentsResponse.json()
+      if (documentsResult.success) {
+        setDocuments(documentsResult.data.documents)
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+    }
+  }
+
   useLayoutEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return
     
-    // Load saved tests from localStorage
-    const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-    setTimeout(() => setSavedTests(tests), 0)
-    
-    // Load saved assignments from localStorage
-    const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-    setTimeout(() => setSavedAssignments(assignments), 0)
-    
-    // Load saved users from localStorage
-    const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
-    setTimeout(() => setSavedUsers(users), 0)
-    
-    // Initialize documents in localStorage if not exists
-    const existingDocs = localStorage.getItem('savedDocuments')
-    if (!existingDocs) {
-      localStorage.setItem('savedDocuments', JSON.stringify(defaultDocuments))
-    } else {
-      // Load existing documents from localStorage
-      const docs = JSON.parse(existingDocs)
-      setTimeout(() => setMockDocuments(docs), 0)
-    }
-  }, [defaultDocuments])
+    loadData()
+  }, [])
 
 
   // Document handlers
-  const handleDeleteDocument = (id: string) => {
-    const updatedDocuments = mockDocuments.filter(doc => doc.id !== id)
-    setMockDocuments(updatedDocuments)
-    
-    // Update localStorage to keep it in sync
-    localStorage.setItem('savedDocuments', JSON.stringify(updatedDocuments))
-    
-    console.log('Deleted document:', id)
-    // Ensure we stay on the docs tab after deletion
-    router.push('/manager?tab=docs')
+  const handleDeleteDocument = async (id: string) => {
+    try {
+      const response = await fetch(`/api/documents/${id}`, {
+        method: 'DELETE'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setDocuments(prev => prev.filter(doc => doc.id !== id))
+        // Ensure we stay on the docs tab after deletion
+        router.push('/manager?tab=docs')
+      } else {
+        console.error('Failed to delete document:', result.message)
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error)
+    }
   }
 
   const handleViewDocument = (name: string) => {
@@ -244,8 +264,8 @@ export default function ManagerPage() {
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">24</div>
-                  <p className="text-xs text-muted-foreground">+2 from last month</p>
+                  <div className="text-2xl font-bold">{savedUsers.length}</div>
+                  <p className="text-xs text-muted-foreground">Total employees</p>
                 </CardContent>
               </Card>
               
@@ -255,8 +275,8 @@ export default function ManagerPage() {
                   <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">8</div>
-                  <p className="text-xs text-muted-foreground">3 completed this week</p>
+                  <div className="text-2xl font-bold">{savedAssignments.length}</div>
+                  <p className="text-xs text-muted-foreground">Total assignments</p>
                 </CardContent>
               </Card>
               
@@ -266,8 +286,8 @@ export default function ManagerPage() {
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">156</div>
-                  <p className="text-xs text-muted-foreground">+12 this month</p>
+                  <div className="text-2xl font-bold">{documents.length}</div>
+                  <p className="text-xs text-muted-foreground">Total documents</p>
                 </CardContent>
               </Card>
               
@@ -277,8 +297,14 @@ export default function ManagerPage() {
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">87%</div>
-                  <p className="text-xs text-muted-foreground">+5% from last month</p>
+                  <div className="text-2xl font-bold">
+                    {savedAssignments.length > 0 
+                      ? Math.round((savedAssignments.filter(a => a.status === 'completed').length / savedAssignments.length) * 100)
+                      : 0}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedAssignments.filter(a => a.status === 'completed').length} of {savedAssignments.length} completed
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -309,34 +335,44 @@ export default function ManagerPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {mockDocuments.map((doc) => (
-                    <div 
-                      key={doc.id}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                      onClick={() => handleViewDocument(doc.name)}
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                        <p className="text-sm text-gray-500">Uploaded {doc.uploadedAt}</p>
+                {documents.length === 0 ? (
+                  <EmptyState
+                    icon={<FileText className="h-12 w-12" />}
+                    title="No documents uploaded yet"
+                    description="Get started by importing your first document to create training materials and tests."
+                    actionLabel="Import Document"
+                    onAction={handleImportDocument}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((doc) => (
+                      <div 
+                        key={doc.id}
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                        onClick={() => handleViewDocument(doc.name)}
+                      >
+                        <div>
+                          <h3 className="font-medium text-gray-900">{doc.name}</h3>
+                          <p className="text-sm text-gray-500">Uploaded {doc.uploadedAt}</p>
+                        </div>
+                        <DeleteConfirmation
+                          onConfirm={() => handleDeleteDocument(doc.id)}
+                          itemName={doc.name}
+                          trigger={
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-gray-400 hover:text-gray-600"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
                       </div>
-                      <DeleteConfirmation
-                        onConfirm={() => handleDeleteDocument(doc.id)}
-                        itemName={doc.name}
-                        trigger={
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-gray-400 hover:text-gray-600"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

@@ -56,6 +56,34 @@ export default function OwnerPage() {
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([])
 
+  // Load data from APIs
+  const loadData = async () => {
+    try {
+      // Load users
+      const usersResponse = await fetch('/api/users')
+      const usersResult = await usersResponse.json()
+      if (usersResult.success) {
+        setSavedUsers(usersResult.data.users)
+      }
+
+      // Load assignments
+      const assignmentsResponse = await fetch('/api/assignments')
+      const assignmentsResult = await assignmentsResponse.json()
+      if (assignmentsResult.success) {
+        setSavedAssignments(assignmentsResult.data.assignments)
+      }
+
+      // Load documents
+      const documentsResponse = await fetch('/api/documents')
+      const documentsResult = await documentsResponse.json()
+      if (documentsResult.success) {
+        setSavedDocuments(documentsResult.data.documents)
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+    }
+  }
+
   useEffect(() => {
     if (status === "loading") return
     
@@ -64,44 +92,28 @@ export default function OwnerPage() {
       return
     }
 
-    // Load data from localStorage
-    if (typeof window !== 'undefined') {
-      const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
-      const assignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      const documents = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
-      
-      // Initialize with some sample documents if none exist
-      if (documents.length === 0) {
-        const sampleDocuments = [
-          { id: "1", name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "2 hours ago" },
-          { id: "2", name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
-          { id: "3", name: "Safety Guidelines.docx", type: "DOCX", uploadedAt: "3 days ago" }
-        ]
-        localStorage.setItem('savedDocuments', JSON.stringify(sampleDocuments))
-        // Use setTimeout to avoid synchronous state updates in effect
-        setTimeout(() => {
-          setSavedDocuments(sampleDocuments)
-        }, 0)
-      } else {
-        setTimeout(() => {
-          setSavedDocuments(documents)
-        }, 0)
-      }
-      
-      setTimeout(() => {
-        setSavedUsers(users)
-        setSavedAssignments(assignments)
-      }, 0)
-    }
+    // Load data from APIs
+    loadData()
 
     // Role-based redirects are now handled by middleware
   }, [session, status, router])
 
   // User handlers
-  const handleDeleteUser = (id: string) => {
-    const updatedUsers = savedUsers.filter(u => u.id !== id)
-    setSavedUsers(updatedUsers)
-    localStorage.setItem('savedUsers', JSON.stringify(updatedUsers))
+  const handleDeleteUser = async (id: string) => {
+    try {
+      const response = await fetch(`/api/users/${id}`, {
+        method: 'DELETE'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setSavedUsers(prev => prev.filter(u => u.id !== id))
+      } else {
+        console.error('Failed to delete user:', result.message)
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error)
+    }
   }
 
   const handleViewUser = (id: string) => {
