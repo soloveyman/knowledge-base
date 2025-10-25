@@ -92,6 +92,8 @@ export default function AssignmentBuilderPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -100,7 +102,39 @@ export default function AssignmentBuilderPage() {
       router.push("/auth/signin")
       return
     }
+
+    // Check if we're in edit mode
+    const editingId = localStorage.getItem('editingAssignmentId')
+    if (editingId) {
+      setIsEditMode(true)
+      setEditingAssignmentId(editingId)
+      loadAssignmentForEditing(editingId)
+      // Clear the editing ID from localStorage
+      localStorage.removeItem('editingAssignmentId')
+    }
   }, [session, status, router])
+
+  const loadAssignmentForEditing = (assignmentId: string) => {
+    try {
+      const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
+      const assignmentToEdit = savedAssignments.find((assignment: any) => assignment.id === assignmentId)
+      
+      if (assignmentToEdit) {
+        // Load assignment configuration
+        setAssignmentConfig({
+          name: assignmentToEdit.name,
+          documentId: assignmentToEdit.document.id.toString(),
+          testId: assignmentToEdit.test.id,
+          selectedUsers: assignmentToEdit.assignedUsers.map((user: any) => user.id),
+          dueDate: new Date(assignmentToEdit.dueDate),
+          description: assignmentToEdit.description || ""
+        })
+      }
+    } catch (error) {
+      console.error('Error loading assignment for editing:', error)
+      setError('Failed to load assignment for editing')
+    }
+  }
 
   useEffect(() => {
     // Load saved tests from localStorage
@@ -165,27 +199,49 @@ export default function AssignmentBuilderPage() {
       const selectedTest = savedTests.find(test => test.id === assignmentConfig.testId)
       const selectedUsersData = mockUsers.filter(user => assignmentConfig.selectedUsers.includes(user.id))
 
-      // Create assignment data structure
-      const assignmentData = {
-        id: Date.now().toString(),
-        name: assignmentConfig.name,
-        description: assignmentConfig.description,
-        document: selectedDocument,
-        test: selectedTest,
-        assignedUsers: selectedUsersData,
-        dueDate: assignmentConfig.dueDate.toISOString(),
-        createdAt: new Date().toISOString(),
-        createdBy: session?.user?.name || 'Unknown',
-        status: 'active'
-      }
-
-      // Save to localStorage (in real app, save to database)
       const existingAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      existingAssignments.push(assignmentData)
-      localStorage.setItem('savedAssignments', JSON.stringify(existingAssignments))
 
-      // Show success message
-      alert(`Assignment created successfully! Assigned to ${selectedUsersData.length} employees.`)
+      if (isEditMode && editingAssignmentId) {
+        // Update existing assignment
+        const assignmentData = {
+          id: editingAssignmentId,
+          name: assignmentConfig.name,
+          description: assignmentConfig.description,
+          document: selectedDocument,
+          test: selectedTest,
+          assignedUsers: selectedUsersData,
+          dueDate: assignmentConfig.dueDate.toISOString(),
+          createdAt: existingAssignments.find((a: any) => a.id === editingAssignmentId)?.createdAt || new Date().toISOString(),
+          createdBy: session?.user?.name || 'Unknown',
+          status: 'active'
+        }
+
+        const updatedAssignments = existingAssignments.map((assignment: any) => 
+          assignment.id === editingAssignmentId ? assignmentData : assignment
+        )
+        localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
+
+        alert(`Assignment updated successfully! Assigned to ${selectedUsersData.length} employees.`)
+      } else {
+        // Create new assignment
+        const assignmentData = {
+          id: Date.now().toString(),
+          name: assignmentConfig.name,
+          description: assignmentConfig.description,
+          document: selectedDocument,
+          test: selectedTest,
+          assignedUsers: selectedUsersData,
+          dueDate: assignmentConfig.dueDate.toISOString(),
+          createdAt: new Date().toISOString(),
+          createdBy: session?.user?.name || 'Unknown',
+          status: 'active'
+        }
+
+        existingAssignments.push(assignmentData)
+        localStorage.setItem('savedAssignments', JSON.stringify(existingAssignments))
+
+        alert(`Assignment created successfully! Assigned to ${selectedUsersData.length} employees.`)
+      }
       
       // Redirect to manager assignments tab
       router.push('/manager?tab=assignments')
@@ -221,7 +277,7 @@ export default function AssignmentBuilderPage() {
             <div className="flex items-center min-w-0">
               <ClipboardList className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
-                Assignment Builder
+                {isEditMode ? 'Edit Assignment' : 'Assignment Builder'}
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -361,7 +417,7 @@ export default function AssignmentBuilderPage() {
                     ) : (
                       <>
                         <ClipboardList className="h-4 w-4 mr-2" />
-                        Create Assignment
+                        {isEditMode ? 'Update Assignment' : 'Create Assignment'}
                       </>
                     )}
                   </Button>

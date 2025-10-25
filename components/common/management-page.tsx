@@ -25,7 +25,9 @@ interface ManagementPageProps {
     }>
     onClick?: () => void
     onDelete?: () => void
+    onEdit?: () => void
   }>
+  showEditButton?: boolean
   emptyState: {
     icon: ReactNode
     title: string
@@ -41,6 +43,7 @@ export function ManagementPage({
   icon,
   actionButton,
   items,
+  showEditButton = false,
   emptyState
 }: ManagementPageProps) {
   return (
@@ -64,6 +67,8 @@ export function ManagementPage({
                 badges={item.badges}
                 onClick={item.onClick}
                 onDelete={item.onDelete}
+                onEdit={item.onEdit}
+                showEditButton={showEditButton}
               />
             ))}
           </div>

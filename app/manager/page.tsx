@@ -136,6 +136,12 @@ export default function ManagerPage() {
     console.log('Open test:', id)
   }
 
+  const handleEditTest = (id: string) => {
+    // Store the test ID for editing and redirect to test builder
+    localStorage.setItem('editingTestId', id)
+    router.push('/test-builder')
+  }
+
   // Assignment handlers
   const handleDeleteAssignment = (id: string) => {
     const updatedAssignments = savedAssignments.filter(a => a.id !== id)
@@ -145,6 +151,12 @@ export default function ManagerPage() {
 
   const handleViewAssignment = (id: string) => {
     console.log('Open assignment:', id)
+  }
+
+  const handleEditAssignment = (id: string) => {
+    // Store the assignment ID for editing and redirect to assignment builder
+    localStorage.setItem('editingAssignmentId', id)
+    router.push('/assignment-builder')
   }
 
   if (status === "loading") {
@@ -316,6 +328,7 @@ export default function ManagerPage() {
               tests={savedTests}
               onDeleteTest={handleDeleteTest}
               onViewTest={handleViewTest}
+              onEditTest={handleEditTest}
             />
           </TabsContent>
 
@@ -324,6 +337,7 @@ export default function ManagerPage() {
               assignments={savedAssignments}
               onDeleteAssignment={handleDeleteAssignment}
               onViewAssignment={handleViewAssignment}
+              onEditAssignment={handleEditAssignment}
             />
           </TabsContent>
 

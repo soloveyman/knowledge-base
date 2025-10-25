@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,6 +28,26 @@ import type {
   DifficultyLevel, 
   Locale 
 } from "@/types/test"
+
+interface SavedTest {
+  id: string
+  title: string
+  type: string
+  difficulty: string
+  locale: string
+  questionCount: number
+  questions: Array<{
+    id: string
+    type: string
+    prompt: string
+    choices?: string[]
+    correct_answer?: string
+    explanation?: string
+  }>
+  sourceDocument: string
+  createdAt: string
+  createdBy: string
+}
 
 // Mock documents data - in real app this would come from your docs API
 const mockDocuments: Document[] = [
@@ -81,6 +101,47 @@ export default function TestBuilderPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [aiProvider, setAiProvider] = useState<string | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingTestId, setEditingTestId] = useState<string | null>(null)
+  const [originalQuestionCount, setOriginalQuestionCount] = useState(0)
+
+  const loadTestForEditing = useCallback((testId: string) => {
+    try {
+      const savedTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
+      const testToEdit = savedTests.find((test: SavedTest) => test.id === testId)
+      
+      if (testToEdit) {
+        // Load test configuration
+        setTestConfig({
+          count: testToEdit.questionCount,
+          type: testToEdit.type,
+          difficulty: testToEdit.difficulty,
+          locale: testToEdit.locale
+        })
+
+        // Load document
+        const document = mockDocuments.find(doc => doc.name === testToEdit.sourceDocument)
+        if (document) {
+          setSelectedDocument(document)
+          const documentContent = getDocumentContent(document.name)
+          setContext(prev => ({
+            ...prev,
+            text: documentContent,
+            facts: extractFacts(documentContent),
+            steps: extractSteps(documentContent),
+            definitions: extractDefinitions(documentContent)
+          }))
+        }
+
+        // Load generated questions
+        setGeneratedQuestions(testToEdit.questions || [])
+        setOriginalQuestionCount(testToEdit.questions?.length || 0)
+      }
+    } catch (error) {
+      console.error('Error loading test for editing:', error)
+      setError('Failed to load test for editing')
+    }
+  }, [])
 
   useEffect(() => {
     if (status === "loading") return
@@ -89,7 +150,17 @@ export default function TestBuilderPage() {
       router.push("/auth/signin")
       return
     }
-  }, [session, status, router])
+
+    // Check if we're in edit mode
+    const editingId = localStorage.getItem('editingTestId')
+    if (editingId) {
+      setIsEditMode(true)
+      setEditingTestId(editingId)
+      loadTestForEditing(editingId)
+      // Clear the editing ID from localStorage
+      localStorage.removeItem('editingTestId')
+    }
+  }, [session, status, router, loadTestForEditing])
 
   const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc)
@@ -280,7 +351,14 @@ export default function TestBuilderPage() {
       const result = await response.json()
       
       if (result.ok) {
-        setGeneratedQuestions(result.questions || [])
+        const newQuestions = result.questions || []
+        if (isEditMode) {
+          // In edit mode, add new questions to existing ones
+          setGeneratedQuestions(prev => [...prev, ...newQuestions])
+        } else {
+          // In create mode, replace questions
+          setGeneratedQuestions(newQuestions)
+        }
         setAiProvider(result.provider || 'unknown')
       } else {
         throw new Error(result.error || 'Failed to generate questions')
@@ -348,6 +426,12 @@ export default function TestBuilderPage() {
     )
   }
 
+  const handleClearAllQuestions = () => {
+    if (confirm('Are you sure you want to clear all questions? This action cannot be undone.')) {
+      setGeneratedQuestions([])
+    }
+  }
+
   const handleSaveTest = async () => {
     if (generatedQuestions.length === 0) {
       setError("No questions to save")
@@ -363,30 +447,51 @@ export default function TestBuilderPage() {
     setError(null)
 
     try {
-      // Create test data structure
-      const testData = {
-        id: Date.now().toString(), // Simple ID generation
-        title: `${selectedDocument.name} - Test`,
-        type: testConfig.type,
-        difficulty: testConfig.difficulty,
-        locale: testConfig.locale,
-        questionCount: generatedQuestions.length,
-        questions: generatedQuestions,
-        sourceDocument: selectedDocument.name,
-        createdAt: new Date().toISOString(),
-        createdBy: session?.user?.name || 'Unknown'
-      }
-
-      // In a real app, you would save this to your database
-      // For now, we'll save to localStorage as a demo
       const existingTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-      existingTests.push(testData)
-      localStorage.setItem('savedTests', JSON.stringify(existingTests))
-
-      // Show success message
-      alert(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
       
-      // Optionally redirect to tests list
+      if (isEditMode && editingTestId) {
+        // Update existing test
+        const testData = {
+          id: editingTestId,
+          title: `${selectedDocument.name} - Test`,
+          type: testConfig.type,
+          difficulty: testConfig.difficulty,
+          locale: testConfig.locale,
+          questionCount: generatedQuestions.length,
+          questions: generatedQuestions,
+          sourceDocument: selectedDocument.name,
+          createdAt: existingTests.find((t: SavedTest) => t.id === editingTestId)?.createdAt || new Date().toISOString(),
+          createdBy: session?.user?.name || 'Unknown'
+        }
+
+        const updatedTests = existingTests.map((test: SavedTest) => 
+          test.id === editingTestId ? testData : test
+        )
+        localStorage.setItem('savedTests', JSON.stringify(updatedTests))
+
+        alert(`Test updated successfully! ${generatedQuestions.length} questions updated.`)
+      } else {
+        // Create new test
+        const testData = {
+          id: Date.now().toString(),
+          title: `${selectedDocument.name} - Test`,
+          type: testConfig.type,
+          difficulty: testConfig.difficulty,
+          locale: testConfig.locale,
+          questionCount: generatedQuestions.length,
+          questions: generatedQuestions,
+          sourceDocument: selectedDocument.name,
+          createdAt: new Date().toISOString(),
+          createdBy: session?.user?.name || 'Unknown'
+        }
+
+        existingTests.push(testData)
+        localStorage.setItem('savedTests', JSON.stringify(existingTests))
+
+        alert(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
+      }
+      
+      // Redirect to tests list
       router.push('/manager?tab=tests')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save test')
@@ -416,7 +521,7 @@ export default function TestBuilderPage() {
             <div className="flex items-center min-w-0">
               <TestTube className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
-                Test Builder
+                {isEditMode ? 'Edit Test' : 'Test Builder'}
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -538,12 +643,12 @@ export default function TestBuilderPage() {
                     {isGenerating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
+                        {isEditMode ? 'Adding Questions...' : 'Generating...'}
                       </>
                     ) : (
                       <>
                         <TestTube className="h-4 w-4 mr-2" />
-                        Generate Test
+                        {isEditMode ? 'Add Questions' : 'Generate Test'}
                       </>
                     )}
                   </Button>
@@ -570,7 +675,14 @@ export default function TestBuilderPage() {
                     <div>
                       <CardTitle>Generated Questions</CardTitle>
                       <CardDescription>
-                        {generatedQuestions.length} questions generated successfully
+                        {isEditMode ? (
+                          <>
+                            {generatedQuestions.length} questions total 
+                            ({originalQuestionCount} existing, {generatedQuestions.length - originalQuestionCount} new)
+                          </>
+                        ) : (
+                          `${generatedQuestions.length} questions generated successfully`
+                        )}
                         {aiProvider && (
                           <span className="ml-2 text-blue-600">
                             (via {aiProvider === 'mock' ? 'Mock Data' : aiProvider.toUpperCase()})
@@ -578,23 +690,35 @@ export default function TestBuilderPage() {
                         )}
                       </CardDescription>
                     </div>
-                    <Button 
-                      onClick={handleSaveTest}
-                      disabled={isSaving}
-                      className="w-full sm:w-auto"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save Test
-                        </>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {isEditMode && generatedQuestions.length > 0 && (
+                        <Button 
+                          onClick={handleClearAllQuestions}
+                          variant="outline"
+                          className="w-full sm:w-auto"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Clear All
+                        </Button>
                       )}
-                    </Button>
+                      <Button 
+                        onClick={handleSaveTest}
+                        disabled={isSaving}
+                        className="w-full sm:w-auto"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            {isEditMode ? 'Update Test' : 'Save Test'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -602,7 +726,12 @@ export default function TestBuilderPage() {
                     {generatedQuestions.map((question, index) => (
                       <div key={question.id || index} className="p-4 border rounded-lg">
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium">Question {index + 1}</h4>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-medium">Question {index + 1}</h4>
+                            {isEditMode && index >= originalQuestionCount && (
+                              <Badge variant="default" className="text-xs">New</Badge>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-2">
                             <Badge variant="outline">{question.type}</Badge>
                             <Button

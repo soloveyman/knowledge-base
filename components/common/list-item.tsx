@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X } from "lucide-react"
+import { X, Edit } from "lucide-react"
 
 interface ListItemProps {
   title: string
@@ -14,7 +14,9 @@ interface ListItemProps {
   }>
   onClick?: () => void
   onDelete?: () => void
+  onEdit?: () => void
   showDeleteButton?: boolean
+  showEditButton?: boolean
 }
 
 export function ListItem({ 
@@ -24,7 +26,9 @@ export function ListItem({
   badges = [], 
   onClick, 
   onDelete, 
-  showDeleteButton = true 
+  onEdit,
+  showDeleteButton = true,
+  showEditButton = false
 }: ListItemProps) {
   return (
     <div 
@@ -57,19 +61,34 @@ export function ListItem({
           </div>
         )}
       </div>
-      {showDeleteButton && onDelete && (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="text-gray-400 hover:text-gray-600"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      )}
+      <div className="flex items-center space-x-1">
+        {showEditButton && onEdit && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-gray-400 hover:text-blue-600"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit()
+            }}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+        )}
+        {showDeleteButton && onDelete && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-gray-400 hover:text-red-600"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

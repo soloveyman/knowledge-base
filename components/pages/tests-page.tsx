@@ -20,12 +20,14 @@ interface TestsPageProps {
   tests: Test[]
   onDeleteTest: (id: string) => void
   onViewTest: (id: string) => void
+  onEditTest: (id: string) => void
 }
 
 export function TestsPage({ 
   tests, 
   onDeleteTest, 
-  onViewTest 
+  onViewTest,
+  onEditTest
 }: TestsPageProps) {
   const router = useRouter()
 
@@ -39,7 +41,8 @@ export function TestsPage({
       { label: test.locale, variant: "secondary" as const }
     ],
     onClick: () => onViewTest(test.id),
-    onDelete: () => onDeleteTest(test.id)
+    onDelete: () => onDeleteTest(test.id),
+    onEdit: () => onEditTest(test.id)
   }))
 
   return (
@@ -53,6 +56,7 @@ export function TestsPage({
         onClick: () => router.push('/test-builder')
       }}
       items={testItems}
+      showEditButton={true}
       emptyState={{
         icon: <TestTube className="h-12 w-12" />,
         title: "No tests created yet",

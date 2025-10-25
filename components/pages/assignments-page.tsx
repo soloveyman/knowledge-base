@@ -36,12 +36,14 @@ interface AssignmentsPageProps {
   assignments: Assignment[]
   onDeleteAssignment: (id: string) => void
   onViewAssignment: (id: string) => void
+  onEditAssignment: (id: string) => void
 }
 
 export function AssignmentsPage({ 
   assignments, 
   onDeleteAssignment, 
-  onViewAssignment 
+  onViewAssignment,
+  onEditAssignment
 }: AssignmentsPageProps) {
   const router = useRouter()
 
@@ -62,7 +64,8 @@ export function AssignmentsPage({
       }
     ],
     onClick: () => onViewAssignment(assignment.id),
-    onDelete: () => onDeleteAssignment(assignment.id)
+    onDelete: () => onDeleteAssignment(assignment.id),
+    onEdit: () => onEditAssignment(assignment.id)
   }))
 
   return (
@@ -76,6 +79,7 @@ export function AssignmentsPage({
         onClick: () => router.push('/assignment-builder')
       }}
       items={assignmentItems}
+      showEditButton={true}
       emptyState={{
         icon: <ClipboardList className="h-12 w-12" />,
         title: "No assignments created yet",
