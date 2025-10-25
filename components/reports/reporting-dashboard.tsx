@@ -73,91 +73,24 @@ export default function ReportingDashboard() {
     loadReportData()
   }, [filters])
 
-  const loadReportData = () => {
-    // Mock data - in production, this would come from API
-    const mockReportData: ReportData[] = [
-      {
-        moduleId: '1',
-        moduleTitle: 'Food Safety Training',
-        totalAssigned: 25,
-        started: 20,
-        completed: 18,
-        averageScore: 87,
-        averageTimeSpent: 28,
-        completionRate: 72,
-        overdueCount: 2
-      },
-      {
-        moduleId: '2',
-        moduleTitle: 'Customer Service Excellence',
-        totalAssigned: 20,
-        started: 15,
-        completed: 12,
-        averageScore: 82,
-        averageTimeSpent: 42,
-        completionRate: 60,
-        overdueCount: 3
-      },
-      {
-        moduleId: '3',
-        moduleTitle: 'Hygiene Standards',
-        totalAssigned: 30,
-        started: 25,
-        completed: 22,
-        averageScore: 91,
-        averageTimeSpent: 18,
-        completionRate: 73,
-        overdueCount: 1
+  const loadReportData = async () => {
+    try {
+      const response = await fetch('/api/reports/dashboard')
+      const result = await response.json()
+      
+      if (result.success) {
+        setReportData(result.data.reportData)
+        setEmployeeProgress(result.data.employeeProgress)
+      } else {
+        console.error('Failed to load report data:', result.message)
+        setReportData([])
+        setEmployeeProgress([])
       }
-    ]
-
-    const mockEmployeeProgress: EmployeeProgress[] = [
-      {
-        id: '1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        status: 'completed',
-        score: 92,
-        timeSpent: 25,
-        lastActivity: '2024-01-15T10:30:00Z',
-        attempts: 1,
-        maxAttempts: 3
-      },
-      {
-        id: '2',
-        name: 'Jane Smith',
-        email: 'jane@example.com',
-        status: 'in_progress',
-        timeSpent: 15,
-        lastActivity: '2024-01-16T14:20:00Z',
-        attempts: 0,
-        maxAttempts: 3
-      },
-      {
-        id: '3',
-        name: 'Mike Johnson',
-        email: 'mike@example.com',
-        status: 'overdue',
-        timeSpent: 0,
-        lastActivity: '2024-01-10T09:15:00Z',
-        attempts: 0,
-        maxAttempts: 3
-      },
-      {
-        id: '4',
-        name: 'Sarah Wilson',
-        email: 'sarah@example.com',
-        status: 'completed',
-        score: 88,
-        timeSpent: 32,
-        lastActivity: '2024-01-14T16:45:00Z',
-        attempts: 2,
-        maxAttempts: 3
-      }
-    ]
-
-    setReportData(mockReportData)
-    setEmployeeProgress(mockEmployeeProgress)
+    } catch (error) {
+      console.error('Error loading report data:', error)
+      setReportData([])
+      setEmployeeProgress([])
+    }
   }
 
   const handleFilterChange = (field: keyof ReportFilters, value: ReportFilters[keyof ReportFilters]) => {

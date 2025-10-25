@@ -78,95 +78,27 @@ export default function SubscriptionManager({
     loadSubscriptionData()
   }, [])
 
-  const loadSubscriptionData = () => {
-    // Mock data - in production, this would come from API
-    const mockPlans: SubscriptionPlan[] = [
-      {
-        id: 'free',
-        name: 'free',
-        displayName: 'Free',
-        description: 'Perfect for small teams getting started',
-        price: 0,
-        currency: 'USD',
-        interval: 'month',
-        maxUsers: 5,
-        maxImportsPerMonth: 10,
-        maxGenerationsPerMonth: 20,
-        features: [
-          'Up to 5 users',
-          '10 document imports per month',
-          '20 AI generations per month',
-          'Basic reporting',
-          'Email support'
-        ]
-      },
-      {
-        id: 'pro',
-        name: 'pro',
-        displayName: 'Pro',
-        description: 'Ideal for growing teams and businesses',
-        price: 2900, // $29.00 in cents
-        currency: 'USD',
-        interval: 'month',
-        maxUsers: 25,
-        maxImportsPerMonth: 100,
-        maxGenerationsPerMonth: 200,
-        features: [
-          'Up to 25 users',
-          '100 document imports per month',
-          '200 AI generations per month',
-          'Advanced reporting & analytics',
-          'Priority support',
-          'Custom branding',
-          'API access'
-        ],
-        isPopular: true
-      },
-      {
-        id: 'business',
-        name: 'business',
-        displayName: 'Business',
-        description: 'For large organizations with advanced needs',
-        price: 9900, // $99.00 in cents
-        currency: 'USD',
-        interval: 'month',
-        maxUsers: 100,
-        maxImportsPerMonth: 500,
-        maxGenerationsPerMonth: 1000,
-        features: [
-          'Up to 100 users',
-          '500 document imports per month',
-          '1000 AI generations per month',
-          'Enterprise reporting & analytics',
-          '24/7 phone support',
-          'White-label solution',
-          'Advanced API access',
-          'Custom integrations',
-          'Dedicated account manager'
-        ]
+  const loadSubscriptionData = async () => {
+    try {
+      const response = await fetch('/api/subscription')
+      const result = await response.json()
+      
+      if (result.success) {
+        setPlans(result.data.plans)
+        setCurrentSubscription(result.data.currentSubscription)
+        setUsage(result.data.usage)
+      } else {
+        console.error('Failed to load subscription data:', result.message)
+        setPlans([])
+        setCurrentSubscription(null)
+        setUsage(null)
       }
-    ]
-
-    const mockCurrentSubscription: CurrentSubscription = {
-      planId: 'pro',
-      planName: 'Pro',
-      status: 'active',
-      currentPeriodStart: '2024-01-01T00:00:00Z',
-      currentPeriodEnd: '2024-02-01T00:00:00Z',
-      cancelAtPeriodEnd: false,
-      nextBillingDate: '2024-02-01T00:00:00Z'
+    } catch (error) {
+      console.error('Error loading subscription data:', error)
+      setPlans([])
+      setCurrentSubscription(null)
+      setUsage(null)
     }
-
-    const mockUsage: Usage = {
-      month: '2024-01',
-      importsCount: 45,
-      generationsCount: 89,
-      usersCount: 18
-    }
-
-    setPlans(mockPlans)
-    setCurrentSubscription(mockCurrentSubscription)
-    setUsage(mockUsage)
   }
 
   const formatPrice = (price: number, currency: string) => {

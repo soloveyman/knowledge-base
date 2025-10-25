@@ -50,13 +50,7 @@ interface SavedTest {
   createdBy: string
 }
 
-// Mock documents data - in real app this would come from your docs API
-const mockDocuments: Document[] = [
-  { id: 1, name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago" },
-  { id: 2, name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
-  { id: 3, name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago" },
-  { id: 4, name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago" }
-]
+// Documents will be loaded from API
 
 const questionTypes: QuestionType[] = [
   { value: "mcq", label: "Multiple Choice (Single)" },
@@ -84,6 +78,7 @@ export default function TestBuilderPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   
+  const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [testConfig, setTestConfig] = useState<TestConfig>({
     count: 5,
@@ -106,6 +101,28 @@ export default function TestBuilderPage() {
   const [editingTestId, setEditingTestId] = useState<string | null>(null)
   const [originalQuestionCount, setOriginalQuestionCount] = useState(0)
 
+  // Load documents from API
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const response = await fetch('/api/documents')
+        const result = await response.json()
+        
+        if (result.success) {
+          setDocuments(result.data.documents)
+        } else {
+          console.error('Failed to load documents:', result.message)
+          setDocuments([])
+        }
+      } catch (error) {
+        console.error('Error loading documents:', error)
+        setDocuments([])
+      }
+    }
+
+    loadDocuments()
+  }, [])
+
   const loadTestForEditing = useCallback((testId: string) => {
     try {
       const savedTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
@@ -121,7 +138,7 @@ export default function TestBuilderPage() {
         })
 
         // Load document
-        const document = mockDocuments.find(doc => doc.name === testToEdit.sourceDocument)
+        const document = documents.find(doc => doc.name === testToEdit.sourceDocument)
         if (document) {
           setSelectedDocument(document)
           const documentContent = getDocumentContent(document.name)
@@ -551,7 +568,7 @@ export default function TestBuilderPage() {
                   <Select 
                     value={selectedDocument?.id?.toString() || ""} 
                     onValueChange={(value) => {
-                      const doc = mockDocuments.find(d => d.id.toString() === value)
+                      const doc = documents.find(d => d.id.toString() === value)
                       if (doc) handleDocumentSelect(doc)
                     }}
                   >
@@ -559,7 +576,7 @@ export default function TestBuilderPage() {
                       <SelectValue placeholder="Choose a document to generate questions from..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockDocuments.map((doc) => (
+                      {documents.map((doc) => (
                         <SelectItem key={doc.id} value={doc.id.toString()}>
                           <div className="flex items-center space-x-2">
                             <FileText className="h-4 w-4" />

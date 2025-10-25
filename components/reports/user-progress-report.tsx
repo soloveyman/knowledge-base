@@ -124,7 +124,7 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
       case 'in_progress':
         return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
       case 'failed':
-        return <Badge className="bg-red-100 text-red-800">Failed</Badge>
+        return <Badge className="bg-red-50 text-black">Failed</Badge>
       case 'overdue':
         return <Badge className="bg-red-100 text-red-800">Overdue</Badge>
       default:

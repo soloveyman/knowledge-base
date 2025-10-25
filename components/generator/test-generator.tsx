@@ -159,52 +159,31 @@ export default function TestGenerator({
       clearInterval(progressInterval)
       setGenerationProgress(100)
 
-      // Mock generated questions
-      const mockQuestions: GeneratedQuestion[] = [
-        {
-          id: '1',
-          title: 'Food Safety Basics',
-          content: 'What is the minimum internal temperature for cooking poultry?',
-          type: 'multiple_choice',
-          options: ['160°F (71°C)', '165°F (74°C)', '170°F (77°C)', '175°F (79°C)'],
-          correctAnswer: '165°F (74°C)',
-          explanation: 'Poultry must be cooked to 165°F (74°C) to ensure all harmful bacteria are destroyed.',
-          difficulty: 'medium',
-          confidence: 85,
-          requiresReview: false,
-          sourceSection: 'Temperature Control'
+      // Call API to generate questions
+      const response = await fetch('/api/generate-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        {
-          id: '2',
-          title: 'Hygiene Practices',
-          content: 'Hand washing should be done for at least 20 seconds.',
-          type: 'true_false',
-          correctAnswer: 'true',
-          explanation: 'The CDC recommends washing hands for at least 20 seconds with soap and water.',
-          difficulty: 'easy',
-          confidence: 95,
-          requiresReview: false,
-          sourceSection: 'Personal Hygiene'
-        },
-        {
-          id: '3',
-          title: 'Cross Contamination',
-          content: 'Describe the proper procedure for cleaning and sanitizing cutting boards.',
-          type: 'text',
-          correctAnswer: 'Wash with hot soapy water, rinse, sanitize with bleach solution, air dry',
-          explanation: 'Proper cleaning involves washing, rinsing, sanitizing, and air drying to prevent cross-contamination.',
-          difficulty: 'hard',
-          confidence: 70,
-          requiresReview: true,
-          sourceSection: 'Cross Contamination Prevention'
+        body: JSON.stringify({
+          sectionIds: params.sectionIds,
+          questionCount: params.questionCount,
+          difficulty: params.difficulty,
+          questionTypes: params.questionTypes
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setGeneratedQuestions(result.data.questions)
+        setIsGenerating(false)
+
+        if (onGenerate) {
+          onGenerate(result.data.questions)
         }
-      ]
-
-      setGeneratedQuestions(mockQuestions)
-      setIsGenerating(false)
-
-      if (onGenerate) {
-        onGenerate(mockQuestions)
+      } else {
+        throw new Error(result.message || 'Failed to generate questions')
       }
 
     } catch (err) {
