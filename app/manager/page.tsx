@@ -6,16 +6,14 @@ import { useEffect, useState, useMemo, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AppBar } from "@/components/common/app-bar"
 import { 
   Users, 
   ClipboardList, 
   BarChart3, 
-  LogOut,
-  Building2,
   FileText,
   X
 } from "lucide-react"
-import { signOut } from "next-auth/react"
 import { TestsPage } from "@/components/pages/tests-page"
 import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
@@ -121,9 +119,6 @@ export default function ManagerPage() {
     }
   }, [defaultDocuments])
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: "/auth/signin" })
-  }
 
   // Document handlers
   const handleDeleteDocument = (id: string) => {
@@ -194,23 +189,7 @@ export default function ManagerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center min-w-0">
-              <Building2 className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Manager Dashboard</h1>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <Button variant="outline" size="sm" onClick={handleSignOut} className="text-xs sm:text-sm">
-                <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppBar role="manager" userName={session.user?.name} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

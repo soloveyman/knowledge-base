@@ -4,19 +4,16 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsersPage } from "@/components/pages/users-page"
+import { AppBar } from "@/components/common/app-bar"
 import { 
   Users, 
   FileText, 
   ClipboardList, 
   BarChart3, 
-  LogOut,
-  Settings,
-  Crown
+  Settings
 } from "lucide-react"
-import { signOut } from "next-auth/react"
 
 interface SavedUser {
   id: string
@@ -56,7 +53,6 @@ export default function OwnerPage() {
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([])
-  const [savedTests, setSavedTests] = useState<unknown[]>([])
 
   useEffect(() => {
     if (status === "loading") return
@@ -94,7 +90,6 @@ export default function OwnerPage() {
       setTimeout(() => {
         setSavedUsers(users)
         setSavedAssignments(assignments)
-        setSavedTests(tests)
       }, 0)
     }
 
@@ -118,9 +113,6 @@ export default function OwnerPage() {
     router.push('/user-builder')
   }
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: "/auth/signin" })
-  }
 
   if (status === "loading") {
     return (
@@ -136,23 +128,7 @@ export default function OwnerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center min-w-0">
-              <Crown className="h-8 w-8 text-yellow-600 mr-3 shrink-0" />
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Owner Dashboard</h1>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <Button variant="outline" size="sm" onClick={handleSignOut} className="text-xs sm:text-sm">
-                <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppBar role="owner" userName={session.user?.name} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

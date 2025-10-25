@@ -349,15 +349,15 @@ export default function TestPage() {
                           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium ${
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium flex-shrink-0 ${
                           isSelected
                             ? 'border-blue-500 bg-blue-500 text-white'
                             : 'border-gray-300'
                         }`}>
                           {letter}
                         </div>
-                        <span>{choice}</span>
+                        <span className="flex-1 break-words leading-relaxed">{choice}</span>
                       </div>
                     </button>
                   )

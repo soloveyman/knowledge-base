@@ -8,18 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AppBar } from "@/components/common/app-bar"
 import { 
   BookOpen, 
   ClipboardList, 
   Clock, 
   CheckCircle,
   AlertCircle,
-  LogOut,
-  Building2,
   Target,
   BarChart3
 } from "lucide-react"
-import { signOut } from "next-auth/react"
 
 interface Assignment {
   id: string
@@ -76,9 +74,6 @@ export default function EmployeePage() {
     return null
   }
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: "/auth/signin" })
-  }
 
   const handleCompleteAssignment = (assignmentId: string) => {
     const updatedAssignments = assignments.map(assignment => 
@@ -181,34 +176,20 @@ export default function EmployeePage() {
     : 0
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      {/* Header */}
-      <header className="bg-white dark:bg-slate-800 shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <Building2 className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  My Learning Dashboard
-                </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {session.user?.businessName} • Welcome back, {session.user?.name}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50">
+      <AppBar role="employee" userName={session.user?.name} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Welcome back, {session.user?.name || 'Employee'}!
+          </h2>
+          <p className="text-gray-600">
+            Your learning journey and assignment management
+          </p>
+        </div>
+
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -218,6 +199,27 @@ export default function EmployeePage() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Overall Progress Card - Top */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Overall Progress</CardTitle>
+                <CardDescription>Your learning journey progress</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Overall Completion</span>
+                    <span>{Math.round(totalProgress)}%</span>
+                  </div>
+                  <Progress value={totalProgress} className="h-3" />
+                  <div className="text-xs text-muted-foreground">
+                    {completedCount} of {assignments.length} assignments completed
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -274,39 +276,10 @@ export default function EmployeePage() {
                 </CardContent>
               </Card>
             </div>
-
-            <div className="grid grid-cols-1 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Overall Progress</CardTitle>
-                  <CardDescription>Your learning journey progress</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Overall Completion</span>
-                      <span>{Math.round(totalProgress)}%</span>
-                    </div>
-                    <Progress value={totalProgress} className="h-3" />
-                    <div className="text-xs text-muted-foreground">
-                      {completedCount} of {assignments.length} assignments completed
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-            </div>
           </TabsContent>
 
           {/* Assignments Tab */}
           <TabsContent value="assignments" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-semibold">My Assignments</h2>
-              <div className="text-sm text-muted-foreground">
-                {inProgressCount} in progress, {pendingCount} pending
-              </div>
-            </div>
-            
             <div className="grid gap-4">
               {transformedAssignments.map((assignment) => (
                 <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
@@ -339,12 +312,12 @@ export default function EmployeePage() {
                               <span>Due: {assignment.dueDate}</span>
                             </div>
                             <div className="flex items-center space-x-1">
-                              <Clock className="h-4 w-4" />
+                              <Clock className="h-5 w-5" />
                               <span>{assignment.estimatedTime}</span>
                             </div>
                             {assignment.score && (
                               <div className="flex items-center space-x-1">
-                                <BarChart3 className="h-4 w-4" />
+                                <BarChart3 className="h-5 w-5" />
                                 <span>Score: {assignment.score}%</span>
                               </div>
                             )}
@@ -401,8 +374,6 @@ export default function EmployeePage() {
 
           {/* Progress Tab */}
           <TabsContent value="progress" className="space-y-6">
-            <h2 className="text-2xl font-semibold">My Progress</h2>
-            
             <div className="grid gap-6">
               <Card>
                 <CardHeader>
