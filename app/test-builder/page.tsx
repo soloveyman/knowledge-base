@@ -8,13 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
-  ArrowLeft, 
   FileText, 
   X,
-  Plus,
   TestTube,
   Loader2
 } from "lucide-react"
@@ -62,9 +59,9 @@ export default function TestBuilderPage() {
   })
   const [context, setContext] = useState({
     text: "",
-    facts: [""],
-    steps: [""],
-    definitions: [""]
+    facts: [],
+    steps: [],
+    definitions: []
   })
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([])
@@ -88,35 +85,6 @@ export default function TestBuilderPage() {
     }))
   }
 
-  const handleContextChange = (field: string, value: string | string[]) => {
-    setContext(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
-
-  const addArrayItem = (field: string) => {
-    setContext(prev => ({
-      ...prev,
-      [field]: [...prev[field as keyof typeof prev], ""]
-    }))
-  }
-
-  const removeArrayItem = (field: string, index: number) => {
-    setContext(prev => ({
-      ...prev,
-      [field]: (prev[field as keyof typeof prev] as string[]).filter((_, i) => i !== index)
-    }))
-  }
-
-  const updateArrayItem = (field: string, index: number, value: string) => {
-    setContext(prev => ({
-      ...prev,
-      [field]: (prev[field as keyof typeof prev] as string[]).map((item, i) => 
-        i === index ? value : item
-      )
-    }))
-  }
 
   const generateHmacSignature = (data: any, secret: string) => {
     const crypto = require('crypto')
@@ -151,12 +119,10 @@ export default function TestBuilderPage() {
       const hmacSecret = process.env.NEXT_PUBLIC_HMAC_SECRET || "test-secret-key"
       const signature = generateHmacSignature(requestData, hmacSecret)
 
-      const response = await fetch('https://test-builder-8k0akfwsd-onboardin-rest.vercel.app/api/generate', {
+      const response = await fetch('/api/generate-test', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-key-id': process.env.NEXT_PUBLIC_HMAC_KEY_ID || "test-key-id",
-          'x-signature': signature
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestData)
       })
@@ -179,7 +145,7 @@ export default function TestBuilderPage() {
     }
   }
 
-  const handleBack = () => {
+  const handleClose = () => {
     router.push('/manager?tab=tests')
   }
 
@@ -202,32 +168,14 @@ export default function TestBuilderPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <Button variant="ghost" size="sm" onClick={handleBack} className="mr-4">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
               <TestTube className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                 Test Builder
               </h1>
             </div>
             <div className="flex items-center space-x-2">
-              <Button 
-                onClick={handleGenerateTest}
-                disabled={isGenerating || !selectedDocument}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <TestTube className="h-4 w-4 mr-2" />
-                    Generate Test
-                  </>
-                )}
+              <Button variant="ghost" size="sm" onClick={handleClose}>
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -239,40 +187,6 @@ export default function TestBuilderPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Configuration Panel */}
           <div className="space-y-6">
-            {/* Document Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Select Document</CardTitle>
-                <CardDescription>Choose a document to generate questions from</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {mockDocuments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedDocument?.id === doc.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                      onClick={() => handleDocumentSelect(doc)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <FileText className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="font-medium text-gray-900">{doc.name}</p>
-                          <p className="text-sm text-gray-500">{doc.type} • {doc.uploadedAt}</p>
-                        </div>
-                      </div>
-                      {selectedDocument?.id === doc.id && (
-                        <Badge variant="secondary">Selected</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Test Configuration */}
             <Card>
               <CardHeader>
@@ -280,6 +194,32 @@ export default function TestBuilderPage() {
                 <CardDescription>Configure your test parameters</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="document-select">Select Document</Label>
+                  <Select 
+                    value={selectedDocument?.id?.toString() || ""} 
+                    onValueChange={(value) => {
+                      const doc = mockDocuments.find(d => d.id.toString() === value)
+                      if (doc) handleDocumentSelect(doc)
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Choose a document to generate questions from..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockDocuments.map((doc) => (
+                        <SelectItem key={doc.id} value={doc.id.toString()}>
+                          <div className="flex items-center space-x-2">
+                            <FileText className="h-4 w-4" />
+                            <span>{doc.name}</span>
+                            <Badge variant="outline" className="ml-2">{doc.type}</Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="count">Number of Questions</Label>
@@ -290,12 +230,13 @@ export default function TestBuilderPage() {
                       max="50"
                       value={testConfig.count}
                       onChange={(e) => setTestConfig(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
+                      className="w-full"
                     />
                   </div>
                   <div>
                     <Label htmlFor="type">Question Type</Label>
                     <Select value={testConfig.type} onValueChange={(value) => setTestConfig(prev => ({ ...prev, type: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -313,7 +254,7 @@ export default function TestBuilderPage() {
                   <div>
                     <Label htmlFor="difficulty">Difficulty</Label>
                     <Select value={testConfig.difficulty} onValueChange={(value) => setTestConfig(prev => ({ ...prev, difficulty: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -328,7 +269,7 @@ export default function TestBuilderPage() {
                   <div>
                     <Label htmlFor="locale">Language</Label>
                     <Select value={testConfig.locale} onValueChange={(value) => setTestConfig(prev => ({ ...prev, locale: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -341,112 +282,29 @@ export default function TestBuilderPage() {
                     </Select>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Context Configuration */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Context Configuration</CardTitle>
-                <CardDescription>Provide additional context for question generation</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="text">Main Text Content</Label>
-                  <Textarea
-                    id="text"
-                    placeholder="Enter the main text content from your document..."
-                    value={context.text}
-                    onChange={(e) => handleContextChange('text', e.target.value)}
-                    rows={4}
-                  />
-                </div>
-
-                <div>
-                  <Label>Key Facts</Label>
-                  {context.facts.map((fact, index) => (
-                    <div key={index} className="flex items-center space-x-2 mb-2">
-                      <Input
-                        value={fact}
-                        onChange={(e) => updateArrayItem('facts', index, e.target.value)}
-                        placeholder="Enter a key fact..."
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeArrayItem('facts', index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addArrayItem('facts')}
+                <div className="pt-4">
+                  <Button 
+                    onClick={handleGenerateTest}
+                    disabled={isGenerating || !selectedDocument}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Fact
-                  </Button>
-                </div>
-
-                <div>
-                  <Label>Process Steps</Label>
-                  {context.steps.map((step, index) => (
-                    <div key={index} className="flex items-center space-x-2 mb-2">
-                      <Input
-                        value={step}
-                        onChange={(e) => updateArrayItem('steps', index, e.target.value)}
-                        placeholder="Enter a process step..."
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeArrayItem('steps', index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addArrayItem('steps')}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Step
-                  </Button>
-                </div>
-
-                <div>
-                  <Label>Definitions</Label>
-                  {context.definitions.map((definition, index) => (
-                    <div key={index} className="flex items-center space-x-2 mb-2">
-                      <Input
-                        value={definition}
-                        onChange={(e) => updateArrayItem('definitions', index, e.target.value)}
-                        placeholder="Enter a definition..."
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeArrayItem('definitions', index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addArrayItem('definitions')}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Definition
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="h-4 w-4 mr-2" />
+                        Generate Test
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
             </Card>
+
           </div>
 
           {/* Results Panel */}
