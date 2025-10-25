@@ -5,21 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, useMemo, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Users, 
-  FileText,
   ClipboardList, 
   BarChart3, 
-  Plus,
   LogOut,
   Building2,
-  TestTube,
+  FileText,
   X
 } from "lucide-react"
 import { signOut } from "next-auth/react"
-import DocumentImport from "@/components/import/document-import"
+import { TestsPage } from "@/components/pages/tests-page"
+import { AssignmentsPage } from "@/components/pages/assignments-page"
 
 interface SavedTest {
   id: string
@@ -72,10 +70,18 @@ export default function ManagerPage() {
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   
+  // Mock documents data
+  const mockDocuments = [
+    { id: "1", name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago" },
+    { id: "2", name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
+    { id: "3", name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago" },
+    { id: "4", name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago" }
+  ]
+  
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
     const tab = searchParams.get('tab')
-    return tab && ['overview', 'import', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
+    return tab && ['overview', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
   }, [searchParams])
 
   useEffect(() => {
@@ -90,6 +96,9 @@ export default function ManagerPage() {
   }, [session, status, router])
 
   useLayoutEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return
+    
     // Load saved tests from localStorage
     const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
     setSavedTests(tests)
@@ -101,6 +110,41 @@ export default function ManagerPage() {
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/auth/signin" })
+  }
+
+  // Document handlers
+  const handleDeleteDocument = (id: string) => {
+    console.log('Delete document:', id)
+  }
+
+  const handleViewDocument = (name: string) => {
+    router.push(`/docs/${encodeURIComponent(name)}`)
+  }
+
+  const handleImportDocument = () => {
+    router.push('/docs/import')
+  }
+
+  // Test handlers
+  const handleDeleteTest = (id: string) => {
+    const updatedTests = savedTests.filter(t => t.id !== id)
+    setSavedTests(updatedTests)
+    localStorage.setItem('savedTests', JSON.stringify(updatedTests))
+  }
+
+  const handleViewTest = (id: string) => {
+    console.log('Open test:', id)
+  }
+
+  // Assignment handlers
+  const handleDeleteAssignment = (id: string) => {
+    const updatedAssignments = savedAssignments.filter(a => a.id !== id)
+    setSavedAssignments(updatedAssignments)
+    localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
+  }
+
+  const handleViewAssignment = (id: string) => {
+    console.log('Open assignment:', id)
   }
 
   if (status === "loading") {
@@ -149,9 +193,8 @@ export default function ManagerPage() {
 
         {/* Main Tabs */}
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="import">Import</TabsTrigger>
             <TabsTrigger value="docs">Docs</TabsTrigger>
             <TabsTrigger value="tests">Tests</TabsTrigger>
             <TabsTrigger value="assignments">Assign</TabsTrigger>
@@ -221,28 +264,34 @@ export default function ManagerPage() {
           </TabsContent>
 
 
-          <TabsContent value="import" className="space-y-6">
-            <DocumentImport />
-          </TabsContent>
-
           <TabsContent value="docs" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Uploaded Documents</CardTitle>
-                <CardDescription>View and manage your uploaded documents</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                  <div>
+                    <CardTitle>Uploaded Documents</CardTitle>
+                    <CardDescription>View and manage your uploaded documents</CardDescription>
+                  </div>
+                  <Button 
+                    className="w-full sm:w-auto"
+                    onClick={handleImportDocument}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Import Document
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {/* Document List */}
-                  <div className="space-y-3">
-                    {/* Sample Document 1 */}
-                     <div 
-                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                       onClick={() => router.push(`/docs/${encodeURIComponent('Ланч меню BS.docx')}`)}
-                     >
+                  {mockDocuments.map((doc) => (
+                    <div 
+                      key={doc.id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleViewDocument(doc.name)}
+                    >
                       <div>
-                        <h3 className="font-medium text-gray-900">Ланч меню BS.docx</h3>
-                        <p className="text-sm text-gray-500">DOCX • Uploaded 2 hours ago</p>
+                        <h3 className="font-medium text-gray-900">{doc.name}</h3>
+                        <p className="text-sm text-gray-500">{doc.type} • Uploaded {doc.uploadedAt}</p>
                       </div>
                       <Button 
                         variant="ghost" 
@@ -250,224 +299,32 @@ export default function ManagerPage() {
                         className="text-gray-400 hover:text-gray-600"
                         onClick={(e) => {
                           e.stopPropagation()
-                          console.log('Delete: Ланч меню BS.docx')
+                          handleDeleteDocument(doc.id)
                         }}
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-
-                    {/* Sample Document 2 */}
-                     <div 
-                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                       onClick={() => router.push(`/docs/${encodeURIComponent('Training Schedule.xlsx')}`)}
-                     >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Training Schedule.xlsx</h3>
-                        <p className="text-sm text-gray-500">XLSX • Uploaded 1 day ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Training Schedule.xlsx')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Sample Document 3 */}
-                     <div 
-                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                       onClick={() => router.push(`/docs/${encodeURIComponent('Employee Handbook.docx')}`)}
-                     >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Employee Handbook.docx</h3>
-                        <p className="text-sm text-gray-500">DOCX • Uploaded 5 minutes ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Employee Handbook.docx')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Sample Document 4 */}
-                     <div 
-                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                       onClick={() => router.push(`/docs/${encodeURIComponent('Safety Guidelines.pdf')}`)}
-                     >
-                      <div>
-                        <h3 className="font-medium text-gray-900">Safety Guidelines.pdf</h3>
-                        <p className="text-sm text-gray-500">PDF • Uploaded 1 hour ago</p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-gray-400 hover:text-gray-600"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          console.log('Delete: Safety Guidelines.pdf')
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="tests" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                  <div>
-                    <CardTitle>Test Management</CardTitle>
-                    <CardDescription>Create and manage tests and assessments</CardDescription>
-                  </div>
-                  <Button 
-                    className="w-full sm:w-auto"
-                    onClick={() => router.push('/test-builder')}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Test
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Test List */}
-                  <div className="space-y-3">
-                    {savedTests.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <TestTube className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>No tests created yet</p>
-                        <p className="text-sm">Create your first test using the Test Builder</p>
-                      </div>
-                    ) : (
-                      savedTests.map((test) => (
-                        <div 
-                          key={test.id}
-                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                          onClick={() => console.log('Open test:', test.title)}
-                        >
-                          <div>
-                            <h3 className="font-medium text-gray-900">{test.title}</h3>
-                            <p className="text-sm text-gray-500">
-                              {test.type} • {test.questionCount} questions • Created {new Date(test.createdAt).toLocaleDateString()}
-                            </p>
-                            <p className="text-xs text-gray-400">Source: {test.sourceDocument}</p>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-gray-400 hover:text-gray-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const updatedTests = savedTests.filter(t => t.id !== test.id)
-                              setSavedTests(updatedTests)
-                              localStorage.setItem('savedTests', JSON.stringify(updatedTests))
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <TestsPage
+              tests={savedTests}
+              onDeleteTest={handleDeleteTest}
+              onViewTest={handleViewTest}
+            />
           </TabsContent>
 
           <TabsContent value="assignments" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                  <div>
-                    <CardTitle>Assignments</CardTitle>
-                    <CardDescription>Assign training modules and tests to employees</CardDescription>
-                  </div>
-                  <Button 
-                    className="w-full sm:w-auto"
-                    onClick={() => router.push('/assignment-builder')}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Assignment
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Assignment List */}
-                  <div className="space-y-3">
-                    {savedAssignments.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <ClipboardList className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>No assignments created yet</p>
-                        <p className="text-sm">Create your first assignment using the Assignment Builder</p>
-                      </div>
-                    ) : (
-                      savedAssignments.map((assignment) => (
-                        <div 
-                          key={assignment.id}
-                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                          onClick={() => console.log('Open assignment:', assignment.name)}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-900">{assignment.name}</h3>
-                            <p className="text-sm text-gray-500">
-                              {assignment.description || 'No description provided'}
-                            </p>
-                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
-                              <span>Document: {assignment.document.name}</span>
-                              <span>Test: {assignment.test.title}</span>
-                              <span>Due: {new Date(assignment.dueDate).toLocaleDateString()}</span>
-                            </div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <Badge variant="outline" className="text-xs">
-                                {assignment.assignedUsers.length} employee(s)
-                              </Badge>
-                              <Badge 
-                                variant={assignment.status === 'active' ? 'default' : 'secondary'} 
-                                className="text-xs"
-                              >
-                                {assignment.status}
-                              </Badge>
-                            </div>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-gray-400 hover:text-gray-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const updatedAssignments = savedAssignments.filter(a => a.id !== assignment.id)
-                              setSavedAssignments(updatedAssignments)
-                              localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <AssignmentsPage
+              assignments={savedAssignments}
+              onDeleteAssignment={handleDeleteAssignment}
+              onViewAssignment={handleViewAssignment}
+            />
           </TabsContent>
 
         </Tabs>
