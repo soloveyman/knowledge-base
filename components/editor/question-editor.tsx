@@ -83,7 +83,7 @@ export default function QuestionEditor({
     }
   }, [question])
 
-  const handleInputChange = (field: keyof Question, value: any) => {
+  const handleInputChange = (field: keyof Question, value: Question[keyof Question]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -98,7 +98,7 @@ export default function QuestionEditor({
     }
   }
 
-  const handleOptionChange = (optionId: string, field: keyof QuestionOption, value: any) => {
+  const handleOptionChange = (optionId: string, field: keyof QuestionOption, value: QuestionOption[keyof QuestionOption]) => {
     setFormData(prev => ({
       ...prev,
       options: prev.options.map(option => 

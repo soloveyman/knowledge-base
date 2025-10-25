@@ -7,6 +7,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
+import { navigateBack, getRedirectUrl } from "@/lib/redirect-utils"
+
+interface UserWithRole {
+  name?: string | null
+  email?: string | null
+  role?: string
+}
+
+interface Assignment {
+  id: string
+  name: string
+  description: string
+  document: {
+    id: number
+    name: string
+    type: string
+    uploadedAt: string
+  }
+  test: {
+    id: string
+    title: string
+    questionCount: number
+  }
+  assignedUsers: Array<{
+    id: number
+    name: string
+    email: string
+    role: string
+    department: string
+  }>
+  dueDate: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
 import { 
   FileText, 
   X,
@@ -60,7 +95,7 @@ export default function DocumentReaderPage() {
     // Load assignment data from localStorage
     if (typeof window !== 'undefined') {
       const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      const assignment = savedAssignments.find((a: any) => a.document?.id.toString() === documentId)
+      const assignment = savedAssignments.find((a: Assignment) => a.document?.id.toString() === documentId)
       
       if (assignment) {
         setAssignmentData(assignment)
@@ -76,7 +111,7 @@ export default function DocumentReaderPage() {
         
         // Update assignment status to in_progress when user starts reading
         if (assignment.status === 'pending' || assignment.status === 'active') {
-          const updatedAssignments = savedAssignments.map((a: any) => 
+          const updatedAssignments = savedAssignments.map((a: Assignment) => 
             a.id === assignment.id 
               ? { ...a, status: 'in_progress' }
               : a
@@ -194,7 +229,9 @@ export default function DocumentReaderPage() {
   }
 
   const handleBack = () => {
-    router.push('/employee?tab=assignments')
+    // Determine user role from session or default to employee
+    const userRole = (session?.user as UserWithRole)?.role || 'employee'
+    navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
 
 

@@ -111,7 +111,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
   const selectedUsers = users.filter(user => assignmentData.assignedTo.includes(user.id))
   const selectedGroups = groups.filter(group => assignmentData.groupIds.includes(group.id))
 
-  const handleInputChange = (field: keyof AssignmentData, value: any) => {
+  const handleInputChange = (field: keyof AssignmentData, value: AssignmentData[keyof AssignmentData]) => {
     setAssignmentData(prev => ({
       ...prev,
       [field]: value

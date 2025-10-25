@@ -48,6 +48,19 @@ interface GeneratedQuestion {
   sourceSection: string
 }
 
+interface TestData {
+  id: string
+  title: string
+  type: string
+  difficulty: string
+  locale: string
+  questionCount: number
+  questions: GeneratedQuestion[]
+  sourceDocument: string
+  createdAt: string
+  createdBy: string
+}
+
 interface TestGeneratorProps {
   moduleId: string
   sections: Array<{
@@ -56,7 +69,7 @@ interface TestGeneratorProps {
     content: string
   }>
   onGenerate?: (questions: GeneratedQuestion[]) => void
-  onSave?: (testData: any) => void
+  onSave?: (testData: TestData) => void
 }
 
 export default function TestGenerator({ 
@@ -94,7 +107,7 @@ export default function TestGenerator({
     { value: 'mixed', label: 'Mixed', color: 'bg-blue-100 text-blue-800' }
   ]
 
-  const handleParamChange = (field: keyof GenerationParams, value: any) => {
+  const handleParamChange = (field: keyof GenerationParams, value: GenerationParams[keyof GenerationParams]) => {
     setParams(prev => ({
       ...prev,
       [field]: value

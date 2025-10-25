@@ -7,6 +7,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
+import { navigateBack } from "@/lib/redirect-utils"
+
+interface UserWithRole {
+  name?: string | null
+  email?: string | null
+  role?: string
+}
+
+interface Document {
+  id: number
+  name: string
+  type: string
+  content: string
+  uploadedAt: string
+  uploadedBy: string
+  size: string
+}
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { 
   FileText, 
@@ -36,13 +53,14 @@ export default function DocumentViewer() {
 
     // Check if document exists in localStorage (mock check)
     const savedDocuments = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
-    const documentExists = savedDocuments.some((doc: any) => 
+    const documentExists = savedDocuments.some((doc: Document) => 
       doc.name === decodeURIComponent(filename)
     )
 
     if (!documentExists) {
-      // Document doesn't exist, redirect back to manager docs tab
-      router.push('/manager?tab=docs')
+      // Document doesn't exist, redirect back to previous tab
+      const userRole = (session?.user as UserWithRole)?.role || 'manager'
+      navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
       return
     }
 
@@ -59,8 +77,9 @@ export default function DocumentViewer() {
   }, [session, status, router, filename])
 
   const handleClose = () => {
-    // Navigate back to the manager page with docs tab active
-    router.push('/manager?tab=docs')
+    // Navigate back to the previous tab
+    const userRole = (session?.user as UserWithRole)?.role || 'manager'
+    navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
   }
 
   if (status === "loading" || loading) {

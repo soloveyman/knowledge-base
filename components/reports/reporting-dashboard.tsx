@@ -160,7 +160,7 @@ export default function ReportingDashboard() {
     setEmployeeProgress(mockEmployeeProgress)
   }
 
-  const handleFilterChange = (field: keyof ReportFilters, value: any) => {
+  const handleFilterChange = (field: keyof ReportFilters, value: ReportFilters[keyof ReportFilters]) => {
     setFilters(prev => ({
       ...prev,
       [field]: value

@@ -5,7 +5,54 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+
+interface Test {
+  id: string
+  title: string
+  type: string
+  difficulty: string
+  locale: string
+  questionCount: number
+  questions: Array<{
+    id: string
+    type: string
+    prompt: string
+    choices?: string[]
+    correct_answer?: string
+    explanation?: string
+  }>
+  sourceDocument: string
+  createdAt: string
+  createdBy: string
+}
+
+interface Assignment {
+  id: string
+  name: string
+  description: string
+  document: {
+    id: number
+    name: string
+    type: string
+    uploadedAt: string
+  }
+  test: {
+    id: string
+    title: string
+    questionCount: number
+  }
+  assignedUsers: Array<{
+    id: number
+    name: string
+    email: string
+    role: string
+    department: string
+  }>
+  dueDate: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
 import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
@@ -20,9 +67,17 @@ import {
   X,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from "lucide-react"
 import { useParams } from "next/navigation"
+import { navigateBack } from "@/lib/redirect-utils"
+
+interface UserWithRole {
+  name?: string | null
+  email?: string | null
+  role?: string
+}
 
 interface TestQuestion {
   id: string
@@ -72,7 +127,7 @@ export default function TestPage() {
     // Load test data from localStorage
     if (typeof window !== 'undefined') {
       const savedTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-      const test = savedTests.find((t: any) => t.id === testId)
+      const test = savedTests.find((t: Test) => t.id === testId)
       
       if (test) {
         setTestData(test)
@@ -134,7 +189,7 @@ export default function TestPage() {
 
     // Update assignment status based on test score
     const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-    const updatedAssignments = savedAssignments.map((assignment: any) => {
+    const updatedAssignments = savedAssignments.map((assignment: Assignment) => {
       if (assignment.test?.id === testId) {
         return { 
           ...assignment, 
@@ -154,13 +209,17 @@ export default function TestPage() {
     if (hasAnswers && !showResults) {
       setShowExitConfirm(true)
     } else {
-      router.push('/employee?tab=assignments')
+      // Determine user role from session or default to employee
+      const userRole = (session?.user as UserWithRole)?.role || 'employee'
+      navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'assignments')
     }
   }
 
   const handleConfirmExit = () => {
     setShowExitConfirm(false)
-    router.push('/employee?tab=assignments')
+    // Determine user role from session or default to employee
+    const userRole = (session?.user as UserWithRole)?.role || 'employee'
+    navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
 
   const handleCancelExit = () => {

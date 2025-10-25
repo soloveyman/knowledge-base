@@ -1,12 +1,13 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/lib/badges"
+import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
@@ -20,13 +21,34 @@ import {
   BarChart3
 } from "lucide-react"
 
+interface Document {
+  id: number
+  name: string
+  type: string
+  uploadedAt: string
+}
+
+interface Test {
+  id: string
+  title: string
+  questionCount: number
+}
+
+interface AssignedUser {
+  id: number
+  name: string
+  email: string
+  role: string
+  department: string
+}
+
 interface Assignment {
   id: string
   name: string
   description: string
-  document: any
-  test: any
-  assignedUsers: any[]
+  document: Document
+  test: Test
+  assignedUsers: AssignedUser[]
   dueDate: string
   createdAt: string
   createdBy: string
@@ -36,8 +58,10 @@ interface Assignment {
 export default function EmployeePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [userAssignments, setUserAssignments] = useState<Assignment[]>([])
+  const [currentTab, setCurrentTab] = useState('overview')
 
   useEffect(() => {
     if (status === "loading") return
@@ -45,6 +69,12 @@ export default function EmployeePage() {
     if (!session) {
       router.push("/auth/signin")
       return
+    }
+
+    // Handle tab from URL
+    const tabFromUrl = getTabFromUrl(searchParams)
+    if (tabFromUrl) {
+      setCurrentTab(tabFromUrl)
     }
 
     // Load assignments from localStorage
@@ -55,13 +85,20 @@ export default function EmployeePage() {
       // Filter assignments for current user
       const currentUserEmail = session.user?.email
       const userAssignments = savedAssignments.filter((assignment: Assignment) => 
-        assignment.assignedUsers.some((user: any) => user.email === currentUserEmail)
+        assignment.assignedUsers.some((user: AssignedUser) => user.email === currentUserEmail)
       )
       setUserAssignments(userAssignments)
     }
 
     // Role-based redirects are now handled by middleware
-  }, [session, status, router])
+  }, [session, status, router, searchParams])
+
+  // Save current tab when it changes
+  useEffect(() => {
+    if (currentTab) {
+      saveCurrentTab('employee', currentTab)
+    }
+  }, [currentTab])
 
   if (status === "loading") {
     return (
@@ -87,7 +124,7 @@ export default function EmployeePage() {
     
     // Update user assignments
     const updatedUserAssignments = updatedAssignments.filter((assignment: Assignment) => 
-      assignment.assignedUsers.some((user: any) => user.email === session?.user?.email)
+      assignment.assignedUsers.some((user: AssignedUser) => user.email === session?.user?.email)
     )
     setUserAssignments(updatedUserAssignments)
   }
@@ -107,7 +144,7 @@ export default function EmployeePage() {
       
       // Update user assignments
       const updatedUserAssignments = updatedAssignments.filter((a: Assignment) => 
-        a.assignedUsers.some((user: any) => user.email === session?.user?.email)
+        a.assignedUsers.some((user: AssignedUser) => user.email === session?.user?.email)
       )
       setUserAssignments(updatedUserAssignments)
       
@@ -191,7 +228,7 @@ export default function EmployeePage() {
           </p>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="assignments">My Assignments</TabsTrigger>

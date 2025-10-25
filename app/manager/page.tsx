@@ -17,6 +17,7 @@ import {
 import { TestsPage } from "@/components/pages/tests-page"
 import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
+import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
 
 interface SavedTest {
   id: string
@@ -81,9 +82,16 @@ export default function ManagerPage() {
   
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
-    const tab = searchParams.get('tab')
+    const tab = getTabFromUrl(searchParams)
     return tab && ['overview', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
   }, [searchParams])
+
+  // Save current tab when it changes
+  useEffect(() => {
+    if (defaultTab) {
+      saveCurrentTab('manager', defaultTab)
+    }
+  }, [defaultTab])
 
   useEffect(() => {
     if (status === "loading") return

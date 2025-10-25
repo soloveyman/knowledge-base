@@ -16,6 +16,18 @@ import {
   UserPlus
 } from "lucide-react"
 
+interface User {
+  id: string
+  name: string
+  job: string
+  email: string
+  password: string
+  role: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
+
 interface UserConfig {
   name: string
   job: string
@@ -63,7 +75,7 @@ export default function UserBuilderPage() {
   const loadUserForEditing = (userId: string) => {
     try {
       const savedUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]')
-      const userToEdit = savedUsers.find((user: any) => user.id === userId)
+      const userToEdit = savedUsers.find((user: User) => user.id === userId)
       
       if (userToEdit) {
         setUserConfig({
@@ -135,14 +147,14 @@ export default function UserBuilderPage() {
           name: userConfig.name,
           job: userConfig.job,
           email: userConfig.email,
-          password: userConfig.password || existingUsers.find((u: any) => u.id === editingUserId)?.password || "",
+          password: userConfig.password || existingUsers.find((u: User) => u.id === editingUserId)?.password || "",
           role: userConfig.role,
-          createdAt: existingUsers.find((u: any) => u.id === editingUserId)?.createdAt || new Date().toISOString(),
+          createdAt: existingUsers.find((u: User) => u.id === editingUserId)?.createdAt || new Date().toISOString(),
           createdBy: session?.user?.name || 'Unknown',
           status: 'active'
         }
 
-        const updatedUsers = existingUsers.map((user: any) => 
+        const updatedUsers = existingUsers.map((user: User) => 
           user.id === editingUserId ? userData : user
         )
         localStorage.setItem('savedUsers', JSON.stringify(updatedUsers))

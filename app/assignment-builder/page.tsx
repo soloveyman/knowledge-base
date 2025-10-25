@@ -76,6 +76,37 @@ interface SavedTest {
   createdBy: string
 }
 
+interface User {
+  id: number
+  name: string
+  email: string
+  role: string
+  job: string
+  department: string
+}
+
+interface Assignment {
+  id: string
+  name: string
+  description: string
+  document: {
+    id: number
+    name: string
+    type: string
+    uploadedAt: string
+  }
+  test: {
+    id: string
+    title: string
+    questionCount: number
+  }
+  assignedUsers: User[]
+  dueDate: string
+  createdAt: string
+  createdBy: string
+  status: string
+}
+
 export default function AssignmentBuilderPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -90,7 +121,7 @@ export default function AssignmentBuilderPage() {
   })
   
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
-  const [savedUsers, setSavedUsers] = useState<any[]>([])
+  const [savedUsers, setSavedUsers] = useState<User[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
@@ -119,7 +150,7 @@ export default function AssignmentBuilderPage() {
   const loadAssignmentForEditing = (assignmentId: string) => {
     try {
       const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      const assignmentToEdit = savedAssignments.find((assignment: any) => assignment.id === assignmentId)
+      const assignmentToEdit = savedAssignments.find((assignment: Assignment) => assignment.id === assignmentId)
       
       if (assignmentToEdit) {
         // Load assignment configuration
@@ -127,7 +158,7 @@ export default function AssignmentBuilderPage() {
           name: assignmentToEdit.name,
           documentId: assignmentToEdit.document.id.toString(),
           testId: assignmentToEdit.test.id,
-          selectedUsers: assignmentToEdit.assignedUsers.map((user: any) => user.id),
+          selectedUsers: assignmentToEdit.assignedUsers.map((user: User) => user.id),
           dueDate: new Date(assignmentToEdit.dueDate),
           description: assignmentToEdit.description || ""
         })
@@ -217,12 +248,12 @@ export default function AssignmentBuilderPage() {
           test: selectedTest,
           assignedUsers: selectedUsersData,
           dueDate: assignmentConfig.dueDate.toISOString(),
-          createdAt: existingAssignments.find((a: any) => a.id === editingAssignmentId)?.createdAt || new Date().toISOString(),
+          createdAt: existingAssignments.find((a: Assignment) => a.id === editingAssignmentId)?.createdAt || new Date().toISOString(),
           createdBy: session?.user?.name || 'Unknown',
           status: 'active'
         }
 
-        const updatedAssignments = existingAssignments.map((assignment: any) => 
+        const updatedAssignments = existingAssignments.map((assignment: Assignment) => 
           assignment.id === editingAssignmentId ? assignmentData : assignment
         )
         localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
