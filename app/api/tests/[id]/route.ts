@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions as questionsTable } from '@/lib/db'
+import { db, tests, questions } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
 export async function GET(
@@ -12,6 +12,7 @@ export async function GET(
 
     // Find test by ID
     const test = await db.select().from(tests).where(eq(tests.id, id)).limit(1)
+    console.log('Test query result:', test.length, 'tests found')
     
     if (test.length === 0) {
       return NextResponse.json({
@@ -21,37 +22,38 @@ export async function GET(
     }
 
     const testData = test[0]
+    console.log('Test data:', testData)
+    console.log('Question IDs:', testData.questionIds)
     
     // If we have question IDs, fetch the actual questions
-    let questions = []
+    let questionsArray = []
     if (testData.questionIds && Array.isArray(testData.questionIds) && testData.questionIds.length > 0) {
+      console.log('Processing question IDs:', testData.questionIds.length)
       // Filter out non-UUID question IDs (like "q1", "q2" from mock data)
       const validQuestionIds = testData.questionIds.filter((qId: string) => 
         typeof qId === 'string' && 
         qId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
       )
+      console.log('Valid question IDs:', validQuestionIds)
       
       if (validQuestionIds.length > 0) {
-        // Fetch questions by IDs
-        const questionsResult = await db.select().from(questionsTable).where(
-          eq(questionsTable.id, validQuestionIds[0]) // This will need to be fixed for multiple IDs
-        )
-        
-        // For now, let's fetch questions one by one (Drizzle limitation)
+        // Fetch questions one by one (Drizzle limitation with IN clause)
         for (const questionId of validQuestionIds) {
-          const questionResult = await db.select().from(questionsTable).where(eq(questionsTable.id, questionId)).limit(1)
+          console.log('Fetching question:', questionId)
+          const questionResult = await db.select().from(questions).where(eq(questions.id, questionId)).limit(1)
           if (questionResult.length > 0) {
-            questions.push(questionResult[0])
+            questionsArray.push(questionResult[0])
           }
         }
       }
     }
 
+    console.log('Returning test data with', questionsArray.length, 'questions')
     return NextResponse.json({
       success: true,
       data: { 
         test: testData,
-        questions: questions
+        questions: questionsArray
       }
     })
   } catch (error) {
@@ -161,7 +163,7 @@ export async function DELETE(
         console.log('Deleting valid question IDs:', validQuestionIds)
         // Delete questions one by one (Drizzle doesn't support IN with delete easily)
         for (const questionId of validQuestionIds) {
-          await db.delete(questionsTable).where(eq(questionsTable.id, questionId))
+          await db.delete(questions).where(eq(questions.id, questionId))
         }
       } else {
         console.log('No valid question IDs to delete (skipping mock question IDs)')

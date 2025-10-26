@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, assignments, documents, modules, assignmentUsers } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
+import { db, assignments, documents, modules, assignmentUsers, testAttempts } from '@/lib/db'
+import { eq, and, desc } from 'drizzle-orm'
 
 export async function GET() {
   try {
@@ -12,7 +12,34 @@ export async function GET() {
       assignmentsData.map(async (assignment) => {
         const users = await db.select().from(assignmentUsers)
           .where(eq(assignmentUsers.assignmentId, assignment.id))
-        return { ...assignment, users }
+        
+        // For each user, check if there are test attempts and get the latest score
+        const usersWithScores = await Promise.all(
+          users.map(async (user) => {
+            if (assignment.testId) {
+              // Get the latest test attempt for this user and this test
+              const attempts = await db.select().from(testAttempts)
+                .where(
+                  and(
+                    eq(testAttempts.testId, assignment.testId),
+                    eq(testAttempts.userId, user.userId)
+                  )
+                )
+                .orderBy(desc(testAttempts.completedAt))
+                .limit(1)
+              
+              if (attempts.length > 0) {
+                return {
+                  ...user,
+                  testScore: attempts[0].score
+                }
+              }
+            }
+            return user
+          })
+        )
+        
+        return { ...assignment, users: usersWithScores }
       })
     )
 

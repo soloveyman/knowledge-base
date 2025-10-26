@@ -11,7 +11,7 @@ export const BADGE_CONFIGS = {
   status: {
     active: { variant: "success" as const, label: "Active" },
     inactive: { variant: "secondary" as const, label: "Inactive" },
-    failed: { variant: "destructive" as const, label: "Failed" },
+    failed: { variant: "secondary" as const, label: "Failed" },
     pending: { variant: "warning" as const, label: "Pending" },
     completed: { variant: "success" as const, label: "Completed" },
     draft: { variant: "outline" as const, label: "Draft" },
@@ -91,9 +91,10 @@ export const BADGE_CONFIGS = {
 
 // Badge variant styles (extending the existing badge component)
 export const badgeVariantStyles = {
-  success: "border-transparent bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400",
-  warning: "border-transparent bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400",
-  info: "border-transparent bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400",
+  success: "border-transparent bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
+  warning: "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
+  info: "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+  failed: "border-transparent bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
 }
 
 // Utility functions for creating badges
@@ -164,6 +165,9 @@ export function CommonBadge({ type, value, className, showIcon, icon }: CommonBa
   const variant = config.variant as BadgeVariant
   const label = config.label
   
+  // Special handling for failed status in status badges
+  const isFailedStatus = type === 'status' && String(value).toLowerCase() === 'failed'
+  
   return (
     <Badge 
       variant={variant === 'success' || variant === 'warning' || variant === 'info' ? 'outline' : variant}
@@ -171,6 +175,7 @@ export function CommonBadge({ type, value, className, showIcon, icon }: CommonBa
         variant === 'success' && badgeVariantStyles.success,
         variant === 'warning' && badgeVariantStyles.warning,
         variant === 'info' && badgeVariantStyles.info,
+        isFailedStatus && badgeVariantStyles.failed,
         className
       )}
     >

@@ -46,9 +46,30 @@ import {
   FileText, 
   X,
   BookOpen,
-  TestTube
+  TestTube,
+  ArrowLeft
 } from "lucide-react"
 import { useParams } from "next/navigation"
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const cleanDocumentContent = (content: string) => {
+  // Remove formatting tags like [CENTER], [/CENTER], etc.
+  return content
+    .replace(/\[CENTER\]/gi, '')
+    .replace(/\[\/CENTER\]/gi, '')
+    .replace(/\[BOLD\]/gi, '')
+    .replace(/\[\/BOLD\]/gi, '')
+    .replace(/\[ITALIC\]/gi, '')
+    .replace(/\[\/ITALIC\]/gi, '')
+    .replace(/\[.*?\]/gi, '') // Remove any other tags like [SIZE], [COLOR], etc.
+}
 
 interface DocumentData {
   id: string
@@ -95,91 +116,78 @@ export default function DocumentReaderPage() {
     // Load assignment data from API
     const loadAssignmentData = async () => {
       try {
-        const response = await fetch(`/api/assignments`)
-        const result = await response.json()
+        // Load actual document data directly using documentId from URL
+        const docResponse = await fetch('/api/documents')
+        const docResult = await docResponse.json()
         
-        if (result.success) {
-          const assignment = result.data.assignments.find((a: any) => 
-            a.moduleId === documentId || a.documentId === documentId
-          )
+        let documentData = null
+        if (!docResult.success) {
+          setLoading(false)
+          return
+        }
+        
+        // Find document by the documentId in the URL
+        const document = docResult.data.documents.find((doc: any) => doc.id === documentId)
+        if (!document) {
+          setLoading(false)
+          return
+        }
+        
+          console.log('Document parsedContent:', document.parsedContent)
+          console.log('Document sections:', document.parsedContent?.sections)
           
-          if (assignment) {
-            // Load actual document data
-            const docResponse = await fetch('/api/documents')
-            const docResult = await docResponse.json()
+          const content = document.parsedContent ? 
+            (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
+            'Document content will be displayed here...'
+          
+          console.log('Final content for display:', content.substring(0, 200))
+          
+          documentData = {
+            id: document.id,
+            name: document.originalFileName || document.title,
+            type: document.fileType?.toUpperCase() || 'DOCX',
+            uploadedAt: document.createdAt,
+            uploadedBy: document.uploadedBy || 'Unknown',
+            size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
+            content: content
+          }
+          
+          setDocumentData(documentData)
             
-            let documentData = null
-            if (docResult.success) {
-              const document = docResult.data.documents.find((doc: any) => 
-                doc.id === assignment.moduleId || doc.id === assignment.documentId
-              )
-              if (document) {
-              console.log('Document parsedContent:', document.parsedContent)
-              console.log('Document sections:', document.parsedContent?.sections)
-              
-              const content = document.parsedContent ? 
-                (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
-                'Document content will be displayed here...'
-              
-              console.log('Final content for display:', content.substring(0, 200))
-              
-              documentData = {
-                id: document.id,
-                name: document.originalFileName || document.title,
-                type: document.fileType?.toUpperCase() || 'DOCX',
-                uploadedAt: document.createdAt,
-                uploadedBy: document.uploadedBy || 'Unknown',
-                size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
-                content: content
-              }
-              }
-            }
+          // Find the assignment that has this document
+          const response = await fetch(`/api/assignments`)
+          const result = await response.json()
+          
+          if (result.success) {
+            // Find assignment that has this moduleId
+            const assignment = result.data.assignments.find((a: any) => a.moduleId === document.moduleId)
             
-            // Fallback to mock data if document not found
-            if (!documentData) {
-              documentData = {
-                id: assignment.moduleId || documentId,
-                name: 'Document',
-                type: 'PDF',
-                uploadedAt: assignment.createdAt,
-                uploadedBy: assignment.createdBy || 'Unknown',
-                size: '2.5 MB',
-                content: getDocumentContent('Document')
-              }
-            }
-            
-            setAssignmentData({
-              id: assignment.id,
-              name: assignment.name || 'Assignment',
-              description: assignment.description || '',
-              document: documentData,
-              test: assignment.testId ? {
-                id: assignment.testId,
-                title: 'Test',
-                questionCount: 5
-              } : null,
-              dueDate: assignment.dueDate,
-              status: assignment.status
-            })
-            
-            // Update assignment status to in_progress when user starts reading
-            if (assignment.status === 'pending' || assignment.status === 'active') {
-              const updateResponse = await fetch(`/api/assignments/${assignment.id}`, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  status: 'in_progress'
-                })
+            if (assignment) {
+              setAssignmentData({
+                id: assignment.id,
+                name: assignment.title || 'Assignment',
+                description: assignment.description || '',
+                document: documentData,
+                test: assignment.testId ? {
+                  id: assignment.testId,
+                  title: 'Test',
+                  questionCount: 5
+                } : null,
+                dueDate: assignment.dueDate,
+                status: assignment.status
               })
-              
-              if (updateResponse.ok) {
-                setAssignmentData(prev => prev ? { ...prev, status: 'in_progress' } : null)
-              }
+            } else {
+              setAssignmentData({
+                id: document.id,
+                name: document.title || 'Document',
+                description: '',
+                document: documentData,
+                test: null,
+                dueDate: '',
+                status: 'completed'
+              })
             }
           }
-        }
       } catch (error) {
         console.error('Error loading assignment:', error)
       } finally {
@@ -312,7 +320,7 @@ export default function DocumentReaderPage() {
     return null
   }
 
-  if (!documentData || !assignmentData) {
+  if (!documentData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -337,7 +345,7 @@ export default function DocumentReaderPage() {
             <div className="flex items-center min-w-0">
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
-                  {assignmentData.name}
+                  {assignmentData?.name || documentData.name}
                 </h1>
                 <p className="text-sm text-gray-600 truncate">
                   {documentData.name}
@@ -367,11 +375,7 @@ export default function DocumentReaderPage() {
                       <FileText className="h-5 w-5" />
                       {documentData.name}
                     </CardTitle>
-                    <CardDescription className="mt-2">
-                      {assignmentData.description}
-                    </CardDescription>
                   </div>
-                  <DocumentTypeBadge type={documentData.type} className="text-xs" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -386,7 +390,7 @@ export default function DocumentReaderPage() {
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                      {documentData.content}
+                      {cleanDocumentContent(documentData.content)}
                     </div>
                   )}
                 </div>
@@ -398,7 +402,7 @@ export default function DocumentReaderPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-6">
               {/* Test Section */}
-              {assignmentData.test && (
+              {assignmentData?.test && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -411,18 +415,18 @@ export default function DocumentReaderPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-sm text-gray-600">
-                      <p><strong>Test:</strong> {assignmentData.test.title}</p>
-                      <p><strong>Questions:</strong> {assignmentData.test.questionCount}</p>
+                      <p><strong>Test:</strong> {assignmentData?.test?.title || 'Test'}</p>
+                      <p><strong>Questions:</strong> {assignmentData?.test?.questionCount || 0}</p>
                       <p><strong>Estimated time:</strong> 15 minutes</p>
                     </div>
                     
                     <Button 
                       onClick={handleTakeTest}
                       className="w-full bg-blue-600 hover:bg-blue-700"
-                      disabled={assignmentData.status === 'completed'}
+                      disabled={assignmentData?.status === 'completed'}
                     >
                       <TestTube className="h-4 w-4 mr-2" />
-                      {assignmentData.status === 'completed' ? 'Test Completed' : 'Take Test'}
+                      {assignmentData?.status === 'completed' ? 'Test Completed' : 'Take Test'}
                     </Button>
                   </CardContent>
                 </Card>

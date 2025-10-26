@@ -300,7 +300,6 @@ export default function DocImportPage() {
   return (
     <PageLayout
       title="Import Documents"
-      icon={<Upload className="h-8 w-8" />}
       onClose={() => router.push(safeReturnTo)}
     >
       <div className="max-w-4xl mx-auto space-y-6">

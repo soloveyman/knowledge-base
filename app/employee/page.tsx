@@ -155,9 +155,9 @@ export default function EmployeePage() {
   }
 
   const handleReadDocument = async (assignmentId: string) => {
-    // Find the assignment and get the document name
-    const assignment = assignments.find(a => a.id === assignmentId)
-    if (assignment && assignment.document) {
+    // Find the assignment and get the document info
+    const assignment = userAssignments.find(a => a.id === assignmentId)
+    if (assignment && assignment.moduleId) {
       try {
         // Update assignment status to in_progress when user starts reading
         const response = await fetch(`/api/assignments/${assignmentId}/start`, {
@@ -173,32 +173,75 @@ export default function EmployeePage() {
         console.error('Error starting assignment:', error)
       }
       
-      // Navigate to document reader
-      router.push(`/read/${assignment.document.id}`)
+      // Find the document that has this moduleId
+      try {
+        const docsResponse = await fetch('/api/documents')
+        const docsResult = await docsResponse.json()
+        if (docsResult.success && docsResult.data.documents) {
+          const document = docsResult.data.documents.find((d: any) => d.moduleId === assignment.moduleId)
+          if (document) {
+            // Navigate to document reader
+            router.push(`/read/${document.id}`)
+          }
+        }
+      } catch (error) {
+        console.error('Error finding document:', error)
+      }
     }
   }
 
   const handleTakeTest = (assignmentId: string) => {
     // Find the assignment and get the test ID
-    const assignment = assignments.find(a => a.id === assignmentId)
-    if (assignment && assignment.test) {
-      // Navigate to test page
-      router.push(`/test/${assignment.test.id}`)
+    const assignment = userAssignments.find(a => a.id === assignmentId)
+    if (assignment && assignment.testId) {
+      // Navigate to test page using testId
+      router.push(`/test/${assignment.testId}`)
     }
   }
 
   // Transform assignment data for display
-  const transformedAssignments = userAssignments.map(assignment => ({
-    id: assignment.id,
-    title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
-    type: assignment.testId ? "test" : "document", // Simplified type detection
-    status: assignment.status === 'active' ? 'pending' : assignment.status,
-    progress: assignment.status === 'completed' ? 100 : 0,
-    dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : 'No due date',
-    description: `Complete assignment ${assignment.id.slice(0, 8)}`, // Generate description
-    estimatedTime: assignment.testId ? "15 min" : "30 min",
-    score: assignment.status === 'completed' ? 85 : assignment.status === 'failed' ? 65 : undefined
-  }))
+  const transformedAssignments = userAssignments.map(assignment => {
+    // Get the user's specific status from assignment_users
+    const currentUserId = session?.user?.id
+    const userAssignment = assignment.users?.find((au: any) => au.userId === currentUserId)
+    
+    // Get the actual test score from the user assignment data
+    const testScore = userAssignment?.testScore
+    
+    // If there's a test score, check if it's below 70% to mark as failed
+    let userStatus = userAssignment?.status || assignment.status || 'pending'
+    if (testScore !== undefined && testScore !== null) {
+      if (testScore < 70) {
+        userStatus = 'failed'
+      } else if (testScore >= 70 && userStatus === 'completed') {
+        userStatus = 'completed'
+      }
+    }
+    
+    // Determine type: if both moduleId and testId exist, it's "both"
+    let type = "document"
+    if (assignment.moduleId && assignment.testId) {
+      type = "both"
+    } else if (assignment.testId) {
+      type = "test"
+    } else if (assignment.moduleId) {
+      type = "document"
+    }
+    
+    return {
+      id: assignment.id,
+      title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
+      type: type,
+      status: userStatus,
+      progress: userStatus === 'completed' ? 100 : 0,
+      dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : 'No due date',
+      description: assignment.description || `Complete assignment ${assignment.id.slice(0, 8)}`, // Use actual description or generate
+      estimatedTime: assignment.testId ? "15 min" : "30 min",
+      score: testScore, // Use actual test score from database
+      moduleId: assignment.moduleId,
+      testId: assignment.testId
+    }
+  })
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -392,7 +435,7 @@ export default function EmployeePage() {
                           </div>
                           
                           <div className="flex gap-2">
-                            {assignment.type === 'document' ? (
+                            {(assignment.type === 'both' || assignment.type === 'document') && (
                               <Button 
                                 size="sm" 
                                 variant="outline"
@@ -401,7 +444,8 @@ export default function EmployeePage() {
                               >
                                 Read
                               </Button>
-                            ) : assignment.type === 'test' ? (
+                            )}
+                            {(assignment.type === 'both' || assignment.type === 'test') && (
                               <Button 
                                 size="sm" 
                                 variant="outline"
@@ -410,25 +454,6 @@ export default function EmployeePage() {
                               >
                                 Test
                               </Button>
-                            ) : (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleReadDocument(assignment.id)}
-                                  className="flex-1"
-                                >
-                                  Read
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleTakeTest(assignment.id)}
-                                  className="flex-1"
-                                >
-                                  Test
-                                </Button>
-                              </>
                             )}
                           </div>
                         </div>
