@@ -84,9 +84,16 @@ export default function DocumentViewer() {
           console.log('Document parsedContent:', document.parsedContent)
           console.log('Document sections:', document.parsedContent?.sections)
           
-          const content = document.parsedContent ? 
+          let content = document.parsedContent ? 
             (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
             'Document content will be displayed here...'
+          
+          // Clean artifacts immediately after extraction (but preserve legitimate lists)
+          content = content
+            .replace(/;\s*1\./g, '')  // Remove "; 1." (artifact)
+            .replace(/\.\s*1\./g, '.')  // Remove ". 1." -> "." (artifact at end of sentence)
+            .replace(/\s+1\.\s*$/gm, '')  // Remove " 1." at END of lines only
+            // Note: Do NOT remove "1." at START of lines (legitimate lists)
           
           console.log('Final content for display:', content.substring(0, 200))
           
@@ -145,7 +152,7 @@ export default function DocumentViewer() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card shadow-sm border-b border-border">
+      <header className="bg-card/95 backdrop-blur-sm shadow-sm border-b border-border sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
@@ -163,11 +170,11 @@ export default function DocumentViewer() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         {/* Document Content */}
         <div className="min-h-screen">
           {documentData?.type === 'PDF' ? (
-            <div className="w-full h-screen border border-border rounded-lg overflow-hidden">
+            <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-lg overflow-hidden">
               <iframe 
                 src={`/api/documents/${encodeURIComponent(filename)}`}
                 className="w-full h-full"
@@ -175,7 +182,7 @@ export default function DocumentViewer() {
               />
             </div>
           ) : (
-            <div className="prose max-w-none document-content">
+            <div className="prose max-w-none document-content overflow-x-auto px-1 sm:px-0">
               {documentData?.content ? (
                 <div 
                   dangerouslySetInnerHTML={{ 

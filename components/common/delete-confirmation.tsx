@@ -53,25 +53,34 @@ export function DeleteConfirmation({
     ? `Are you sure you want to delete "${itemName}"? This action cannot be undone.`
     : description
 
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen)
+    if (!newOpen) {
+      // Dialog is closing - ensure any parent click handlers don't fire
+      // This is handled by the Dialog component itself, but we add this for safety
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="destructive" size="sm">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+    <div onClick={(e) => e.stopPropagation()}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button variant="destructive" size="sm">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+        </DialogTrigger>
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-lg">
+        <DialogHeader className="gap-4 text-left">
           <div className="flex items-start gap-3">
             <div className="shrink-0 mt-0.5">
               <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
-            <div className="flex-1 min-w-0">
-              <DialogTitle className="text-left wrap-break-word pr-4">{displayTitle}</DialogTitle>
-              <DialogDescription className="text-left mt-2 wrap-break-word pr-4">
+            <div className="flex-1 min-w-0 pr-8">
+              <DialogTitle className="text-left wrap-break-word max-w-full">{displayTitle}</DialogTitle>
+              <DialogDescription className="text-left mt-2 wrap-break-word max-w-full">
                 {displayDescription}
               </DialogDescription>
             </div>
@@ -106,5 +115,6 @@ export function DeleteConfirmation({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </div>
   )
 }

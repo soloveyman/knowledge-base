@@ -633,27 +633,29 @@ export default function ManagerPage() {
                     {documents.map((doc) => (
                       <div 
                         key={doc.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent cursor-pointer"
+                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent cursor-pointer gap-3"
                         onClick={() => handleViewDocument(doc.name)}
                       >
-                        <div>
-                          <h3 className="font-medium text-foreground dark:text-white">{doc.name}</h3>
-                          <p className="text-sm text-muted-foreground">Uploaded {doc.uploadedAt}</p>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
+                          <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                         </div>
-                        <DeleteConfirmation
-                          onConfirm={() => handleDeleteDocument(doc.id)}
-                          itemName={doc.name}
-                          trigger={
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-muted-foreground hover:text-foreground"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          }
-                        />
+                        <div className="shrink-0">
+                          <DeleteConfirmation
+                            onConfirm={() => handleDeleteDocument(doc.id)}
+                            itemName={doc.name}
+                            trigger={
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            }
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

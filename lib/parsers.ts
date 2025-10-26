@@ -2,6 +2,29 @@ import * as XLSX from 'xlsx'
 import * as pdfParse from 'pdf-parse'
 import * as JSZip from 'jszip'
 
+/**
+ * Normalize whitespace in text while preserving structure and readability
+ * - Collapses multiple spaces/tabs into single space
+ * - Preserves line breaks and paragraph breaks
+ * - Handles special characters and formatting
+ */
+function normalizeWhitespace(text: string): string {
+  return text
+    // Normalize tabs and multiple spaces to single space (within a line)
+    .replace(/[ \t]+/g, ' ')
+    // Preserve paragraph breaks (2+ newlines)
+    .replace(/\n{3,}/g, '\n\n')
+    // Normalize single line breaks
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Trim each line to prevent leading/trailing spaces
+    .split('\n')
+    .map(line => line.trim())
+    .join('\n')
+    // Final trim
+    .trim()
+}
+
 export interface ParseResult {
   readonly text: string
   readonly metadata?: ParseMetadata
@@ -26,10 +49,17 @@ export interface ParsedContent {
     headers: string[]
     rows: string[][]
   }>
+  images: Array<{
+    filename: string
+    data: string  // base64 encoded
+    type: string
+    position?: number
+  }>
   metadata: {
     totalSections: number
     totalTables: number
     wordCount: number
+    totalImages: number
   }
 }
 
@@ -57,7 +87,7 @@ export class ParseError extends Error {
 export async function parseDocx(buffer: ArrayBuffer, options: {
   includeMetadata?: boolean
   normalizeWhitespace?: boolean
-} = {}): Promise<ParseResult> {
+} = {}): Promise<ParseResult & { images?: Array<{filename: string, data: string, type: string}> }> {
   try {
     // Ensure we have a valid buffer
     if (!buffer || buffer.byteLength === 0) {
@@ -75,6 +105,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
     console.log('Parsing DOCX with improved parser...')
     
     let text = ''
+    const images: Array<{filename: string, data: string, type: string}> = []
     
     // Add timeout to prevent hanging
     const parseWithTimeout = async () => {
@@ -86,6 +117,30 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         // Extract document.xml and styles.xml from the DOCX package
         const documentXml = await zip.file('word/document.xml')?.async('text')
         const stylesXml = await zip.file('word/styles.xml')?.async('text')
+        const mediaFolder = zip.folder('word/media')
+        if (mediaFolder) {
+          console.log('Extracting images from word/media...')
+          const mediaFiles = Object.keys(mediaFolder.files).filter(filename => !mediaFolder.files[filename].dir)
+          
+          for (const filename of mediaFiles) {
+            try {
+              const imageBuffer = await mediaFolder.file(filename)?.async('arraybuffer')
+              if (imageBuffer) {
+                const base64 = Buffer.from(imageBuffer).toString('base64')
+                const extension = filename.split('.').pop()?.toLowerCase() || 'png'
+                const mimeType = `image/${extension}`
+                images.push({
+                  filename: filename,
+                  data: `data:${mimeType};base64,${base64}`,
+                  type: mimeType
+                })
+                console.log(`Extracted image: ${filename}`)
+              }
+            } catch (error) {
+              console.warn(`Failed to extract image ${filename}:`, error)
+            }
+          }
+        }
         
         if (documentXml) {
           console.log('Found document.xml, extracting text with formatting...')
@@ -119,24 +174,54 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
             let isBold = false
             let isItalic = false
             
+            let previousRunFormatting = { bold: false, italic: false }
+            
             textRuns.forEach(run => {
+              // Check for formatting in this run
+              const runIsBold = run.includes('<w:b/>') || run.includes('<w:b ')
+              const runIsItalic = run.includes('<w:i/>') || run.includes('<w:i ')
+              
               // Extract text from each run
               const textMatches = run.match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
               if (textMatches) {
                 textMatches.forEach(match => {
-                  const textContent = match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1')
+                  let textContent = match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1')
+                  
+                  // Close previous formatting if it differs
+                  if (previousRunFormatting.bold && !runIsBold) {
+                    paragraphText += '[/BOLD]'
+                  }
+                  if (previousRunFormatting.italic && !runIsItalic) {
+                    paragraphText += '[/ITALIC]'
+                  }
+                  
+                  // Open formatting if it's starting
+                  if (!previousRunFormatting.bold && runIsBold) {
+                    paragraphText += '[BOLD]'
+                  }
+                  if (!previousRunFormatting.italic && runIsItalic) {
+                    paragraphText += '[ITALIC]'
+                  }
+                  
                   paragraphText += textContent
+                  
+                  // Update previous formatting
+                  previousRunFormatting = { bold: runIsBold, italic: runIsItalic }
                 })
               }
               
-              // Check for formatting
-              if (run.includes('<w:b/>') || run.includes('<w:b ')) {
-                isBold = true
-              }
-              if (run.includes('<w:i/>') || run.includes('<w:i ')) {
-                isItalic = true
-              }
+              // Track if any run has formatting
+              if (runIsBold) isBold = true
+              if (runIsItalic) isItalic = true
             })
+            
+            // Close any remaining formatting at the end of the paragraph
+            if (previousRunFormatting.bold) {
+              paragraphText += '[/BOLD]'
+            }
+            if (previousRunFormatting.italic) {
+              paragraphText += '[/ITALIC]'
+            }
             
             // Get paragraph style to detect headings
             const style = getParagraphStyle(paragraph)
@@ -183,17 +268,15 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
               formattedText = `${'#'.repeat(headingLevel)} ${formattedText}`
             }
             
-            // Add formatting
-            if (isBold) formattedText = `[BOLD]${formattedText}[/BOLD]`
-            if (isItalic) formattedText = `[ITALIC]${formattedText}[/ITALIC]`
-            
-            // Add alignment markers
-            if (alignment === 'center') {
-              formattedText = `[CENTER]${formattedText}[/CENTER]`
-            } else if (alignment === 'right') {
-              formattedText = `[RIGHT]${formattedText}[/RIGHT]`
-            } else if (alignment === 'justify') {
-              formattedText = `[JUSTIFY]${formattedText}[/JUSTIFY]`
+            // Add alignment markers only if there's actual content
+            if (formattedText && formattedText.trim().length > 0) {
+              if (alignment === 'center') {
+                formattedText = `[CENTER]${formattedText}[/CENTER]`
+              } else if (alignment === 'right') {
+                formattedText = `[RIGHT]${formattedText}[/RIGHT]`
+              } else if (alignment === 'justify') {
+                formattedText = `[JUSTIFY]${formattedText}[/JUSTIFY]`
+              }
             }
             
             return formattedText
@@ -203,6 +286,11 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
           console.log('First few paragraphs:', parsedParagraphs.slice(0, 3))
           
           text = parsedParagraphs.join('\n')
+          
+          // Clean up empty tag pairs immediately
+          text = text.replace(/\[CENTER\]\s*\[\/CENTER\]/g, '')
+          text = text.replace(/\[RIGHT\]\s*\[\/RIGHT\]/g, '')
+          text = text.replace(/\[JUSTIFY\]\s*\[\/JUSTIFY\]/g, '')
           
           // Clean up any HTML/CSS/XML artifacts that might have been embedded
           console.log('Raw extracted text before cleaning:', text.substring(0, 200))
@@ -296,19 +384,29 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
           const alignmentMatch = paragraph.match(/<w:jc w:val="([^"]*)"/)
           const alignment = alignmentMatch ? alignmentMatch[1] : 'left'
           
-          // Add alignment markers
-          if (alignment === 'center') {
-            paragraphText = `[CENTER]${paragraphText}[/CENTER]`
-          } else if (alignment === 'right') {
-            paragraphText = `[RIGHT]${paragraphText}[/RIGHT]`
-          } else if (alignment === 'justify') {
-            paragraphText = `[JUSTIFY]${paragraphText}[/JUSTIFY]`
+          // Trim the text first
+          paragraphText = paragraphText.trim()
+          
+          // Add alignment markers only if there's actual content
+          if (paragraphText && paragraphText.length > 0) {
+            if (alignment === 'center') {
+              paragraphText = `[CENTER]${paragraphText}[/CENTER]`
+            } else if (alignment === 'right') {
+              paragraphText = `[RIGHT]${paragraphText}[/RIGHT]`
+            } else if (alignment === 'justify') {
+              paragraphText = `[JUSTIFY]${paragraphText}[/JUSTIFY]`
+            }
           }
           
-          return paragraphText.trim()
+          return paragraphText
         }).filter(p => p.length > 0)
         
         text = parsedParagraphs.join('\n')
+        
+        // Clean up empty tag pairs immediately
+        text = text.replace(/\[CENTER\]\s*\[\/CENTER\]/g, '')
+        text = text.replace(/\[RIGHT\]\s*\[\/RIGHT\]/g, '')
+        text = text.replace(/\[JUSTIFY\]\s*\[\/JUSTIFY\]/g, '')
         
         // Clean up any HTML-like tags that might have been embedded
         console.log('Raw fallback text before cleaning:', text.substring(0, 200))
@@ -390,18 +488,22 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
 
     const metadata: ParseMetadata | undefined = options.includeMetadata ? {
       parsedAt: new Date(),
-      parserVersion: '2.0.0'
+      parserVersion: '3.0.0'
     } : undefined
-
-    return {
-      text,
-      metadata
+    
+    // Return images if they were extracted
+    const result: any = { text, metadata }
+    if (images.length > 0) {
+      result.images = images
     }
+
+    return result
   } catch (error) {
     console.error('DOCX parsing error:', error)
     throw new ParseError(`Failed to parse DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
+
 
 export async function parsePdf(buffer: ArrayBuffer, options: {
   includeMetadata?: boolean
@@ -614,7 +716,8 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   console.log('Line breaks in raw text:', (text.match(/\n/g) || []).length)
   
   // Additional cleaning to remove any remaining HTML/CSS artifacts
-  const cleanedText = text
+  // Preserve structure and readability
+  let cleanedText = text
     // Remove any HTML tags
     .replace(/<html[^>]*>/gi, '')
     .replace(/<\/html>/gi, '')
@@ -624,35 +727,50 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove CSS
     .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove JavaScript
     .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
-    .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove HTML entities
-    .replace(/&lt;/g, '<') // Decode specific entities
+    // Decode HTML entities
+    .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
-    // Remove CSS property patterns (e.g., margin:10px; color:#fff;)
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove any other entities
+    // Remove CSS property patterns
     .replace(/([a-z-]+):\s*[^;]+;?/gi, '')
-    .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
-    .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
-    .trim()
+  
+  // Normalize whitespace while preserving structure
+  cleanedText = normalizeWhitespace(cleanedText)
   
   console.log('Cleaned text for structured content:', cleanedText.substring(0, 200))
   console.log('Line breaks in cleaned text:', (cleanedText.match(/\n/g) || []).length)
+  
+  // Check if text has formatting tags - if so, don't force line breaks aggressively
+  const hasFormattingTags = /\[(?:BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)/.test(cleanedText)
   
   // Force line breaks if text appears continuous
   let finalText = cleanedText
   if (finalText && finalText.length > 50 && !finalText.includes('\n')) {
     console.log('Structured content: Text appears continuous, forcing line breaks...')
-    finalText = finalText
-      .replace(/(\d+г\s+\d+р)/g, '$1\n') // After weight and price
-      .replace(/([.!?])\s+/g, '$1\n') // After sentence endings
-      .replace(/([а-яё])\s+([А-ЯЁ])/g, '$1\n$2') // Before capital letters after lowercase
-      .replace(/(\d+р)\s+([А-ЯЁ])/g, '$1\n$2') // After price before capital letters
-      .replace(/(🎞\s*СЛАЙД\s*\d+)/g, '\n$1\n') // Around slide markers
-      .replace(/([А-ЯЁ][а-яё]+\s*[А-ЯЁ][а-яё]*\.)/g, '$1\n') // After names/titles ending with period
-      .replace(/\n\s*\n/g, '\n') // Clean up multiple line breaks
-      .trim()
+    
+    if (hasFormattingTags) {
+      // If text has formatting tags, be more careful not to break them
+      finalText = finalText
+        .replace(/([.!?])\s+(?![^\[]*\[)/g, '$1\n') // After sentence endings, but not within tags
+        .replace(/\n\s*\n/g, '\n') // Clean up multiple line breaks
+        .trim()
+    } else {
+      // No formatting tags, can be more aggressive
+      finalText = finalText
+        .replace(/(\d+г\s+\d+р)/g, '$1\n') // After weight and price
+        .replace(/([.!?])\s+/g, '$1\n') // After sentence endings
+        .replace(/([а-яё])\s+([А-ЯЁ])/g, '$1\n$2') // Before capital letters after lowercase
+        .replace(/(\d+р)\s+([А-ЯЁ])/g, '$1\n$2') // After price before capital letters
+        .replace(/(🎞\s*СЛАЙД\s*\d+)/g, '\n$1\n') // Around slide markers
+        .replace(/([А-ЯЁ][а-яё]+\s*[А-ЯЁ][а-яё]*\.)/g, '$1\n') // After names/titles ending with period
+        .replace(/\n\s*\n/g, '\n') // Clean up multiple line breaks
+        .trim()
+    }
+    
     console.log('Structured content: After forcing line breaks:', finalText.substring(0, 200))
     console.log('Line breaks after forcing:', (finalText.match(/\n/g) || []).length)
   }
@@ -765,10 +883,12 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   return {
     sections,
     tables,
+    images: [], // Images would be extracted in parseDocx and passed here
     metadata: {
       totalSections: sections.length,
       totalTables: tables.length,
-      wordCount
+      wordCount,
+      totalImages: 0
     }
   }
 }

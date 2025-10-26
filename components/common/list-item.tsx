@@ -39,9 +39,9 @@ export function ListItem({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-foreground">{title}</h3>
+          <h3 className="font-medium text-foreground truncate">{title}</h3>
         {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-sm text-muted-foreground truncate">{subtitle}</p>
         )}
         {metadata.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 mt-2 text-xs text-muted-foreground">
