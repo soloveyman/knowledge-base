@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { db, documents } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { desc } from 'drizzle-orm'
 
 export async function GET() {
   try {
-    const allDocuments = await db.select().from(documents)
+    const allDocuments = await db.select().from(documents).orderBy(desc(documents.createdAt))
 
     return NextResponse.json({
       success: true,

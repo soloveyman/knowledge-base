@@ -83,11 +83,31 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         console.log('Attempting JSZip extraction...')
         const zip = await JSZip.loadAsync(uint8Array)
         
-        // Extract document.xml from the DOCX package
+        // Extract document.xml and styles.xml from the DOCX package
         const documentXml = await zip.file('word/document.xml')?.async('text')
+        const stylesXml = await zip.file('word/styles.xml')?.async('text')
         
         if (documentXml) {
           console.log('Found document.xml, extracting text with formatting...')
+          
+          // Helper to get paragraph style
+          const getParagraphStyle = (paragraph: string): string | null => {
+            const styleMatch = paragraph.match(/<w:pStyle w:val="([^"]*)"[^>]*>/)
+            return styleMatch ? styleMatch[1] : null
+          }
+          
+          // Check if paragraph is a list item
+          const isListItem = (paragraph: string): { isList: boolean; isOrdered: boolean; level?: number } => {
+            const numPrMatch = paragraph.match(/<w:numPr[^>]*>.*?<\/w:numPr>/gs)
+            if (numPrMatch) {
+              const ilvlMatch = paragraph.match(/<w:ilvl w:val="(\d+)"/)
+              const level = ilvlMatch ? parseInt(ilvlMatch[1]) : 0
+              return { isList: true, isOrdered: true, level }
+            }
+            const bulletMatch = paragraph.match(/<w:rPr>.*?<w:rFonts[^>]*w:ascii="Symbol"[^>]*>.*?<\/w:rPr>/)
+            return bulletMatch ? { isList: true, isOrdered: false, level: 0 } : { isList: false, isOrdered: false }
+          }
+          
           // Parse paragraphs to maintain structure and alignment
           const paragraphs = documentXml.match(/<w:p[^>]*>.*?<\/w:p>/gs) || []
           
@@ -96,6 +116,9 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
             const textRuns = paragraph.match(/<w:r[^>]*>.*?<\/w:r>/gs) || []
             
             let paragraphText = ''
+            let isBold = false
+            let isItalic = false
+            
             textRuns.forEach(run => {
               // Extract text from each run
               const textMatches = run.match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
@@ -105,22 +128,75 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
                   paragraphText += textContent
                 })
               }
+              
+              // Check for formatting
+              if (run.includes('<w:b/>') || run.includes('<w:b ')) {
+                isBold = true
+              }
+              if (run.includes('<w:i/>') || run.includes('<w:i ')) {
+                isItalic = true
+              }
             })
+            
+            // Get paragraph style to detect headings
+            const style = getParagraphStyle(paragraph)
+            let headingLevel = 0
+            
+            if (style) {
+              if (style.includes('Heading1') || style.includes('Title')) {
+                headingLevel = 1
+              } else if (style.includes('Heading2')) {
+                headingLevel = 2
+              } else if (style.includes('Heading3')) {
+                headingLevel = 3
+              } else if (style.includes('Heading4')) {
+                headingLevel = 4
+              } else if (style.includes('Heading5')) {
+                headingLevel = 5
+              } else if (style.includes('Heading6')) {
+                headingLevel = 6
+              }
+            }
+            
+            // Check for list items
+            const listInfo = isListItem(paragraph)
             
             // Check for paragraph alignment
             const alignmentMatch = paragraph.match(/<w:jc w:val="([^"]*)"/)
             const alignment = alignmentMatch ? alignmentMatch[1] : 'left'
             
-            // Add alignment markers
-            if (alignment === 'center') {
-              paragraphText = `[CENTER]${paragraphText}[/CENTER]`
-            } else if (alignment === 'right') {
-              paragraphText = `[RIGHT]${paragraphText}[/RIGHT]`
-            } else if (alignment === 'justify') {
-              paragraphText = `[JUSTIFY]${paragraphText}[/JUSTIFY]`
+            // Build the formatted paragraph
+            let formattedText = paragraphText.trim()
+            
+            // Add list markers
+            if (listInfo.isList) {
+              const indent = '  '.repeat(listInfo.level || 0)
+              if (listInfo.isOrdered) {
+                formattedText = `${indent}1. ${formattedText}`
+              } else {
+                formattedText = `${indent}• ${formattedText}`
+              }
             }
             
-            return paragraphText.trim()
+            // Add heading markers
+            if (headingLevel > 0) {
+              formattedText = `${'#'.repeat(headingLevel)} ${formattedText}`
+            }
+            
+            // Add formatting
+            if (isBold) formattedText = `[BOLD]${formattedText}[/BOLD]`
+            if (isItalic) formattedText = `[ITALIC]${formattedText}[/ITALIC]`
+            
+            // Add alignment markers
+            if (alignment === 'center') {
+              formattedText = `[CENTER]${formattedText}[/CENTER]`
+            } else if (alignment === 'right') {
+              formattedText = `[RIGHT]${formattedText}[/RIGHT]`
+            } else if (alignment === 'justify') {
+              formattedText = `[JUSTIFY]${formattedText}[/JUSTIFY]`
+            }
+            
+            return formattedText
           }).filter(p => p.length > 0)
           
           console.log('Parsed paragraphs count:', parsedParagraphs.length)
@@ -128,20 +204,33 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
           
           text = parsedParagraphs.join('\n')
           
-          // Clean up any HTML-like tags that might have been embedded
+          // Clean up any HTML/CSS/XML artifacts that might have been embedded
           console.log('Raw extracted text before cleaning:', text.substring(0, 200))
           
           text = text
+            // Remove any HTML tags
+            .replace(/<html[^>]*>/gi, '')
+            .replace(/<\/html>/gi, '')
+            .replace(/<head[^>]*>.*?<\/head>/gis, '')
+            .replace(/<body[^>]*>/gi, '')
+            .replace(/<\/body>/gi, '')
+            .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove CSS
+            .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove JavaScript
+            .replace(/<[^>]*>/g, '') // Remove any remaining XML/HTML tags
             .replace(/<p[^>]*>/g, '') // Remove <p> tags
             .replace(/<\/p>/g, '\n') // Replace </p> with newlines
-            .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
-            .replace(/&lt;/g, '<') // Decode HTML entities
+            // Decode HTML entities
+            .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&amp;/g, '&')
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'")
             .replace(/&nbsp;/g, ' ') // Remove non-breaking spaces
-            .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
+            .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove any other entities
+            // Remove CSS property patterns (e.g., margin:10px; color:#fff;)
+            .replace(/([a-z-]+):\s*[^;]+;?/gi, '')
+            // Normalize spaces and tabs, but preserve line breaks
+            .replace(/[ \t]+/g, ' ')
             .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
             .trim()
           
@@ -225,16 +314,29 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         console.log('Raw fallback text before cleaning:', text.substring(0, 200))
         
         text = text
+          // Remove any HTML tags
+          .replace(/<html[^>]*>/gi, '')
+          .replace(/<\/html>/gi, '')
+          .replace(/<head[^>]*>.*?<\/head>/gis, '')
+          .replace(/<body[^>]*>/gi, '')
+          .replace(/<\/body>/gi, '')
+          .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove CSS
+          .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove JavaScript
+          .replace(/<[^>]*>/g, '') // Remove any remaining XML/HTML tags
           .replace(/<p[^>]*>/g, '') // Remove <p> tags
           .replace(/<\/p>/g, '\n') // Replace </p> with newlines
-          .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
-          .replace(/&lt;/g, '<') // Decode HTML entities
+          // Decode HTML entities
+          .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
           .replace(/&amp;/g, '&')
           .replace(/&quot;/g, '"')
           .replace(/&#39;/g, "'")
-          .replace(/&nbsp;/g, ' ') // Remove non-breaking spaces
-          .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove any other entities
+          // Remove CSS property patterns (e.g., margin:10px; color:#fff;)
+          .replace(/([a-z-]+):\s*[^;]+;?/gi, '')
+          // Normalize spaces and tabs, but preserve line breaks
+          .replace(/[ \t]+/g, ' ')
           .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
           .trim()
         
@@ -511,8 +613,16 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   console.log('Raw text input to structured content:', text.substring(0, 200))
   console.log('Line breaks in raw text:', (text.match(/\n/g) || []).length)
   
-  // Additional cleaning to remove any remaining HTML artifacts
+  // Additional cleaning to remove any remaining HTML/CSS artifacts
   const cleanedText = text
+    // Remove any HTML tags
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<head[^>]*>.*?<\/head>/gis, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '')
+    .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove CSS
+    .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove JavaScript
     .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
     .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove HTML entities
     .replace(/&lt;/g, '<') // Decode specific entities
@@ -521,6 +631,8 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    // Remove CSS property patterns (e.g., margin:10px; color:#fff;)
+    .replace(/([a-z-]+):\s*[^;]+;?/gi, '')
     .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
     .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
     .trim()
@@ -555,11 +667,11 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   let currentSection: { title: string; level: number; content: string; order: number } | null = null
   let sectionOrder = 1
   
-  // Simple heading detection (lines starting with # or all caps)
+  // Improved heading detection and list preservation
   for (const line of lines) {
     const trimmedLine = line.trim()
     
-    // Check for markdown-style headings
+    // Check for markdown-style headings (with #)
     if (trimmedLine.startsWith('#')) {
       if (currentSection) {
         sections.push(currentSection)
@@ -588,9 +700,28 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         order: sectionOrder++
       }
     }
-    // Regular content
+    // Regular content (preserve lists with markers like 1., 2., or •)
     else if (currentSection) {
-      currentSection.content += (currentSection.content ? '\n' : '') + line
+      // Check if this line is a list item
+      const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(trimmedLine)
+      
+      // If it's a list item or regular content, add it
+      if (isListItem || trimmedLine.length > 0) {
+        currentSection.content += (currentSection.content ? '\n' : '') + line
+      }
+    }
+    else {
+      // If no section exists, create a default section for content without headings
+      if (!currentSection) {
+        currentSection = {
+          title: fileName.replace(/\.[^/.]+$/, ''), // Use filename as title
+          level: 1,
+          content: line,
+          order: sectionOrder++
+        }
+      } else {
+        currentSection.content += (currentSection.content ? '\n' : '') + line
+      }
     }
   }
   

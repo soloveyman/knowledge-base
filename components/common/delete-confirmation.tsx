@@ -65,13 +65,13 @@ export function DeleteConfirmation({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="shrink-0">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 mt-0.5">
               <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
-            <div>
-              <DialogTitle className="text-left">{displayTitle}</DialogTitle>
-              <DialogDescription className="text-left mt-2">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-left wrap-break-word pr-4">{displayTitle}</DialogTitle>
+              <DialogDescription className="text-left mt-2 wrap-break-word pr-4">
                 {displayDescription}
               </DialogDescription>
             </div>

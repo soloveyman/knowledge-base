@@ -25,13 +25,9 @@ interface Document {
   uploadedBy: string
   size: string
 }
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { 
   FileText, 
-  Calendar,
-  User,
-  X,
-  Info
+  X
 } from "lucide-react"
 import { useParams } from "next/navigation"
 
@@ -158,51 +154,6 @@ export default function DocumentViewer() {
               </h1>
             </div>
             <div className="flex items-center space-x-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Info className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                  <div className="p-3">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File Name</label>
-                        <p className="text-sm text-foreground mt-1 break-all">{documentData?.name}</p>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File Type</label>
-                        <div className="mt-1">
-                          <DocumentTypeBadge type={documentData?.type} />
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File Size</label>
-                        <p className="text-sm text-foreground mt-1">{documentData?.size}</p>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uploaded</label>
-                        <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          {documentData?.uploadedAt ? new Date(documentData.uploadedAt).toLocaleDateString() : 'Unknown'}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uploaded By</label>
-                        <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                          <User className="h-4 w-4 mr-2" />
-                          {documentData?.uploadedBy}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
               <Button variant="ghost" size="sm" onClick={handleClose}>
                 <X className="h-4 w-4" />
               </Button>

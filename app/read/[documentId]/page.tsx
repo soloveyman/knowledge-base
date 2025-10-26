@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
 import { navigateBack, getRedirectUrl } from "@/lib/redirect-utils"
+import { renderFormattedText } from "@/lib/content-renderer"
 
 interface UserWithRole {
   name?: string | null
@@ -403,9 +404,12 @@ export default function DocumentReaderPage() {
                       />
                     </div>
                   ) : (
-                    <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-                      {cleanDocumentContent(documentData.content)}
-                    </div>
+                    <div 
+                      className="document-content prose max-w-none"
+                      dangerouslySetInnerHTML={{ 
+                        __html: renderFormattedText(documentData.content) 
+                      }}
+                    />
                   )}
                 </div>
               </CardContent>

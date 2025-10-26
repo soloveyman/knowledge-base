@@ -17,7 +17,8 @@ import {
   FileText, 
   X, 
   CheckCircle, 
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react"
 import { parseDocument, ParsedContent } from '@/lib/parsers'
 import { clearParsingCache } from '@/lib/localStorage-utils'
@@ -260,11 +261,11 @@ export default function DocImportPage() {
     switch (status) {
       case 'uploading':
       case 'processing':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+        return <Loader2 className="h-4 w-4 animate-spin text-primary" />
       case 'ready':
-        return <CheckCircle className="h-4 w-4 text-green-600" />
+        return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-600" />
+        return <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
       default:
         return null
     }
@@ -287,9 +288,9 @@ export default function DocImportPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-foreground"></div>
+        </div>
     )
   }
 
@@ -358,18 +359,17 @@ export default function DocImportPage() {
             <CardContent>
               <div className="space-y-4">
                 {files.map((file) => (
-                  <div key={file.id} className="flex items-center space-x-4 p-4 border rounded-lg">
-                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  <div key={file.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground truncate">{file.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatFileSize(file.size)} • {file.type.split('/')[1].toUpperCase()}
+                        {formatFileSize(file.size)}
                       </p>
                       {file.status === 'uploading' && (
                         <Progress value={file.progress} className="mt-2" />
                       )}
                       {file.error && (
-                        <p className="text-sm text-red-600 mt-1">{file.error}</p>
+                        <p className="text-sm text-destructive mt-1">{file.error}</p>
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
@@ -395,7 +395,6 @@ export default function DocImportPage() {
                   <Button 
                     onClick={saveDocuments}
                     disabled={isUploading}
-                    className="bg-blue-600 hover:bg-blue-700"
                   >
                     {isUploading ? (
                       <>

@@ -146,7 +146,13 @@ export function processTextWithEnhancedFormatting(text: string): FormattedText {
   html = html.replace(/\[RIGHT\](.*?)\[\/RIGHT\]/gs, '<p class="text-right">$1</p>')
   html = html.replace(/\[JUSTIFY\](.*?)\[\/JUSTIFY\]/gs, '<p class="text-justify">$1</p>')
   
-  // Process bold and italic
+  // Process [BOLD] tags
+  html = html.replace(/\[BOLD\](.*?)\[\/BOLD\]/gs, '<strong class="font-bold">$1</strong>')
+  
+  // Process [ITALIC] tags
+  html = html.replace(/\[ITALIC\](.*?)\[\/ITALIC\]/gs, '<em class="italic">$1</em>')
+  
+  // Process bold and italic (markdown-style)
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
   
@@ -181,7 +187,9 @@ export function processTextWithEnhancedFormatting(text: string): FormattedText {
   html = escapeHtml(html)
   
   // Re-apply formatting after escaping
+  html = html.replace(/&lt;strong class="font-bold"&gt;(.*?)&lt;\/strong&gt;/g, '<strong class="font-bold">$1</strong>')
   html = html.replace(/&lt;strong&gt;(.*?)&lt;\/strong&gt;/g, '<strong>$1</strong>')
+  html = html.replace(/&lt;em class="italic"&gt;(.*?)&lt;\/em&gt;/g, '<em class="italic">$1</em>')
   html = html.replace(/&lt;em&gt;(.*?)&lt;\/em&gt;/g, '<em>$1</em>')
   html = html.replace(/&lt;br&gt;/g, '<br>')
   html = html.replace(/&lt;p class="text-center"&gt;(.*?)&lt;\/p&gt;/g, '<p class="text-center">$1</p>')
