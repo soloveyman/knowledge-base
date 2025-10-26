@@ -163,16 +163,30 @@ export default function DocumentReaderPage() {
             const assignment = result.data.assignments.find((a: any) => a.moduleId === document.moduleId)
             
             if (assignment) {
+              // Fetch test data if testId exists
+              let testData = null
+              if (assignment.testId) {
+                try {
+                  const testResponse = await fetch(`/api/tests/${assignment.testId}`)
+                  const testResult = await testResponse.json()
+                  if (testResult.success && testResult.data.test) {
+                    testData = {
+                      id: assignment.testId,
+                      title: testResult.data.test.title,
+                      questionCount: testResult.data.test.questionIds?.length || 0
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error loading test:', error)
+                }
+              }
+              
               setAssignmentData({
                 id: assignment.id,
                 name: assignment.title || 'Assignment',
                 description: assignment.description || '',
                 document: documentData,
-                test: assignment.testId ? {
-                  id: assignment.testId,
-                  title: 'Test',
-                  questionCount: 5
-                } : null,
+                test: testData,
                 dueDate: assignment.dueDate,
                 status: assignment.status
               })
