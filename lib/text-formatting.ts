@@ -127,7 +127,7 @@ export function processTextWithEnhancedFormatting(text: string): FormattedText {
     return { html: '', plainText: '' }
   }
 
-  // Process [BOLD] and [ITALIC] tags
+  // First pass: Process [BOLD] and [ITALIC] tags
   let html = text
     .replace(/\[BOLD\](.*?)\[\/BOLD\]/gs, '<strong class="font-bold">$1</strong>')
     .replace(/\[ITALIC\](.*?)\[\/ITALIC\]/gs, '<em class="italic">$1</em>')
@@ -143,18 +143,30 @@ export function processTextWithEnhancedFormatting(text: string): FormattedText {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
   
-  // Process line breaks
-  html = html
-    .replace(/\n\n/g, '</p><p class="mb-4">')
-    .replace(/\n/g, '<br>')
+  // Process line breaks - split by double newlines for paragraphs, single for breaks
+  // Also handle single newlines as paragraph breaks when there are formatting markers
+  const hasFormattingMarkers = html.includes('[BOLD]') || html.includes('[ITALIC]')
   
-  // Wrap in paragraph tags if not already wrapped
-  if (!html.trim().startsWith('<')) {
-    html = '<p class="mb-4">' + html
+  let paragraphs: string[]
+  if (html.match(/\n{2,}/) || (hasFormattingMarkers && html.includes('\n'))) {
+    // Split by double+ newlines, or by single newlines if formatting is present
+    paragraphs = html.split(/\n\n+/)
+  } else {
+    // Single newlines - split on them
+    paragraphs = html.split('\n')
   }
-  if (!html.trim().endsWith('>')) {
-    html = html + '</p>'
-  }
+  
+  const processedParagraphs = paragraphs
+    .map(paragraph => {
+      const trimmed = paragraph.trim()
+      if (!trimmed) return ''
+      // Convert remaining \n to <br> within the paragraph
+      const processedParagraph = trimmed.replace(/\n/g, '<br>')
+      return `<p class="mb-4 leading-relaxed">${processedParagraph}</p>`
+    })
+    .filter(p => p)
+  
+  html = processedParagraphs.join('')
 
   return {
     html,

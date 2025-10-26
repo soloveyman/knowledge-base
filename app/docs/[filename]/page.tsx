@@ -79,6 +79,7 @@ export default function DocumentViewer() {
         )
 
         console.log('Found document:', document)
+        console.log('Document ID:', document.id)
 
         if (document) {
           console.log('Document parsedContent:', document.parsedContent)
@@ -87,6 +88,14 @@ export default function DocumentViewer() {
           let content = document.parsedContent ? 
             (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
             'Document content will be displayed here...'
+          
+          // Debug: Check for newlines in content
+          console.log('Content has newlines:', content.includes('\n'))
+          console.log('Content has double newlines:', content.includes('\n\n'))
+          console.log('First 500 chars of raw content:', content.substring(0, 500))
+          console.log('Parser version:', document.parsedContent?.metadata?.parserVersion)
+          console.log('Total newline count:', (content.match(/\n/g) || []).length)
+          console.log('Content sample with \\n visible:', content.substring(0, 200).replace(/\n/g, '\\n'))
           
           // Clean artifacts immediately after extraction (but preserve legitimate lists)
           content = content
@@ -186,7 +195,13 @@ export default function DocumentViewer() {
               {documentData?.content ? (
                 <div 
                   dangerouslySetInnerHTML={{ 
-                    __html: processTextWithEnhancedFormatting(documentData.content).html 
+                    __html: (() => {
+                      const formatted = processTextWithEnhancedFormatting(documentData.content)
+                      console.log('Processing content with length:', documentData.content.length)
+                      console.log('Formatted HTML length:', formatted.html.length)
+                      console.log('First 200 chars of formatted HTML:', formatted.html.substring(0, 200))
+                      return formatted.html
+                    })()
                   }} 
                 />
               ) : (
