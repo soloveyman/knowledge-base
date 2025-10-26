@@ -7,13 +7,13 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Upload, 
-  FileText, 
   CheckCircle, 
   AlertCircle, 
   X, 
   RefreshCw
 } from "lucide-react"
 import { parseDocument, UnsupportedFileTypeError, FileReadError, ParseError, ParsedContent } from "@/lib/parsers"
+import { clearParsingCache } from "@/lib/localStorage-utils"
 
 interface ParsingLog {
   level: 'info' | 'warning' | 'error'
@@ -32,9 +32,33 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [parsingStatus, setParsingStatus] = useState<'idle' | 'uploading' | 'parsing' | 'completed' | 'error'>('idle')
-  const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null)
+  const [, setParsedContent] = useState<ParsedContent | null>(null)
   const [parsingLog, setParsingLog] = useState<ParsingLog[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  const handleFileSelect = useCallback((file: File) => {
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/msword', // .doc
+      'application/vnd.ms-excel' // .xls
+    ]
+    
+    if (!allowedTypes.includes(file.type)) {
+      setError('Please upload a DOCX or XLSX file')
+      return
+    }
+
+    // Validate file size (15MB limit)
+    if (file.size > 15 * 1024 * 1024) {
+      setError('File size must be less than 15MB')
+      return
+    }
+
+    setSelectedFile(file)
+    setError(null)
+  }, [])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -54,31 +78,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelect(e.dataTransfer.files[0])
     }
-  }, [])
-
-  const handleFileSelect = (file: File) => {
-    // Validate file type
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/msword', // .doc
-      'application/vnd.ms-excel' // .xls
-    ]
-    
-    if (!allowedTypes.includes(file.type)) {
-      setError('Please upload a DOCX or XLSX file')
-      return
-    }
-
-    // Validate file size (20MB limit)
-    if (file.size > 20 * 1024 * 1024) {
-      setError('File size must be less than 20MB')
-      return
-    }
-
-    setSelectedFile(file)
-    setError(null)
-  }
+  }, [handleFileSelect])
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -88,6 +88,10 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
 
   const startImport = async () => {
     if (!selectedFile) return
+
+    // Clear any cached parsing results to ensure fresh parsing
+    console.log('Clearing parsing cache to ensure fresh parsing...')
+    clearParsingCache()
 
     setParsingStatus('uploading')
     setUploadProgress(0)
@@ -134,6 +138,11 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
       setParsedContent(parsedContent)
       setParsingLog(logs)
       setParsingStatus('completed')
+      
+      // Call the completion callback if provided
+      if (onImportComplete) {
+        onImportComplete('imported-document')
+      }
 
     } catch (err) {
       let errorMessage = 'Failed to parse document. Please try again.'
@@ -180,20 +189,6 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
     }
   }
 
-  const getStatusText = () => {
-    switch (parsingStatus) {
-      case 'uploading':
-        return 'Uploading file...'
-      case 'parsing':
-        return 'Parsing document structure...'
-      case 'completed':
-        return 'Import completed successfully'
-      case 'error':
-        return 'Import failed'
-      default:
-        return 'Ready to import'
-    }
-  }
 
   return (
     <div className="space-y-6">

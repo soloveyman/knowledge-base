@@ -30,26 +30,6 @@ import type {
   Locale 
 } from "@/types/test"
 
-interface SavedTest {
-  id: string
-  title: string
-  type: string
-  difficulty: string
-  locale: string
-  questionCount: number
-  questions: Array<{
-    id: string
-    type: string
-    prompt: string
-    choices?: string[]
-    correct_answer?: string
-    explanation?: string
-  }>
-  sourceDocument: string
-  createdAt: string
-  createdBy: string
-}
-
 // Documents will be loaded from API
 
 const questionTypes: QuestionType[] = [
@@ -123,37 +103,49 @@ export default function TestBuilderPage() {
     loadDocuments()
   }, [])
 
-  const loadTestForEditing = useCallback((testId: string) => {
+  const loadTestForEditing = useCallback(async (testId: string) => {
     try {
-      const savedTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-      const testToEdit = savedTests.find((test: SavedTest) => test.id === testId)
+      const response = await fetch(`/api/tests/${testId}`)
+      const result = await response.json()
       
-      if (testToEdit) {
+      if (result.success && result.data.test) {
+        const test = result.data.test
+        
         // Load test configuration
         setTestConfig({
-          count: testToEdit.questionCount,
-          type: testToEdit.type,
-          difficulty: testToEdit.difficulty,
-          locale: testToEdit.locale
+          count: test.questionIds?.length || 5,
+          type: test.type || 'mcq',
+          difficulty: test.difficulty || 'medium',
+          locale: 'ru' // Default locale
         })
 
-        // Load document
-        const document = documents.find(doc => doc.name === testToEdit.sourceDocument)
-        if (document) {
-          setSelectedDocument(document)
-          const documentContent = getDocumentContent(document.name)
-          setContext(prev => ({
-            ...prev,
-            text: documentContent,
-            facts: extractFacts(documentContent),
-            steps: extractSteps(documentContent),
-            definitions: extractDefinitions(documentContent)
-          }))
+        // Load document if available
+        if (test.moduleId) {
+          const docResponse = await fetch(`/api/documents/${test.moduleId}`)
+          const docResult = await docResponse.json()
+          if (docResult.success && docResult.data.document) {
+            const document = docResult.data.document
+            setSelectedDocument({
+              id: document.id,
+              name: document.title,
+              type: document.fileType?.toUpperCase() || 'UNKNOWN',
+              uploadedAt: document.createdAt
+            })
+            const documentContent = getDocumentContent(document.title)
+            setContext(prev => ({
+              ...prev,
+              text: documentContent,
+              facts: extractFacts(documentContent),
+              steps: extractSteps(documentContent),
+              definitions: extractDefinitions(documentContent)
+            }))
+          }
         }
 
-        // Load generated questions
-        setGeneratedQuestions(testToEdit.questions || [])
-        setOriginalQuestionCount(testToEdit.questions?.length || 0)
+        // Load questions - this would need a separate API call to get question details
+        // For now, we'll set empty questions and let the user regenerate
+        setGeneratedQuestions([])
+        setOriginalQuestionCount(0)
       }
     } catch (error) {
       console.error('Error loading test for editing:', error)
@@ -169,14 +161,13 @@ export default function TestBuilderPage() {
       return
     }
 
-    // Check if we're in edit mode
-    const editingId = localStorage.getItem('editingTestId')
+    // Check if we're in edit mode via URL parameter
+    const urlParams = new URLSearchParams(window.location.search)
+    const editingId = urlParams.get('edit')
     if (editingId) {
       setIsEditMode(true)
       setEditingTestId(editingId)
       loadTestForEditing(editingId)
-      // Clear the editing ID from localStorage
-      localStorage.removeItem('editingTestId')
     }
   }, [session, status, router, loadTestForEditing])
 
@@ -465,46 +456,55 @@ export default function TestBuilderPage() {
     setError(null)
 
     try {
-      const existingTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-      
       if (isEditMode && editingTestId) {
         // Update existing test
-        const testData = {
-          id: editingTestId,
-          title: `${selectedDocument.name} - Test`,
-          type: testConfig.type,
-          difficulty: testConfig.difficulty,
-          locale: testConfig.locale,
-          questionCount: generatedQuestions.length,
-          questions: generatedQuestions,
-          sourceDocument: selectedDocument.name,
-          createdAt: existingTests.find((t: SavedTest) => t.id === editingTestId)?.createdAt || new Date().toISOString(),
-          createdBy: session?.user?.name || 'Unknown'
-        }
+        const response = await fetch(`/api/tests/${editingTestId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: `${selectedDocument.name} - Test`,
+            description: `Test generated from ${selectedDocument.name}`,
+            questionIds: generatedQuestions.map(q => q.id),
+            passingScore: 70,
+            timeLimit: 15,
+            maxAttempts: 1,
+            shuffleQuestions: false,
+            showCorrectAnswers: true,
+            status: 'published'
+          })
+        })
 
-        const updatedTests = existingTests.map((test: SavedTest) => 
-          test.id === editingTestId ? testData : test
-        )
-        localStorage.setItem('savedTests', JSON.stringify(updatedTests))
+        if (!response.ok) {
+          throw new Error('Failed to update test')
+        }
 
         alert(`Test updated successfully! ${generatedQuestions.length} questions updated.`)
       } else {
         // Create new test
-        const testData = {
-          id: Date.now().toString(),
-          title: `${selectedDocument.name} - Test`,
-          type: testConfig.type,
-          difficulty: testConfig.difficulty,
-          locale: testConfig.locale,
-          questionCount: generatedQuestions.length,
-          questions: generatedQuestions,
-          sourceDocument: selectedDocument.name,
-          createdAt: new Date().toISOString(),
-          createdBy: session?.user?.name || 'Unknown'
-        }
+        const response = await fetch('/api/tests', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: `${selectedDocument.name} - Test`,
+            description: `Test generated from ${selectedDocument.name}`,
+            moduleId: selectedDocument.id,
+            questionIds: generatedQuestions.map(q => q.id),
+            passingScore: 70,
+            timeLimit: 15,
+            maxAttempts: 1,
+            shuffleQuestions: false,
+            showCorrectAnswers: true,
+            status: 'published'
+          })
+        })
 
-        existingTests.push(testData)
-        localStorage.setItem('savedTests', JSON.stringify(existingTests))
+        if (!response.ok) {
+          throw new Error('Failed to create test')
+        }
 
         alert(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
       }
@@ -537,7 +537,6 @@ export default function TestBuilderPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <TestTube className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                 {isEditMode ? 'Edit Test' : 'Test Builder'}
               </h1>

@@ -92,37 +92,102 @@ export default function DocumentReaderPage() {
       return
     }
 
-    // Load assignment data from localStorage
-    if (typeof window !== 'undefined') {
-      const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      const assignment = savedAssignments.find((a: Assignment) => a.document?.id.toString() === documentId)
-      
-      if (assignment) {
-        setAssignmentData(assignment)
+    // Load assignment data from API
+    const loadAssignmentData = async () => {
+      try {
+        const response = await fetch(`/api/assignments`)
+        const result = await response.json()
         
-        // Create document data with content
-        const documentWithContent = {
-          ...assignment.document,
-          uploadedBy: assignment.createdBy,
-          size: '2.5 MB',
-          content: getDocumentContent(assignment.document.name)
-        }
-        setDocumentData(documentWithContent)
-        
-        // Update assignment status to in_progress when user starts reading
-        if (assignment.status === 'pending' || assignment.status === 'active') {
-          const updatedAssignments = savedAssignments.map((a: Assignment) => 
-            a.id === assignment.id 
-              ? { ...a, status: 'in_progress' }
-              : a
+        if (result.success) {
+          const assignment = result.data.assignments.find((a: any) => 
+            a.moduleId === documentId || a.documentId === documentId
           )
-          localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-          setAssignmentData(prev => prev ? { ...prev, status: 'in_progress' } : null)
+          
+          if (assignment) {
+            // Load actual document data
+            const docResponse = await fetch('/api/documents')
+            const docResult = await docResponse.json()
+            
+            let documentData = null
+            if (docResult.success) {
+              const document = docResult.data.documents.find((doc: any) => 
+                doc.id === assignment.moduleId || doc.id === assignment.documentId
+              )
+              if (document) {
+              console.log('Document parsedContent:', document.parsedContent)
+              console.log('Document sections:', document.parsedContent?.sections)
+              
+              const content = document.parsedContent ? 
+                (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
+                'Document content will be displayed here...'
+              
+              console.log('Final content for display:', content.substring(0, 200))
+              
+              documentData = {
+                id: document.id,
+                name: document.originalFileName || document.title,
+                type: document.fileType?.toUpperCase() || 'DOCX',
+                uploadedAt: document.createdAt,
+                uploadedBy: document.uploadedBy || 'Unknown',
+                size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
+                content: content
+              }
+              }
+            }
+            
+            // Fallback to mock data if document not found
+            if (!documentData) {
+              documentData = {
+                id: assignment.moduleId || documentId,
+                name: 'Document',
+                type: 'PDF',
+                uploadedAt: assignment.createdAt,
+                uploadedBy: assignment.createdBy || 'Unknown',
+                size: '2.5 MB',
+                content: getDocumentContent('Document')
+              }
+            }
+            
+            setAssignmentData({
+              id: assignment.id,
+              name: assignment.name || 'Assignment',
+              description: assignment.description || '',
+              document: documentData,
+              test: assignment.testId ? {
+                id: assignment.testId,
+                title: 'Test',
+                questionCount: 5
+              } : null,
+              dueDate: assignment.dueDate,
+              status: assignment.status
+            })
+            
+            // Update assignment status to in_progress when user starts reading
+            if (assignment.status === 'pending' || assignment.status === 'active') {
+              const updateResponse = await fetch(`/api/assignments/${assignment.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  status: 'in_progress'
+                })
+              })
+              
+              if (updateResponse.ok) {
+                setAssignmentData(prev => prev ? { ...prev, status: 'in_progress' } : null)
+              }
+            }
+          }
         }
+      } catch (error) {
+        console.error('Error loading assignment:', error)
+      } finally {
+        setLoading(false)
       }
-      
-      setLoading(false)
     }
+
+    loadAssignmentData()
   }, [session, status, router, documentId])
 
   // Mock document content - same as test builder
@@ -270,7 +335,6 @@ export default function DocumentReaderPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <BookOpen className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                   {assignmentData.name}

@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsersPage } from "@/components/pages/users-page"
@@ -57,7 +57,7 @@ export default function OwnerPage() {
   const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([])
 
   // Load data from APIs
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // Load users
       const usersResponse = await fetch('/api/users')
@@ -82,7 +82,7 @@ export default function OwnerPage() {
     } catch (error) {
       console.error('Error loading data:', error)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (status === "loading") return
@@ -93,10 +93,13 @@ export default function OwnerPage() {
     }
 
     // Load data from APIs
-    loadData()
+    const fetchData = async () => {
+      await loadData()
+    }
+    fetchData()
 
     // Role-based redirects are now handled by middleware
-  }, [session, status, router])
+  }, [session, status, router, loadData])
 
   // User handlers
   const handleDeleteUser = async (id: string) => {
@@ -121,9 +124,8 @@ export default function OwnerPage() {
   }
 
   const handleEditUser = (id: string) => {
-    // Store the user ID for editing and redirect to user builder
-    localStorage.setItem('editingUserId', id)
-    router.push('/user-builder')
+    // Redirect to user builder with edit parameter
+    router.push(`/user-builder?edit=${id}`)
   }
 
 

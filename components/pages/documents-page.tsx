@@ -9,6 +9,8 @@ interface Document {
   name: string
   type: string
   uploadedAt: string
+  size?: string
+  status?: string
 }
 
 interface DocumentsPageProps {
@@ -30,6 +32,14 @@ export function DocumentsPage({
     id: doc.id,
     title: doc.name,
     subtitle: `Uploaded ${doc.uploadedAt}`,
+    metadata: doc.size ? [doc.size] : undefined,
+    badges: [
+      {
+        label: doc.type,
+        variant: doc.type === 'DOCX' ? 'default' : doc.type === 'XLSX' ? 'secondary' : 'outline'
+      },
+      ...(doc.status === 'ready' ? [{ label: 'Ready', variant: 'default' as const }] : [])
+    ],
     onClick: () => onViewDocument(doc.name),
     onDelete: () => onDeleteDocument(doc.id)
   }))
@@ -42,7 +52,7 @@ export function DocumentsPage({
       actionButton={{
         label: "Import Document",
         icon: <Plus className="h-4 w-4" />,
-        onClick: onImportDocument || (() => router.push('/docs/import'))
+        onClick: onImportDocument || (() => router.push('/docs/import?returnTo=/docs'))
       }}
       items={documentItems}
       emptyState={{
@@ -50,7 +60,7 @@ export function DocumentsPage({
         title: "No documents uploaded yet",
         description: "Upload your first document to get started",
         actionLabel: "Import Document",
-        onAction: onImportDocument || (() => router.push('/docs/import'))
+        onAction: onImportDocument || (() => router.push('/docs/import?returnTo=/docs'))
       }}
     />
   )

@@ -1,14 +1,25 @@
 import { NextResponse } from 'next/server'
+import { db, documents } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
 
-    // TODO: Replace with actual database delete operation
-    // For now, return success to indicate no mock data
+    // Check if document exists
+    const existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    if (existingDocument.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'Document not found'
+      }, { status: 404 })
+    }
+
+    // Delete the document
+    await db.delete(documents).where(eq(documents.id, id))
 
     return NextResponse.json({
       success: true,

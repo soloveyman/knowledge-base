@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { PageLayout } from "@/components/common/page-layout"
 import { DocumentsPage } from "@/components/pages/documents-page"
+import { cleanupDocumentFromLocalStorage } from "@/lib/localStorage-utils"
 import { FileText } from "lucide-react"
 
 interface Document {
@@ -14,6 +15,14 @@ interface Document {
   uploadedAt: string
   size?: string
   status?: 'processing' | 'ready' | 'error'
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 export default function DocsPage() {
@@ -34,41 +43,65 @@ export default function DocsPage() {
     loadDocuments()
   }, [session, status, router])
 
-  const loadDocuments = () => {
+  const loadDocuments = async () => {
     try {
-      const savedDocs = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
-      if (savedDocs.length === 0) {
-        // Load mock documents if none saved
-        const mockDocs: Document[] = [
-          { id: "1", name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago", size: "2.3 MB", status: "ready" },
-          { id: "2", name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago", size: "1.8 MB", status: "ready" },
-          { id: "3", name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago", size: "4.1 MB", status: "ready" },
-          { id: "4", name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago", size: "3.2 MB", status: "ready" }
-        ]
-        setDocuments(mockDocs)
-        localStorage.setItem('savedDocuments', JSON.stringify(mockDocs))
+      const response = await fetch('/api/documents')
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('Raw documents from API:', result.data.documents)
+        // Transform database documents to match the expected format
+        const transformedDocs = result.data.documents.map((doc: any) => ({
+          id: doc.id,
+          name: doc.originalFileName || doc.title,
+          type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+          uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+          size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+          status: doc.status || 'ready'
+        }))
+        console.log('Transformed documents:', transformedDocs)
+        setDocuments(transformedDocs)
       } else {
-        setDocuments(savedDocs)
+        console.error('Failed to load documents:', result.message)
+        setDocuments([])
       }
     } catch (error) {
       console.error('Error loading documents:', error)
+      setDocuments([])
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleDeleteDocument = (id: string) => {
-    const updatedDocs = documents.filter(doc => doc.id !== id)
-    setDocuments(updatedDocs)
-    localStorage.setItem('savedDocuments', JSON.stringify(updatedDocs))
+  const handleDeleteDocument = async (id: string) => {
+    try {
+      const response = await fetch(`/api/documents/${id}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        // Remove from local state
+        const updatedDocs = documents.filter(doc => doc.id !== id)
+        setDocuments(updatedDocs)
+        
+        // Clean up localStorage when document is deleted
+        cleanupDocumentFromLocalStorage(id)
+      } else {
+        console.error('Failed to delete document')
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error)
+    }
   }
 
   const handleViewDocument = (name: string) => {
+    console.log('handleViewDocument called with name:', name)
+    console.log('Encoded name:', encodeURIComponent(name))
     router.push(`/docs/${encodeURIComponent(name)}`)
   }
 
   const handleImportDocument = () => {
-    router.push('/docs/import')
+    router.push('/docs/import?returnTo=/docs')
   }
 
   if (status === "loading" || isLoading) {

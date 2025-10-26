@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
 
 export async function GET() {
   try {
@@ -25,13 +26,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { name, email, role } = body
+    const { name, job, email, password, role } = body
 
     // Validate required fields
-    if (!name || !email || !role) {
+    if (!name || !email || !password || !role) {
       return NextResponse.json({
         success: false,
-        message: 'Name, email, and role are required'
+        message: 'Name, email, password, and role are required'
       }, { status: 400 })
     }
 
@@ -44,12 +45,16 @@ export async function POST(request: Request) {
       }, { status: 409 })
     }
 
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 12)
+
     // Create new user
     const newUser = await db.insert(users).values({
       name,
+      job,
       email,
+      password: hashedPassword,
       role: role as 'owner' | 'manager' | 'employee',
-      // Note: In a real app, you'd hash the password and handle authentication properly
     }).returning()
 
     return NextResponse.json({

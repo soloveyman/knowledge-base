@@ -18,13 +18,13 @@ const ROLE_TAB_MAPPINGS = {
 
 type UserRole = keyof typeof ROLE_TAB_MAPPINGS
 
-// Get the previous tab from localStorage or default to the role's default tab
+// Get the previous tab from sessionStorage or default to the role's default tab
 export function getPreviousTab(role: UserRole): string {
   if (typeof window === 'undefined') {
     return ROLE_TAB_MAPPINGS[role].defaultTab
   }
   
-  const storedTab = localStorage.getItem(`previousTab_${role}`)
+  const storedTab = sessionStorage.getItem(`previousTab_${role}`)
   const validTabs = ROLE_TAB_MAPPINGS[role].tabs
   
   if (storedTab && validTabs.includes(storedTab as any)) {
@@ -34,13 +34,13 @@ export function getPreviousTab(role: UserRole): string {
   return ROLE_TAB_MAPPINGS[role].defaultTab
 }
 
-// Save the current tab to localStorage
+// Save the current tab to sessionStorage
 export function saveCurrentTab(role: UserRole, tab: string) {
   if (typeof window === 'undefined') return
   
   const validTabs = ROLE_TAB_MAPPINGS[role].tabs
   if (validTabs.includes(tab as any)) {
-    localStorage.setItem(`previousTab_${role}`, tab)
+    sessionStorage.setItem(`previousTab_${role}`, tab)
   }
 }
 

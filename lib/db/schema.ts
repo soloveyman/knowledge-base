@@ -6,6 +6,8 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
   name: text('name'),
+  job: text('job'),
+  password: text('password'), // Hashed password for authentication
   image: text('image'),
   emailVerified: timestamp('email_verified'),
   role: text('role').notNull().$type<'owner' | 'manager' | 'employee'>(),
@@ -73,7 +75,7 @@ export const moduleVersions = pgTable('module_versions', {
 export const sections = pgTable('sections', {
   id: uuid('id').primaryKey().defaultRandom(),
   moduleId: uuid('module_id').notNull().references(() => modules.id),
-  parentId: uuid('parent_id').references(() => sections.id), // For nested sections
+  parentId: uuid('parent_id'), // For nested sections - will be referenced in relations
   title: text('title').notNull(),
   content: text('content'),
   order: integer('order').default(0),
@@ -289,7 +291,7 @@ export const sectionsRelations = relations(sections, ({ one, many }) => ({
   questions: many(questions),
 }));
 
-export const documentsRelations = relations(documents, ({ one, many }) => ({
+export const documentsRelations = relations(documents, ({ one }) => ({
   module: one(modules, {
     fields: [documents.moduleId],
     references: [modules.id],

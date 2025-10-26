@@ -2,6 +2,9 @@ import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { z } from "zod"
+import { db, users } from "./db"
+import { eq } from "drizzle-orm"
+import bcrypt from "bcryptjs"
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -25,42 +28,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           const { email, password } = loginSchema.parse(credentials)
           
-          // Mock users for testing - no database required
-          const mockUsers = {
-            'owner@test.com': {
-              id: 'owner-1',
-              email: 'owner@test.com',
-              name: 'John Owner',
-              role: 'owner' as UserRole,
-              businessId: 'business-1',
-              businessName: 'Test Company',
-            },
-            'manager@test.com': {
-              id: 'manager-1', 
-              email: 'manager@test.com',
-              name: 'Jane Manager',
-              role: 'manager' as UserRole,
-              businessId: 'business-1',
-              businessName: 'Test Company',
-            },
-            'employee@test.com': {
-              id: 'employee-1',
-              email: 'employee@test.com', 
-              name: 'Bob Employee',
-              role: 'employee' as UserRole,
-              businessId: 'business-1',
-              businessName: 'Test Company',
-            }
-          }
-
-          const user = mockUsers[email as keyof typeof mockUsers]
+          // Find user in database
+          const dbUsers = await db.select().from(users).where(eq(users.email, email)).limit(1)
           
-          if (!user) {
+          if (dbUsers.length === 0) {
+            console.log("User not found:", email)
             return null
           }
 
-          // Accept any password for test users
-          return user
+          const dbUser = dbUsers[0]
+          
+          // Check if user has a password (some users might not have one if created via OAuth)
+          if (!dbUser.password) {
+            console.log("User has no password set:", email)
+            return null
+          }
+
+          // Verify password
+          const isValidPassword = await bcrypt.compare(password, dbUser.password)
+          
+          if (!isValidPassword) {
+            console.log("Invalid password for user:", email)
+            return null
+          }
+
+          // Return user object for NextAuth
+          return {
+            id: dbUser.id,
+            email: dbUser.email,
+            name: dbUser.name || undefined,
+            role: dbUser.role as UserRole,
+            businessId: 'business-1', // You can add this to your schema later
+            businessName: 'Knowledge Base', // You can add this to your schema later
+          }
         } catch (error) {
           console.error("Auth error:", error)
           return null

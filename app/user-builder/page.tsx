@@ -30,7 +30,9 @@ interface User {
 
 interface UserConfig {
   name: string
+  job: string
   email: string
+  password: string
   role: string
 }
 
@@ -40,7 +42,9 @@ export default function UserBuilderPage() {
   
   const [userConfig, setUserConfig] = useState<UserConfig>({
     name: "",
+    job: "",
     email: "",
+    password: "",
     role: ""
   })
   
@@ -57,14 +61,13 @@ export default function UserBuilderPage() {
       return
     }
 
-    // Check if we're in edit mode
-    const editingId = localStorage.getItem('editingUserId')
+    // Check if we're in edit mode via URL parameter
+    const urlParams = new URLSearchParams(window.location.search)
+    const editingId = urlParams.get('edit')
     if (editingId) {
       setIsEditMode(true)
       setEditingUserId(editingId)
       loadUserForEditing(editingId)
-      // Clear the editing ID from localStorage
-      localStorage.removeItem('editingUserId')
     }
   }, [session, status, router])
 
@@ -90,12 +93,24 @@ export default function UserBuilderPage() {
       setError("Name is required")
       return false
     }
+    if (!userConfig.job.trim()) {
+      setError("Job title is required")
+      return false
+    }
     if (!userConfig.email.trim()) {
       setError("Email is required")
       return false
     }
     if (!userConfig.email.includes('@')) {
       setError("Please enter a valid email address")
+      return false
+    }
+    if (!userConfig.password.trim() && !isEditMode) {
+      setError("Password is required")
+      return false
+    }
+    if (userConfig.password.trim() && userConfig.password.length < 6) {
+      setError("Password must be at least 6 characters")
       return false
     }
     if (!userConfig.role) {
@@ -124,7 +139,9 @@ export default function UserBuilderPage() {
           },
           body: JSON.stringify({
             name: userConfig.name,
+            job: userConfig.job,
             email: userConfig.email,
+            password: userConfig.password,
             role: userConfig.role,
           }),
         })
@@ -169,7 +186,6 @@ export default function UserBuilderPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <Users className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                 {isEditMode ? 'Edit User' : 'User Builder'}
               </h1>
@@ -234,6 +250,15 @@ export default function UserBuilderPage() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="job">Job Title *</Label>
+                    <Input
+                      id="job"
+                      value={userConfig.job}
+                      onChange={(e) => handleInputChange('job', e.target.value)}
+                      placeholder="Enter job title"
+                    />
+                  </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address *</Label>
@@ -246,6 +271,19 @@ export default function UserBuilderPage() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="password">
+                      Password {!isEditMode && '*'}
+                      {isEditMode && <span className="text-sm text-gray-500 ml-1">(leave blank to keep current)</span>}
+                    </Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={userConfig.password}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
+                      placeholder={isEditMode ? "Enter new password (optional)" : "Enter password"}
+                    />
+                  </div>
 
                   <div className="space-y-2 md:col-span-1">
                     <Label htmlFor="role">Role *</Label>

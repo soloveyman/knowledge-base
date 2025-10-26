@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx'
+import * as pdfParse from 'pdf-parse'
+import * as JSZip from 'jszip'
 
 export interface ParseResult {
   readonly text: string
@@ -70,57 +72,269 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
 
     // Convert ArrayBuffer to Uint8Array
     const uint8Array = new Uint8Array(buffer)
-    console.log('Uint8Array details:', {
-      length: uint8Array.length,
-      constructor: uint8Array.constructor.name,
-      isUint8Array: uint8Array instanceof Uint8Array
-    })
+    console.log('Parsing DOCX with improved parser...')
     
-    // Simple text extraction from DOCX by reading the document.xml file
-    // DOCX files are ZIP archives containing XML files
     let text = ''
     
-    try {
-      // For now, we'll use a simple approach that extracts basic text
-      // This is a fallback method that works by treating DOCX as a ZIP file
-      console.log('Attempting simple DOCX text extraction...')
-      
-      // Convert to string and look for text content between tags
-      const bufferString = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array)
-      
-      // Extract text from XML-like content (basic approach)
-      const textMatches = bufferString.match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
-      if (textMatches) {
-        text = textMatches
-          .map(match => {
-            const textContent = match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1')
-            return textContent
+    // Add timeout to prevent hanging
+    const parseWithTimeout = async () => {
+      try {
+        // Try JSZip first, but fallback to regex if it fails
+        console.log('Attempting JSZip extraction...')
+        const zip = await JSZip.loadAsync(uint8Array)
+        
+        // Extract document.xml from the DOCX package
+        const documentXml = await zip.file('word/document.xml')?.async('text')
+        
+        if (documentXml) {
+          console.log('Found document.xml, extracting text with formatting...')
+          // Parse paragraphs to maintain structure and alignment
+          const paragraphs = documentXml.match(/<w:p[^>]*>.*?<\/w:p>/gs) || []
+          
+          const parsedParagraphs = paragraphs.map(paragraph => {
+            // Extract text runs within this paragraph
+            const textRuns = paragraph.match(/<w:r[^>]*>.*?<\/w:r>/gs) || []
+            
+            let paragraphText = ''
+            textRuns.forEach(run => {
+              // Extract text from each run
+              const textMatches = run.match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
+              if (textMatches) {
+                textMatches.forEach(match => {
+                  const textContent = match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1')
+                  paragraphText += textContent
+                })
+              }
+            })
+            
+            // Check for paragraph alignment
+            const alignmentMatch = paragraph.match(/<w:jc w:val="([^"]*)"/)
+            const alignment = alignmentMatch ? alignmentMatch[1] : 'left'
+            
+            // Add alignment markers
+            if (alignment === 'center') {
+              paragraphText = `[CENTER]${paragraphText}[/CENTER]`
+            } else if (alignment === 'right') {
+              paragraphText = `[RIGHT]${paragraphText}[/RIGHT]`
+            } else if (alignment === 'justify') {
+              paragraphText = `[JUSTIFY]${paragraphText}[/JUSTIFY]`
+            }
+            
+            return paragraphText.trim()
+          }).filter(p => p.length > 0)
+          
+          console.log('Parsed paragraphs count:', parsedParagraphs.length)
+          console.log('First few paragraphs:', parsedParagraphs.slice(0, 3))
+          
+          text = parsedParagraphs.join('\n')
+          
+          // Clean up any HTML-like tags that might have been embedded
+          console.log('Raw extracted text before cleaning:', text.substring(0, 200))
+          
+          text = text
+            .replace(/<p[^>]*>/g, '') // Remove <p> tags
+            .replace(/<\/p>/g, '\n') // Replace </p> with newlines
+            .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+            .replace(/&lt;/g, '<') // Decode HTML entities
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ') // Remove non-breaking spaces
+            .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
+            .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
+            .trim()
+          
+          console.log('Text after cleaning:', text.substring(0, 200))
+          
+          // If no structured text found, try to extract any readable text
+          if (!text || text.length < 10) {
+            console.log('No structured text found, trying fallback extraction...')
+            const readableText = documentXml
+              .replace(/<[^>]*>/g, ' ') // Remove XML tags
+              .replace(/[^\w\s\u0400-\u04FF\u00C0-\u017F\u2000-\u206F\u2E00-\u2E7F\u3000-\u303F\uFF00-\uFFEF]/g, ' ') // Keep letters, spaces, Cyrillic, Latin extended, punctuation, and symbols
+              .replace(/\s+/g, ' ')
+              .trim()
+            
+            if (readableText.length > 10) {
+              text = readableText
+            }
+          }
+          
+          // Force line breaks based on common patterns if text is still continuous
+          if (text && text.length > 50 && !text.includes('\n')) {
+            console.log('Text appears continuous, forcing line breaks...')
+            // Look for patterns that suggest line breaks should be added
+            text = text
+              .replace(/(\d+г\s+\d+р)\s+/g, '$1\n') // After weight/price patterns
+              .replace(/([а-яё])\s+([А-ЯЁ])/g, '$1\n$2') // Before capital letters after lowercase
+              .replace(/(\d+р)\s+([А-ЯЁ])/g, '$1\n$2') // After price before capital letters
+              .replace(/([а-яё])\s+([А-ЯЁ][а-яё]*\s+[а-яё])/g, '$1\n$2') // Before menu categories
+              .trim()
+            console.log('After forcing line breaks:', text.substring(0, 200))
+          }
+        } else {
+          console.log('No document.xml found in DOCX')
+        }
+        
+        console.log('DOCX parsing completed, text length:', text.length)
+        
+      } catch (extractionError) {
+        console.log('JSZip extraction failed, using regex fallback:', extractionError)
+        // Fallback: regex-based text extraction with formatting
+        const bufferString = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array)
+        
+        // Parse paragraphs to maintain structure
+        const paragraphs = bufferString.match(/<w:p[^>]*>.*?<\/w:p>/gs) || []
+        
+        const parsedParagraphs = paragraphs.map(paragraph => {
+          // Extract text runs within this paragraph
+          const textRuns = paragraph.match(/<w:r[^>]*>.*?<\/w:r>/gs) || []
+          
+          let paragraphText = ''
+          textRuns.forEach(run => {
+            // Extract text from each run
+            const textMatches = run.match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
+            if (textMatches) {
+              textMatches.forEach(match => {
+                const textContent = match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1')
+                paragraphText += textContent
+              })
+            }
           })
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-      }
-      
-      // If no structured text found, try to extract any readable text
-      if (!text) {
-        const readableText = bufferString
-          .replace(/<[^>]*>/g, ' ') // Remove XML tags
-          .replace(/[^\w\s\u0400-\u04FF]/g, ' ') // Keep only letters, spaces, and Cyrillic
-          .replace(/\s+/g, ' ')
+          
+          // Check for paragraph alignment
+          const alignmentMatch = paragraph.match(/<w:jc w:val="([^"]*)"/)
+          const alignment = alignmentMatch ? alignmentMatch[1] : 'left'
+          
+          // Add alignment markers
+          if (alignment === 'center') {
+            paragraphText = `[CENTER]${paragraphText}[/CENTER]`
+          } else if (alignment === 'right') {
+            paragraphText = `[RIGHT]${paragraphText}[/RIGHT]`
+          } else if (alignment === 'justify') {
+            paragraphText = `[JUSTIFY]${paragraphText}[/JUSTIFY]`
+          }
+          
+          return paragraphText.trim()
+        }).filter(p => p.length > 0)
+        
+        text = parsedParagraphs.join('\n')
+        
+        // Clean up any HTML-like tags that might have been embedded
+        console.log('Raw fallback text before cleaning:', text.substring(0, 200))
+        
+        text = text
+          .replace(/<p[^>]*>/g, '') // Remove <p> tags
+          .replace(/<\/p>/g, '\n') // Replace </p> with newlines
+          .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+          .replace(/&lt;/g, '<') // Decode HTML entities
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&nbsp;/g, ' ') // Remove non-breaking spaces
+          .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
+          .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
           .trim()
         
-        if (readableText.length > 10) {
-          text = readableText
+        console.log('Fallback text after cleaning:', text.substring(0, 200))
+        
+        // If no structured text found, try to extract any readable text
+        if (!text || text.length < 10) {
+          const readableText = bufferString
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/[^\w\s\u0400-\u04FF\u00C0-\u017F\u2000-\u206F\u2E00-\u2E7F\u3000-\u303F\uFF00-\uFFEF]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+          
+          if (readableText.length > 10) {
+            text = readableText
+          } else {
+            text = 'Document content extracted (basic parsing)'
+          }
         }
+        
+        // Force line breaks based on common patterns if text is still continuous
+        if (text && text.length > 50 && !text.includes('\n')) {
+          console.log('Fallback: Text appears continuous, forcing line breaks...')
+          // Look for patterns that suggest line breaks should be added
+          text = text
+            .replace(/(\d+г\s+\d+р)\s+/g, '$1\n') // After weight/price patterns
+            .replace(/([а-яё])\s+([А-ЯЁ])/g, '$1\n$2') // Before capital letters after lowercase
+            .replace(/(\d+р)\s+([А-ЯЁ])/g, '$1\n$2') // After price before capital letters
+            .replace(/([а-яё])\s+([А-ЯЁ][а-яё]*\s+[а-яё])/g, '$1\n$2') // Before menu categories
+            .trim()
+          console.log('Fallback: After forcing line breaks:', text.substring(0, 200))
+        }
+        
+        console.log('Fallback DOCX parsing completed, text length:', text.length)
       }
       
-      console.log('Simple extraction completed, text length:', text.length)
-      
-    } catch (extractionError) {
-      console.log('Simple extraction failed:', extractionError)
-      // Fallback: return a basic message
-      text = 'Document content extracted (basic parsing)'
+      return text
     }
+    
+    // Execute parsing with timeout
+    text = await Promise.race([
+      parseWithTimeout(),
+      new Promise<string>((_, reject) => 
+        setTimeout(() => reject(new Error('DOCX parsing timeout after 10 seconds')), 10000)
+      )
+    ])
+    
+    if (options.normalizeWhitespace) {
+      text = text.replace(/\s+/g, ' ').trim()
+    }
+
+    const metadata: ParseMetadata | undefined = options.includeMetadata ? {
+      parsedAt: new Date(),
+      parserVersion: '2.0.0'
+    } : undefined
+
+    return {
+      text,
+      metadata
+    }
+  } catch (error) {
+    console.error('DOCX parsing error:', error)
+    throw new ParseError(`Failed to parse DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+export async function parsePdf(buffer: ArrayBuffer, options: {
+  includeMetadata?: boolean
+  normalizeWhitespace?: boolean
+} = {}): Promise<ParseResult> {
+  try {
+    // Ensure we have a valid buffer
+    if (!buffer || buffer.byteLength === 0) {
+      throw new Error('Empty or invalid buffer provided')
+    }
+
+    console.log('Buffer details:', {
+      byteLength: buffer.byteLength,
+      constructor: buffer.constructor.name,
+      isArrayBuffer: buffer instanceof ArrayBuffer
+    })
+
+    // Convert ArrayBuffer to Buffer for pdf-parse
+    const uint8Array = new Uint8Array(buffer)
+    const pdfBuffer = Buffer.from(uint8Array)
+    
+    console.log('Parsing PDF with pdf-parse...')
+    
+    // Use pdf-parse to extract text from PDF with timeout
+    const data = await Promise.race([
+      pdfParse(pdfBuffer),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('PDF parsing timeout after 15 seconds')), 15000)
+      )
+    ]) as any
+    
+    let text = data.text
+    
+    console.log('PDF parsing completed, text length:', text.length)
+    console.log('PDF pages:', data.numpages)
     
     if (options.normalizeWhitespace) {
       text = text.replace(/\s+/g, ' ').trim()
@@ -136,8 +350,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       metadata
     }
   } catch (error) {
-    console.error('DOCX parsing error:', error)
-    throw new ParseError(`Failed to parse DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new ParseError(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
@@ -206,6 +419,16 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
 export async function parseDocument(file: File): Promise<ParsedContent> {
   console.log('parseDocument called with file:', file.name, 'size:', file.size, 'type:', file.type)
   
+  // Add cache-busting timestamp to ensure fresh parsing
+  const parseTimestamp = Date.now()
+  console.log('Parse timestamp (cache-busting):', parseTimestamp)
+  
+  // Validate file size (15MB limit)
+  const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
+  if (file.size > MAX_FILE_SIZE) {
+    throw new ParseError(`File size exceeds 15MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
+  }
+  
   const buffer = await file.arrayBuffer()
   console.log('Buffer created, size:', buffer.byteLength)
   
@@ -213,13 +436,20 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   console.log('File extension detected:', fileExtension)
   
   // Validate file format by checking magic bytes
+  const uint8Array = new Uint8Array(buffer)
+  
   if (fileExtension === 'docx') {
-    const uint8Array = new Uint8Array(buffer)
     // DOCX files should start with PK (ZIP signature)
     if (uint8Array.length < 4 || uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
       throw new ParseError('Invalid DOCX file format - file does not appear to be a valid DOCX document')
     }
     console.log('DOCX file format validated')
+  } else if (fileExtension === 'xlsx') {
+    // XLSX files should also start with PK (ZIP signature)
+    if (uint8Array.length < 4 || uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
+      throw new ParseError('Invalid XLSX file format - file does not appear to be a valid XLSX document')
+    }
+    console.log('XLSX file format validated')
   }
   
   let parseResult: ParseResult
@@ -243,7 +473,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
         console.log('XLSX parsing completed, text length:', parseResult.text.length)
         break
       default:
-        throw new UnsupportedFileTypeError(fileExtension || 'unknown')
+        throw new UnsupportedFileTypeError(`File type '${fileExtension}' is not supported. Only DOCX and XLSX files are supported.`)
     }
   } catch (error) {
     console.error('Parse error in parseDocument:', error)
@@ -256,12 +486,69 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   // Parse the extracted text into structured content
   console.log('Converting to structured content...')
   const structuredContent = parseTextToStructuredContent(parseResult.text, file.name)
+  
+  // Ensure line breaks are preserved in the content
+  if (structuredContent.sections && structuredContent.sections.length > 0) {
+    structuredContent.sections = structuredContent.sections.map(section => ({
+      ...section,
+      content: section.content.replace(/\n/g, '\n') // Ensure line breaks are preserved
+    }))
+  }
+  
   console.log('Structured content created:', structuredContent)
+  
+  // Add parsing metadata to track improvements
+  structuredContent.metadata = {
+    ...structuredContent.metadata,
+    parseTimestamp,
+    parserVersion: '3.0.0', // Increment this when making parsing improvements
+    cacheBusting: true
+  }
   return structuredContent
 }
 
 function parseTextToStructuredContent(text: string, fileName: string): ParsedContent {
-  const lines = text.split('\n').filter(line => line.trim())
+  console.log('Raw text input to structured content:', text.substring(0, 200))
+  console.log('Line breaks in raw text:', (text.match(/\n/g) || []).length)
+  
+  // Additional cleaning to remove any remaining HTML artifacts
+  const cleanedText = text
+    .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove HTML entities
+    .replace(/&lt;/g, '<') // Decode specific entities
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/[ \t]+/g, ' ') // Normalize spaces and tabs, but preserve line breaks
+    .replace(/\n\s*\n/g, '\n\n') // Preserve paragraph breaks
+    .trim()
+  
+  console.log('Cleaned text for structured content:', cleanedText.substring(0, 200))
+  console.log('Line breaks in cleaned text:', (cleanedText.match(/\n/g) || []).length)
+  
+  // Force line breaks if text appears continuous
+  let finalText = cleanedText
+  if (finalText && finalText.length > 50 && !finalText.includes('\n')) {
+    console.log('Structured content: Text appears continuous, forcing line breaks...')
+    finalText = finalText
+      .replace(/(\d+г\s+\d+р)/g, '$1\n') // After weight and price
+      .replace(/([.!?])\s+/g, '$1\n') // After sentence endings
+      .replace(/([а-яё])\s+([А-ЯЁ])/g, '$1\n$2') // Before capital letters after lowercase
+      .replace(/(\d+р)\s+([А-ЯЁ])/g, '$1\n$2') // After price before capital letters
+      .replace(/(🎞\s*СЛАЙД\s*\d+)/g, '\n$1\n') // Around slide markers
+      .replace(/([А-ЯЁ][а-яё]+\s*[А-ЯЁ][а-яё]*\.)/g, '$1\n') // After names/titles ending with period
+      .replace(/\n\s*\n/g, '\n') // Clean up multiple line breaks
+      .trim()
+    console.log('Structured content: After forcing line breaks:', finalText.substring(0, 200))
+    console.log('Line breaks after forcing:', (finalText.match(/\n/g) || []).length)
+  }
+  
+  const lines = finalText.split('\n').filter(line => line.trim())
+  console.log('Lines after splitting:', lines.length)
+  console.log('First few lines:', lines.slice(0, 5))
+  
   const sections: Array<{ title: string; level: number; content: string; order: number }> = []
   const tables: Array<{ title: string; headers: string[]; rows: string[][] }> = []
   
@@ -303,7 +590,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     }
     // Regular content
     else if (currentSection) {
-      currentSection.content += (currentSection.content ? '\n' : '') + trimmedLine
+      currentSection.content += (currentSection.content ? '\n' : '') + line
     }
   }
   
@@ -317,7 +604,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     sections.push({
       title: fileName.replace(/\.[^/.]+$/, ''), // Remove file extension
       level: 1,
-      content: text,
+      content: finalText,
       order: 1
     })
   }
@@ -340,6 +627,9 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   
   // Calculate word count
   const wordCount = text.split(/\s+/).filter(word => word.length > 0).length
+  
+  console.log('Final sections created:', sections.length)
+  console.log('First section content:', sections[0]?.content?.substring(0, 200))
   
   return {
     sections,

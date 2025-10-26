@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
 import { navigateBack } from "@/lib/redirect-utils"
+import { processTextWithEnhancedFormatting } from '@/lib/text-formatting'
 
 interface UserWithRole {
   name?: string | null
@@ -34,6 +35,14 @@ import {
 } from "lucide-react"
 import { useParams } from "next/navigation"
 
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 export default function DocumentViewer() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -51,30 +60,73 @@ export default function DocumentViewer() {
       return
     }
 
-    // Check if document exists in localStorage (mock check)
-    const savedDocuments = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
-    const documentExists = savedDocuments.some((doc: Document) => 
-      doc.name === decodeURIComponent(filename)
-    )
+    // Load document data from database
+    loadDocumentData()
+  }, [session, status, router, filename])
 
-    if (!documentExists) {
-      // Document doesn't exist, redirect back to previous tab
+  const loadDocumentData = async () => {
+    try {
+      setLoading(true)
+      
+      console.log('Loading document data for filename:', filename)
+      
+      // Fetch all documents from the database
+      const response = await fetch('/api/documents')
+      const result = await response.json()
+      
+      console.log('Documents API response:', result)
+      
+      if (result.success) {
+        // Find the document by filename
+        const document = result.data.documents.find((doc: any) => 
+          doc.originalFileName === decodeURIComponent(filename) || doc.title === decodeURIComponent(filename)
+        )
+
+        console.log('Found document:', document)
+
+        if (document) {
+          console.log('Document parsedContent:', document.parsedContent)
+          console.log('Document sections:', document.parsedContent?.sections)
+          
+          const content = document.parsedContent ? 
+            (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
+            'Document content will be displayed here...'
+          
+          console.log('Final content for display:', content.substring(0, 200))
+          
+          setDocumentData({
+            id: document.id,
+            name: document.originalFileName || document.title,
+            type: document.fileType?.toUpperCase() || 'DOCX',
+            uploadedAt: document.createdAt,
+            uploadedBy: document.uploadedBy || 'Unknown',
+            size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
+            content: content
+          })
+        } else {
+          console.log('Document not found, redirecting back')
+          // Document doesn't exist, redirect back to previous tab
+          const userRole = (session?.user as UserWithRole)?.role || 'manager'
+          navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
+          return
+        }
+      } else {
+        console.error('Failed to load documents:', result.message)
+        // Redirect back on error
+        const userRole = (session?.user as UserWithRole)?.role || 'manager'
+        navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
+        return
+      }
+    } catch (error) {
+      console.error('Error loading document:', error)
+      // Redirect back on error
       const userRole = (session?.user as UserWithRole)?.role || 'manager'
       navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
       return
+    } finally {
+      setLoading(false)
     }
-
-    // Simulate loading document data
-    setLoading(false)
-    setDocumentData({
-      name: decodeURIComponent(filename),
-      type: filename.split('.').pop()?.toUpperCase() || 'DOCX',
-      uploadedAt: new Date().toISOString(),
-      uploadedBy: session.user?.name || 'Unknown',
-      size: '2.5 MB',
-      content: 'Document content will be displayed here...'
-    })
-  }, [session, status, router, filename])
+  }
 
   const handleClose = () => {
     // Navigate back to the previous tab
@@ -101,7 +153,6 @@ export default function DocumentViewer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <FileText className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                 {documentData?.name || 'Document Viewer'}
               </h1>
@@ -173,45 +224,19 @@ export default function DocumentViewer() {
               />
             </div>
           ) : (
-            <div className="prose max-w-none">
-              <h1>Ланч меню BS</h1>
-              <h2>Основные блюда</h2>
-              <ul>
-                <li>Борщ украинский с мясом - 250₽</li>
-                <li>Суп-пюре из тыквы - 200₽</li>
-                <li>Куриный бульон с лапшой - 180₽</li>
-              </ul>
-              
-              <h2>Салаты</h2>
-              <ul>
-                <li>Цезарь с курицей - 320₽</li>
-                <li>Греческий салат - 280₽</li>
-                <li>Салат из свежих овощей - 200₽</li>
-              </ul>
-              
-              <h2>Горячие блюда</h2>
-              <ul>
-                <li>Котлета по-киевски с картофелем - 450₽</li>
-                <li>Рыба на гриле с рисом - 380₽</li>
-                <li>Паста карбонара - 350₽</li>
-                <li>Плов с бараниной - 420₽</li>
-              </ul>
-              
-              <h2>Напитки</h2>
-              <ul>
-                <li>Свежевыжатый апельсиновый сок - 150₽</li>
-                <li>Чай/кофе - 80₽</li>
-                <li>Минеральная вода - 60₽</li>
-              </ul>
-              
-              <h2>Десерты</h2>
-              <ul>
-                <li>Тирамису - 200₽</li>
-                <li>Чизкейк - 180₽</li>
-                <li>Мороженое (3 шарика) - 120₽</li>
-              </ul>
-              
-              <p><em>Все цены указаны в рублях. Меню может изменяться в зависимости от сезона.</em></p>
+            <div className="prose max-w-none document-content">
+              {documentData?.content ? (
+                <div 
+                  dangerouslySetInnerHTML={{ 
+                    __html: processTextWithEnhancedFormatting(documentData.content).html 
+                  }} 
+                />
+              ) : (
+                <div>
+                  <h1>{documentData?.name || 'Document'}</h1>
+                  <p>Document content will be displayed here...</p>
+                </div>
+              )}
             </div>
           )}
         </div>

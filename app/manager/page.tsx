@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo, useLayoutEffect } from "react"
+import { useEffect, useState, useMemo, useLayoutEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -19,6 +19,15 @@ import { TestsPage } from "@/components/pages/tests-page"
 import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 import UserProgressReport from "@/components/reports/user-progress-report"
+import { cleanupDocumentFromLocalStorage, syncLocalStorageWithDatabase, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
 
 interface SavedTest {
@@ -82,12 +91,64 @@ export default function ManagerPage() {
     status: string
   }>>([])
   
+  // Initialize documents from localStorage to prevent empty state on re-mount
   const [documents, setDocuments] = useState<Array<{
     id: string
     name: string
     type: string
     uploadedAt: string
-  }>>([])
+    size?: string
+    status?: string
+  }>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('manager-documents')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
+
+  // Debug wrapper for setDocuments
+  const setDocumentsWithLog = (newDocuments: Array<{
+    id: string
+    name: string
+    type: string
+    uploadedAt: string
+    size?: string
+    status?: string
+  }>) => {
+    console.log('Manager: setDocuments called with:', newDocuments.length, 'documents')
+    if (newDocuments.length === 0) {
+      console.log('Manager: WARNING - Documents being cleared!')
+      console.trace('Manager: Stack trace for document clearing:')
+    } else {
+      // Save to localStorage to persist across re-mounts
+      try {
+        localStorage.setItem('manager-documents', JSON.stringify(newDocuments))
+      } catch (error) {
+        console.error('Failed to save documents to localStorage:', error)
+      }
+    }
+    setDocuments(newDocuments)
+  }
+
+  // Initialize with empty array and log it
+  console.log('Manager: Initial documents state:', documents.length, 'documents')
+
+  // Fix any corrupted localStorage data on initialization
+  useEffect(() => {
+    fixCorruptedLocalStorage()
+  }, [])
+
+  // Monitor documents state changes
+  useEffect(() => {
+    console.log('Manager: Documents state changed to:', documents.length, 'documents')
+  }, [documents])
   
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
@@ -114,8 +175,13 @@ export default function ManagerPage() {
   }, [session, status, router])
 
   // Load data from APIs
-  const loadData = async () => {
+  const loadData = useCallback(async (preserveDocuments = false) => {
     try {
+      // Set loading state for documents if we're refreshing
+      if (preserveDocuments) {
+        setIsLoadingDocuments(true)
+      }
+
       // Load users
       const usersResponse = await fetch('/api/users')
       const usersResult = await usersResponse.json()
@@ -141,19 +207,88 @@ export default function ManagerPage() {
       const documentsResponse = await fetch('/api/documents')
       const documentsResult = await documentsResponse.json()
       if (documentsResult.success) {
-        setDocuments(documentsResult.data.documents)
+        console.log('Manager: Raw documents from API:', documentsResult.data.documents)
+        // Transform database documents to match the expected format
+        const transformedDocs = documentsResult.data.documents.map((doc: {
+          id: string
+          originalFileName?: string
+          title: string
+          fileType?: string
+          createdAt: string
+          fileSize?: number
+          status?: string
+        }) => ({
+          id: doc.id,
+          name: doc.originalFileName || doc.title,
+          type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+          uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+          size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+          status: doc.status || 'ready'
+        }))
+        console.log('Manager: Transformed documents:', transformedDocs)
+        setDocumentsWithLog(transformedDocs)
+        
+        // Sync localStorage with database to remove stale data
+        syncLocalStorageWithDatabase(transformedDocs)
+      } else if (!preserveDocuments) {
+        // Only clear documents if we're not preserving them and the API call failed
+        setDocumentsWithLog([])
       }
     } catch (error) {
       console.error('Error loading data:', error)
+      if (!preserveDocuments) {
+        setDocumentsWithLog([])
+      }
+    } finally {
+      // Clear loading state
+      setIsLoadingDocuments(false)
     }
-  }
+  }, [])
 
   useLayoutEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return
     
-    loadData()
-  }, [])
+    const fetchData = async () => {
+      await loadData()
+    }
+    fetchData()
+  }, [loadData])
+
+  // Reload data when tab changes to docs
+  useEffect(() => {
+    if (defaultTab === 'docs') {
+      console.log('Manager: Docs tab activated, reloading documents...')
+      // Use setTimeout to avoid synchronous setState in effect
+      // Preserve documents during refresh to avoid empty state
+      setTimeout(() => loadData(true), 0)
+    }
+  }, [defaultTab, loadData])
+
+  // Reload data when page becomes visible (e.g., when returning from document viewer)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && defaultTab === 'docs') {
+        console.log('Manager: Page became visible, reloading documents...')
+        setTimeout(() => loadData(true), 0)
+      }
+    }
+
+    const handleFocus = () => {
+      if (defaultTab === 'docs') {
+        console.log('Manager: Window focused, reloading documents...')
+        setTimeout(() => loadData(true), 0)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [defaultTab, loadData])
 
 
   // Document handlers
@@ -165,7 +300,18 @@ export default function ManagerPage() {
       const result = await response.json()
       
       if (result.success) {
-        setDocuments(prev => prev.filter(doc => doc.id !== id))
+        setDocumentsWithLog(prev => prev.filter((doc: {
+          id: string
+          name: string
+          type: string
+          uploadedAt: string
+          size?: string
+          status?: string
+        }) => doc.id !== id))
+        
+        // Clean up localStorage when document is deleted
+        cleanupDocumentFromLocalStorage(id)
+        
         // Ensure we stay on the docs tab after deletion
         router.push('/manager?tab=docs')
       } else {
@@ -177,18 +323,31 @@ export default function ManagerPage() {
   }
 
   const handleViewDocument = (name: string) => {
+    console.log('Manager: handleViewDocument called with name:', name)
+    console.log('Manager: Encoded name:', encodeURIComponent(name))
     router.push(`/docs/${encodeURIComponent(name)}`)
   }
 
   const handleImportDocument = () => {
-    router.push('/docs/import')
+    router.push('/docs/import?returnTo=/manager?tab=docs')
   }
 
   // Test handlers
-  const handleDeleteTest = (id: string) => {
-    const updatedTests = savedTests.filter(t => t.id !== id)
-    setSavedTests(updatedTests)
-    localStorage.setItem('savedTests', JSON.stringify(updatedTests))
+  const handleDeleteTest = async (id: string) => {
+    try {
+      const response = await fetch(`/api/tests/${id}`, {
+        method: 'DELETE'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setSavedTests(prev => prev.filter(t => t.id !== id))
+      } else {
+        console.error('Failed to delete test:', result.message)
+      }
+    } catch (error) {
+      console.error('Error deleting test:', error)
+    }
   }
 
   const handleViewTest = (id: string) => {
@@ -196,16 +355,26 @@ export default function ManagerPage() {
   }
 
   const handleEditTest = (id: string) => {
-    // Store the test ID for editing and redirect to test builder
-    localStorage.setItem('editingTestId', id)
-    router.push('/test-builder')
+    // Redirect to test builder with edit parameter
+    router.push(`/test-builder?edit=${id}`)
   }
 
   // Assignment handlers
-  const handleDeleteAssignment = (id: string) => {
-    const updatedAssignments = savedAssignments.filter(a => a.id !== id)
-    setSavedAssignments(updatedAssignments)
-    localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
+  const handleDeleteAssignment = async (id: string) => {
+    try {
+      const response = await fetch(`/api/assignments/${id}`, {
+        method: 'DELETE'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setSavedAssignments(prev => prev.filter(a => a.id !== id))
+      } else {
+        console.error('Failed to delete assignment:', result.message)
+      }
+    } catch (error) {
+      console.error('Error deleting assignment:', error)
+    }
   }
 
   const handleViewAssignment = (id: string) => {
@@ -213,9 +382,8 @@ export default function ManagerPage() {
   }
 
   const handleEditAssignment = (id: string) => {
-    // Store the assignment ID for editing and redirect to assignment builder
-    localStorage.setItem('editingAssignmentId', id)
-    router.push('/assignment-builder')
+    // Redirect to assignment builder with edit parameter
+    router.push(`/assignment-builder?edit=${id}`)
   }
 
   if (status === "loading") {
@@ -335,7 +503,12 @@ export default function ManagerPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {documents.length === 0 ? (
+                {isLoadingDocuments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <span className="ml-3 text-gray-600">Refreshing documents...</span>
+                  </div>
+                ) : documents.length === 0 ? (
                   <EmptyState
                     icon={<FileText className="h-12 w-12" />}
                     title="No documents uploaded yet"

@@ -1,58 +1,10 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-
-interface Test {
-  id: string
-  title: string
-  type: string
-  difficulty: string
-  locale: string
-  questionCount: number
-  questions: Array<{
-    id: string
-    type: string
-    prompt: string
-    choices?: string[]
-    correct_answer?: string
-    explanation?: string
-  }>
-  sourceDocument: string
-  createdAt: string
-  createdBy: string
-}
-
-interface Assignment {
-  id: string
-  name: string
-  description: string
-  document: {
-    id: number
-    name: string
-    type: string
-    uploadedAt: string
-  }
-  test: {
-    id: string
-    title: string
-    questionCount: number
-  }
-  assignedUsers: Array<{
-    id: number
-    name: string
-    email: string
-    role: string
-    department: string
-  }>
-  dueDate: string
-  createdAt: string
-  createdBy: string
-  status: string
-}
 import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
@@ -70,7 +22,6 @@ import {
   AlertCircle,
   ArrowLeft
 } from "lucide-react"
-import { useParams } from "next/navigation"
 import { navigateBack } from "@/lib/redirect-utils"
 
 interface UserWithRole {
@@ -124,17 +75,46 @@ export default function TestPage() {
       return
     }
 
-    // Load test data from localStorage
-    if (typeof window !== 'undefined') {
-      const savedTests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-      const test = savedTests.find((t: Test) => t.id === testId)
-      
-      if (test) {
-        setTestData(test)
+    // Load test data from API
+    const loadTestData = async () => {
+      try {
+        const response = await fetch(`/api/tests/${testId}`)
+        const result = await response.json()
+        
+        if (result.success && result.data.test) {
+          const test = result.data.test
+          setTestData({
+            id: test.id,
+            title: test.title,
+            type: test.type || 'mcq',
+            difficulty: test.difficulty || 'medium',
+            locale: 'ru', // Default locale
+            questionCount: test.questionIds?.length || 0,
+            questions: test.questionIds?.map((qId: string) => {
+              // For now, we'll need to fetch question details separately
+              // This is a simplified mapping - you may need to enhance the API
+              return {
+                id: qId,
+                type: 'mcq',
+                prompt: `Question ${qId}`,
+                choices: ['A', 'B', 'C', 'D'],
+                correct_answer: 'A',
+                explanation: 'Sample explanation'
+              }
+            }) || [],
+            sourceDocument: test.moduleId || 'Unknown',
+            createdAt: test.createdAt,
+            createdBy: test.createdBy || 'Unknown'
+          })
+        }
+      } catch (error) {
+        console.error('Error loading test:', error)
+      } finally {
+        setLoading(false)
       }
-      
-      setLoading(false)
     }
+
+    loadTestData()
   }, [session, status, router, testId])
 
   const handleAnswerSelect = (questionId: string, answer: string) => {
@@ -156,7 +136,7 @@ export default function TestPage() {
     }
   }
 
-  const handleSubmitTest = useCallback(() => {
+  const handleSubmitTest = useCallback(async () => {
     if (!testData) return
 
     let correctAnswers = 0
@@ -170,20 +150,29 @@ export default function TestPage() {
     setScore(percentage)
     setShowResults(true)
 
-    // Update assignment status based on test score
-    const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-    const updatedAssignments = savedAssignments.map((assignment: Assignment) => {
-      if (assignment.test?.id === testId) {
-        return { 
-          ...assignment, 
-          status: percentage >= 70 ? 'completed' : 'failed',
-          testScore: percentage
-        }
+    // Save test attempt to database
+    try {
+      const response = await fetch('/api/test-attempts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          testId: testId,
+          answers: answers,
+          score: percentage,
+          timeSpent: (15 * 60) - timeLeft, // Calculate time spent
+          status: 'completed'
+        })
+      })
+
+      if (!response.ok) {
+        console.error('Failed to save test attempt')
       }
-      return assignment
-    })
-    localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-  }, [testData, answers, testId])
+    } catch (error) {
+      console.error('Error saving test attempt:', error)
+    }
+  }, [testData, answers, testId, timeLeft])
 
   // Timer effect
   useEffect(() => {
@@ -268,7 +257,6 @@ export default function TestPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center min-w-0">
-                <TestTube className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                   Test Results
                 </h1>
@@ -341,7 +329,6 @@ export default function TestPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <TestTube className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                   {testData.title}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { PageLayout } from "@/components/common/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,8 @@ import {
   AlertCircle,
   Loader2
 } from "lucide-react"
+import { parseDocument, ParsedContent } from '@/lib/parsers'
+import { clearParsingCache } from '@/lib/localStorage-utils'
 
 interface UploadedFile {
   id: string
@@ -28,26 +30,42 @@ interface UploadedFile {
   status: 'uploading' | 'processing' | 'ready' | 'error'
   progress: number
   error?: string
+  parsedContent?: ParsedContent
+  parsingLog?: any[]
+  file?: File // Store the actual File object
 }
 
 const ACCEPTED_FILE_TYPES = {
-  'application/pdf': '.pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
-  'application/vnd.ms-excel': '.xls',
-  'text/plain': '.txt'
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx'
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
 
 export default function DocImportPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Get the return URL from query parameters, with proper encoding
+  const returnTo = searchParams.get('returnTo') || '/docs'
+  
+  // Validate returnTo URL to prevent open redirects
+  const isValidReturnUrl = (url: string) => {
+    try {
+      const parsed = new URL(url, window.location.origin)
+      return parsed.origin === window.location.origin
+    } catch {
+      return false
+    }
+  }
+  
+  const safeReturnTo = isValidReturnUrl(returnTo) ? returnTo : '/docs'
 
   useEffect(() => {
     if (status === "loading") return
@@ -105,7 +123,7 @@ export default function DocImportPage() {
 
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File ${file.name} is too large. Maximum size is 10MB`)
+        setError(`File ${file.name} is too large. Maximum size is 15MB`)
         return
       }
 
@@ -116,7 +134,8 @@ export default function DocImportPage() {
         size: file.size,
         type: file.type,
         status: 'uploading',
-        progress: 0
+        progress: 0,
+        file: file // Store the actual File object
       })
     })
 
@@ -131,24 +150,60 @@ export default function DocImportPage() {
     
     for (const file of filesToUpload) {
       try {
-        // Simulate upload progress
-        for (let progress = 0; progress <= 100; progress += 10) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+        // Set status to processing immediately
+        setFiles(prev => prev.map(f => 
+          f.id === file.id 
+            ? { ...f, status: 'processing', progress: 0 }
+            : f
+        ))
+
+        // Parse the file content - use the file from filesToUpload since files state might not be updated yet
+        const fileObj = filesToUpload.find(f => f.id === file.id)
+        console.log('Looking for file with id:', file.id, 'Found:', !!fileObj, 'Has file:', !!(fileObj && fileObj.file))
+        if (fileObj && fileObj.file) {
+          try {
+            // Clear any cached parsing results to ensure fresh parsing
+            clearParsingCache()
+            
+            console.log(`Starting to parse file: ${fileObj.name}`)
+            const startTime = Date.now()
+            
+            const parsedContent = await parseDocument(fileObj.file)
+            
+            const endTime = Date.now()
+            console.log(`Parsing completed in ${endTime - startTime}ms for file: ${fileObj.name}`)
+            
+            setFiles(prev => prev.map(f => 
+              f.id === file.id 
+                ? { 
+                    ...f, 
+                    status: 'ready',
+                    progress: 100,
+                    parsedContent: parsedContent,
+                    parsingLog: []
+                  }
+                : f
+            ))
+          } catch (parseError) {
+            console.error('Parse error:', parseError)
+            setFiles(prev => prev.map(f => 
+              f.id === file.id 
+                ? { 
+                    ...f, 
+                    status: 'error', 
+                    error: parseError instanceof Error ? parseError.message : 'Parse failed'
+                  }
+                : f
+            ))
+          }
+        } else {
+          console.error('File object not found for id:', file.id)
           setFiles(prev => prev.map(f => 
             f.id === file.id 
-              ? { ...f, progress, status: progress === 100 ? 'processing' : 'uploading' }
+              ? { ...f, status: 'error', error: 'File object not found' }
               : f
           ))
         }
-
-        // Simulate processing
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        setFiles(prev => prev.map(f => 
-          f.id === file.id 
-            ? { ...f, status: 'ready' }
-            : f
-        ))
       } catch (error) {
         setFiles(prev => prev.map(f => 
           f.id === file.id 
@@ -165,26 +220,40 @@ export default function DocImportPage() {
     setFiles(prev => prev.filter(f => f.id !== fileId))
   }
 
-  const saveDocuments = () => {
+  const saveDocuments = async () => {
     const readyFiles = files.filter(f => f.status === 'ready')
     if (readyFiles.length === 0) return
 
-    const newDocuments = readyFiles.map(file => ({
-      id: file.id,
-      name: file.name,
-      type: file.type.split('/')[1].toUpperCase(),
-      uploadedAt: 'Just now',
-      size: formatFileSize(file.size),
-      status: 'ready' as const
-    }))
+    try {
+      // Save each file to the database
+      for (const file of readyFiles) {
+        const response = await fetch('/api/documents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: file.name,
+            originalFileName: file.name,
+            fileType: file.type.split('/')[1],
+            fileUrl: file.url || null,
+            fileSize: file.size,
+            parsedContent: file.parsedContent || null,
+            parsingLog: file.parsingLog || null,
+            uploadedBy: session?.user?.id || 'unknown'
+          }),
+        })
 
-    // Save to localStorage
-    const existingDocs = JSON.parse(localStorage.getItem('savedDocuments') || '[]')
-    const updatedDocs = [...existingDocs, ...newDocuments]
-    localStorage.setItem('savedDocuments', JSON.stringify(updatedDocs))
+        if (!response.ok) {
+          console.error('Failed to save document:', file.name)
+        }
+      }
 
-    // Redirect to docs page
-    router.push('/docs')
+      // Redirect to the specified return URL
+      router.push(safeReturnTo)
+    } catch (error) {
+      console.error('Error saving documents:', error)
+    }
   }
 
   const getStatusIcon = (status: UploadedFile['status']) => {
@@ -232,7 +301,7 @@ export default function DocImportPage() {
     <PageLayout
       title="Import Documents"
       icon={<Upload className="h-8 w-8" />}
-      onClose={() => router.push('/docs')}
+      onClose={() => router.push(safeReturnTo)}
     >
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Upload Area */}
@@ -240,7 +309,7 @@ export default function DocImportPage() {
           <CardHeader>
             <CardTitle>Upload Documents</CardTitle>
             <CardDescription>
-              Upload PDF, Word, Excel, or text files to your knowledge base
+              Upload Word and Excel files to your knowledge base
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -261,7 +330,7 @@ export default function DocImportPage() {
                   Drop files here or click to browse
                 </p>
                 <p className="text-sm text-gray-500">
-                  Supports PDF, DOCX, XLSX, XLS, TXT files up to 10MB
+                  Supports DOCX and XLSX files up to 15MB
                 </p>
               </div>
               <Input

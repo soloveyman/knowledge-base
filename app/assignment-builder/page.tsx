@@ -136,31 +136,32 @@ export default function AssignmentBuilderPage() {
       return
     }
 
-    // Check if we're in edit mode
-    const editingId = localStorage.getItem('editingAssignmentId')
+    // Check if we're in edit mode via URL parameter
+    const urlParams = new URLSearchParams(window.location.search)
+    const editingId = urlParams.get('edit')
     if (editingId) {
       setIsEditMode(true)
       setEditingAssignmentId(editingId)
       loadAssignmentForEditing(editingId)
-      // Clear the editing ID from localStorage
-      localStorage.removeItem('editingAssignmentId')
     }
   }, [session, status, router])
 
-  const loadAssignmentForEditing = (assignmentId: string) => {
+  const loadAssignmentForEditing = async (assignmentId: string) => {
     try {
-      const savedAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-      const assignmentToEdit = savedAssignments.find((assignment: Assignment) => assignment.id === assignmentId)
+      const response = await fetch(`/api/assignments/${assignmentId}`)
+      const result = await response.json()
       
-      if (assignmentToEdit) {
+      if (result.success && result.data.assignment) {
+        const assignment = result.data.assignment
+        
         // Load assignment configuration
         setAssignmentConfig({
-          name: assignmentToEdit.name,
-          documentId: assignmentToEdit.document.id.toString(),
-          testId: assignmentToEdit.test.id,
-          selectedUsers: assignmentToEdit.assignedUsers.map((user: User) => user.id),
-          dueDate: new Date(assignmentToEdit.dueDate),
-          description: assignmentToEdit.description || ""
+          name: assignment.name || '',
+          documentId: assignment.moduleId || '',
+          testId: assignment.testId || '',
+          selectedUsers: assignment.assignedTo ? [assignment.assignedTo] : [],
+          dueDate: assignment.dueDate ? new Date(assignment.dueDate) : undefined,
+          description: assignment.description || ''
         })
       }
     } catch (error) {
@@ -170,13 +171,34 @@ export default function AssignmentBuilderPage() {
   }
 
   useEffect(() => {
-    // Load saved tests from localStorage
-    const tests = JSON.parse(localStorage.getItem('savedTests') || '[]')
-    setSavedTests(tests)
-    
-    // Load saved users from localStorage
-    const users = JSON.parse(localStorage.getItem('savedUsers') || '[]')
-    setSavedUsers(users)
+    // Load tests from API
+    const loadTests = async () => {
+      try {
+        const response = await fetch('/api/tests')
+        const result = await response.json()
+        if (result.success) {
+          setSavedTests(result.data.tests)
+        }
+      } catch (error) {
+        console.error('Error loading tests:', error)
+      }
+    }
+
+    // Load users from API
+    const loadUsers = async () => {
+      try {
+        const response = await fetch('/api/users')
+        const result = await response.json()
+        if (result.success) {
+          setSavedUsers(result.data.users)
+        }
+      } catch (error) {
+        console.error('Error loading users:', error)
+      }
+    }
+
+    loadTests()
+    loadUsers()
   }, [])
 
   const handleUserToggle = (userId: string) => {
@@ -232,52 +254,52 @@ export default function AssignmentBuilderPage() {
     setError(null)
 
     try {
-      const selectedDocument = mockDocuments.find(doc => doc.id.toString() === assignmentConfig.documentId)
-      const selectedTest = savedTests.find(test => test.id === assignmentConfig.testId)
-      const selectedUsersData = savedUsers.filter(user => assignmentConfig.selectedUsers.includes(user.id))
-
-      const existingAssignments = JSON.parse(localStorage.getItem('savedAssignments') || '[]')
-
       if (isEditMode && editingAssignmentId) {
         // Update existing assignment
-        const assignmentData = {
-          id: editingAssignmentId,
-          name: assignmentConfig.name,
-          description: assignmentConfig.description,
-          document: selectedDocument,
-          test: selectedTest,
-          assignedUsers: selectedUsersData,
-          dueDate: assignmentConfig.dueDate.toISOString(),
-          createdAt: existingAssignments.find((a: Assignment) => a.id === editingAssignmentId)?.createdAt || new Date().toISOString(),
-          createdBy: session?.user?.name || 'Unknown',
-          status: 'active'
+        const response = await fetch(`/api/assignments/${editingAssignmentId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: assignmentConfig.name,
+            description: assignmentConfig.description,
+            moduleId: assignmentConfig.documentId,
+            testId: assignmentConfig.testId,
+            assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
+            dueDate: assignmentConfig.dueDate.toISOString(),
+            status: 'pending'
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to update assignment')
         }
 
-        const updatedAssignments = existingAssignments.map((assignment: Assignment) => 
-          assignment.id === editingAssignmentId ? assignmentData : assignment
-        )
-        localStorage.setItem('savedAssignments', JSON.stringify(updatedAssignments))
-
-        alert(`Assignment updated successfully! Assigned to ${selectedUsersData.length} employees.`)
+        alert(`Assignment updated successfully!`)
       } else {
         // Create new assignment
-        const assignmentData = {
-          id: Date.now().toString(),
-          name: assignmentConfig.name,
-          description: assignmentConfig.description,
-          document: selectedDocument,
-          test: selectedTest,
-          assignedUsers: selectedUsersData,
-          dueDate: assignmentConfig.dueDate.toISOString(),
-          createdAt: new Date().toISOString(),
-          createdBy: session?.user?.name || 'Unknown',
-          status: 'active'
+        const response = await fetch('/api/assignments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: assignmentConfig.name,
+            description: assignmentConfig.description,
+            moduleId: assignmentConfig.documentId,
+            testId: assignmentConfig.testId,
+            assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
+            dueDate: assignmentConfig.dueDate.toISOString(),
+            status: 'pending'
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create assignment')
         }
 
-        existingAssignments.push(assignmentData)
-        localStorage.setItem('savedAssignments', JSON.stringify(existingAssignments))
-
-        alert(`Assignment created successfully! Assigned to ${selectedUsersData.length} employees.`)
+        alert(`Assignment created successfully!`)
       }
       
       // Redirect to manager assignments tab
@@ -312,7 +334,6 @@ export default function AssignmentBuilderPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <ClipboardList className="h-8 w-8 text-blue-600 mr-3 shrink-0" />
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
                 {isEditMode ? 'Edit Assignment' : 'Assignment Builder'}
               </h1>

@@ -3,6 +3,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Document text alignment styles */
+.text-justify {
+  text-align: justify;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-left {
+  text-align: left;
+}
+
+/* Enhanced document formatting */
+.document-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.document-content strong {
+  font-weight: 600;
+}
+
+.document-content em {
+  font-style: italic;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -58,8 +58,11 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
 
   useEffect(() => {
-    // Calculate progress for each user
-    const progressData: UserProgress[] = users.map(user => {
+    // Filter out users with owner and manager roles - only show employees
+    const employeeUsers = users.filter(user => user.role === 'employee')
+    
+    // Calculate progress for each employee user
+    const progressData: UserProgress[] = employeeUsers.map(user => {
       // Find assignments assigned to this user
       const userAssignments = assignments.filter(assignment => {
         if (!Array.isArray(assignment.assignedUsers)) return false
@@ -151,14 +154,14 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
       <Card>
         <CardHeader>
         <CardTitle>
-          User Progress Report
+          Employee Progress Report
         </CardTitle>
-          <CardDescription>Track user progress and assignment completion</CardDescription>
+          <CardDescription>Track employee progress and assignment completion</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-gray-500">
             <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p>No users or assignments found</p>
+            <p>No employees or assignments found</p>
           </div>
         </CardContent>
       </Card>
@@ -169,9 +172,9 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
     <Card>
       <CardHeader>
         <CardTitle>
-          User Progress Report
+          Employee Progress Report
         </CardTitle>
-        <CardDescription>Track user progress and assignment completion</CardDescription>
+        <CardDescription>Track employee progress and assignment completion</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" className="space-y-2">
