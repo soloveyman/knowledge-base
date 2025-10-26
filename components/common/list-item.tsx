@@ -34,11 +34,12 @@ export function ListItem({
 }: ListItemProps) {
   return (
     <div 
-      className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent cursor-pointer"
+      className="p-4 border border-border rounded-lg hover:bg-accent cursor-pointer"
       onClick={onClick}
     >
-      <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-foreground">{title}</h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-foreground">{title}</h3>
         {subtitle && (
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         )}
@@ -89,9 +90,9 @@ export function ListItem({
             })}
           </div>
         )}
-      </div>
-      <div className="flex items-center space-x-1">
-        {showEditButton && onEdit && (
+        </div>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+          {showEditButton && onEdit && (
           <Button 
             variant="ghost" 
             size="sm" 
@@ -120,6 +121,7 @@ export function ListItem({
             }
           />
         )}
+        </div>
       </div>
     </div>
   )

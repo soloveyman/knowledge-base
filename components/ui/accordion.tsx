@@ -88,7 +88,7 @@ const AccordionTrigger = React.forwardRef<HTMLButtonElement, AccordionTriggerPro
       <button
         ref={ref}
         className={cn(
-          "flex w-full items-center justify-between p-4 text-left font-medium transition-all hover:bg-accent [&[data-state=open]>svg]:rotate-180",
+          "flex w-full items-start justify-between p-4 text-left font-medium transition-all hover:bg-accent [&[data-state=open]>svg]:rotate-180",
           className
         )}
         onClick={() => toggleItem(itemValue)}
@@ -98,7 +98,7 @@ const AccordionTrigger = React.forwardRef<HTMLButtonElement, AccordionTriggerPro
           {children}
         </div>
         <ChevronDown className={cn(
-          "h-4 w-4 shrink-0 transition-transform duration-200",
+          "h-4 w-4 shrink-0 mt-0.5 transition-transform duration-200",
           isOpen && "rotate-180"
         )} />
       </button>
