@@ -410,13 +410,8 @@ export default function TestBuilderPage() {
       
       if (result.success) {
         const newQuestions = result.data?.questions || []
-        if (isEditMode) {
-          // In edit mode, add new questions to existing ones
-          setGeneratedQuestions(prev => [...prev, ...newQuestions])
-        } else {
-          // In create mode, replace questions
-          setGeneratedQuestions(newQuestions)
-        }
+        // Always add new questions to existing ones (never replace)
+        setGeneratedQuestions(prev => [...prev, ...newQuestions])
         setAiProvider(result.provider || 'unknown')
       } else {
         throw new Error(result.message || 'Failed to generate questions')
@@ -708,12 +703,12 @@ export default function TestBuilderPage() {
                     {isGenerating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isEditMode ? 'Adding Questions...' : 'Generating...'}
+                        {generatedQuestions.length > 0 ? 'Adding More Questions...' : 'Generating...'}
                       </>
                     ) : (
                       <>
                         <TestTube className="h-4 w-4 mr-2" />
-                        {isEditMode ? 'Add Questions' : 'Generate Test'}
+                        {generatedQuestions.length > 0 ? 'Add More Questions' : 'Generate Questions'}
                       </>
                     )}
                   </Button>
