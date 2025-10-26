@@ -52,14 +52,9 @@ export function AssignmentsPage({
   const assignmentItems = assignments.map((assignment) => ({
     id: assignment.id,
     title: `Assignment ${assignment.id.slice(0, 8)}`, // Use first 8 chars of ID as title
-    subtitle: `Module: ${assignment.moduleId?.slice(0, 8) || 'N/A'} | Test: ${assignment.testId?.slice(0, 8) || 'N/A'}`,
-    metadata: [
-      `Assigned To: ${assignment.assignedTo?.slice(0, 8) || 'N/A'}`,
-      `Due: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'}`,
-      `Created: ${new Date(assignment.createdAt).toLocaleDateString()}`
-    ],
+    subtitle: `Due: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'} | Created: ${new Date(assignment.createdAt).toLocaleDateString()}`,
+    metadata: [],
     badges: [
-      { label: `Max Attempts: ${assignment.maxAttempts || 1}`, variant: "outline" as const },
       { 
         label: assignment.status, 
         variant: assignment.status === 'completed' ? "default" as const : 

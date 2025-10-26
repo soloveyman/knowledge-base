@@ -241,7 +241,7 @@ export default function AssignmentBuilderPage() {
   const handleSelectAllUsers = () => {
     setAssignmentConfig(prev => ({
       ...prev,
-      selectedUsers: savedUsers.map(user => user.id)
+      selectedUsers: savedUsers.filter(user => user.role === 'employee').map(user => user.id)
     }))
   }
 
@@ -534,7 +534,7 @@ export default function AssignmentBuilderPage() {
                       variant="outline"
                       size="sm"
                       onClick={handleSelectAllUsers}
-                      disabled={assignmentConfig.selectedUsers.length === savedUsers.length}
+                      disabled={assignmentConfig.selectedUsers.length === savedUsers.filter(user => user.role === 'employee').length}
                     >
                       Select All
                     </Button>
@@ -551,7 +551,7 @@ export default function AssignmentBuilderPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {savedUsers.map((user) => (
+                  {savedUsers.filter(user => user.role === 'employee').map((user) => (
                     <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                       <Checkbox
                         id={`user-${user.id}`}
@@ -560,17 +560,12 @@ export default function AssignmentBuilderPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-gray-400" />
                           <label
                             htmlFor={`user-${user.id}`}
                             className="text-sm font-medium text-gray-900 cursor-pointer"
                           >
                             {user.name}
                           </label>
-                        </div>
-                        <p className="text-xs text-gray-500">{user.email}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <RoleBadge role={user.role} className="text-xs" />
                           <Badge variant="secondary" className="text-xs">
                             {user.job}
                           </Badge>
