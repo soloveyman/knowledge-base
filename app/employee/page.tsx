@@ -326,7 +326,7 @@ export default function EmployeePage() {
             </Card>
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
@@ -467,8 +467,8 @@ export default function EmployeePage() {
           </TabsContent>
 
           {/* Progress Tab */}
-          <TabsContent value="progress" className="space-y-6">
-            <div className="grid gap-6">
+          <TabsContent value="progress" className="space-y-3 md:space-y-6">
+            <div className="grid gap-3 md:gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Learning Statistics</CardTitle>

@@ -423,9 +423,9 @@ export default function AssignmentBuilderPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
           {/* Configuration Panel */}
-          <div className="space-y-6">
+          <div className="space-y-3 md:space-y-6">
             {/* Assignment Configuration */}
             <Card>
               <CardHeader>
@@ -557,7 +557,7 @@ export default function AssignmentBuilderPage() {
           </div>
 
           {/* Employee Selection Panel */}
-          <div className="space-y-6">
+          <div className="space-y-3 md:space-y-6">
             <ErrorMessage error={error} />
 
             <Card>

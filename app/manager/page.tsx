@@ -491,7 +491,7 @@ export default function ManagerPage() {
 
 
         {/* Main Tabs */}
-        <Tabs defaultValue={defaultTab} className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="docs">Docs</TabsTrigger>
@@ -499,9 +499,9 @@ export default function ManagerPage() {
             <TabsTrigger value="assignments">Assign</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="overview" className="space-y-3 md:space-y-6">
             {/* Overview Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
@@ -597,7 +597,7 @@ export default function ManagerPage() {
           </TabsContent>
 
 
-          <TabsContent value="docs" className="space-y-6">
+          <TabsContent value="docs" className="space-y-3 md:space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -662,7 +662,7 @@ export default function ManagerPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="tests" className="space-y-6">
+          <TabsContent value="tests" className="space-y-3 md:space-y-6">
             <TestsPage
               tests={savedTests}
               onDeleteTest={handleDeleteTest}
@@ -672,7 +672,7 @@ export default function ManagerPage() {
             />
           </TabsContent>
 
-          <TabsContent value="assignments" className="space-y-6">
+          <TabsContent value="assignments" className="space-y-3 md:space-y-6">
             <AssignmentsPage
               assignments={savedAssignments}
               onDeleteAssignment={handleDeleteAssignment}

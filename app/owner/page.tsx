@@ -161,7 +161,7 @@ export default function OwnerPage() {
 
 
         {/* Main Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue="overview" className="space-y-3 md:space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="w-full min-w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
@@ -170,9 +170,9 @@ export default function OwnerPage() {
             </TabsList>
           </div>
 
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="overview" className="space-y-3 md:space-y-6">
             {/* Overview Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -289,7 +289,7 @@ export default function OwnerPage() {
 
           </TabsContent>
 
-          <TabsContent value="users" className="space-y-6">
+          <TabsContent value="users" className="space-y-3 md:space-y-6">
             <UsersPage
               users={savedUsers}
               onDeleteUser={handleDeleteUser}
@@ -299,7 +299,7 @@ export default function OwnerPage() {
           </TabsContent>
 
 
-          <TabsContent value="settings" className="space-y-6">
+          <TabsContent value="settings" className="space-y-3 md:space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>System Settings</CardTitle>
