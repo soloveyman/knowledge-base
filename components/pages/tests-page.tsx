@@ -21,13 +21,15 @@ interface TestsPageProps {
   onDeleteTest: (id: string) => void
   onViewTest: (id: string) => void
   onEditTest: (id: string) => void
+  isLoading?: boolean
 }
 
 export function TestsPage({ 
   tests, 
   onDeleteTest, 
   onViewTest,
-  onEditTest
+  onEditTest,
+  isLoading = false
 }: TestsPageProps) {
   const router = useRouter()
 
@@ -57,6 +59,7 @@ export function TestsPage({
       }}
       items={testItems}
       showEditButton={true}
+      isLoading={isLoading}
       emptyState={{
         icon: <TestTube className="h-12 w-12" />,
         title: "No tests created yet",

@@ -6,13 +6,14 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { DocumentTypeBadge, CountBadge, RoleBadge } from "@/lib/badges"
+import { RoleBadge } from "@/lib/badges"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ErrorMessage } from "@/components/common/error-message"
 import { 
   FileText, 
   X,
@@ -27,25 +28,13 @@ import {
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
-// Mock documents data - same as test builder
-const mockDocuments = [
-  { id: 1, name: "Ланч меню BS.docx", type: "DOCX", uploadedAt: "2 hours ago" },
-  { id: 2, name: "Training Schedule.xlsx", type: "XLSX", uploadedAt: "1 day ago" },
-  { id: 3, name: "Employee Handbook.docx", type: "DOCX", uploadedAt: "5 minutes ago" },
-  { id: 4, name: "Safety Guidelines.pdf", type: "PDF", uploadedAt: "1 hour ago" }
-]
-
-// Mock users data
-const mockUsers = [
-  { id: 1, name: "Анна Иванова", email: "anna.ivanova@company.com", role: "Manager", department: "Operations" },
-  { id: 2, name: "Петр Петров", email: "petr.petrov@company.com", role: "Employee", department: "Kitchen" },
-  { id: 3, name: "Мария Сидорова", email: "maria.sidorova@company.com", role: "Employee", department: "Service" },
-  { id: 4, name: "Алексей Козлов", email: "alexey.kozlov@company.com", role: "Employee", department: "Kitchen" },
-  { id: 5, name: "Елена Морозова", email: "elena.morozova@company.com", role: "Employee", department: "Service" },
-  { id: 6, name: "Дмитрий Волков", email: "dmitry.volkov@company.com", role: "Employee", department: "Management" },
-  { id: 7, name: "Ольга Новикова", email: "olga.novikova@company.com", role: "Employee", department: "Kitchen" },
-  { id: 8, name: "Сергей Лебедев", email: "sergey.lebedev@company.com", role: "Employee", department: "Service" }
-]
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 
 interface AssignmentConfig {
   name: string
@@ -122,6 +111,14 @@ export default function AssignmentBuilderPage() {
   
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedUsers, setSavedUsers] = useState<User[]>([])
+  const [savedDocuments, setSavedDocuments] = useState<Array<{
+    id: string
+    name: string
+    type: string
+    uploadedAt: string
+    size?: string
+    status?: string
+  }>>([])
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
@@ -156,12 +153,12 @@ export default function AssignmentBuilderPage() {
         
         // Load assignment configuration
         setAssignmentConfig({
-          name: assignment.name || '',
-          documentId: assignment.moduleId || '',
+          name: `Assignment ${assignment.id.slice(0, 8)}`, // Generate name from ID
+          documentId: assignment.moduleId || '', // Use moduleId as documentId for now
           testId: assignment.testId || '',
           selectedUsers: assignment.assignedTo ? [assignment.assignedTo] : [],
           dueDate: assignment.dueDate ? new Date(assignment.dueDate) : undefined,
-          description: assignment.description || ''
+          description: `Assignment created on ${new Date(assignment.createdAt).toLocaleDateString()}`
         })
       }
     } catch (error) {
@@ -197,8 +194,39 @@ export default function AssignmentBuilderPage() {
       }
     }
 
+    // Load documents from API
+    const loadDocuments = async () => {
+      try {
+        const response = await fetch('/api/documents')
+        const result = await response.json()
+        if (result.success) {
+          // Transform database documents to match the expected format
+          const transformedDocs = result.data.documents.map((doc: {
+            id: string
+            originalFileName?: string
+            title: string
+            fileType?: string
+            createdAt: string
+            fileSize?: number
+            status?: string
+          }) => ({
+            id: doc.id,
+            name: doc.originalFileName || doc.title,
+            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+            uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+            size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+            status: doc.status || 'ready'
+          }))
+          setSavedDocuments(transformedDocs)
+        }
+      } catch (error) {
+        console.error('Error loading documents:', error)
+      }
+    }
+
     loadTests()
     loadUsers()
+    loadDocuments()
   }, [])
 
   const handleUserToggle = (userId: string) => {
@@ -273,30 +301,36 @@ export default function AssignmentBuilderPage() {
         })
 
         if (!response.ok) {
-          throw new Error('Failed to update assignment')
+          const errorData = await response.json()
+          throw new Error(errorData.message || 'Failed to update assignment')
         }
 
         alert(`Assignment updated successfully!`)
       } else {
         // Create new assignment
+        const assignmentData = {
+          name: assignmentConfig.name,
+          description: assignmentConfig.description,
+          moduleId: assignmentConfig.documentId,
+          testId: assignmentConfig.testId,
+          assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
+          dueDate: assignmentConfig.dueDate.toISOString(),
+          status: 'pending'
+        }
+        
+        console.log('Creating assignment with data:', assignmentData)
+        
         const response = await fetch('/api/assignments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            name: assignmentConfig.name,
-            description: assignmentConfig.description,
-            moduleId: assignmentConfig.documentId,
-            testId: assignmentConfig.testId,
-            assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
-            dueDate: assignmentConfig.dueDate.toISOString(),
-            status: 'pending'
-          })
+          body: JSON.stringify(assignmentData)
         })
 
         if (!response.ok) {
-          throw new Error('Failed to create assignment')
+          const errorData = await response.json()
+          throw new Error(errorData.message || 'Failed to create assignment')
         }
 
         alert(`Assignment created successfully!`)
@@ -391,12 +425,11 @@ export default function AssignmentBuilderPage() {
                       <SelectValue placeholder="Choose a document..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockDocuments.map((doc) => (
-                        <SelectItem key={doc.id} value={doc.id.toString()}>
+                      {savedDocuments.map((doc) => (
+                        <SelectItem key={doc.id} value={doc.id}>
                           <div className="flex items-center space-x-2">
                             <FileText className="h-4 w-4" />
                             <span>{doc.name}</span>
-                            <DocumentTypeBadge type={doc.type} className="ml-2" />
                           </div>
                         </SelectItem>
                       ))}
@@ -422,7 +455,6 @@ export default function AssignmentBuilderPage() {
                             <div className="flex items-center space-x-2">
                               <TestTube className="h-4 w-4" />
                               <span>{test.title}</span>
-                              <CountBadge type="questions" count={test.questionCount} className="ml-2" />
                             </div>
                           </SelectItem>
                         ))
@@ -486,13 +518,7 @@ export default function AssignmentBuilderPage() {
 
           {/* Employee Selection Panel */}
           <div className="space-y-6">
-            {error && (
-              <Card className="border-red-200 bg-red-50">
-                <CardContent className="pt-6">
-                  <p className="text-red-600">{error}</p>
-                </CardContent>
-              </Card>
-            )}
+            <ErrorMessage error={error} />
 
             <Card>
               <CardHeader>

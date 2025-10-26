@@ -3,19 +3,163 @@ import { NextResponse } from 'next/server'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { sectionIds, questionCount, difficulty, questionTypes } = body
+    const { params, context } = body
 
-    // TODO: Replace with actual AI test generation
-    // For now, return empty array to indicate no mock data
-    const generatedQuestions = []
+    // Check if Grok API key is available
+    if (!process.env.GROK_API_KEY) {
+      // Fallback to mock questions if no API key
+      const mockQuestions = [
+        {
+          id: `q_${Date.now()}_1`,
+          type: "mcq",
+          prompt: "What is the main topic of this document?",
+          choices: ["Menu items", "Pricing", "Restaurant hours", "Contact information"],
+          correct_answer: "0",
+          explanation: "The document contains menu items and pricing information."
+        },
+        {
+          id: `q_${Date.now()}_2`,
+          type: "tf",
+          prompt: "This document contains pricing information.",
+          correct_answer: "true",
+          explanation: "The document includes prices for various menu items."
+        },
+        {
+          id: `q_${Date.now()}_3`,
+          type: "mcq",
+          prompt: "What type of cuisine is featured in this menu?",
+          choices: ["Italian", "Russian", "Mixed", "Fast food"],
+          correct_answer: "2",
+          explanation: "The menu contains a mix of different cuisines and styles."
+        }
+      ]
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          questions: mockQuestions,
+          totalGenerated: mockQuestions.length
+        },
+        provider: "mock",
+        message: "Using mock questions - GROK_API_KEY not configured"
+      })
+    }
+
+    // Generate questions using Grok API
+    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'grok-2',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert test generator. Generate ${params?.count || 5} high-quality questions based on the provided content. 
+            
+            Requirements:
+            - Questions should test understanding of the content
+            - Include multiple choice, true/false, and fill-in-the-blank questions
+            - Provide clear explanations for answers
+            - Difficulty level: ${params?.difficulty || 'medium'}
+            - Language: ${params?.locale || 'English'}
+            
+            Return ONLY a valid JSON array with this exact format:
+            [
+              {
+                "id": "unique_id",
+                "type": "mcq|tf|complete",
+                "prompt": "Question text",
+                "choices": ["option1", "option2", "option3", "option4"],
+                "correct_answer": "0|1|2|3|true|false|answer_text",
+                "explanation": "Why this answer is correct"
+              }
+            ]`
+          },
+          {
+            role: 'user',
+            content: `Generate questions based on this content:\n\n${context?.text || 'No content provided'}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    })
+
+    if (!grokResponse.ok) {
+      console.error(`Grok API error: ${grokResponse.status} - ${grokResponse.statusText}`)
+      
+      // Fallback to mock questions when API fails
+      const mockQuestions = [
+        {
+          id: `q_${Date.now()}_1`,
+          type: "mcq",
+          prompt: "What is the main topic of this document?",
+          choices: ["Menu items", "Pricing", "Restaurant hours", "Contact information"],
+          correct_answer: "0",
+          explanation: "The document contains menu items and pricing information."
+        },
+        {
+          id: `q_${Date.now()}_2`,
+          type: "tf",
+          prompt: "This document contains pricing information.",
+          correct_answer: "true",
+          explanation: "The document includes prices for various menu items."
+        },
+        {
+          id: `q_${Date.now()}_3`,
+          type: "mcq",
+          prompt: "What type of cuisine is featured in this menu?",
+          choices: ["Italian", "Russian", "Mixed", "Fast food"],
+          correct_answer: "2",
+          explanation: "The menu contains a mix of different cuisines and styles."
+        }
+      ]
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          questions: mockQuestions,
+          totalGenerated: mockQuestions.length
+        },
+        provider: "mock",
+        message: `Grok API failed (${grokResponse.status}) - using mock questions`
+      })
+    }
+
+    const grokData = await grokResponse.json()
+    const content = grokData.choices?.[0]?.message?.content
+
+    if (!content) {
+      throw new Error('No content received from Grok API')
+    }
+
+    // Parse the JSON response from Grok
+    let generatedQuestions
+    try {
+      generatedQuestions = JSON.parse(content)
+    } catch (parseError) {
+      console.error('Failed to parse Grok response:', content)
+      throw new Error('Invalid JSON response from Grok API')
+    }
+
+    // Add unique IDs to questions
+    const questionsWithIds = generatedQuestions.map((q: any, index: number) => ({
+      ...q,
+      id: q.id || `q_${Date.now()}_${index}`
+    }))
 
     return NextResponse.json({
       success: true,
       data: {
-        questions: generatedQuestions,
-        totalGenerated: generatedQuestions.length
-      }
+        questions: questionsWithIds,
+        totalGenerated: questionsWithIds.length
+      },
+      provider: "grok"
     })
+
   } catch (error) {
     console.error('Test generation API error:', error)
     return NextResponse.json({

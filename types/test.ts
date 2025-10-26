@@ -1,10 +1,18 @@
 // Shared types for test generation functionality
 
 export interface Document {
-  id: number
-  name: string
-  type: string
-  uploadedAt: string
+  id: string
+  title: string
+  originalFileName?: string
+  fileType?: string
+  fileUrl?: string
+  fileSize?: number
+  parsedContent?: any
+  parsingLog?: any[]
+  status: string
+  uploadedBy: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface TestConfig {

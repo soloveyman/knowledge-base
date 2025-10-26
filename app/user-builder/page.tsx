@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ErrorMessage } from "@/components/common/error-message"
 import { 
   Users, 
   X, 
@@ -71,10 +72,24 @@ export default function UserBuilderPage() {
     }
   }, [session, status, router])
 
-  const loadUserForEditing = (userId: string) => {
+  const loadUserForEditing = async (userId: string) => {
     try {
-      // TODO: Load user from API instead of localStorage
-      setError('User editing functionality coming soon!')
+      const response = await fetch(`/api/users/${userId}`)
+      const result = await response.json()
+      
+      if (result.success && result.data.user) {
+        const user = result.data.user
+        setUserConfig({
+          name: user.name || '',
+          job: user.job || '',
+          email: user.email || '',
+          password: '', // New password field
+          role: user.role || ''
+        })
+        setError(null)
+      } else {
+        setError('Failed to load user data')
+      }
     } catch (error) {
       console.error('Error loading user for editing:', error)
       setError('Failed to load user for editing')
@@ -128,8 +143,28 @@ export default function UserBuilderPage() {
 
     try {
       if (isEditMode && editingUserId) {
-        // TODO: Implement user update API
-        alert(`User update functionality coming soon!`)
+        // Update existing user via API
+        const response = await fetch(`/api/users/${editingUserId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: userConfig.name,
+            job: userConfig.job,
+            email: userConfig.email,
+            password: userConfig.password, // Will be ignored if empty
+            role: userConfig.role,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to update user')
+        }
+
+        alert(`User updated successfully!`)
       } else {
         // Create new user via API
         const response = await fetch('/api/users', {
@@ -201,13 +236,7 @@ export default function UserBuilderPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-          {error && (
-            <Card className="border-red-200 bg-red-50">
-              <CardContent className="pt-6">
-                <p className="text-red-600">{error}</p>
-              </CardContent>
-            </Card>
-          )}
+          <ErrorMessage error={error} />
 
           <Card>
             <CardHeader>
@@ -276,6 +305,8 @@ export default function UserBuilderPage() {
                       Password {!isEditMode && '*'}
                       {isEditMode && <span className="text-sm text-gray-500 ml-1">(leave blank to keep current)</span>}
                     </Label>
+                    
+                    
                     <Input
                       id="password"
                       type="password"

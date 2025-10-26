@@ -10,13 +10,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ErrorMessage } from "@/components/common/error-message"
 import { Progress } from "@/components/ui/progress"
 import { 
   Upload, 
   FileText, 
   X, 
   CheckCircle, 
-  AlertCircle,
   Loader2
 } from "lucide-react"
 import { parseDocument, ParsedContent } from '@/lib/parsers'
@@ -345,16 +345,7 @@ export default function DocImportPage() {
         </Card>
 
         {/* Error Display */}
-        {error && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <p className="text-red-600">{error}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <ErrorMessage error={error} showIcon={true} />
 
         {/* File List */}
         {files.length > 0 && (

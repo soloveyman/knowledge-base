@@ -37,32 +37,34 @@ interface AssignmentsPageProps {
   onDeleteAssignment: (id: string) => void
   onViewAssignment: (id: string) => void
   onEditAssignment: (id: string) => void
+  isLoading?: boolean
 }
 
 export function AssignmentsPage({ 
   assignments, 
   onDeleteAssignment, 
   onViewAssignment,
-  onEditAssignment
+  onEditAssignment,
+  isLoading = false
 }: AssignmentsPageProps) {
   const router = useRouter()
 
   const assignmentItems = assignments.map((assignment) => ({
     id: assignment.id,
-    title: assignment.name,
-    subtitle: assignment.description || 'No description provided',
+    title: `Assignment ${assignment.id.slice(0, 8)}`, // Use first 8 chars of ID as title
+    subtitle: `Module: ${assignment.moduleId?.slice(0, 8) || 'N/A'} | Test: ${assignment.testId?.slice(0, 8) || 'N/A'}`,
     metadata: [
-      `Document: ${assignment.document.name}`,
-      `Test: ${assignment.test.title}`,
-      `Due: ${new Date(assignment.dueDate).toLocaleDateString()}`
+      `Assigned To: ${assignment.assignedTo?.slice(0, 8) || 'N/A'}`,
+      `Due: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'}`,
+      `Created: ${new Date(assignment.createdAt).toLocaleDateString()}`
     ],
     badges: [
-      { label: `${assignment.assignedUsers.length} employee(s)`, variant: "outline" as const },
+      { label: `Max Attempts: ${assignment.maxAttempts || 1}`, variant: "outline" as const },
       { 
         label: assignment.status, 
-        variant: assignment.status === 'active' ? "default" as const : 
-                assignment.status === 'failed' ? "destructive" as const : 
-                "secondary" as const 
+        variant: assignment.status === 'completed' ? "default" as const : 
+                assignment.status === 'in_progress' ? "secondary" as const : 
+                "outline" as const 
       }
     ],
     onClick: () => onViewAssignment(assignment.id),
@@ -82,6 +84,7 @@ export function AssignmentsPage({
       }}
       items={assignmentItems}
       showEditButton={true}
+      isLoading={isLoading}
       emptyState={{
         icon: <ClipboardList className="h-12 w-12" />,
         title: "No assignments created yet",

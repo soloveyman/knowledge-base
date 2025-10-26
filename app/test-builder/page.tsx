@@ -6,11 +6,12 @@ import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { DocumentTypeBadge, TestTypeBadge } from "@/lib/badges"
+import { TestTypeBadge } from "@/lib/badges"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ErrorMessage } from "@/components/common/error-message"
 import { 
   FileText, 
   X,
@@ -110,12 +111,13 @@ export default function TestBuilderPage() {
       
       if (result.success && result.data.test) {
         const test = result.data.test
+        const questions = result.data.questions || []
         
         // Load test configuration
         setTestConfig({
           count: test.questionIds?.length || 5,
-          type: test.type || 'mcq',
-          difficulty: test.difficulty || 'medium',
+          type: questions.length > 0 ? questions[0].type || 'mcq' : 'mcq',
+          difficulty: questions.length > 0 ? questions[0].difficulty || 'medium' : 'medium',
           locale: 'ru' // Default locale
         })
 
@@ -127,11 +129,28 @@ export default function TestBuilderPage() {
             const document = docResult.data.document
             setSelectedDocument({
               id: document.id,
-              name: document.title,
-              type: document.fileType?.toUpperCase() || 'UNKNOWN',
-              uploadedAt: document.createdAt
+              title: document.title,
+              originalFileName: document.originalFileName,
+              fileType: document.fileType,
+              fileUrl: document.fileUrl,
+              fileSize: document.fileSize,
+              parsedContent: document.parsedContent,
+              parsingLog: document.parsingLog,
+              status: document.status,
+              uploadedBy: document.uploadedBy,
+              createdAt: document.createdAt,
+              updatedAt: document.updatedAt
             })
-            const documentContent = getDocumentContent(document.title)
+            // Use actual document content from parsedContent
+            let documentContent = ''
+            if (document.parsedContent && document.parsedContent.sections) {
+              documentContent = document.parsedContent.sections
+                .map((section: { title: string; content: string }) => `${section.title}\n${section.content}`)
+                .join('\n\n')
+            } else {
+              // Fallback to mock content if no parsed content
+              documentContent = getDocumentContent(document.title)
+            }
             setContext(prev => ({
               ...prev,
               text: documentContent,
@@ -142,10 +161,31 @@ export default function TestBuilderPage() {
           }
         }
 
-        // Load questions - this would need a separate API call to get question details
-        // For now, we'll set empty questions and let the user regenerate
-        setGeneratedQuestions([])
-        setOriginalQuestionCount(0)
+        // Load existing questions
+        if (questions.length > 0) {
+          const transformedQuestions: GeneratedQuestion[] = questions.map((q: {
+            id: string
+            type?: string
+            content?: string
+            title?: string
+            options?: string[]
+            correctAnswer?: string
+            explanation?: string
+          }) => ({
+            id: q.id,
+            type: q.type || 'mcq',
+            prompt: q.content || q.title || 'Question',
+            choices: q.options || ['A', 'B', 'C', 'D'],
+            correct_answer: q.correctAnswer || 'A',
+            explanation: q.explanation || 'No explanation provided'
+          }))
+          setGeneratedQuestions(transformedQuestions)
+          setOriginalQuestionCount(transformedQuestions.length)
+        } else {
+          // No questions found, set empty
+          setGeneratedQuestions([])
+          setOriginalQuestionCount(0)
+        }
       }
     } catch (error) {
       console.error('Error loading test for editing:', error)
@@ -173,8 +213,17 @@ export default function TestBuilderPage() {
 
   const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc)
-    // Load actual document content based on document name
-    const documentContent = getDocumentContent(doc.name)
+    // Use actual document content from parsedContent
+    let documentContent = ''
+    if (doc.parsedContent && doc.parsedContent.sections) {
+      documentContent = doc.parsedContent.sections
+        .map((section: { title: string; content: string }) => `${section.title}\n${section.content}`)
+        .join('\n\n')
+    } else {
+      // Fallback to mock content if no parsed content
+      documentContent = getDocumentContent(doc.title || doc.originalFileName || 'Untitled Document')
+    }
+    
     setContext(prev => ({
       ...prev,
       text: documentContent,
@@ -338,7 +387,7 @@ export default function TestBuilderPage() {
           steps: context.steps.filter(s => s.trim()),
           definitions: context.definitions.filter(d => d.trim())
         },
-        sourceRefs: [selectedDocument.name]
+        sourceRefs: [selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document']
       }
 
       // Generate HMAC signature (placeholder for demo)
@@ -359,8 +408,8 @@ export default function TestBuilderPage() {
 
       const result = await response.json()
       
-      if (result.ok) {
-        const newQuestions = result.questions || []
+      if (result.success) {
+        const newQuestions = result.data?.questions || []
         if (isEditMode) {
           // In edit mode, add new questions to existing ones
           setGeneratedQuestions(prev => [...prev, ...newQuestions])
@@ -370,7 +419,7 @@ export default function TestBuilderPage() {
         }
         setAiProvider(result.provider || 'unknown')
       } else {
-        throw new Error(result.error || 'Failed to generate questions')
+        throw new Error(result.message || 'Failed to generate questions')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate test')
@@ -464,8 +513,8 @@ export default function TestBuilderPage() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            title: `${selectedDocument.name} - Test`,
-            description: `Test generated from ${selectedDocument.name}`,
+            title: `${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'} - Test`,
+            description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
             questionIds: generatedQuestions.map(q => q.id),
             passingScore: 70,
             timeLimit: 15,
@@ -489,10 +538,10 @@ export default function TestBuilderPage() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            title: `${selectedDocument.name} - Test`,
-            description: `Test generated from ${selectedDocument.name}`,
+            title: `${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'} - Test`,
+            description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
             moduleId: selectedDocument.id,
-            questionIds: generatedQuestions.map(q => q.id),
+            questions: generatedQuestions, // Send the actual question objects
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
@@ -579,8 +628,7 @@ export default function TestBuilderPage() {
                         <SelectItem key={doc.id} value={doc.id.toString()}>
                           <div className="flex items-center space-x-2">
                             <FileText className="h-4 w-4" />
-                            <span>{doc.name}</span>
-                            <DocumentTypeBadge type={doc.type} className="ml-2" />
+                            <span>{doc.title || doc.originalFileName || 'Untitled Document'}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -677,13 +725,7 @@ export default function TestBuilderPage() {
 
           {/* Results Panel */}
           <div className="space-y-6">
-            {error && (
-              <Card className="border-red-200 bg-red-50">
-                <CardContent className="pt-6">
-                  <p className="text-red-600">{error}</p>
-                </CardContent>
-              </Card>
-            )}
+            <ErrorMessage error={error} />
 
             {generatedQuestions.length > 0 && (
               <Card>

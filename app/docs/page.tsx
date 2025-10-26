@@ -28,8 +28,35 @@ const formatFileSize = (bytes: number): string => {
 export default function DocsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [documents, setDocuments] = useState<Document[]>([])
+  const [documents, setDocuments] = useState<Document[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('docs-page-documents')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   const [isLoading, setIsLoading] = useState(true)
+
+  // Debug wrapper for setDocuments
+  const setDocumentsWithLog = (newDocuments: Document[]) => {
+    console.log('DocsPage: setDocuments called with:', newDocuments.length, 'documents')
+    if (newDocuments.length === 0) {
+      console.log('DocsPage: WARNING - Documents being cleared!')
+      console.trace('DocsPage: Stack trace for document clearing:')
+    } else {
+      // Save to localStorage to persist across re-mounts
+      try {
+        localStorage.setItem('docs-page-documents', JSON.stringify(newDocuments))
+      } catch (error) {
+        console.error('Failed to save documents to localStorage:', error)
+      }
+    }
+    setDocuments(newDocuments)
+  }
 
   useEffect(() => {
     if (status === "loading") return
@@ -60,14 +87,14 @@ export default function DocsPage() {
           status: doc.status || 'ready'
         }))
         console.log('Transformed documents:', transformedDocs)
-        setDocuments(transformedDocs)
+        setDocumentsWithLog(transformedDocs)
       } else {
         console.error('Failed to load documents:', result.message)
-        setDocuments([])
+        setDocumentsWithLog([])
       }
     } catch (error) {
       console.error('Error loading documents:', error)
-      setDocuments([])
+      setDocumentsWithLog([])
     } finally {
       setIsLoading(false)
     }
@@ -82,7 +109,7 @@ export default function DocsPage() {
       if (response.ok) {
         // Remove from local state
         const updatedDocs = documents.filter(doc => doc.id !== id)
-        setDocuments(updatedDocs)
+        setDocumentsWithLog(updatedDocs)
         
         // Clean up localStorage when document is deleted
         cleanupDocumentFromLocalStorage(id)

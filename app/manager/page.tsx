@@ -78,8 +78,30 @@ export default function ManagerPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [savedTests, setSavedTests] = useState<SavedTest[]>([])
-  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
+  // Initialize tests from localStorage to prevent empty state on re-mount
+  const [savedTests, setSavedTests] = useState<SavedTest[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('manager-tests')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  // Initialize assignments from localStorage to prevent empty state on re-mount
+  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('manager-assignments')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   const [savedUsers, setSavedUsers] = useState<Array<{
     id: string
     name: string
@@ -112,6 +134,8 @@ export default function ManagerPage() {
   })
   
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
+  const [isLoadingTests, setIsLoadingTests] = useState(false)
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
 
   // Debug wrapper for setDocuments
   const setDocumentsWithLog = (newDocuments: Array<{
@@ -135,6 +159,40 @@ export default function ManagerPage() {
       }
     }
     setDocuments(newDocuments)
+  }
+
+  // Debug wrapper for setSavedTests
+  const setSavedTestsWithLog = (newTests: SavedTest[]) => {
+    console.log('Manager: setSavedTests called with:', newTests.length, 'tests')
+    if (newTests.length === 0) {
+      console.log('Manager: WARNING - Tests being cleared!')
+      console.trace('Manager: Stack trace for test clearing:')
+    } else {
+      // Save to localStorage to persist across re-mounts
+      try {
+        localStorage.setItem('manager-tests', JSON.stringify(newTests))
+      } catch (error) {
+        console.error('Failed to save tests to localStorage:', error)
+      }
+    }
+    setSavedTests(newTests)
+  }
+
+  // Debug wrapper for setSavedAssignments
+  const setSavedAssignmentsWithLog = (newAssignments: SavedAssignment[]) => {
+    console.log('Manager: setSavedAssignments called with:', newAssignments.length, 'assignments')
+    if (newAssignments.length === 0) {
+      console.log('Manager: WARNING - Assignments being cleared!')
+      console.trace('Manager: Stack trace for assignment clearing:')
+    } else {
+      // Save to localStorage to persist across re-mounts
+      try {
+        localStorage.setItem('manager-assignments', JSON.stringify(newAssignments))
+      } catch (error) {
+        console.error('Failed to save assignments to localStorage:', error)
+      }
+    }
+    setSavedAssignments(newAssignments)
   }
 
   // Initialize with empty array and log it
@@ -177,9 +235,11 @@ export default function ManagerPage() {
   // Load data from APIs
   const loadData = useCallback(async (preserveDocuments = false) => {
     try {
-      // Set loading state for documents if we're refreshing
+      // Set loading states if we're refreshing
       if (preserveDocuments) {
         setIsLoadingDocuments(true)
+        setIsLoadingTests(true)
+        setIsLoadingAssignments(true)
       }
 
       // Load users
@@ -193,14 +253,14 @@ export default function ManagerPage() {
       const assignmentsResponse = await fetch('/api/assignments')
       const assignmentsResult = await assignmentsResponse.json()
       if (assignmentsResult.success) {
-        setSavedAssignments(assignmentsResult.data.assignments)
+        setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
       // Load tests
       const testsResponse = await fetch('/api/tests')
       const testsResult = await testsResponse.json()
       if (testsResult.success) {
-        setSavedTests(testsResult.data.tests)
+        setSavedTestsWithLog(testsResult.data.tests)
       }
 
       // Load documents
@@ -240,8 +300,10 @@ export default function ManagerPage() {
         setDocumentsWithLog([])
       }
     } finally {
-      // Clear loading state
+      // Clear loading states
       setIsLoadingDocuments(false)
+      setIsLoadingTests(false)
+      setIsLoadingAssignments(false)
     }
   }, [])
 
@@ -265,18 +327,38 @@ export default function ManagerPage() {
     }
   }, [defaultTab, loadData])
 
+  // Reload data when tab changes to tests
+  useEffect(() => {
+    if (defaultTab === 'tests') {
+      console.log('Manager: Tests tab activated, reloading tests...')
+      // Use setTimeout to avoid synchronous setState in effect
+      // Preserve tests during refresh to avoid empty state
+      setTimeout(() => loadData(true), 0)
+    }
+  }, [defaultTab, loadData])
+
+  // Reload data when tab changes to assignments
+  useEffect(() => {
+    if (defaultTab === 'assignments') {
+      console.log('Manager: Assignments tab activated, reloading assignments...')
+      // Use setTimeout to avoid synchronous setState in effect
+      // Preserve assignments during refresh to avoid empty state
+      setTimeout(() => loadData(true), 0)
+    }
+  }, [defaultTab, loadData])
+
   // Reload data when page becomes visible (e.g., when returning from document viewer)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && defaultTab === 'docs') {
-        console.log('Manager: Page became visible, reloading documents...')
+      if (!document.hidden && (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments')) {
+        console.log('Manager: Page became visible, reloading data...')
         setTimeout(() => loadData(true), 0)
       }
     }
 
     const handleFocus = () => {
-      if (defaultTab === 'docs') {
-        console.log('Manager: Window focused, reloading documents...')
+      if (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments') {
+        console.log('Manager: Window focused, reloading data...')
         setTimeout(() => loadData(true), 0)
       }
     }
@@ -300,14 +382,7 @@ export default function ManagerPage() {
       const result = await response.json()
       
       if (result.success) {
-        setDocumentsWithLog(prev => prev.filter((doc: {
-          id: string
-          name: string
-          type: string
-          uploadedAt: string
-          size?: string
-          status?: string
-        }) => doc.id !== id))
+        setDocumentsWithLog(documents.filter(doc => doc.id !== id))
         
         // Clean up localStorage when document is deleted
         cleanupDocumentFromLocalStorage(id)
@@ -341,7 +416,7 @@ export default function ManagerPage() {
       const result = await response.json()
       
       if (result.success) {
-        setSavedTests(prev => prev.filter(t => t.id !== id))
+        setSavedTestsWithLog(savedTests.filter(t => t.id !== id))
       } else {
         console.error('Failed to delete test:', result.message)
       }
@@ -368,7 +443,7 @@ export default function ManagerPage() {
       const result = await response.json()
       
       if (result.success) {
-        setSavedAssignments(prev => prev.filter(a => a.id !== id))
+        setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
       } else {
         console.error('Failed to delete assignment:', result.message)
       }
@@ -556,6 +631,7 @@ export default function ManagerPage() {
               onDeleteTest={handleDeleteTest}
               onViewTest={handleViewTest}
               onEditTest={handleEditTest}
+              isLoading={isLoadingTests}
             />
           </TabsContent>
 
@@ -565,6 +641,7 @@ export default function ManagerPage() {
               onDeleteAssignment={handleDeleteAssignment}
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}
+              isLoading={isLoadingAssignments}
             />
           </TabsContent>
 

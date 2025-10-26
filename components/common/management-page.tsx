@@ -35,6 +35,7 @@ interface ManagementPageProps {
     actionLabel?: string
     onAction?: () => void
   }
+  isLoading?: boolean
 }
 
 export function ManagementPage({
@@ -44,7 +45,8 @@ export function ManagementPage({
   actionButton,
   items,
   showEditButton = false,
-  emptyState
+  emptyState,
+  isLoading = false
 }: ManagementPageProps) {
   return (
     <ManagementCard
@@ -54,7 +56,12 @@ export function ManagementPage({
       actionButton={actionButton}
     >
       <div className="space-y-3">
-        {items.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <span className="ml-2 text-gray-600">Loading...</span>
+          </div>
+        ) : items.length === 0 ? (
           <EmptyState {...emptyState} />
         ) : (
           <div className="space-y-3">
