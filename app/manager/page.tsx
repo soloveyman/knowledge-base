@@ -542,12 +542,45 @@ export default function ManagerPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {savedAssignments.length > 0 
-                      ? Math.round((savedAssignments.filter(a => a.status === 'completed').length / savedAssignments.length) * 100)
-                      : 0}%
+                    {(() => {
+                      // Count completed assignments from assignment_users table
+                      let totalUserAssignments = 0
+                      let completedUserAssignments = 0
+                      
+                      savedAssignments.forEach(assignment => {
+                        if (assignment.users && Array.isArray(assignment.users)) {
+                          assignment.users.forEach((au: any) => {
+                            totalUserAssignments++
+                            if (au.status === 'completed') {
+                              completedUserAssignments++
+                            }
+                          })
+                        }
+                      })
+                      
+                      return totalUserAssignments > 0 
+                        ? Math.round((completedUserAssignments / totalUserAssignments) * 100)
+                        : 0
+                    })()}%
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {savedAssignments.filter(a => a.status === 'completed').length} of {savedAssignments.length} completed
+                    {(() => {
+                      let totalUserAssignments = 0
+                      let completedUserAssignments = 0
+                      
+                      savedAssignments.forEach(assignment => {
+                        if (assignment.users && Array.isArray(assignment.users)) {
+                          assignment.users.forEach((au: any) => {
+                            totalUserAssignments++
+                            if (au.status === 'completed') {
+                              completedUserAssignments++
+                            }
+                          })
+                        }
+                      })
+                      
+                      return `${completedUserAssignments} of ${totalUserAssignments} completed`
+                    })()}
                   </p>
                 </CardContent>
               </Card>
@@ -556,7 +589,9 @@ export default function ManagerPage() {
             {console.log('Manager: Rendering UserProgressReport with:', savedUsers.length, 'users and', savedAssignments.length, 'assignments')}
             <UserProgressReport 
               users={savedUsers} 
-              assignments={savedAssignments} 
+              assignments={savedAssignments}
+              modules={documents}
+              tests={savedTests}
             />
 
           </TabsContent>

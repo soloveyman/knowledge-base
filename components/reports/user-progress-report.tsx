@@ -55,9 +55,11 @@ interface UserProgress {
 interface UserProgressReportProps {
   users: User[]
   assignments: Assignment[]
+  modules?: any[]
+  tests?: any[]
 }
 
-export default function UserProgressReport({ users, assignments }: UserProgressReportProps) {
+export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
 
   useEffect(() => {
@@ -80,22 +82,36 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
         return false
       })
 
-      const completedCount = userAssignments.filter(assignment => 
-        assignment.status === 'completed' || assignment.status === 'passed'
-      ).length
-
-      const overdueCount = userAssignments.filter(assignment => {
-        const dueDate = new Date(assignment.dueDate)
-        const now = new Date()
-        return dueDate < now && assignment.status !== 'completed' && assignment.status !== 'passed'
+      // Use the actual user's status from assignment_users instead of the generic assignment status
+      const completedCount = userAssignments.filter(assignment => {
+        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        return userAssignment?.status === 'completed' || userAssignment?.status === 'passed'
       }).length
 
-      const completedWithScores = userAssignments.filter(assignment => 
-        assignment.status === 'completed'
-      )
+      const overdueCount = userAssignments.filter(assignment => {
+        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        const dueDate = new Date(assignment.dueDate)
+        const now = new Date()
+        return dueDate < now && userAssignment?.status !== 'completed' && userAssignment?.status !== 'passed'
+      }).length
 
-      const averageScore = completedWithScores.length > 0
-        ? Math.round(completedWithScores.reduce((sum, assignment) => sum + 85, 0) / completedWithScores.length)
+      const completedWithScores = userAssignments.filter(assignment => {
+        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        return userAssignment?.status === 'completed'
+      })
+
+      // Get the actual scores from test attempts
+      const scores: number[] = []
+      for (const assignment of completedWithScores) {
+        // Find the user's test score from the assignment's users array
+        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        if (userAssignment?.testScore !== undefined && userAssignment.testScore !== null) {
+          scores.push(userAssignment.testScore)
+        }
+      }
+      
+      const averageScore = scores.length > 0
+        ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
         : 0
 
       return {
@@ -242,25 +258,33 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
                       <p>No assignments assigned</p>
                     </div>
                   ) : (
-                    progress.assignments.map((assignment) => (
+                    progress.assignments.map((assignment) => {
+                      // Get the user's specific assignment details
+                      const userAssignment = assignment.users?.find((au: any) => au.userId === progress.user.id)
+                      const actualStatus = userAssignment?.status || assignment.status || 'pending'
+                      const actualTitle = assignment.title || `Assignment ${assignment.id.slice(0, 8)}`
+                      const actualDescription = assignment.description || `Complete assignment ${assignment.id.slice(0, 8)}`
+                      
+                      return (
                       <div key={assignment.id} className="p-4 border rounded-lg bg-gray-50">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-medium">Assignment {assignment.id.slice(0, 8)}</h4>
-                              {getStatusIcon(assignment.status)}
-                              {getStatusBadge(assignment.status)}
+                              <h4 className="font-medium">{actualTitle}</h4>
+                              {getStatusIcon(actualStatus)}
+                              {getStatusBadge(actualStatus)}
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">Complete assignment {assignment.id.slice(0, 8)}</p>
+                            <p className="text-sm text-gray-600 mb-2">{actualDescription}</p>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500">
-                              <div className="flex items-center gap-1">
-                                <FileText className="h-4 w-4" />
-                                <span>Module: {assignment.moduleId.slice(0, 8)}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Target className="h-4 w-4" />
-                                <span>Test: {assignment.testId.slice(0, 8)}</span>
-                              </div>
+                              {assignment.testId && (
+                                <div className="flex items-center gap-1">
+                                  <Target className="h-4 w-4" />
+                                  <span>Test: {(() => {
+                                    const test = tests.find((t: any) => t.id === assignment.testId)
+                                    return test?.title || assignment.testId.slice(0, 8)
+                                  })()}</span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-4 w-4" />
                                 <span className={isOverdue(assignment.dueDate, assignment.status) ? 'text-red-600' : ''}>
@@ -270,18 +294,22 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
                             </div>
                           </div>
                           <div className="flex flex-row md:flex-col md:text-right gap-3 md:gap-0">
-                            {assignment.status === 'completed' && (
-                              <div className="text-lg font-bold text-blue-600">
-                                85%
-                              </div>
-                            )}
-                            {isOverdue(assignment.dueDate, assignment.status) && (
+                            {actualStatus === 'completed' && (() => {
+                              const score = userAssignment?.testScore
+                              return score !== undefined && score !== null ? (
+                                <div className="text-lg font-bold text-blue-600">
+                                  {score}%
+                                </div>
+                              ) : null
+                            })()}
+                            {isOverdue(assignment.dueDate, actualStatus) && (
                               <div className="text-xs text-red-600 font-medium">Overdue</div>
                             )}
                           </div>
                         </div>
                       </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </AccordionContent>
