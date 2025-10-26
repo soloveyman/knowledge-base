@@ -39,6 +39,9 @@ interface SavedAssignment {
   createdBy: string
   status: string
   testScore?: number
+  users?: Array<{ userId: string; status: string; testScore?: number }>
+  moduleId?: string
+  testId?: string
 }
 
 interface SavedDocument {
@@ -189,9 +192,29 @@ export default function OwnerPage() {
                   <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{savedAssignments.length}</div>
+                  <div className="text-2xl font-bold">{(() => {
+                    let totalUserAssignments = 0
+                    savedAssignments.forEach(assignment => {
+                      if (assignment.users && Array.isArray(assignment.users)) {
+                        totalUserAssignments += assignment.users.length
+                      }
+                    })
+                    return totalUserAssignments
+                  })()}</div>
                   <p className="text-xs text-muted-foreground">
-                    {savedAssignments.filter(a => a.status === 'active').length} active, {savedAssignments.filter(a => a.status === 'completed').length} completed
+                    {(() => {
+                      let activeCount = 0
+                      let completedCount = 0
+                      savedAssignments.forEach(assignment => {
+                        if (assignment.users && Array.isArray(assignment.users)) {
+                          assignment.users.forEach((au: { userId: string; status: string; testScore?: number }) => {
+                            if (au.status === 'in_progress' || au.status === 'pending') activeCount++
+                            if (au.status === 'completed') completedCount++
+                          })
+                        }
+                      })
+                      return `${activeCount} active, ${completedCount} completed`
+                    })()}
                   </p>
                 </CardContent>
               </Card>
@@ -216,12 +239,44 @@ export default function OwnerPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {savedAssignments.length > 0 
-                      ? Math.round((savedAssignments.filter(a => a.status === 'completed').length / savedAssignments.length) * 100)
-                      : 0}%
+                    {(() => {
+                      let totalUserAssignments = 0
+                      let completedUserAssignments = 0
+                      
+                      savedAssignments.forEach(assignment => {
+                        if (assignment.users && Array.isArray(assignment.users)) {
+                          assignment.users.forEach((au: { userId: string; status: string; testScore?: number }) => {
+                            totalUserAssignments++
+                            if (au.status === 'completed') {
+                              completedUserAssignments++
+                            }
+                          })
+                        }
+                      })
+                      
+                      return totalUserAssignments > 0 
+                        ? Math.round((completedUserAssignments / totalUserAssignments) * 100)
+                        : 0
+                    })()}%
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {savedAssignments.filter(a => a.status === 'completed').length} of {savedAssignments.length} completed
+                    {(() => {
+                      let totalUserAssignments = 0
+                      let completedUserAssignments = 0
+                      
+                      savedAssignments.forEach(assignment => {
+                        if (assignment.users && Array.isArray(assignment.users)) {
+                          assignment.users.forEach((au: { userId: string; status: string; testScore?: number }) => {
+                            totalUserAssignments++
+                            if (au.status === 'completed') {
+                              completedUserAssignments++
+                            }
+                          })
+                        }
+                      })
+                      
+                      return `${completedUserAssignments} of ${totalUserAssignments} completed`
+                    })()}
                   </p>
                 </CardContent>
               </Card>
@@ -229,7 +284,7 @@ export default function OwnerPage() {
 
             <UserProgressReport 
               users={savedUsers} 
-              assignments={savedAssignments} 
+              assignments={savedAssignments as SavedAssignment[] & { users?: Array<{ userId: string; status: string; testScore?: number }> }[]}
             />
 
           </TabsContent>
