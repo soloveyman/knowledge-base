@@ -52,26 +52,16 @@ interface SavedTest {
 
 interface SavedAssignment {
   id: string
-  name: string
-  description: string
-  document: {
-    id: number
-    name: string
-    type: string
-    uploadedAt: string
-  }
-  test: SavedTest
-  assignedUsers: Array<{
-    id: number
-    name: string
-    email: string
-    role: string
-    department: string
-  }>
+  moduleId: string
+  testId: string
+  assignedTo: string
+  assignedBy: string
   dueDate: string
-  createdAt: string
-  createdBy: string
   status: string
+  allowRetake: boolean
+  maxAttempts: number
+  createdAt: string
+  updatedAt: string
 }
 
 export default function ManagerPage() {
@@ -253,6 +243,7 @@ export default function ManagerPage() {
       const assignmentsResponse = await fetch('/api/assignments')
       const assignmentsResult = await assignmentsResponse.json()
       if (assignmentsResult.success) {
+        console.log('Manager: Loaded assignments from API:', assignmentsResult.data.assignments)
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
@@ -347,17 +338,27 @@ export default function ManagerPage() {
     }
   }, [defaultTab, loadData])
 
+  // Reload data when tab changes to overview
+  useEffect(() => {
+    if (defaultTab === 'overview') {
+      console.log('Manager: Overview tab activated, reloading data...')
+      // Use setTimeout to avoid synchronous setState in effect
+      // Preserve data during refresh to avoid empty state
+      setTimeout(() => loadData(true), 0)
+    }
+  }, [defaultTab, loadData])
+
   // Reload data when page becomes visible (e.g., when returning from document viewer)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments')) {
+      if (!document.hidden && (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments' || defaultTab === 'overview')) {
         console.log('Manager: Page became visible, reloading data...')
         setTimeout(() => loadData(true), 0)
       }
     }
 
     const handleFocus = () => {
-      if (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments') {
+      if (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments' || defaultTab === 'overview') {
         console.log('Manager: Window focused, reloading data...')
         setTimeout(() => loadData(true), 0)
       }
@@ -552,6 +553,7 @@ export default function ManagerPage() {
               </Card>
             </div>
 
+            {console.log('Manager: Rendering UserProgressReport with:', savedUsers.length, 'users and', savedAssignments.length, 'assignments')}
             <UserProgressReport 
               users={savedUsers} 
               assignments={savedAssignments} 

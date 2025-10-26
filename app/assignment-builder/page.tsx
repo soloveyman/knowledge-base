@@ -66,7 +66,7 @@ interface SavedTest {
 }
 
 interface User {
-  id: number
+  id: string
   name: string
   email: string
   role: string
@@ -284,24 +284,29 @@ export default function AssignmentBuilderPage() {
     try {
       if (isEditMode && editingAssignmentId) {
         // Update existing assignment
+        const updateData = {
+          moduleId: assignmentConfig.documentId,
+          testId: assignmentConfig.testId,
+          assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
+          dueDate: assignmentConfig.dueDate.toISOString(),
+          status: 'pending'
+        }
+        console.log('Assignment Builder: Updating assignment with data:', updateData)
+        console.log('Assignment Builder: Assignment ID:', editingAssignmentId)
+        console.log('Assignment Builder: URL:', `/api/assignments/${editingAssignmentId}`)
+        
         const response = await fetch(`/api/assignments/${editingAssignmentId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            name: assignmentConfig.name,
-            description: assignmentConfig.description,
-            moduleId: assignmentConfig.documentId,
-            testId: assignmentConfig.testId,
-            assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
-            dueDate: assignmentConfig.dueDate.toISOString(),
-            status: 'pending'
-          })
+          body: JSON.stringify(updateData)
         })
 
         if (!response.ok) {
           const errorData = await response.json()
+          console.error('Assignment Builder: API Error Response:', errorData)
+          console.error('Assignment Builder: Response Status:', response.status)
           throw new Error(errorData.message || 'Failed to update assignment')
         }
 
@@ -309,11 +314,9 @@ export default function AssignmentBuilderPage() {
       } else {
         // Create new assignment
         const assignmentData = {
-          name: assignmentConfig.name,
-          description: assignmentConfig.description,
           moduleId: assignmentConfig.documentId,
           testId: assignmentConfig.testId,
-          assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
+          assignedTo: assignmentConfig.selectedUsers, // Send all selected users
           dueDate: assignmentConfig.dueDate.toISOString(),
           status: 'pending'
         }
@@ -333,7 +336,9 @@ export default function AssignmentBuilderPage() {
           throw new Error(errorData.message || 'Failed to create assignment')
         }
 
-        alert(`Assignment created successfully!`)
+        const result = await response.json()
+        const assignmentCount = result.data?.count || assignmentConfig.selectedUsers.length
+        alert(`${assignmentCount} assignment(s) created successfully!`)
       }
       
       // Redirect to manager assignments tab

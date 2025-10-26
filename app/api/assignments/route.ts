@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const {
       moduleId: documentId, // Frontend sends documentId as moduleId
       testId,
-      assignedTo,
+      assignedTo, // Can be a single user ID or array of user IDs
       dueDate,
       status = 'pending',
       assignedBy = '3e1b5c25-7785-41b3-9c1f-68453a28bc90' // Owner user ID
@@ -54,6 +54,10 @@ export async function POST(request: Request) {
         message: 'Missing required fields: documentId, testId, and assignedTo are required'
       }, { status: 400 })
     }
+
+    // Normalize assignedTo to array
+    const userIds = Array.isArray(assignedTo) ? assignedTo : [assignedTo]
+    console.log('Processing assignments for users:', userIds)
 
     console.log('Fetching document to get moduleId...')
     
@@ -94,26 +98,32 @@ export async function POST(request: Request) {
     }
 
     console.log('Found moduleId:', moduleId)
-    console.log('Attempting to insert assignment into database...')
+    console.log('Attempting to insert assignments into database...')
 
-    // Create the assignment
-    const newAssignment = await db.insert(assignments).values({
-      moduleId,
-      testId,
-      assignedTo,
-      assignedBy,
-      dueDate: dueDate ? new Date(dueDate) : null,
-      status: status || 'pending'
-    }).returning()
+    // Create assignments for each user
+    const assignmentPromises = userIds.map(userId => 
+      db.insert(assignments).values({
+        moduleId,
+        testId,
+        assignedTo: userId,
+        assignedBy,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        status: status || 'pending'
+      }).returning()
+    )
 
-    console.log('Assignment created successfully:', newAssignment[0])
+    const newAssignments = await Promise.all(assignmentPromises)
+    const createdAssignments = newAssignments.map(result => result[0])
+
+    console.log('Assignments created successfully:', createdAssignments.length, 'assignments')
 
     return NextResponse.json({
       success: true,
       data: {
-        assignment: newAssignment[0]
+        assignments: createdAssignments,
+        count: createdAssignments.length
       },
-      message: 'Assignment created successfully'
+      message: `Successfully created ${createdAssignments.length} assignment(s)`
     })
   } catch (error) {
     console.error('Create assignment API error:', error)

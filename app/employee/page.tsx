@@ -75,9 +75,10 @@ export default function EmployeePage() {
         setAssignments(allAssignments)
         
         // Filter assignments for current user
-        const currentUserEmail = session?.user?.email
-        const userAssignments = allAssignments.filter((assignment: Assignment) => 
-          assignment.assignedUsers.some((user: AssignedUser) => user.email === currentUserEmail)
+        // Note: Database assignments have assignedTo (single user ID) not assignedUsers (array)
+        const currentUserId = session?.user?.id
+        const userAssignments = allAssignments.filter((assignment: any) => 
+          assignment.assignedTo && assignment.assignedTo === currentUserId
         )
         setUserAssignments(userAssignments)
       } else {
@@ -186,14 +187,14 @@ export default function EmployeePage() {
   // Transform assignment data for display
   const transformedAssignments = userAssignments.map(assignment => ({
     id: assignment.id,
-    title: assignment.name,
-    type: assignment.test && assignment.document ? "both" : assignment.test ? "test" : "document",
+    title: `Assignment ${assignment.id.slice(0, 8)}`, // Generate title from ID since no name field
+    type: assignment.testId ? "test" : "document", // Simplified type detection
     status: assignment.status === 'active' ? 'pending' : assignment.status,
     progress: assignment.status === 'completed' ? 100 : 0,
-    dueDate: new Date(assignment.dueDate).toISOString().split('T')[0],
-    description: assignment.description || `Complete ${assignment.test && assignment.document ? 'document review and test' : assignment.test ? 'test' : 'document review'}`,
-    estimatedTime: assignment.test && assignment.document ? "45 min" : assignment.test ? "15 min" : "30 min",
-    score: assignment.testScore || (assignment.status === 'completed' ? 85 : assignment.status === 'failed' ? 65 : undefined)
+    dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : 'No due date',
+    description: `Complete assignment ${assignment.id.slice(0, 8)}`, // Generate description
+    estimatedTime: assignment.testId ? "15 min" : "30 min",
+    score: assignment.status === 'completed' ? 85 : assignment.status === 'failed' ? 65 : undefined
   }))
 
   const getStatusIcon = (status: string) => {

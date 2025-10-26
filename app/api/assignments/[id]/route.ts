@@ -42,6 +42,7 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
+    console.log('Assignment API: Updating assignment', id, 'with data:', body)
 
     const {
       moduleId,
@@ -52,6 +53,14 @@ export async function PUT(
       assignedBy = '3e1b5c25-7785-41b3-9c1f-68453a28bc90'
     } = body
 
+    // Validate required fields
+    if (!moduleId || !testId || !assignedTo) {
+      return NextResponse.json({
+        success: false,
+        message: 'Missing required fields: moduleId, testId, and assignedTo are required'
+      }, { status: 400 })
+    }
+
     // Check if assignment exists
     const existingAssignment = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1)
     if (existingAssignment.length === 0) {
@@ -61,19 +70,32 @@ export async function PUT(
       }, { status: 404 })
     }
 
+    // Prepare update data with only valid fields
+    const updateData: any = {
+      moduleId,
+      testId,
+      assignedTo,
+      assignedBy,
+      updatedAt: new Date()
+    }
+
+    // Only add dueDate if provided
+    if (dueDate) {
+      updateData.dueDate = new Date(dueDate)
+    }
+
+    // Only add status if provided
+    if (status) {
+      updateData.status = status
+    }
+
     // Update the assignment
     const updatedAssignment = await db.update(assignments)
-      .set({
-        moduleId,
-        testId,
-        assignedTo,
-        assignedBy,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        status: status || 'pending',
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(assignments.id, id))
       .returning()
+
+    console.log('Assignment API: Updated assignment:', updatedAssignment[0])
 
     return NextResponse.json({
       success: true,
