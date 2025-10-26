@@ -91,7 +91,7 @@ export function ListItem({
           </div>
         )}
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
+        <div className="flex items-center space-x-1 shrink-0">
           {showEditButton && onEdit && (
           <Button 
             variant="ghost" 
