@@ -63,6 +63,22 @@ export default function EmployeePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [userAssignments, setUserAssignments] = useState<Assignment[]>([])
   const [currentTab, setCurrentTab] = useState('overview')
+  const [testAttempts, setTestAttempts] = useState<any[]>([])
+
+  // Load test attempts from API
+  const loadTestAttempts = async () => {
+    try {
+      const response = await fetch(`/api/test-attempts?userId=${session?.user?.id}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        setTestAttempts(result.data.attempts || [])
+      }
+    } catch (error) {
+      console.error('Error loading test attempts:', error)
+      setTestAttempts([])
+    }
+  }
 
   // Load assignments from API
   const loadAssignments = async () => {
@@ -112,6 +128,9 @@ export default function EmployeePage() {
 
     // Load assignments from API
     loadAssignments()
+    
+    // Load test attempts
+    loadTestAttempts()
 
     // Role-based redirects are now handled by middleware
   }, [session, status, router, searchParams])
@@ -396,7 +415,7 @@ export default function EmployeePage() {
               <div className="grid gap-4">
                 {transformedAssignments.map((assignment) => (
                 <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+                  <CardContent className="p-3 md:p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
@@ -440,7 +459,7 @@ export default function EmployeePage() {
                                 size="sm" 
                                 variant="outline"
                                 onClick={() => handleReadDocument(assignment.id)}
-                                className="flex-1"
+                                className="flex-1 text-primary border-primary hover:bg-primary hover:text-primary-foreground"
                               >
                                 Read
                               </Button>
@@ -450,7 +469,7 @@ export default function EmployeePage() {
                                 size="sm" 
                                 variant="outline"
                                 onClick={() => handleTakeTest(assignment.id)}
-                                className="flex-1"
+                                className="flex-1 text-primary border-primary hover:bg-primary hover:text-primary-foreground"
                               >
                                 Test
                               </Button>
@@ -498,25 +517,66 @@ export default function EmployeePage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Test Results</CardTitle>
-                  <CardDescription>Your test scores and performance</CardDescription>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>Your recent assignment activity and test scores</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {transformedAssignments.filter(a => a.type === 'test' && a.score).map((test) => (
-                      <div key={test.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{test.title}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Completed on {test.dueDate}
-                          </p>
+                  <div className="space-y-3">
+                    {/* Show recent assignments with scores */}
+                    {transformedAssignments
+                      .filter(a => a.score !== undefined && a.score !== null && (a.status === 'completed' || a.status === 'failed'))
+                      .sort((a, b) => new Date(b.dueDate || '').getTime() - new Date(a.dueDate || '').getTime())
+                      .slice(0, 5)
+                      .map((assignment) => (
+                        <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium">{assignment.title}</h4>
+                              <StatusBadge status={assignment.status} />
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {assignment.dueDate && `Due: ${assignment.dueDate}`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-lg font-bold ${assignment.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
+                              {assignment.score}%
+                            </div>
+                            <div className="text-xs text-muted-foreground">Score</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-green-600">{test.score}%</div>
-                          <div className="text-sm text-muted-foreground">Score</div>
+                      ))}
+                    
+                    {/* Show test attempts */}
+                    {testAttempts
+                      .sort((a, b) => new Date(b.completedAt || '').getTime() - new Date(a.completedAt || '').getTime())
+                      .slice(0, 5)
+                      .map((attempt) => (
+                        <div key={attempt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium">Test Attempt</h4>
+                              <StatusBadge status={attempt.status === 'completed' ? 'completed' : 'failed'} />
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {attempt.completedAt && `Completed: ${new Date(attempt.completedAt).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-lg font-bold ${attempt.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
+                              {attempt.score}%
+                            </div>
+                            <div className="text-xs text-muted-foreground">Score</div>
+                          </div>
                         </div>
+                      ))}
+                    
+                    {transformedAssignments.filter(a => a.score !== undefined && a.score !== null).length === 0 && testAttempts.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No recent activity yet.</p>
+                        <p className="text-sm mt-2">Complete assignments to see your progress here.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -82,25 +82,27 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <Building2 className="h-12 w-12 text-blue-600" />
+    <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] p-4">
+      <Card className="w-full max-w-md bg-card/95 border-border">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center">
+            <Building2 className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Knowledge Base Platform</CardTitle>
-          <CardDescription>
-            Sign in to access your learning management system
-          </CardDescription>
+          <div className="space-y-2">
+            <CardTitle className="text-2xl font-bold">Knowledge Base Platform</CardTitle>
+            <CardDescription>
+              Sign in to access your learning management system
+            </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
           
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -139,12 +141,12 @@ export default function SignInPage() {
             </Button>
           </form>
           
-          <div className="relative">
+          <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
           

@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
         await db.update(assignmentUsers)
           .set({
             status: assignmentStatus,
+            testScore: score,
             completedAt: new Date(),
             updatedAt: new Date()
           })
