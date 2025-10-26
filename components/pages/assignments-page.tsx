@@ -51,7 +51,7 @@ export function AssignmentsPage({
 
   const assignmentItems = assignments.map((assignment) => ({
     id: assignment.id,
-    title: `Assignment ${assignment.id.slice(0, 8)}`, // Use first 8 chars of ID as title
+    title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
     subtitle: `Due: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'} | Created: ${new Date(assignment.createdAt).toLocaleDateString()}`,
     metadata: [],
     badges: [

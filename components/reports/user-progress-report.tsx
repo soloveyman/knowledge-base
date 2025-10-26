@@ -28,9 +28,11 @@ interface User {
 
 interface Assignment {
   id: string
+  title?: string
+  description?: string
   moduleId: string
   testId: string
-  assignedTo: string
+  assignedTo?: string
   assignedBy: string
   dueDate: string
   status: string
@@ -38,6 +40,7 @@ interface Assignment {
   maxAttempts: number
   createdAt: string
   updatedAt: string
+  users?: Array<{ userId: string; status: string }>
 }
 
 interface UserProgress {
@@ -68,10 +71,13 @@ export default function UserProgressReport({ users, assignments }: UserProgressR
     
     // Calculate progress for each employee user
     const progressData: UserProgress[] = employeeUsers.map(user => {
-      // Find assignments assigned to this user
+      // Find assignments assigned to this user using the assignment_users junction table
       const userAssignments = assignments.filter(assignment => {
-        // Database assignments have assignedTo (single user ID) not assignedUsers (array)
-        return assignment.assignedTo === user.id
+        // Check if this assignment has users array and contains the current user
+        if (assignment.users && Array.isArray(assignment.users)) {
+          return assignment.users.some((au: any) => au.userId === user.id)
+        }
+        return false
       })
 
       const completedCount = userAssignments.filter(assignment => 

@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server'
-import { db, assignments, documents, modules } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, assignments, documents, modules, assignmentUsers } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 
 export async function GET() {
   try {
-    // Fetch assignments from database
+    // Fetch assignments from database with their users
     const assignmentsData = await db.select().from(assignments)
+    
+    // Fetch users for each assignment
+    const assignmentsWithUsers = await Promise.all(
+      assignmentsData.map(async (assignment) => {
+        const users = await db.select().from(assignmentUsers)
+          .where(eq(assignmentUsers.assignmentId, assignment.id))
+        return { ...assignment, users }
+      })
+    )
 
     return NextResponse.json({
       success: true,
       data: {
-        assignments: assignmentsData
+        assignments: assignmentsWithUsers
       }
     })
   } catch (error) {
@@ -32,6 +41,8 @@ export async function POST(request: Request) {
       moduleId: documentId, // Frontend sends documentId as moduleId
       testId,
       assignedTo, // Can be a single user ID or array of user IDs
+      title,
+      description,
       dueDate,
       status = 'pending',
       assignedBy = '3e1b5c25-7785-41b3-9c1f-68453a28bc90' // Owner user ID
@@ -98,32 +109,90 @@ export async function POST(request: Request) {
     }
 
     console.log('Found moduleId:', moduleId)
-    console.log('Attempting to insert assignments into database...')
+    console.log('Checking for existing assignments...')
 
-    // Create assignments for each user
-    const assignmentPromises = userIds.map(userId => 
-      db.insert(assignments).values({
+    // Check for existing assignments with same module and test
+    const existingAssignments = await db.select().from(assignments)
+      .where(and(
+        eq(assignments.moduleId, moduleId),
+        eq(assignments.testId, testId)
+      ))
+
+    let assignmentId: string | undefined
+
+    if (existingAssignments.length > 0) {
+      // Use existing assignment
+      assignmentId = existingAssignments[0].id
+      console.log('Found existing assignment:', assignmentId)
+    } else {
+      // Create a new assignment
+      const newAssignment = await db.insert(assignments).values({
+        title: title || `Assignment for ${document[0].title}`,
+        description: description || '',
         moduleId,
         testId,
-        assignedTo: userId,
         assignedBy,
         dueDate: dueDate ? new Date(dueDate) : null,
         status: status || 'pending'
       }).returning()
-    )
+      
+      assignmentId = newAssignment[0].id
+      console.log('Created new assignment:', assignmentId)
+    }
 
-    const newAssignments = await Promise.all(assignmentPromises)
-    const createdAssignments = newAssignments.map(result => result[0])
+    // Check existing users for this assignment
+    const existingAssignmentUsers = await db.select().from(assignmentUsers)
+      .where(eq(assignmentUsers.assignmentId, assignmentId))
+    
+    const existingUserIds = new Set(existingAssignmentUsers.map(au => au.userId))
+    
+    // Filter out users who already have this assignment
+    const usersToAssign = userIds.filter(userId => !existingUserIds.has(userId))
+    
+    if (usersToAssign.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          assignment: existingAssignments[0],
+          count: 0
+        },
+        message: 'All selected users already have this assignment',
+        warning: 'No new users were added'
+      })
+    }
 
-    console.log('Assignments created successfully:', createdAssignments.length, 'assignments')
+    const skippedCount = userIds.length - usersToAssign.length
+    console.log(`Adding ${usersToAssign.length} users to assignment, skipping ${skippedCount} existing ones`)
+
+    // Add users to the assignment
+    const newAssignmentUsers = []
+    for (const userId of usersToAssign) {
+      try {
+        const result = await db.insert(assignmentUsers).values({
+          assignmentId,
+          userId,
+          status: status || 'pending'
+        }).returning()
+        newAssignmentUsers.push(result[0])
+      } catch (error) {
+        console.error(`Failed to add user ${userId} to assignment:`, error)
+      }
+    }
+
+    console.log('Users added successfully:', newAssignmentUsers.length, 'users')
+
+    const responseMessage = usersToAssign.length === userIds.length
+      ? `Successfully added ${newAssignmentUsers.length} user(s) to assignment`
+      : `Added ${newAssignmentUsers.length} user(s) to assignment. ${skippedCount} user(s) already had this assignment.`
 
     return NextResponse.json({
       success: true,
       data: {
-        assignments: createdAssignments,
-        count: createdAssignments.length
+        assignment: existingAssignments[0] || { id: assignmentId },
+        count: newAssignmentUsers.length,
+        skippedCount
       },
-      message: `Successfully created ${createdAssignments.length} assignment(s)`
+      message: responseMessage
     })
   } catch (error) {
     console.error('Create assignment API error:', error)

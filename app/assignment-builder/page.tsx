@@ -150,15 +150,32 @@ export default function AssignmentBuilderPage() {
       
       if (result.success && result.data.assignment) {
         const assignment = result.data.assignment
+        const users = result.data.users || []
+        
+        // Get all user IDs from assignmentUsers
+        const allUserIds = users.map((u: any) => u.userId)
+        
+        // Find the document that has this moduleId
+        let documentId = ''
+        try {
+          const docsResponse = await fetch('/api/documents')
+          const docsResult = await docsResponse.json()
+          if (docsResult.success) {
+            const doc = docsResult.data.documents.find((d: any) => d.moduleId === assignment.moduleId)
+            documentId = doc ? doc.id : ''
+          }
+        } catch (err) {
+          console.error('Error fetching documents:', err)
+        }
         
         // Load assignment configuration
         setAssignmentConfig({
-          name: `Assignment ${assignment.id.slice(0, 8)}`, // Generate name from ID
-          documentId: assignment.moduleId || '', // Use moduleId as documentId for now
+          name: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use title if exists, otherwise ID
+          documentId: documentId,
           testId: assignment.testId || '',
-          selectedUsers: assignment.assignedTo ? [assignment.assignedTo] : [],
+          selectedUsers: allUserIds, // Load all users with this assignment
           dueDate: assignment.dueDate ? new Date(assignment.dueDate) : undefined,
-          description: `Assignment created on ${new Date(assignment.createdAt).toLocaleDateString()}`
+          description: assignment.description || '' // Load the actual description
         })
       }
     } catch (error) {
@@ -287,7 +304,9 @@ export default function AssignmentBuilderPage() {
         const updateData = {
           moduleId: assignmentConfig.documentId,
           testId: assignmentConfig.testId,
-          assignedTo: assignmentConfig.selectedUsers[0], // For now, assign to first user
+          assignedTo: assignmentConfig.selectedUsers, // Send all selected users
+          title: assignmentConfig.name, // Send the custom title
+          description: assignmentConfig.description, // Send the description
           dueDate: assignmentConfig.dueDate.toISOString(),
           status: 'pending'
         }
@@ -310,13 +329,23 @@ export default function AssignmentBuilderPage() {
           throw new Error(errorData.message || 'Failed to update assignment')
         }
 
-        alert(`Assignment updated successfully!`)
+        const result = await response.json()
+        const assignmentCount = result.data?.count || assignmentConfig.selectedUsers.length
+        const skippedCount = result.data?.skippedCount || 0
+        
+        if (skippedCount > 0) {
+          alert(`Updated ${assignmentCount} assignment(s). ${skippedCount} user(s) already had this assignment.`)
+        } else {
+          alert(`Successfully updated ${assignmentCount} assignment(s)!`)
+        }
       } else {
         // Create new assignment
         const assignmentData = {
           moduleId: assignmentConfig.documentId,
           testId: assignmentConfig.testId,
           assignedTo: assignmentConfig.selectedUsers, // Send all selected users
+          title: assignmentConfig.name, // Send the custom title
+          description: assignmentConfig.description, // Send the description
           dueDate: assignmentConfig.dueDate.toISOString(),
           status: 'pending'
         }
@@ -338,7 +367,13 @@ export default function AssignmentBuilderPage() {
 
         const result = await response.json()
         const assignmentCount = result.data?.count || assignmentConfig.selectedUsers.length
-        alert(`${assignmentCount} assignment(s) created successfully!`)
+        const skippedCount = result.data?.skippedCount || 0
+        
+        if (skippedCount > 0) {
+          alert(`Created ${assignmentCount} new assignment(s). ${skippedCount} user(s) already had this assignment.`)
+        } else {
+          alert(`Successfully created ${assignmentCount} assignment(s)!`)
+        }
       }
       
       // Redirect to manager assignments tab

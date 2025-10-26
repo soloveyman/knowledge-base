@@ -74,12 +74,15 @@ export default function EmployeePage() {
         const allAssignments = result.data.assignments
         setAssignments(allAssignments)
         
-        // Filter assignments for current user
-        // Note: Database assignments have assignedTo (single user ID) not assignedUsers (array)
+        // Filter assignments for current user using the new assignment_users table
         const currentUserId = session?.user?.id
-        const userAssignments = allAssignments.filter((assignment: any) => 
-          assignment.assignedTo && assignment.assignedTo === currentUserId
-        )
+        const userAssignments = allAssignments.filter((assignment: any) => {
+          // Check if this assignment has users array and contains the current user
+          if (assignment.users && Array.isArray(assignment.users)) {
+            return assignment.users.some((au: any) => au.userId === currentUserId)
+          }
+          return false
+        })
         setUserAssignments(userAssignments)
       } else {
         console.error('Failed to load assignments:', result.message)
@@ -187,7 +190,7 @@ export default function EmployeePage() {
   // Transform assignment data for display
   const transformedAssignments = userAssignments.map(assignment => ({
     id: assignment.id,
-    title: `Assignment ${assignment.id.slice(0, 8)}`, // Generate title from ID since no name field
+    title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
     type: assignment.testId ? "test" : "document", // Simplified type detection
     status: assignment.status === 'active' ? 'pending' : assignment.status,
     progress: assignment.status === 'completed' ? 100 : 0,

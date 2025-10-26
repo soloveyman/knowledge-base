@@ -158,15 +158,26 @@ export const userGroupMembers = pgTable('user_group_members', {
 
 export const assignments = pgTable('assignments', {
   id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title'), // Custom name for the assignment
+  description: text('description'), // Description of the assignment
   moduleId: uuid('module_id').references(() => modules.id),
   testId: uuid('test_id').references(() => tests.id),
-  assignedTo: uuid('assigned_to').references(() => users.id), // null for group assignments
-  groupId: uuid('group_id').references(() => userGroups.id), // null for individual assignments
   assignedBy: uuid('assigned_by').notNull().references(() => users.id),
+  groupId: uuid('group_id').references(() => userGroups.id), // null for individual assignments
   dueDate: timestamp('due_date'),
   status: text('status').notNull().default('pending'), // 'pending', 'in_progress', 'completed', 'overdue'
   allowRetake: boolean('allow_retake').default(false),
   maxAttempts: integer('max_attempts').default(1),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const assignmentUsers = pgTable('assignment_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  assignmentId: uuid('assignment_id').notNull().references(() => assignments.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('pending'), // 'pending', 'in_progress', 'completed', 'overdue'
+  completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -360,10 +371,6 @@ export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
     fields: [assignments.testId],
     references: [tests.id],
   }),
-  assignedTo: one(users, {
-    fields: [assignments.assignedTo],
-    references: [users.id],
-  }),
   group: one(userGroups, {
     fields: [assignments.groupId],
     references: [userGroups.id],
@@ -372,7 +379,19 @@ export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
     fields: [assignments.assignedBy],
     references: [users.id],
   }),
+  assignmentUsers: many(assignmentUsers),
   progress: many(progress),
+}));
+
+export const assignmentUsersRelations = relations(assignmentUsers, ({ one }) => ({
+  assignment: one(assignments, {
+    fields: [assignmentUsers.assignmentId],
+    references: [assignments.id],
+  }),
+  user: one(users, {
+    fields: [assignmentUsers.userId],
+    references: [users.id],
+  }),
 }));
 
 export const testAttemptsRelations = relations(testAttempts, ({ one }) => ({

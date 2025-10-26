@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, assignments } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, assignments, documents, modules, assignmentUsers } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 
 export async function GET(
   request: Request,
@@ -19,10 +19,15 @@ export async function GET(
       }, { status: 404 })
     }
 
+    // Fetch users assigned to this assignment
+    const assignmentUsersList = await db.select().from(assignmentUsers)
+      .where(eq(assignmentUsers.assignmentId, id))
+
     return NextResponse.json({
       success: true,
       data: {
-        assignment: assignment[0]
+        assignment: assignment[0],
+        users: assignmentUsersList
       }
     })
   } catch (error) {
@@ -45,20 +50,36 @@ export async function PUT(
     console.log('Assignment API: Updating assignment', id, 'with data:', body)
 
     const {
-      moduleId,
+      moduleId: documentId,
       testId,
       assignedTo,
+      title,
+      description,
       dueDate,
       status = 'pending',
       assignedBy = '3e1b5c25-7785-41b3-9c1f-68453a28bc90'
     } = body
 
     // Validate required fields
-    if (!moduleId || !testId || !assignedTo) {
+    if (!documentId || !testId || !assignedTo) {
       return NextResponse.json({
         success: false,
         message: 'Missing required fields: moduleId, testId, and assignedTo are required'
       }, { status: 400 })
+    }
+
+    // Normalize assignedTo to array
+    const userIds = Array.isArray(assignedTo) ? assignedTo : [assignedTo]
+    console.log('Processing assignment updates for users:', userIds)
+
+    // Get the document to find its moduleId
+    const document = await db.select().from(documents).where(eq(documents.id, documentId)).limit(1)
+    
+    if (document.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'Document not found'
+      }, { status: 404 })
     }
 
     // Check if assignment exists
@@ -70,39 +91,76 @@ export async function PUT(
       }, { status: 404 })
     }
 
-    // Prepare update data with only valid fields
-    const updateData: any = {
-      moduleId,
-      testId,
-      assignedTo,
-      assignedBy,
-      updatedAt: new Date()
-    }
-
-    // Only add dueDate if provided
+    // Update assignment dueDate, title, and description
+    const updateFields: any = { updatedAt: new Date() }
     if (dueDate) {
-      updateData.dueDate = new Date(dueDate)
+      updateFields.dueDate = new Date(dueDate)
+    }
+    if (title) {
+      updateFields.title = title
+    }
+    if (description !== undefined) {
+      updateFields.description = description
+    }
+    
+    if (Object.keys(updateFields).length > 1) {
+      await db.update(assignments)
+        .set(updateFields)
+        .where(eq(assignments.id, id))
     }
 
-    // Only add status if provided
-    if (status) {
-      updateData.status = status
+    // Check existing users for this assignment
+    const existingAssignmentUsers = await db.select().from(assignmentUsers)
+      .where(eq(assignmentUsers.assignmentId, id))
+    
+    const existingUserIds = new Set(existingAssignmentUsers.map(au => au.userId))
+    
+    // Filter out users who already have this assignment
+    const usersToAssign = userIds.filter(userId => !existingUserIds.has(userId))
+    
+    if (usersToAssign.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          assignment: existingAssignment[0],
+          count: 0
+        },
+        message: 'All selected users already have this assignment',
+        warning: 'No new users were added'
+      })
     }
 
-    // Update the assignment
-    const updatedAssignment = await db.update(assignments)
-      .set(updateData)
-      .where(eq(assignments.id, id))
-      .returning()
+    const skippedCount = userIds.length - usersToAssign.length
 
-    console.log('Assignment API: Updated assignment:', updatedAssignment[0])
+    // Add users to the assignment
+    const newAssignmentUsers = []
+    for (const userId of usersToAssign) {
+      try {
+        const result = await db.insert(assignmentUsers).values({
+          assignmentId: id,
+          userId,
+          status: status || 'pending'
+        }).returning()
+        newAssignmentUsers.push(result[0])
+      } catch (error) {
+        console.error(`Failed to add user ${userId} to assignment:`, error)
+      }
+    }
+
+    console.log('Users added successfully:', newAssignmentUsers.length)
+
+    const responseMessage = usersToAssign.length === userIds.length
+      ? `Successfully added ${newAssignmentUsers.length} user(s) to assignment`
+      : `Added ${newAssignmentUsers.length} user(s) to assignment. ${skippedCount} user(s) already had this assignment.`
 
     return NextResponse.json({
       success: true,
       data: {
-        assignment: updatedAssignment[0]
+        assignment: existingAssignment[0],
+        count: newAssignmentUsers.length,
+        skippedCount
       },
-      message: 'Assignment updated successfully'
+      message: responseMessage
     })
   } catch (error) {
     console.error('Update assignment API error:', error)
