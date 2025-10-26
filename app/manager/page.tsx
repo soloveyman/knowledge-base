@@ -475,16 +475,16 @@ export default function ManagerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <AppBar role="manager" />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
             Welcome back, {session.user?.name || 'Manager'}!
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Manage your team&apos;s training and knowledge base
           </p>
         </div>
@@ -617,8 +617,8 @@ export default function ManagerPage() {
               <CardContent>
                 {isLoadingDocuments ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    <span className="ml-3 text-gray-600">Refreshing documents...</span>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                    <span className="ml-3 text-muted-foreground">Refreshing documents...</span>
                   </div>
                 ) : documents.length === 0 ? (
                   <EmptyState
@@ -633,12 +633,12 @@ export default function ManagerPage() {
                     {documents.map((doc) => (
                       <div 
                         key={doc.id}
-                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent cursor-pointer"
                         onClick={() => handleViewDocument(doc.name)}
                       >
                         <div>
-                          <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                          <p className="text-sm text-gray-500">Uploaded {doc.uploadedAt}</p>
+                          <h3 className="font-medium text-foreground dark:text-white">{doc.name}</h3>
+                          <p className="text-sm text-muted-foreground">Uploaded {doc.uploadedAt}</p>
                         </div>
                         <DeleteConfirmation
                           onConfirm={() => handleDeleteDocument(doc.id)}
@@ -647,7 +647,7 @@ export default function ManagerPage() {
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="text-gray-400 hover:text-gray-600"
+                              className="text-muted-foreground hover:text-foreground"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <X className="h-4 w-4" />

@@ -344,7 +344,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
 
             {/* User Selection Modal */}
             {showUserSelection && (
-              <div className="border rounded-lg p-4 bg-gray-50">
+              <div className="border rounded-lg p-4 bg-muted">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium">Select Users and Groups</h4>
                   <Button

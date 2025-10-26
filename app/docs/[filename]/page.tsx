@@ -147,13 +147,13 @@ export default function DocumentViewer() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                 {documentData?.name || 'Document Viewer'}
               </h1>
             </div>
@@ -168,33 +168,33 @@ export default function DocumentViewer() {
                   <div className="p-3">
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">File Name</label>
-                        <p className="text-sm text-gray-900 mt-1 break-all">{documentData?.name}</p>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File Name</label>
+                        <p className="text-sm text-foreground mt-1 break-all">{documentData?.name}</p>
                       </div>
                       
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">File Type</label>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File Type</label>
                         <div className="mt-1">
                           <DocumentTypeBadge type={documentData?.type} />
                         </div>
                       </div>
                       
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">File Size</label>
-                        <p className="text-sm text-gray-900 mt-1">{documentData?.size}</p>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File Size</label>
+                        <p className="text-sm text-foreground mt-1">{documentData?.size}</p>
                       </div>
                       
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Uploaded</label>
-                        <div className="flex items-center mt-1 text-sm text-gray-600">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uploaded</label>
+                        <div className="flex items-center mt-1 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4 mr-2" />
                           {documentData?.uploadedAt ? new Date(documentData.uploadedAt).toLocaleDateString() : 'Unknown'}
                         </div>
                       </div>
                       
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Uploaded By</label>
-                        <div className="flex items-center mt-1 text-sm text-gray-600">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uploaded By</label>
+                        <div className="flex items-center mt-1 text-sm text-muted-foreground">
                           <User className="h-4 w-4 mr-2" />
                           {documentData?.uploadedBy}
                         </div>
@@ -216,7 +216,7 @@ export default function DocumentViewer() {
         {/* Document Content */}
         <div className="min-h-screen">
           {documentData?.type === 'PDF' ? (
-            <div className="w-full h-screen border border-gray-200 rounded-lg overflow-hidden">
+            <div className="w-full h-screen border border-border rounded-lg overflow-hidden">
               <iframe 
                 src={`/api/documents/${encodeURIComponent(filename)}`}
                 className="w-full h-full"

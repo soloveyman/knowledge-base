@@ -311,7 +311,7 @@ export default function VersionManager({
                     </div>
 
                     {version.changeLog && (
-                      <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                      <div className="mt-2 p-2 bg-muted rounded text-xs">
                         <strong>Changes:</strong> {version.changeLog}
                       </div>
                     )}
@@ -452,9 +452,9 @@ export default function VersionManager({
               </div>
 
               {selectedVersion.changeLog && (
-                <div className="mt-4 p-3 bg-gray-50 rounded">
+                <div className="mt-4 p-3 bg-muted rounded">
                   <h5 className="font-medium text-sm mb-1">Change Log:</h5>
-                  <p className="text-sm text-gray-600">{selectedVersion.changeLog}</p>
+                  <p className="text-sm text-muted-foreground">{selectedVersion.changeLog}</p>
                 </div>
               )}
 

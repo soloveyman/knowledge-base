@@ -21,7 +21,7 @@ interface ToolbarProps {
 export function Toolbar({ actions, className }: ToolbarProps) {
   return (
     <div className={cn(
-      "flex flex-wrap items-center gap-2 p-2 border rounded-lg bg-gray-50",
+      "flex flex-wrap items-center gap-2 p-2 border rounded-lg bg-muted",
       className
     )}>
       {actions.map((action, index) => (

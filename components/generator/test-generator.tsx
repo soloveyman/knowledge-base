@@ -389,7 +389,7 @@ export default function TestGenerator({
                   variant={params.difficulty === difficulty.value ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => handleParamChange('difficulty', difficulty.value)}
-                  className={params.difficulty === difficulty.value ? '' : 'hover:bg-gray-50'}
+                  className={params.difficulty === difficulty.value ? '' : 'hover:bg-accent'}
                 >
                   {difficulty.label}
                 </Button>

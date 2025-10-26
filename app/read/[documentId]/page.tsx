@@ -324,9 +324,9 @@ export default function DocumentReaderPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Document Not Found</h2>
-          <p className="text-gray-600 mb-4">The requested document could not be found.</p>
+          <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-semibold text-foreground dark:text-white mb-2">Document Not Found</h2>
+          <p className="text-muted-foreground mb-4">The requested document could not be found.</p>
           <Button onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Assignments
@@ -337,17 +337,17 @@ export default function DocumentReaderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
+      <header className="bg-card shadow-sm border-b border-border sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                   {assignmentData?.name || documentData.name}
                 </h1>
-                <p className="text-sm text-gray-600 truncate">
+                <p className="text-sm text-muted-foreground truncate">
                   {documentData.name}
                 </p>
               </div>
@@ -381,7 +381,7 @@ export default function DocumentReaderPage() {
               <CardContent>
                 <div className="prose max-w-none">
                   {documentData.type === 'PDF' ? (
-                    <div className="w-full h-screen border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="w-full h-screen border border-border rounded-lg overflow-hidden">
                       <iframe 
                         src={`/api/documents/${encodeURIComponent(documentData.name)}`}
                         className="w-full h-full"
@@ -389,7 +389,7 @@ export default function DocumentReaderPage() {
                       />
                     </div>
                   ) : (
-                    <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                    <div className="whitespace-pre-wrap text-foreground leading-relaxed">
                       {cleanDocumentContent(documentData.content)}
                     </div>
                   )}
@@ -414,7 +414,7 @@ export default function DocumentReaderPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       <p><strong>Test:</strong> {assignmentData?.test?.title || 'Test'}</p>
                       <p><strong>Questions:</strong> {assignmentData?.test?.questionCount || 0}</p>
                       <p><strong>Estimated time:</strong> 15 minutes</p>

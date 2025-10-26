@@ -237,9 +237,9 @@ export default function TestPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <TestTube className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Test Not Found</h2>
-          <p className="text-gray-600 mb-4">The requested test could not be found.</p>
+          <TestTube className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-semibold text-foreground dark:text-white mb-2">Test Not Found</h2>
+          <p className="text-muted-foreground mb-4">The requested test could not be found.</p>
           <Button onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Assignments
@@ -251,13 +251,13 @@ export default function TestPage() {
 
   if (showResults) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b">
+        <header className="bg-card shadow-sm border-b border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                   Test Results
                 </h1>
               </div>
@@ -271,16 +271,9 @@ export default function TestPage() {
         </header>
 
         {/* Results */}
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
+        <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
+          <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                {score >= 70 ? (
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                ) : (
-                  <AlertCircle className="h-8 w-8 text-red-600" />
-                )}
-              </div>
               <CardTitle className="text-2xl">
                 {score >= 70 ? 'Congratulations!' : 'Test Completed'}
               </CardTitle>
@@ -292,21 +285,21 @@ export default function TestPage() {
               <div className="text-6xl font-bold text-blue-600">
                 {score}%
               </div>
-              <div className="text-lg text-gray-600">
+              <div className="text-lg text-muted-foreground">
                 {score >= 70 ? 'You passed the test!' : 'You need to score 70% or higher to pass.'}
               </div>
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-foreground">
                     {Object.keys(answers).length}
                   </div>
-                  <div className="text-sm text-gray-600">Questions Answered</div>
+                  <div className="text-sm text-muted-foreground">Questions Answered</div>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-foreground">
                     {testData.questions.length}
                   </div>
-                  <div className="text-sm text-gray-600">Total Questions</div>
+                  <div className="text-sm text-muted-foreground">Total Questions</div>
                 </div>
               </div>
               <Button onClick={handleBack} className="w-full max-w-xs">
@@ -323,23 +316,23 @@ export default function TestPage() {
   const progress = ((currentQuestion + 1) / testData.questions.length) * 100
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
+      <header className="bg-card shadow-sm border-b border-border sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                   {testData.title}
                 </h1>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Question {currentQuestion + 1} of {testData.questions.length}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span>{formatTime(timeLeft)}</span>
               </div>
@@ -352,9 +345,9 @@ export default function TestPage() {
       </header>
 
       {/* Progress */}
-      <div className="bg-white border-b">
+      <div className="bg-card border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+          <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
             <span>Progress</span>
             <span>{Math.round(progress)}%</span>
           </div>
@@ -391,15 +384,15 @@ export default function TestPage() {
                       onClick={() => handleAnswerSelect(currentQ.id, letter)}
                       className={`w-full p-4 text-left border rounded-lg transition-colors ${
                         isSelected
-                          ? 'border-blue-500 bg-blue-50 text-blue-900'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          ? 'border-primary bg-primary/10 text-primary-foreground'
+                          : 'border-border hover:border-accent hover:bg-accent'
                       }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium shrink-0 ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-500 text-white'
-                            : 'border-gray-300'
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border'
                         }`}>
                           {letter}
                         </div>

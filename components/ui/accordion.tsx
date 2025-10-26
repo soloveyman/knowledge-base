@@ -88,7 +88,7 @@ const AccordionTrigger = React.forwardRef<HTMLButtonElement, AccordionTriggerPro
       <button
         ref={ref}
         className={cn(
-          "flex w-full items-center justify-between p-4 text-left font-medium transition-all hover:bg-gray-50 [&[data-state=open]>svg]:rotate-180",
+          "flex w-full items-center justify-between p-4 text-left font-medium transition-all hover:bg-accent [&[data-state=open]>svg]:rotate-180",
           className
         )}
         onClick={() => toggleItem(itemValue)}

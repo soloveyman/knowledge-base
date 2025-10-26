@@ -34,16 +34,16 @@ export function ListItem({
 }: ListItemProps) {
   return (
     <div 
-      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+      className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent cursor-pointer"
       onClick={onClick}
     >
       <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-gray-900">{title}</h3>
+        <h3 className="font-medium text-foreground">{title}</h3>
         {subtitle && (
-          <p className="text-sm text-gray-500">{subtitle}</p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
         )}
         {metadata.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 mt-2 text-xs text-gray-400">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 mt-2 text-xs text-muted-foreground">
             {metadata.map((item, index) => (
               <span key={index}>{item}</span>
             ))}
@@ -95,7 +95,7 @@ export function ListItem({
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-gray-400 hover:text-blue-600"
+            className="text-muted-foreground hover:text-primary"
             onClick={(e) => {
               e.stopPropagation()
               onEdit()
@@ -112,7 +112,7 @@ export function ListItem({
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-gray-400 hover:text-red-600"
+                className="text-muted-foreground hover:text-destructive"
                 onClick={(e) => e.stopPropagation()}
               >
                 <X className="h-4 w-4" />

@@ -216,12 +216,12 @@ export default function UserBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                 {isEditMode ? 'Edit User' : 'User Builder'}
               </h1>
             </div>
@@ -303,7 +303,7 @@ export default function UserBuilderPage() {
                   <div className="space-y-2">
                     <Label htmlFor="password">
                       Password {!isEditMode && '*'}
-                      {isEditMode && <span className="text-sm text-gray-500 ml-1">(leave blank to keep current)</span>}
+                      {isEditMode && <span className="text-sm text-muted-foreground ml-1">(leave blank to keep current)</span>}
                     </Label>
                     
                     
@@ -330,9 +330,9 @@ export default function UserBuilderPage() {
                   </div>
                 </div>
 
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Role Permissions</h4>
-                  <div className="text-sm text-blue-800 space-y-1">
+                <div className="bg-primary/10 p-4 rounded-lg">
+                  <h4 className="font-medium text-primary-foreground mb-2">Role Permissions</h4>
+                  <div className="text-sm text-primary-foreground space-y-1">
                     {userConfig.role === 'manager' && (
                       <>
                         <p>• Create and manage tests and assignments</p>
@@ -350,7 +350,7 @@ export default function UserBuilderPage() {
                       </>
                     )}
                     {!userConfig.role && (
-                      <p className="text-gray-600">Select a role to see permissions</p>
+                      <p className="text-muted-foreground">Select a role to see permissions</p>
                     )}
                   </div>
                 </div>

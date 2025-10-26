@@ -20,5 +20,6 @@ export { StatCard } from "./stat-card"
 export { Toolbar } from "./toolbar"
 export { DataTable } from "./data-table"
 export { Modal } from "./modal"
+export { ThemeToggle } from "./theme-toggle"
 export type { Column } from "./data-table"
 

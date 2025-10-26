@@ -139,7 +139,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
       case 'overdue':
         return <AlertCircle className="h-4 w-4 text-red-500" />
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />
+        return <Clock className="h-4 w-4 text-muted-foreground" />
     }
   }
 
@@ -147,16 +147,16 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     switch (status) {
       case 'completed':
       case 'passed':
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>
+        return <Badge className="bg-green-500/20 text-green-600 dark:text-green-400">Completed</Badge>
       case 'active':
       case 'in_progress':
-        return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+        return <Badge className="bg-primary/20 text-primary-foreground">In Progress</Badge>
       case 'failed':
-        return <Badge className="bg-red-50 text-black">Failed</Badge>
+        return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">Failed</Badge>
       case 'overdue':
-        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>
+        return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">Overdue</Badge>
       default:
-        return <Badge className="bg-gray-100 text-gray-800">Not Started</Badge>
+        return <Badge className="bg-muted text-muted-foreground">Not Started</Badge>
     }
   }
 
@@ -184,8 +184,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
           <CardDescription>Track employee progress and assignment completion</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p>No employees or assignments found</p>
           </div>
         </CardContent>
@@ -253,8 +253,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
               <AccordionContent value={progress.user.id}>
                 <div className="space-y-3">
                   {progress.assignments.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500">
-                      <FileText className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <div className="text-center py-4 text-muted-foreground">
+                      <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                       <p>No assignments assigned</p>
                     </div>
                   ) : (
@@ -266,7 +266,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                       const actualDescription = assignment.description || `Complete assignment ${assignment.id.slice(0, 8)}`
                       
                       return (
-                      <div key={assignment.id} className="p-4 border rounded-lg bg-gray-50">
+                      <div key={assignment.id} className="p-4 border rounded-lg bg-card">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
@@ -274,8 +274,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                               {getStatusIcon(actualStatus)}
                               {getStatusBadge(actualStatus)}
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">{actualDescription}</p>
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground mb-2">{actualDescription}</p>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
                               {assignment.testId && (
                                 <div className="flex items-center gap-1">
                                   <Target className="h-4 w-4" />

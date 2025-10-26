@@ -575,13 +575,13 @@ export default function TestBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                 {isEditMode ? 'Edit Test' : 'Test Builder'}
               </h1>
             </div>

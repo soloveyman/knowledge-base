@@ -185,7 +185,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
       case 'uploading':
         return <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
       default:
-        return <Upload className="h-5 w-5 text-gray-500" />
+        return <Upload className="h-5 w-5 text-muted-foreground" />
     }
   }
 
@@ -216,9 +216,9 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
               onDragOver={handleDrag}
               onDrop={handleDrop}
             >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg font-medium mb-2">Drop your file here</p>
-              <p className="text-gray-500 mb-4">
+              <p className="text-muted-foreground mb-4">
                 Supports DOCX and XLSX files up to 20MB
               </p>
               <input
@@ -236,14 +236,14 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
             </div>
           ) : (
             <div className="space-y-4">
-               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+               <div className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent">
                  <div>
-                   <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                   <p className="text-sm text-gray-500">
+                   <p className="font-medium text-foreground">{selectedFile.name}</p>
+                   <p className="text-sm text-muted-foreground">
                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                    </p>
                  </div>
-                 <Button variant="ghost" size="sm" onClick={resetImport} className="text-gray-400 hover:text-gray-600">
+                 <Button variant="ghost" size="sm" onClick={resetImport} className="text-muted-foreground hover:text-foreground">
                    <X className="h-4 w-4" />
                  </Button>
                </div>
@@ -336,10 +336,10 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                       {log.message}
                     </span>
                     {log.line && (
-                      <span className="text-gray-400 ml-2">(Line {log.line})</span>
+                      <span className="text-muted-foreground ml-2">(Line {log.line})</span>
                     )}
                     {log.cell && (
-                      <span className="text-gray-400 ml-2">(Cell {log.cell})</span>
+                      <span className="text-muted-foreground ml-2">(Cell {log.cell})</span>
                     )}
                   </div>
                 </div>

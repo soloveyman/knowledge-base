@@ -115,21 +115,21 @@ export default function ReportingDashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800'
-      case 'in_progress': return 'bg-blue-100 text-blue-800'
-      case 'not_started': return 'bg-gray-100 text-gray-800'
-      case 'overdue': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'completed': return 'bg-green-500/20 text-green-600 dark:text-green-400'
+      case 'in_progress': return 'bg-primary/20 text-primary-foreground'
+      case 'not_started': return 'bg-muted text-muted-foreground'
+      case 'overdue': return 'bg-red-500/20 text-red-600 dark:text-red-400'
+      default: return 'bg-muted text-muted-foreground'
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />
-      case 'in_progress': return <Activity className="h-4 w-4 text-blue-500" />
-      case 'not_started': return <Clock className="h-4 w-4 text-gray-500" />
-      case 'overdue': return <AlertCircle className="h-4 w-4 text-red-500" />
-      default: return <Clock className="h-4 w-4 text-gray-500" />
+      case 'completed': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+      case 'in_progress': return <Activity className="h-4 w-4 text-primary" />
+      case 'not_started': return <Clock className="h-4 w-4 text-muted-foreground" />
+      case 'overdue': return <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+      default: return <Clock className="h-4 w-4 text-muted-foreground" />
     }
   }
 
@@ -397,12 +397,12 @@ export default function ReportingDashboard() {
             {employeeProgress.map((employee) => (
               <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    <Users className="h-5 w-5 text-gray-500" />
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <Users className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <div>
                     <h4 className="font-medium">{employee.name}</h4>
-                    <p className="text-sm text-gray-600">{employee.email}</p>
+                    <p className="text-sm text-muted-foreground">{employee.email}</p>
                   </div>
                 </div>
 
@@ -425,12 +425,12 @@ export default function ReportingDashboard() {
                     <div className="text-sm font-medium">
                       {employee.attempts}/{employee.maxAttempts}
                     </div>
-                    <div className="text-xs text-gray-600">Attempts</div>
+                    <div className="text-xs text-muted-foreground">Attempts</div>
                   </div>
 
                   <StatusBadge status={employee.status} />
 
-                  <div className="text-right text-xs text-gray-500">
+                  <div className="text-right text-xs text-muted-foreground">
                     <div>Last activity:</div>
                     <div>{formatDate(employee.lastActivity)}</div>
                   </div>
@@ -462,7 +462,7 @@ export default function ReportingDashboard() {
             >
               <FileText className="h-6 w-6 mb-2" />
               <span>CSV Export</span>
-              <span className="text-xs text-gray-500">Spreadsheet format</span>
+              <span className="text-xs text-muted-foreground">Spreadsheet format</span>
             </Button>
 
             <Button
@@ -473,7 +473,7 @@ export default function ReportingDashboard() {
             >
               <Award className="h-6 w-6 mb-2" />
               <span>PDF Report</span>
-              <span className="text-xs text-gray-500">Formatted report</span>
+              <span className="text-xs text-muted-foreground">Formatted report</span>
             </Button>
 
             <Button
@@ -483,7 +483,7 @@ export default function ReportingDashboard() {
             >
               <BarChart3 className="h-6 w-6 mb-2" />
               <span>Analytics</span>
-              <span className="text-xs text-gray-500">Advanced insights</span>
+              <span className="text-xs text-muted-foreground">Advanced insights</span>
             </Button>
           </div>
         </CardContent>

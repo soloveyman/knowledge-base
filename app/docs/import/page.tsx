@@ -315,20 +315,20 @@ export default function DocImportPage() {
             <div
               className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragActive 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-primary/10' 
+                  : 'border-border hover:border-accent'
               }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
             >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <div className="space-y-2">
-                <p className="text-lg font-medium text-gray-900">
+                <p className="text-lg font-medium text-foreground">
                   Drop files here or click to browse
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Supports DOCX and XLSX files up to 15MB
                 </p>
               </div>
@@ -359,10 +359,10 @@ export default function DocImportPage() {
               <div className="space-y-4">
                 {files.map((file) => (
                   <div key={file.id} className="flex items-center space-x-4 p-4 border rounded-lg">
-                    <FileText className="h-8 w-8 text-gray-400" />
+                    <FileText className="h-8 w-8 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{file.name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-foreground truncate">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">
                         {formatFileSize(file.size)} • {file.type.split('/')[1].toUpperCase()}
                       </p>
                       {file.status === 'uploading' && (
@@ -374,14 +374,14 @@ export default function DocImportPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(file.status)}
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-muted-foreground">
                         {getStatusText(file.status)}
                       </span>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFile(file.id)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         <X className="h-4 w-4" />
                       </Button>

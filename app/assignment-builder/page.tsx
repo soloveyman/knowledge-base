@@ -402,13 +402,13 @@ export default function AssignmentBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                 {isEditMode ? 'Edit Assignment' : 'Assignment Builder'}
               </h1>
             </div>
@@ -488,7 +488,7 @@ export default function AssignmentBuilderPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {savedTests.length === 0 ? (
-                        <div className="p-2 text-sm text-gray-500">No tests available. Create a test first.</div>
+                        <div className="p-2 text-sm text-muted-foreground">No tests available. Create a test first.</div>
                       ) : (
                         savedTests.map((test) => (
                           <SelectItem key={test.id} value={test.id}>
@@ -592,7 +592,7 @@ export default function AssignmentBuilderPage() {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {savedUsers.filter(user => user.role === 'employee').map((user) => (
-                    <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                    <div key={user.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent">
                       <Checkbox
                         id={`user-${user.id}`}
                         checked={assignmentConfig.selectedUsers.includes(user.id)}
@@ -602,7 +602,7 @@ export default function AssignmentBuilderPage() {
                         <div className="flex items-center space-x-2">
                           <label
                             htmlFor={`user-${user.id}`}
-                            className="text-sm font-medium text-gray-900 cursor-pointer"
+                            className="text-sm font-medium text-foreground cursor-pointer"
                           >
                             {user.name}
                           </label>
@@ -619,8 +619,8 @@ export default function AssignmentBuilderPage() {
                 </div>
                 
                 {assignmentConfig.selectedUsers.length > 0 && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
+                  <div className="mt-4 p-3 bg-primary/10 rounded-lg">
+                    <p className="text-sm text-primary-foreground">
                       <strong>{assignmentConfig.selectedUsers.length}</strong> employee(s) selected
                     </p>
                   </div>

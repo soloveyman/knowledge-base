@@ -29,7 +29,7 @@ export function DataTable<T extends Record<string, any>>({
 }: DataTableProps<T>) {
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-500">
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
         {emptyMessage}
       </div>
     )

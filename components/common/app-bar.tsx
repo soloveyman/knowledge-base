@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
 import { signOut } from "next-auth/react"
+import { ThemeToggle } from "./theme-toggle"
 
 interface AppBarProps {
   role: 'owner' | 'manager' | 'employee'
@@ -34,15 +35,16 @@ export function AppBar({ role, onSignOut }: AppBarProps) {
   const title = getTitle()
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-card shadow-sm border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center min-w-0">
-            <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
               {title}
             </h1>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
+            <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleSignOut} className="text-xs sm:text-sm">
               <LogOut className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Sign Out</span>

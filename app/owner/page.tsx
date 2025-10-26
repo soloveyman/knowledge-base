@@ -145,16 +145,16 @@ export default function OwnerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <AppBar role="owner" />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
             Welcome back, {session.user?.name || 'Owner'}!
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Full system control and business management
           </p>
         </div>
@@ -306,8 +306,8 @@ export default function OwnerPage() {
                 <CardDescription>Configure system-wide settings and preferences</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <Settings className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <p>System settings will be implemented here</p>
                 </div>
               </CardContent>

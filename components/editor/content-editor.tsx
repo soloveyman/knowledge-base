@@ -285,7 +285,7 @@ export default function ContentEditor({
 
           <TabsContent value="edit" className="space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-1 p-2 border rounded-lg bg-gray-50">
+            <div className="flex flex-wrap items-center gap-1 p-2 border rounded-lg bg-muted">
               {toolbarButtons.map((button, index) => (
                 <Button
                   key={index}

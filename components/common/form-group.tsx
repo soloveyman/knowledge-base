@@ -31,7 +31,7 @@ export function FormGroup({
       </Label>
       {children}
       {helpText && (
-        <p className="text-sm text-gray-500">{helpText}</p>
+        <p className="text-sm text-muted-foreground">{helpText}</p>
       )}
       {error && (
         <p className="text-sm text-red-600">{error}</p>
