@@ -264,8 +264,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                       // Get the user's specific assignment details
                       const userAssignment = assignment.users?.find((au: any) => au.userId === progress.user.id)
                       const actualStatus = userAssignment?.status || assignment.status || 'pending'
-                      const actualTitle = assignment.title || `Assignment ${assignment.id.slice(0, 8)}`
-                      const actualDescription = assignment.description || `Complete assignment ${assignment.id.slice(0, 8)}`
+                      const actualTitle = assignment.title || assignment.name || `Assignment ${assignment.id.slice(0, 8)}`
+                      const actualDescription = assignment.description || assignment.title || assignment.name || `Complete assignment ${assignment.id.slice(0, 8)}`
                       
                       return (
                       <div key={assignment.id} className="p-4 border rounded-lg bg-card">
