@@ -34,7 +34,7 @@ interface Assignment {
   testId: string
   assignedTo?: string
   assignedBy: string
-  dueDate: string
+  dueDate?: string
   status: string
   allowRetake: boolean
   maxAttempts: number
@@ -89,6 +89,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
       }).length
 
       const overdueCount = userAssignments.filter(assignment => {
+        if (!assignment.dueDate) return false
         const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
         const dueDate = new Date(assignment.dueDate)
         const now = new Date()
@@ -168,7 +169,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     })
   }
 
-  const isOverdue = (dueDate: string, status: string) => {
+  const isOverdue = (dueDate: string | undefined, status: string) => {
+    if (!dueDate) return false
     const due = new Date(dueDate)
     const now = new Date()
     return due < now && status !== 'completed' && status !== 'passed'
@@ -285,12 +287,14 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                   })()}</span>
                                 </div>
                               )}
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4" />
-                                <span className={isOverdue(assignment.dueDate, assignment.status) ? 'text-red-600' : ''}>
-                                  Due: {formatDate(assignment.dueDate)}
-                                </span>
-                              </div>
+                              {assignment.dueDate && (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span className={isOverdue(assignment.dueDate, assignment.status) ? 'text-red-600' : ''}>
+                                    Due: {formatDate(assignment.dueDate)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="flex flex-row md:flex-col md:text-right gap-3 md:gap-0">

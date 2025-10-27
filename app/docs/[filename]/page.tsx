@@ -198,15 +198,16 @@ export default function DocumentViewer() {
       
       // Only render headers if they exist and are not empty
       const hasHeaders = table.headers && table.headers.length > 0 && table.headers.some(h => h.trim())
-      const headersHTML = hasHeaders ? table.headers.map(header => {
+      const headersHTML = hasHeaders ? table.headers.map((header, idx) => {
         const escapedHeader = escapeHTML(header)
-        return `<th class="px-4 py-2 text-left border-b border-border bg-muted/50 font-semibold">${escapedHeader}</th>`
+        // Use fit-content for natural width, with reasonable constraints
+        return `<th class="px-2 md:px-4 py-2 text-left border-b border-border bg-muted/50 font-semibold text-xs md:text-sm" style="min-width: fit-content; white-space: normal;">${escapedHeader}</th>`
       }).join('') : ''
       
       const rowsHTML = nonEmptyRows.map(row => {
-        const cellsHTML = row.map(cell => {
+        const cellsHTML = row.map((cell, idx) => {
           const escapedCell = escapeHTML(String(cell))
-          return `<td class="px-4 py-2 border-b border-border">${escapedCell}</td>`
+          return `<td class="px-2 md:px-4 py-2 border-b border-border text-xs md:text-sm" style="white-space: normal;">${escapedCell}</td>`
         }).join('')
         return `<tr class="hover:bg-muted/20">${cellsHTML}</tr>`
       }).join('')
@@ -214,7 +215,7 @@ export default function DocumentViewer() {
       // Render table with or without headers based on detection
       const tableHTML = hasHeaders 
         ? `
-          <table class="min-w-full border-collapse">
+          <table class="w-full border-collapse" style="table-layout: auto; width: 100%;">
             <thead>
               <tr>${headersHTML}</tr>
             </thead>
@@ -224,7 +225,7 @@ export default function DocumentViewer() {
           </table>
         `
         : `
-          <table class="min-w-full border-collapse">
+          <table class="w-full border-collapse" style="table-layout: auto; width: 100%;">
             <tbody>
               ${rowsHTML}
             </tbody>
@@ -232,9 +233,9 @@ export default function DocumentViewer() {
         `
       
       return `
-        <div class="my-8 w-full">
-          <h3 class="text-xl font-bold mb-4 text-foreground">${escapedTitle}</h3>
-          <div class="overflow-x-auto rounded-lg border border-border max-w-full">
+        <div class="my-8 w-full overflow-x-auto">
+          <h3 class="text-base md:text-xl font-bold mb-4 text-foreground">${escapedTitle}</h3>
+          <div class="w-full rounded-lg border border-border">
             ${tableHTML}
           </div>
         </div>
@@ -258,7 +259,7 @@ export default function DocumentViewer() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm shadow-sm border-b border-border sticky top-0 z-10 w-full">
-        <div className="w-full mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
@@ -275,7 +276,7 @@ export default function DocumentViewer() {
       </header>
 
       {/* Main Content */}
-      <main className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4 md:py-6 lg:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Document Content */}
         <div className="min-h-screen w-full">
           {documentData?.type === 'PDF' ? (
@@ -287,11 +288,10 @@ export default function DocumentViewer() {
               />
             </div>
           ) : (
-            <div className="w-full prose max-w-none document-content">
+            <div className="document-content" style={{ maxWidth: '100%', width: '100%' }}>
               {documentData?.content ? (
-                <div className="w-full overflow-x-auto">
-                  <div className="w-full max-w-full"
-                    dangerouslySetInnerHTML={{ 
+                <>
+                  <div dangerouslySetInnerHTML={{ 
                       __html: (() => {
                         const formatted = renderFormattedText(documentData.content)
                         console.log('Processing content with length:', documentData.content.length)
@@ -303,13 +303,12 @@ export default function DocumentViewer() {
                   />
                   {/* Render tables after content */}
                   {documentData?.tables && documentData.tables.length > 0 && (
-                    <div className="w-full max-w-full"
-                      dangerouslySetInnerHTML={{ 
+                    <div dangerouslySetInnerHTML={{ 
                         __html: renderTablesAsHTML(documentData.tables)
                       }} 
                     />
                   )}
-                </div>
+                </>
               ) : (
                 <div>
                   <h1>{documentData?.name || 'Document'}</h1>

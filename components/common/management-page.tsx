@@ -26,6 +26,7 @@ interface ManagementPageProps {
     onClick?: () => void
     onDelete?: () => void
     onEdit?: () => void
+    deleteDataLossWarning?: string
   }>
   showEditButton?: boolean
   emptyState: {
@@ -76,6 +77,7 @@ export function ManagementPage({
                 onDelete={item.onDelete}
                 onEdit={item.onEdit}
                 showEditButton={showEditButton}
+                deleteDataLossWarning={item.deleteDataLossWarning}
               />
             ))}
           </div>

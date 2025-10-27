@@ -280,18 +280,8 @@ export default function AssignmentBuilderPage() {
       return
     }
 
-    if (!assignmentConfig.testId) {
-      setError("Please select a test")
-      return
-    }
-
     if (assignmentConfig.selectedUsers.length === 0) {
       setError("Please select at least one employee")
-      return
-    }
-
-    if (!assignmentConfig.dueDate) {
-      setError("Please select a due date")
       return
     }
 
@@ -301,14 +291,15 @@ export default function AssignmentBuilderPage() {
     try {
       if (isEditMode && editingAssignmentId) {
         // Update existing assignment
-        const updateData = {
+        const updateData: Record<string, unknown> = {
           moduleId: assignmentConfig.documentId,
-          testId: assignmentConfig.testId,
           assignedTo: assignmentConfig.selectedUsers, // Send all selected users
           title: assignmentConfig.name, // Send the custom title
           description: assignmentConfig.description, // Send the description
-          dueDate: assignmentConfig.dueDate.toISOString(),
-          status: 'pending'
+          status: 'pending',
+          // Always include optional fields (send null to clear)
+          testId: assignmentConfig.testId || null,
+          dueDate: assignmentConfig.dueDate ? assignmentConfig.dueDate.toISOString() : null
         }
         console.log('Assignment Builder: Updating assignment with data:', updateData)
         console.log('Assignment Builder: Assignment ID:', editingAssignmentId)
@@ -340,14 +331,20 @@ export default function AssignmentBuilderPage() {
         }
       } else {
         // Create new assignment
-        const assignmentData = {
+        const assignmentData: Record<string, unknown> = {
           moduleId: assignmentConfig.documentId,
-          testId: assignmentConfig.testId,
           assignedTo: assignmentConfig.selectedUsers, // Send all selected users
           title: assignmentConfig.name, // Send the custom title
           description: assignmentConfig.description, // Send the description
-          dueDate: assignmentConfig.dueDate.toISOString(),
           status: 'pending'
+        }
+        
+        // Add optional fields if provided
+        if (assignmentConfig.testId) {
+          assignmentData.testId = assignmentConfig.testId
+        }
+        if (assignmentConfig.dueDate) {
+          assignmentData.dueDate = assignmentConfig.dueDate.toISOString()
         }
         
         console.log('Creating assignment with data:', assignmentData)
@@ -434,7 +431,7 @@ export default function AssignmentBuilderPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="assignment-name">Assignment Name</Label>
+                  <Label htmlFor="assignment-name">Assignment Name *</Label>
                   <Input
                     id="assignment-name"
                     placeholder="Enter assignment name..."
@@ -456,7 +453,7 @@ export default function AssignmentBuilderPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="document-select">Select Document</Label>
+                  <Label htmlFor="document-select">Select Document *</Label>
                   <Select 
                     value={assignmentConfig.documentId} 
                     onValueChange={(value) => setAssignmentConfig(prev => ({ ...prev, documentId: value }))}
@@ -478,7 +475,7 @@ export default function AssignmentBuilderPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="test-select">Select Test</Label>
+                  <Label htmlFor="test-select">Select Test (Optional)</Label>
                   <Select 
                     value={assignmentConfig.testId} 
                     onValueChange={(value) => setAssignmentConfig(prev => ({ ...prev, testId: value }))}
@@ -503,23 +500,40 @@ export default function AssignmentBuilderPage() {
                   </Select>
                 </div>
 
-                <div>
-                  <Label>Due Date</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Due Date (Optional)</Label>
+                    {assignmentConfig.dueDate && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setAssignmentConfig(prev => ({ ...prev, dueDate: undefined }))
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal",
+                          "w-full justify-between text-left font-normal",
                           !assignmentConfig.dueDate && "text-muted-foreground"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {assignmentConfig.dueDate ? format(assignmentConfig.dueDate, "PPP") : "Pick a date"}
+                        <div className="flex items-center">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {assignmentConfig.dueDate ? format(assignmentConfig.dueDate, "PPP") : "Pick a date"}
+                        </div>
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
+                      <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)] sm:max-w-none" align="start">
+                        <Calendar
                         mode="single"
                         selected={assignmentConfig.dueDate}
                         onSelect={(date) => {
@@ -536,7 +550,7 @@ export default function AssignmentBuilderPage() {
                 <div className="pt-4">
                   <Button 
                     onClick={handleCreateAssignment}
-                    disabled={isCreating || !assignmentConfig.name || !assignmentConfig.documentId || !assignmentConfig.testId || assignmentConfig.selectedUsers.length === 0 || !assignmentConfig.dueDate}
+                    disabled={isCreating || !assignmentConfig.name || !assignmentConfig.documentId || assignmentConfig.selectedUsers.length === 0}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     {isCreating ? (

@@ -50,7 +50,8 @@ export function UsersPage({
     ],
     onClick: () => onViewUser(user.id),
     onDelete: () => onDeleteUser(user.id),
-    onEdit: () => onEditUser(user.id)
+    onEdit: () => onEditUser(user.id),
+    deleteDataLossWarning: "Deleting this user will permanently remove all their test attempts, assignments, progress, and group memberships. Content they created (modules, documents, tests) will remain but will no longer be linked to any user."
   }))
 
   return (

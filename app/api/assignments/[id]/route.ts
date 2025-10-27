@@ -61,10 +61,10 @@ export async function PUT(
     } = body
 
     // Validate required fields
-    if (!documentId || !testId || !assignedTo) {
+    if (!documentId || !assignedTo) {
       return NextResponse.json({
         success: false,
-        message: 'Missing required fields: moduleId, testId, and assignedTo are required'
+        message: 'Missing required fields: documentId and assignedTo are required'
       }, { status: 400 })
     }
 
@@ -93,14 +93,17 @@ export async function PUT(
 
     // Update assignment dueDate, title, and description
     const updateFields: any = { updatedAt: new Date() }
-    if (dueDate) {
-      updateFields.dueDate = new Date(dueDate)
+    if (dueDate !== undefined) {
+      updateFields.dueDate = dueDate ? new Date(dueDate) : null
     }
     if (title) {
       updateFields.title = title
     }
     if (description !== undefined) {
       updateFields.description = description
+    }
+    if (testId !== undefined) {
+      updateFields.testId = testId || null
     }
     
     if (Object.keys(updateFields).length > 1) {

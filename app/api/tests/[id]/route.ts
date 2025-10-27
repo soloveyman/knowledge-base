@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions } from '@/lib/db'
+import { db, tests, questions, assignments, assignmentUsers, testAttempts } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
 export async function GET(
@@ -8,7 +8,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    console.log('GET request for test ID:', id)
+    const { searchParams } = new URL(request.url)
+    const checkDependencies = searchParams.get('checkDependencies') === 'true'
+    
+    console.log('GET request for test ID:', id, 'checkDependencies:', checkDependencies)
 
     // Find test by ID
     const test = await db.select().from(tests).where(eq(tests.id, id)).limit(1)
@@ -22,6 +25,18 @@ export async function GET(
     }
 
     const testData = test[0]
+    
+    // If just checking dependencies, return assignments info
+    if (checkDependencies) {
+      const relatedAssignments = await db.select().from(assignments).where(eq(assignments.testId, id))
+      return NextResponse.json({
+        success: true,
+        hasAssignments: relatedAssignments.length > 0,
+        assignmentCount: relatedAssignments.length,
+        assignments: relatedAssignments
+      })
+    }
+    
     console.log('Test data:', testData)
     console.log('Question IDs:', testData.questionIds)
     
@@ -148,6 +163,20 @@ export async function DELETE(
     // Get question IDs from the test
     const test = existingTest[0]
     const questionIds = test.questionIds as string[] || []
+    
+    // Check if test is used in assignments - if so, block deletion
+    const relatedAssignments = await db.select().from(assignments).where(eq(assignments.testId, id))
+    console.log(`Found ${relatedAssignments.length} assignments using this test`)
+    
+    if (relatedAssignments.length > 0) {
+      return NextResponse.json({
+        success: false,
+        message: `Cannot delete test. It is used in ${relatedAssignments.length} assignment(s). Please delete the assignments first.`,
+        error: 'HAS_ASSIGNMENTS',
+        assignmentCount: relatedAssignments.length,
+        assignments: relatedAssignments
+      }, { status: 400 })
+    }
     
     // Delete associated questions first (only if they are valid UUIDs)
     if (questionIds.length > 0) {

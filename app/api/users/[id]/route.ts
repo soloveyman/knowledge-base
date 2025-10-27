@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, users } from '@/lib/db'
+import { db, users, testAttempts, assignmentUsers, progress, modules, questions, tests, assignments, userGroupMembers } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
@@ -106,8 +106,6 @@ export async function DELETE(
     console.log('=== DELETE API Debug ===')
     console.log('Request URL:', request.url)
     console.log('Extracted ID:', id)
-    console.log('ID type:', typeof id)
-    console.log('ID length:', id?.length)
 
     // Check if user exists
     const existingUser = await db.select().from(users).where(eq(users.id, id)).limit(1)
@@ -121,7 +119,29 @@ export async function DELETE(
       }, { status: 404 })
     }
 
-    // Delete the user
+    // Cascade delete related records
+    // Delete user's test attempts
+    await db.delete(testAttempts).where(eq(testAttempts.userId, id))
+    console.log('Deleted test attempts')
+    
+    // Delete user's assignment users
+    await db.delete(assignmentUsers).where(eq(assignmentUsers.userId, id))
+    console.log('Deleted assignment users')
+    
+    // Delete user's progress
+    await db.delete(progress).where(eq(progress.userId, id))
+    console.log('Deleted progress')
+    
+    // Delete user's group memberships
+    await db.delete(userGroupMembers).where(eq(userGroupMembers.userId, id))
+    console.log('Deleted group memberships')
+    
+    // Note: We're not deleting modules, questions, tests, assignments, documents
+    // created by the user as they might be used by others.
+    // If you want to delete those too, add them here.
+    // For now, we'll just leave the createdBy field as a reference.
+
+    // Finally, delete the user
     await db.delete(users).where(eq(users.id, id))
     console.log('User deleted successfully')
 

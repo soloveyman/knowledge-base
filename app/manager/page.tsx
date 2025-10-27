@@ -392,9 +392,11 @@ export default function ManagerPage() {
         router.push('/manager?tab=docs')
       } else {
         console.error('Failed to delete document:', result.message)
+        alert(result.message)
       }
     } catch (error) {
       console.error('Error deleting document:', error)
+      alert('Error deleting document')
     }
   }
 
@@ -420,9 +422,11 @@ export default function ManagerPage() {
         setSavedTestsWithLog(savedTests.filter(t => t.id !== id))
       } else {
         console.error('Failed to delete test:', result.message)
+        alert(result.message)
       }
     } catch (error) {
       console.error('Error deleting test:', error)
+      alert('Error deleting test')
     }
   }
 

@@ -1,6 +1,52 @@
 import { NextResponse } from 'next/server'
-import { db, documents } from '@/lib/db'
+import { db, documents, assignments } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const { searchParams } = new URL(request.url)
+    const checkDependencies = searchParams.get('checkDependencies') === 'true'
+    
+    console.log('GET request for document ID:', id, 'checkDependencies:', checkDependencies)
+
+    // Find document by ID
+    const doc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    
+    if (doc.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'Document not found'
+      }, { status: 404 })
+    }
+
+    // If just checking dependencies, return assignments info
+    if (checkDependencies) {
+      const relatedAssignments = await db.select().from(assignments).where(eq(assignments.moduleId, doc[0].moduleId))
+      return NextResponse.json({
+        success: true,
+        hasAssignments: relatedAssignments.length > 0,
+        assignmentCount: relatedAssignments.length,
+        assignments: relatedAssignments
+      })
+    }
+    
+    return NextResponse.json({
+      success: true,
+      data: { document: doc[0] }
+    })
+  } catch (error) {
+    console.error('Get document API error:', error)
+    return NextResponse.json({
+      success: false,
+      message: 'Failed to get document',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
 
 export async function DELETE(
   request: Request,
@@ -16,6 +62,22 @@ export async function DELETE(
         success: false,
         message: 'Document not found'
       }, { status: 404 })
+    }
+
+    // Check if document's module is used in assignments - if so, block deletion
+    const document = existingDocument[0]
+    if (document.moduleId) {
+      const relatedAssignments = await db.select().from(assignments).where(eq(assignments.moduleId, document.moduleId))
+      
+      if (relatedAssignments.length > 0) {
+        return NextResponse.json({
+          success: false,
+          message: `Cannot delete document. It is used in ${relatedAssignments.length} assignment(s). Please delete the assignments first.`,
+          error: 'HAS_ASSIGNMENTS',
+          assignmentCount: relatedAssignments.length,
+          assignments: relatedAssignments
+        }, { status: 400 })
+      }
     }
 
     // Delete the document

@@ -349,13 +349,19 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
         
         // Check if first row looks like actual headers (short strings, no numbers)
         const firstRow = rows[0] || []
+        // Look for common header patterns: title case, short descriptions, task-related words
         const looksLikeHeaders = firstRow.length > 0 && 
           firstRow.every(cell => {
             const str = String(cell).trim()
-            return str.length < 50 && // Short text
+            const lower = str.toLowerCase()
+            // Common header patterns in multiple languages
+            const headerKeywords = ['задача', 'сотрудник', 'отметка', 'контроль', '№', 'номер', 'task', 'employee', 'name', 'description', 'дата', 'date', 'время', 'time']
+            return str.length > 0 && // Non-empty
+                   str.length < 100 && // Reasonable length for headers
                    !/^\d+(\.\d+)?\s*(ml|g|шт|гр)$/i.test(str) && // Not quantities
-                   !str.includes('|')
-          })
+                   (str.length < 50 || headerKeywords.some(keyword => lower.includes(keyword)))
+          }) &&
+          rows.length > 1 // Must have at least 2 rows (headers + data)
         
         // Helper function to filter empty rows
         const filterEmptyRows = (rowsArray: string[][]) => {
@@ -395,13 +401,20 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
           }
         }
         
-        // Add text content
-        rows.forEach(row => {
-          const rowText = row.filter(cell => cell && String(cell).trim()).join(' | ')
-          if (rowText) {
-            text += rowText + '\n'
-          }
-        })
+        // Add text content only if no table was created for this sheet
+        const hasTable = rows.length > 0 && (
+          (looksLikeHeaders && rows.length > 1) || 
+          (!looksLikeHeaders && filterEmptyRows(rows).length > 0)
+        )
+        
+        if (!hasTable) {
+          rows.forEach(row => {
+            const rowText = row.filter(cell => cell && String(cell).trim()).join(' | ')
+            if (rowText) {
+              text += rowText + '\n'
+            }
+          })
+        }
       }
     })
 

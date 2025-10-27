@@ -22,6 +22,7 @@ interface DeleteConfirmationProps {
   trigger?: React.ReactNode
   isLoading?: boolean
   variant?: "default" | "destructive"
+  dataLossWarning?: string
 }
 
 export function DeleteConfirmation({
@@ -32,7 +33,8 @@ export function DeleteConfirmation({
   itemName,
   trigger,
   isLoading = false,
-  variant = "destructive"
+  variant = "destructive",
+  dataLossWarning
 }: DeleteConfirmationProps) {
   const [open, setOpen] = useState(false)
 
@@ -79,9 +81,19 @@ export function DeleteConfirmation({
               <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
             <div className="flex-1 min-w-0 pr-8">
-              <DialogTitle className="text-left wrap-break-word max-w-full">{displayTitle}</DialogTitle>
-              <DialogDescription className="text-left mt-2 wrap-break-word max-w-full">
+              <DialogTitle className="text-left" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{displayTitle}</DialogTitle>
+              <DialogDescription className="text-left mt-2 space-y-2" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 {displayDescription}
+                {dataLossWarning && (
+                  <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 rounded-md">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                      <p className="text-sm text-orange-900 dark:text-orange-200">
+                        {dataLossWarning}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </DialogDescription>
             </div>
           </div>

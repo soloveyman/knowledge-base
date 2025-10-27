@@ -26,7 +26,7 @@ interface Assignment {
     role: string
     department: string
   }>
-  dueDate: string
+  dueDate?: string
   createdAt: string
   createdBy: string
   status: string

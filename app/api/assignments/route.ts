@@ -85,11 +85,11 @@ export async function POST(request: Request) {
     })
 
     // Validate required fields
-    if (!documentId || !testId || !assignedTo) {
+    if (!documentId || !assignedTo) {
       console.log('Validation failed - missing required fields')
       return NextResponse.json({
         success: false,
-        message: 'Missing required fields: documentId, testId, and assignedTo are required'
+        message: 'Missing required fields: documentId and assignedTo are required'
       }, { status: 400 })
     }
 

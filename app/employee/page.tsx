@@ -50,7 +50,7 @@ interface Assignment {
   document: Document
   test: Test
   assignedUsers: AssignedUser[]
-  dueDate: string
+  dueDate?: string
   createdAt: string
   createdBy: string
   status: string
@@ -437,10 +437,12 @@ export default function EmployeePage() {
                         
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center space-x-1">
-                              {getStatusIcon(assignment.status)}
-                              <span>Due: {assignment.dueDate}</span>
-                            </div>
+                            {assignment.dueDate && (
+                              <div className="flex items-center space-x-1">
+                                {getStatusIcon(assignment.status)}
+                                <span>Due: {assignment.dueDate}</span>
+                              </div>
+                            )}
                             <div className="flex items-center space-x-1">
                               <Clock className="h-5 w-5" />
                               <span>{assignment.estimatedTime}</span>

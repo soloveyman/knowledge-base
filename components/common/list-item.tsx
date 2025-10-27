@@ -19,6 +19,7 @@ interface ListItemProps {
   onEdit?: () => void
   showDeleteButton?: boolean
   showEditButton?: boolean
+  deleteDataLossWarning?: string
 }
 
 export function ListItem({ 
@@ -30,7 +31,8 @@ export function ListItem({
   onDelete, 
   onEdit,
   showDeleteButton = true,
-  showEditButton = false
+  showEditButton = false,
+  deleteDataLossWarning
 }: ListItemProps) {
   return (
     <div 
@@ -109,6 +111,7 @@ export function ListItem({
           <DeleteConfirmation
             onConfirm={onDelete}
             itemName={title}
+            dataLossWarning={deleteDataLossWarning}
             trigger={
               <Button 
                 variant="ghost" 

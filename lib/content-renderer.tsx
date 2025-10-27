@@ -3,12 +3,12 @@ export function renderFormattedText(content: string): string {
   
   let rendered = content
   
-  // FIRST CLEANUP: Remove all "1." type artifacts immediately
+  // FIRST CLEANUP: Remove all numbered artifacts immediately
   // This catches them before any other processing  
-  rendered = rendered.replace(/;\s*1\./g, '')  // "; 1." anywhere (artifact from parsing)
-  rendered = rendered.replace(/\.\s*1\./g, '.')  // ". 1." -> "." (artifact at end of sentence)  
-  rendered = rendered.replace(/\s+1\.\s*$/gm, '')  // " 1." at end of lines (whitespace + 1.)
-  // Note: This should NOT remove "1." at START of lines (legitimate numbered lists)
+  rendered = rendered.replace(/;\s*\d+\./g, '')  // "; 9.", "; 1.", "; 3." anywhere (artifact from parsing)
+  rendered = rendered.replace(/\.\s*\d+\./g, '.')  // ". 9." -> ".", ". 1." -> "." (artifact at end of sentence)  
+  rendered = rendered.replace(/\s+\d+\.\s*$/gm, '')  // " 9.", " 1.", " 3." at end of lines (whitespace + number)
+  // Note: This should NOT remove numbers at START of lines (legitimate numbered lists)
   
   // Second pass: handle incomplete or malformed tag pairs
   // Remove any standalone closing tags without opening tags
@@ -56,7 +56,7 @@ export function renderFormattedText(content: string): string {
   
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
-      processedLines.push(`<p class="mb-4 leading-relaxed text-foreground">${currentParagraph.join(' ')}</p>`)
+      processedLines.push(`<p class="mb-4 leading-relaxed text-foreground">${currentParagraph.join('<br />')}</p>`)
       currentParagraph = []
       inParagraph = false
     }
@@ -129,8 +129,8 @@ export function renderFormattedText(content: string): string {
         inList = false
       }
       
-      // Check if line contains inline HTML (from previous processing)
-      if (/<(strong|em|div)/.test(line)) {
+      // Check if line contains block HTML elements (from previous processing)
+      if (/<(div|h[1-6])/.test(line)) {
         flushParagraph()
         processedLines.push(line)
       } else {
@@ -162,12 +162,12 @@ export function renderFormattedText(content: string): string {
   rendered = rendered.replace(/\[(?:BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]/g, '')
   rendered = rendered.replace(/\[\/(?:BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]/g, '')
   
-  // AGGRESSIVE SECOND PASS: Remove any remaining "1" artifacts in HTML
-  rendered = rendered.replace(/;\s*1\./g, '') // ";" followed by "1." anywhere
-  rendered = rendered.replace(/&nbsp;\s*1\./g, '&nbsp;') // "&nbsp; 1."
-  rendered = rendered.replace(/>\s*1\.\s*</g, '><') // "1." between tags
-  rendered = rendered.replace(/<\/(li|p|div)>\s*1\.\s*</g, '</$1><') // "1." after closing tags
-  rendered = rendered.replace(/>(\s)*1\.\s*</g, '><') // "1." with whitespace between tags
+  // AGGRESSIVE SECOND PASS: Remove any remaining number artifacts in HTML
+  rendered = rendered.replace(/;\s*\d+\./g, '') // ";" followed by any number anywhere
+  rendered = rendered.replace(/&nbsp;\s*\d+\./g, '&nbsp;') // "&nbsp; 9.", "&nbsp; 1."
+  rendered = rendered.replace(/>\s*\d+\.\s*</g, '><') // Any number between tags
+  rendered = rendered.replace(/<\/(li|p|div)>\s*\d+\.\s*</g, '</$1><') // Numbers after closing tags
+  rendered = rendered.replace(/>(\s)*\d+\.\s*</g, '><') // Numbers with whitespace between tags
   
   // Clean up any multiple spaces that might have been created
   rendered = rendered.replace(/\s{2,}/g, ' ')
@@ -175,8 +175,8 @@ export function renderFormattedText(content: string): string {
   // Remove empty paragraphs that might have been created
   rendered = rendered.replace(/<p class="mb-4.*?text-foreground">\s*<\/p>/g, '')
   rendered = rendered.replace(/<p class="mb-[456].*?text-foreground">\s*<\/p>/g, '')
-  rendered = rendered.replace(/<p class="[^"]*">\s*1\.\s*<\/p>/g, '') // Paragraphs containing only "1."
-  rendered = rendered.replace(/<p class="[^"]*">\s*;\s*1\.\s*<\/p>/g, '') // Paragraphs containing only "; 1."
+  rendered = rendered.replace(/<p class="[^"]*">\s*\d+\.\s*<\/p>/g, '') // Paragraphs containing only a number
+  rendered = rendered.replace(/<p class="[^"]*">\s*;\s*\d+\.\s*<\/p>/g, '') // Paragraphs containing "; number"
   
   return rendered
 }

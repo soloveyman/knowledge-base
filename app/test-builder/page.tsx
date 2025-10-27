@@ -596,18 +596,18 @@ export default function TestBuilderPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 overflow-hidden">
           {/* Configuration Panel */}
-          <div className="space-y-3 md:space-y-6">
+          <div className="space-y-3 md:space-y-6 min-w-0">
             {/* Test Configuration */}
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle>Test Configuration</CardTitle>
                 <CardDescription>Configure your test parameters</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 overflow-hidden">
                 <div>
-                  <Label htmlFor="document-select">Select Document</Label>
+                  <Label htmlFor="document-select">Select Document *</Label>
                   <Select 
                     value={selectedDocument?.id?.toString() || ""} 
                     onValueChange={(value) => {
@@ -719,16 +719,16 @@ export default function TestBuilderPage() {
           </div>
 
           {/* Results Panel */}
-          <div className="space-y-3 md:space-y-6">
+          <div className="space-y-3 md:space-y-6 min-w-0">
             <ErrorMessage error={error} />
 
             {generatedQuestions.length > 0 && (
-              <Card>
+              <Card className="overflow-hidden">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <CardTitle>Generated Questions</CardTitle>
-                      <CardDescription>
+                      <CardDescription className="wrap-break-word">
                         {isEditMode ? (
                           <>
                             {generatedQuestions.length} questions total 
@@ -775,18 +775,18 @@ export default function TestBuilderPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-hidden">
                   <div className="space-y-4">
                     {generatedQuestions.map((question, index) => (
-                      <div key={question.id || index} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-medium">Question {index + 1}</h4>
+                      <div key={question.id || index} className="p-4 border rounded-lg overflow-hidden">
+                        <div className="flex items-start justify-between mb-2 gap-2">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <h4 className="font-medium truncate">Question {index + 1}</h4>
                             {isEditMode && index >= originalQuestionCount && (
-                              <Badge variant="default" className="text-xs">New</Badge>
+                              <Badge variant="default" className="text-xs shrink-0">New</Badge>
                             )}
                           </div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 shrink-0">
                             <TestTypeBadge type={question.type} />
                             <Button
                               variant="ghost"
@@ -824,19 +824,20 @@ export default function TestBuilderPage() {
                               </div>
                               <div className="space-y-2">
                                 {question.choices.map((choice: string, choiceIndex: number) => (
-                                  <div key={choiceIndex} className="flex items-center space-x-2">
-                                    <span className="text-sm font-medium w-6">
+                                  <div key={choiceIndex} className="flex items-center space-x-2 min-w-0">
+                                    <span className="text-sm font-medium w-6 shrink-0">
                                       {String.fromCharCode(65 + choiceIndex)}.
                                     </span>
                                     <Input
                                       value={choice}
                                       onChange={(e) => handleUpdateChoice(question.id, choiceIndex, e.target.value)}
-                                      className="flex-1"
+                                      className="flex-1 min-w-0"
                                     />
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleDeleteChoice(question.id, choiceIndex)}
+                                      className="shrink-0"
                                     >
                                       <X className="h-4 w-4" />
                                     </Button>
