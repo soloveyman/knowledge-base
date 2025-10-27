@@ -500,29 +500,14 @@ export default function AssignmentBuilderPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Due Date (Optional)</Label>
-                    {assignmentConfig.dueDate && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => {
-                          setAssignmentConfig(prev => ({ ...prev, dueDate: undefined }))
-                        }}
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Clear
-                      </Button>
-                    )}
-                  </div>
+                <div>
+                  <Label>Due Date (Optional)</Label>
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-between text-left font-normal",
+                          "w-full justify-between text-left font-normal relative",
                           !assignmentConfig.dueDate && "text-muted-foreground"
                         )}
                       >
@@ -530,6 +515,15 @@ export default function AssignmentBuilderPage() {
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {assignmentConfig.dueDate ? format(assignmentConfig.dueDate, "PPP") : "Pick a date"}
                         </div>
+                        {assignmentConfig.dueDate && (
+                          <X 
+                            className="h-4 w-4" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAssignmentConfig(prev => ({ ...prev, dueDate: undefined }))
+                            }}
+                          />
+                        )}
                       </Button>
                     </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)] sm:max-w-none" align="start">
