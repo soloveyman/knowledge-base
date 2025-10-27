@@ -30,6 +30,23 @@
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  font-style: normal !important;
+}
+
+/* Override any italic styling from prose - only actual italic elements should be italic */
+.document-content p,
+.document-content div,
+.document-content span,
+.document-content ul,
+.document-content ol,
+.document-content li {
+  font-style: normal !important;
+}
+
+/* Only em and i tags should be italic */
+.document-content em,
+.document-content i {
+  font-style: italic !important;
 }
 
 /* Ensure all content fits within viewport */
@@ -98,6 +115,7 @@
 .document-content p {
   margin-bottom: 1rem;
   line-height: 1.7;
+  font-style: normal !important;
 }
 
 /* Mobile: smaller font sizes and margins */
