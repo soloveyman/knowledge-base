@@ -432,7 +432,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
         console.log('Parsing XLSX file...')
         parseResult = await parseXlsx(buffer, { 
           includeMetadata: true, 
-          normalizeWhitespace: true 
+          normalizeWhitespace: false // Don't normalize - preserve line breaks and formatting
         })
         console.log('XLSX parsing completed, text length:', parseResult.text.length)
         break

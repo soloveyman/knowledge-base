@@ -37,13 +37,13 @@ export function renderFormattedText(content: string): string {
   rendered = rendered.replace(/\[RIGHT\]/g, '<div class="mb-5 text-right">')
   rendered = rendered.replace(/\[JUSTIFY\]/g, '<div class="mb-5 text-justify">')
   
-  // Convert markdown-style headings with enhanced spacing and responsive sizing
-  rendered = rendered.replace(/^# (.+)$/gm, '</p><h1 class="text-2xl sm:text-3xl font-bold mt-6 sm:mt-8 mb-3 sm:mb-4 text-foreground">$1</h1><p class="mb-5 sm:mb-6 text-foreground">')
-  rendered = rendered.replace(/^## (.+)$/gm, '</p><h2 class="text-xl sm:text-2xl font-bold mt-5 sm:mt-7 mb-2 sm:mb-3 text-foreground">$1</h2><p class="mb-4 sm:mb-5 text-foreground">')
-  rendered = rendered.replace(/^### (.+)$/gm, '</p><h3 class="text-lg sm:text-xl font-semibold mt-4 sm:mt-6 mb-2 sm:mb-3 text-foreground">$1</h3><p class="mb-4 sm:mb-5 text-foreground">')
-  rendered = rendered.replace(/^#### (.+)$/gm, '</p><h4 class="text-base sm:text-lg font-semibold mt-4 sm:mt-5 mb-2 text-foreground">$1</h4><p class="mb-3 sm:mb-4 text-foreground">')
-  rendered = rendered.replace(/^##### (.+)$/gm, '</p><h5 class="text-sm sm:text-base font-semibold mt-3 sm:mt-4 mb-2 text-foreground">$1</h5><p class="mb-3 sm:mb-4 text-foreground">')
-  rendered = rendered.replace(/^###### (.+)$/gm, '</p><h6 class="text-xs sm:text-sm font-semibold mt-3 sm:mt-4 mb-2 text-foreground">$1</h6><p class="mb-3 sm:mb-4 text-foreground">')
+  // Convert markdown-style headings with enhanced spacing and responsive sizing - increased sizes for better readability
+  rendered = rendered.replace(/^# (.+)$/gm, '</p><h1 class="text-3xl sm:text-4xl font-bold mt-6 sm:mt-8 mb-3 sm:mb-4 text-foreground">$1</h1><p class="mb-5 sm:mb-6 text-foreground">')
+  rendered = rendered.replace(/^## (.+)$/gm, '</p><h2 class="text-2xl sm:text-3xl font-bold mt-5 sm:mt-7 mb-2 sm:mb-3 text-foreground">$1</h2><p class="mb-4 sm:mb-5 text-foreground">')
+  rendered = rendered.replace(/^### (.+)$/gm, '</p><h3 class="text-xl sm:text-2xl font-semibold mt-4 sm:mt-6 mb-2 sm:mb-3 text-foreground">$1</h3><p class="mb-4 sm:mb-5 text-foreground">')
+  rendered = rendered.replace(/^#### (.+)$/gm, '</p><h4 class="text-lg sm:text-xl font-semibold mt-4 sm:mt-5 mb-2 text-foreground">$1</h4><p class="mb-3 sm:mb-4 text-foreground">')
+  rendered = rendered.replace(/^##### (.+)$/gm, '</p><h5 class="text-base sm:text-lg font-semibold mt-3 sm:mt-4 mb-2 text-foreground">$1</h5><p class="mb-3 sm:mb-4 text-foreground">')
+  rendered = rendered.replace(/^###### (.+)$/gm, '</p><h6 class="text-sm sm:text-base font-semibold mt-3 sm:mt-4 mb-2 text-foreground">$1</h6><p class="mb-3 sm:mb-4 text-foreground">')
   
   // Split into lines for processing
   const lines = rendered.split('\n')
