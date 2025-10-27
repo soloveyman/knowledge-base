@@ -416,8 +416,6 @@
   }
 }
 
-/* Calendar styling - using default react-day-picker styles */
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
