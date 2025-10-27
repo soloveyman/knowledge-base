@@ -92,9 +92,21 @@ export default function DocumentViewer() {
           console.log('Document sections:', document.parsedContent?.sections)
           console.log('Document tables:', document.parsedContent?.tables)
           
-          let content = document.parsedContent ? 
-            (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
-            'Document content will be displayed here...'
+          // Extract content from sections
+          let content = ''
+          if (document.parsedContent?.sections?.length > 0) {
+            content = document.parsedContent.sections.map(s => s.content).join('\n')
+          }
+          
+          // Extract tables from parsedContent  
+          const tables = document.parsedContent?.tables || []
+          
+          // If no sections but we have tables, show a message
+          if (!content && tables.length > 0) {
+            content = 'Document contains tables below.'
+          } else if (!content) {
+            content = 'Document content will be displayed here...'
+          }
           
           // Debug: Check for newlines in content
           console.log('Content has newlines:', content.includes('\n'))
@@ -112,9 +124,6 @@ export default function DocumentViewer() {
             // Note: Do NOT remove "1." at START of lines (legitimate lists)
           
           console.log('Final content for display:', content.substring(0, 200))
-          
-          // Extract tables from parsedContent
-          const tables = document.parsedContent?.tables || []
           console.log('Found tables:', tables.length)
           
           setDocumentData({
@@ -215,7 +224,7 @@ export default function DocumentViewer() {
       // Render table with or without headers based on detection
       const tableHTML = hasHeaders 
         ? `
-          <table class="w-full border-collapse" style="table-layout: auto; width: 100%;">
+          <table class="w-full border-collapse" style="table-layout: auto; width: 100%; border: none;">
             <thead>
               <tr>${headersHTML}</tr>
             </thead>
@@ -225,7 +234,7 @@ export default function DocumentViewer() {
           </table>
         `
         : `
-          <table class="w-full border-collapse" style="table-layout: auto; width: 100%;">
+          <table class="w-full border-collapse" style="table-layout: auto; width: 100%; border: none;">
             <tbody>
               ${rowsHTML}
             </tbody>
@@ -235,7 +244,7 @@ export default function DocumentViewer() {
       return `
         <div class="my-8 w-full overflow-x-auto">
           <h3 class="text-base md:text-xl font-bold mb-4 text-foreground">${escapedTitle}</h3>
-          <div class="w-full rounded-lg border border-border">
+          <div class="w-full">
             ${tableHTML}
           </div>
         </div>

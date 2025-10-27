@@ -134,12 +134,53 @@ export default function DocumentReaderPage() {
           return
         }
         
-          console.log('Document parsedContent:', document.parsedContent)
-          console.log('Document sections:', document.parsedContent?.sections)
+        console.log('Document parsedContent:', document.parsedContent)
+        console.log('Document sections:', document.parsedContent?.sections)
+        console.log('Document tables:', document.parsedContent?.tables)
+        
+        let content = ''
+        
+        // Handle sections (for docx files)
+        if (document.parsedContent?.sections?.length > 0) {
+          content = document.parsedContent.sections.map(s => s.content).join('\n')
+        }
+        
+        // Handle tables (for xlsx files)
+        if (document.parsedContent?.tables?.length > 0) {
+          const tablesContent = document.parsedContent.tables.map(table => {
+            let tableText = `<div class="mb-6"><h3 class="text-xl font-semibold mb-3">${table.title}</h3><div class="overflow-x-auto"><table class="min-w-full border-collapse"><tbody>`
+            
+            // Add headers if they exist
+            if (table.headers && table.headers.length > 0 && table.headers.some(h => h)) {
+              tableText += '<tr class="bg-muted border-b border-border">'
+              table.headers.forEach(header => {
+                tableText += `<th class="px-4 py-2 text-left text-sm font-semibold">${header || ''}</th>`
+              })
+              tableText += '</tr>'
+            }
+            
+            // Add rows
+            table.rows.forEach((row, rowIndex) => {
+              if (row && row.some(cell => cell)) {
+                tableText += `<tr class="border-b border-border">`
+                row.forEach(cell => {
+                  tableText += `<td class="px-4 py-2">${cell || ''}</td>`
+                })
+                tableText += '</tr>'
+              }
+            })
+            
+            tableText += '</tbody></table></div></div>'
+            return tableText
+          }).join('\n')
           
-          let content = document.parsedContent ? 
-            (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
-            'Document content will be displayed here...'
+          content += tablesContent
+        }
+        
+        // Fallback if no content
+        if (!content) {
+          content = 'Document content will be displayed here...'
+        }
           
           // Clean artifacts immediately after extraction (but preserve legitimate lists)
           content = content
@@ -414,7 +455,9 @@ export default function DocumentReaderPage() {
                     <div 
                       className="document-content prose max-w-none overflow-x-auto"
                       dangerouslySetInnerHTML={{ 
-                        __html: renderFormattedText(documentData.content) 
+                        __html: documentData.content.includes('<table') 
+                          ? documentData.content // HTML already rendered (xlsx)
+                          : renderFormattedText(documentData.content) // Process text (docx)
                       }}
                     />
                   )}

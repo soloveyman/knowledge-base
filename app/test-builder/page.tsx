@@ -143,12 +143,41 @@ export default function TestBuilderPage() {
             })
             // Use actual document content from parsedContent
             let documentContent = ''
-            if (document.parsedContent && document.parsedContent.sections) {
+            
+            // Extract content from sections
+            if (document.parsedContent?.sections?.length > 0) {
               documentContent = document.parsedContent.sections
                 .map((section: { title: string; content: string }) => `${section.title}\n${section.content}`)
                 .join('\n\n')
-            } else {
-              // Fallback to mock content if no parsed content
+            }
+            
+            // Extract content from tables (for xlsx files)
+            if (document.parsedContent?.tables?.length > 0) {
+              const tablesContent = document.parsedContent.tables
+                .map((table: { title: string; headers: string[]; rows: string[][] }) => {
+                  let tableText = `${table.title}\n`
+                  
+                  // Add headers if they exist
+                  if (table.headers && table.headers.some(h => h)) {
+                    tableText += table.headers.join(' | ') + '\n'
+                  }
+                  
+                  // Add rows
+                  table.rows.forEach(row => {
+                    if (row && row.some(cell => cell)) {
+                      tableText += row.join(' | ') + '\n'
+                    }
+                  })
+                  
+                  return tableText
+                })
+                .join('\n\n')
+              
+              documentContent += (documentContent ? '\n\n' : '') + tablesContent
+            }
+            
+            // Fallback to mock content if no parsed content
+            if (!documentContent) {
               documentContent = getDocumentContent(document.title)
             }
             setContext(prev => ({
@@ -215,12 +244,41 @@ export default function TestBuilderPage() {
     setSelectedDocument(doc)
     // Use actual document content from parsedContent
     let documentContent = ''
-    if (doc.parsedContent && doc.parsedContent.sections) {
+    
+    // Extract content from sections
+    if (doc.parsedContent?.sections?.length > 0) {
       documentContent = doc.parsedContent.sections
         .map((section: { title: string; content: string }) => `${section.title}\n${section.content}`)
         .join('\n\n')
-    } else {
-      // Fallback to mock content if no parsed content
+    }
+    
+    // Extract content from tables (for xlsx files)
+    if (doc.parsedContent?.tables?.length > 0) {
+      const tablesContent = doc.parsedContent.tables
+        .map((table: { title: string; headers: string[]; rows: string[][] }) => {
+          let tableText = `${table.title}\n`
+          
+          // Add headers if they exist
+          if (table.headers && table.headers.some(h => h)) {
+            tableText += table.headers.join(' | ') + '\n'
+          }
+          
+          // Add rows
+          table.rows.forEach(row => {
+            if (row && row.some(cell => cell)) {
+              tableText += row.join(' | ') + '\n'
+            }
+          })
+          
+          return tableText
+        })
+        .join('\n\n')
+      
+      documentContent += (documentContent ? '\n\n' : '') + tablesContent
+    }
+    
+    // Fallback to mock content if no parsed content
+    if (!documentContent) {
       documentContent = getDocumentContent(doc.title || doc.originalFileName || 'Untitled Document')
     }
     
