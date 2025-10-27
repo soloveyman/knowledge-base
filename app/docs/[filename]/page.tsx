@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
 import { navigateBack } from "@/lib/redirect-utils"
 import { processTextWithEnhancedFormatting } from '@/lib/text-formatting'
+import { renderFormattedText } from '@/lib/content-renderer'
 
 interface UserWithRole {
   name?: string | null
@@ -21,6 +22,11 @@ interface Document {
   name: string
   type: string
   content: string
+  tables?: Array<{
+    title: string
+    headers: string[]
+    rows: string[][]
+  }>
   uploadedAt: string
   uploadedBy: string
   size: string
@@ -84,6 +90,7 @@ export default function DocumentViewer() {
         if (document) {
           console.log('Document parsedContent:', document.parsedContent)
           console.log('Document sections:', document.parsedContent?.sections)
+          console.log('Document tables:', document.parsedContent?.tables)
           
           let content = document.parsedContent ? 
             (document.parsedContent.sections?.map(s => s.content).join('\n') || 'Document content will be displayed here...') :
@@ -106,6 +113,10 @@ export default function DocumentViewer() {
           
           console.log('Final content for display:', content.substring(0, 200))
           
+          // Extract tables from parsedContent
+          const tables = document.parsedContent?.tables || []
+          console.log('Found tables:', tables.length)
+          
           setDocumentData({
             id: document.id,
             name: document.originalFileName || document.title,
@@ -113,7 +124,8 @@ export default function DocumentViewer() {
             uploadedAt: document.createdAt,
             uploadedBy: document.uploadedBy || 'Unknown',
             size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
-            content: content
+            content: content,
+            tables: tables
           })
         } else {
           console.log('Document not found, redirecting back')
@@ -146,6 +158,90 @@ export default function DocumentViewer() {
     navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
   }
 
+  // Helper function to escape HTML characters
+  const escapeHTML = (text: string) => {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
+  }
+
+  // Helper function to render tables as HTML
+  const renderTablesAsHTML = (tables?: Array<{title: string; headers: string[]; rows: string[][]}>): string => {
+    if (!tables || tables.length === 0) {
+      console.log('No tables to render')
+      return ''
+    }
+    
+    console.log('Rendering tables:', tables.length)
+    tables.forEach((table, index) => {
+      console.log(`Table ${index}:`, table.title, 'Headers:', table.headers.length, 'Rows:', table.rows.length)
+    })
+    
+    return tables.map(table => {
+      const escapedTitle = escapeHTML(table.title)
+      
+      // Filter out empty rows (rows where all cells are empty or whitespace)
+      const nonEmptyRows = table.rows.filter(row => {
+        // Check if row has at least one non-empty cell
+        return row && row.length > 0 && row.some(cell => 
+          cell !== null && cell !== undefined && String(cell).trim().length > 0
+        )
+      })
+      
+      // Skip entire table if no rows have content
+      if (nonEmptyRows.length === 0) {
+        console.log(`Skipping empty table: ${table.title}`)
+        return ''
+      }
+      
+      console.log(`Rendering table: ${table.title} with ${nonEmptyRows.length} non-empty rows`)
+      
+      // Only render headers if they exist and are not empty
+      const hasHeaders = table.headers && table.headers.length > 0 && table.headers.some(h => h.trim())
+      const headersHTML = hasHeaders ? table.headers.map(header => {
+        const escapedHeader = escapeHTML(header)
+        return `<th class="px-4 py-2 text-left border-b border-border bg-muted/50 font-semibold">${escapedHeader}</th>`
+      }).join('') : ''
+      
+      const rowsHTML = nonEmptyRows.map(row => {
+        const cellsHTML = row.map(cell => {
+          const escapedCell = escapeHTML(String(cell))
+          return `<td class="px-4 py-2 border-b border-border">${escapedCell}</td>`
+        }).join('')
+        return `<tr class="hover:bg-muted/20">${cellsHTML}</tr>`
+      }).join('')
+      
+      // Render table with or without headers based on detection
+      const tableHTML = hasHeaders 
+        ? `
+          <table class="min-w-full border-collapse">
+            <thead>
+              <tr>${headersHTML}</tr>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
+        `
+        : `
+          <table class="min-w-full border-collapse">
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
+        `
+      
+      return `
+        <div class="my-8 w-full">
+          <h3 class="text-xl font-bold mb-4 text-foreground">${escapedTitle}</h3>
+          <div class="overflow-x-auto rounded-lg border border-border max-w-full">
+            ${tableHTML}
+          </div>
+        </div>
+      `
+    }).join('')
+  }
+
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -161,9 +257,9 @@ export default function DocumentViewer() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card/95 backdrop-blur-sm shadow-sm border-b border-border sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+      <header className="bg-card/95 backdrop-blur-sm shadow-sm border-b border-border sticky top-0 z-10 w-full">
+        <div className="w-full mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                 {documentData?.name || 'Document Viewer'}
@@ -179,11 +275,11 @@ export default function DocumentViewer() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <main className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4 md:py-6 lg:py-8">
         {/* Document Content */}
-        <div className="min-h-screen">
+        <div className="min-h-screen w-full">
           {documentData?.type === 'PDF' ? (
-            <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-lg overflow-hidden">
+            <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-screen border border-border rounded-lg overflow-hidden">
               <iframe 
                 src={`/api/documents/${encodeURIComponent(filename)}`}
                 className="w-full h-full"
@@ -191,19 +287,29 @@ export default function DocumentViewer() {
               />
             </div>
           ) : (
-            <div className="prose max-w-none document-content overflow-x-auto px-1 sm:px-0">
+            <div className="w-full prose max-w-none document-content">
               {documentData?.content ? (
-                <div 
-                  dangerouslySetInnerHTML={{ 
-                    __html: (() => {
-                      const formatted = processTextWithEnhancedFormatting(documentData.content)
-                      console.log('Processing content with length:', documentData.content.length)
-                      console.log('Formatted HTML length:', formatted.html.length)
-                      console.log('First 200 chars of formatted HTML:', formatted.html.substring(0, 200))
-                      return formatted.html
-                    })()
-                  }} 
-                />
+                <div className="w-full overflow-x-auto">
+                  <div className="w-full max-w-full"
+                    dangerouslySetInnerHTML={{ 
+                      __html: (() => {
+                        const formatted = renderFormattedText(documentData.content)
+                        console.log('Processing content with length:', documentData.content.length)
+                        console.log('Formatted HTML length:', formatted.length)
+                        console.log('First 200 chars of formatted HTML:', formatted.substring(0, 200))
+                        return formatted
+                      })()
+                    }} 
+                  />
+                  {/* Render tables after content */}
+                  {documentData?.tables && documentData.tables.length > 0 && (
+                    <div className="w-full max-w-full"
+                      dangerouslySetInnerHTML={{ 
+                        __html: renderTablesAsHTML(documentData.tables)
+                      }} 
+                    />
+                  )}
+                </div>
               ) : (
                 <div>
                   <h1>{documentData?.name || 'Document'}</h1>

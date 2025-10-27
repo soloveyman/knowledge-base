@@ -29,6 +29,11 @@ function normalizeWhitespace(text: string): string {
 export interface ParseResult {
   readonly text: string
   readonly metadata?: ParseMetadata
+  readonly tables?: Array<{
+    title: string
+    headers: string[]
+    rows: string[][]
+  }>
 }
 
 export interface ParseMetadata {
@@ -341,15 +346,53 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
         
         // Process rows
         const rows = jsonData as string[][]
-        const headers = rows[0] || []
-        const dataRows = rows.slice(1)
         
-        if (headers.length > 0 && dataRows.length > 0) {
-          tables.push({
-            title: sheetName,
-            headers: headers.map(h => String(h)),
-            rows: dataRows.map(row => row.map(cell => String(cell)))
+        // Check if first row looks like actual headers (short strings, no numbers)
+        const firstRow = rows[0] || []
+        const looksLikeHeaders = firstRow.length > 0 && 
+          firstRow.every(cell => {
+            const str = String(cell).trim()
+            return str.length < 50 && // Short text
+                   !/^\d+(\.\d+)?\s*(ml|g|шт|гр)$/i.test(str) && // Not quantities
+                   !str.includes('|')
           })
+        
+        // Helper function to filter empty rows
+        const filterEmptyRows = (rowsArray: string[][]) => {
+          return rowsArray.filter(row => 
+            row && row.some(cell => cell !== null && cell !== undefined && String(cell).trim().length > 0)
+          )
+        }
+        
+        if (looksLikeHeaders && rows.length > 1) {
+          // First row is headers, rest is data
+          const headers = firstRow.map(h => String(h))
+          const dataRows = filterEmptyRows(rows.slice(1))
+          
+          if (dataRows.length > 0) {
+            tables.push({
+              title: sheetName,
+              headers: headers,
+              rows: dataRows.map(row => row.map(cell => String(cell)))
+            })
+          }
+        } else {
+          // All rows are data rows, treat all as data
+          if (rows.length > 0 && firstRow.length > 0) {
+            // Filter out empty rows
+            const nonEmptyRows = filterEmptyRows(rows)
+            
+            if (nonEmptyRows.length > 0) {
+              // Use first row as data and create empty headers (will be hidden in render)
+              const headers: string[] = [] // Empty headers to indicate no headers
+              
+              tables.push({
+                title: sheetName,
+                headers: headers,
+                rows: nonEmptyRows.map(row => row.map(cell => String(cell)))
+              })
+            }
+          }
         }
         
         // Add text content
@@ -373,7 +416,8 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
 
     return {
       text,
-      metadata
+      metadata,
+      tables
     }
   } catch (error) {
     throw new ParseError(`Failed to parse XLSX: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -451,6 +495,12 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   console.log('Converting to structured content...')
   const structuredContent = parseTextToStructuredContent(parseResult.text, file.name)
   
+  // Merge tables from XLSX parsing if they exist
+  if (parseResult.tables && parseResult.tables.length > 0) {
+    console.log('Found tables in parseResult:', parseResult.tables.length)
+    structuredContent.tables = [...structuredContent.tables, ...parseResult.tables]
+  }
+  
   // Ensure line breaks are preserved in the content
   if (structuredContent.sections && structuredContent.sections.length > 0) {
     structuredContent.sections = structuredContent.sections.map(section => ({
@@ -460,6 +510,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   }
   
   console.log('Structured content created:', structuredContent)
+  console.log('Total tables in structured content:', structuredContent.tables.length)
   
   // Add parsing metadata to track improvements
   structuredContent.metadata = {
