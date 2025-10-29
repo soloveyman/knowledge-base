@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AppBar } from "@/components/common/app-bar";
 import { 
   Crown, 
   Users, 
@@ -153,12 +154,16 @@ export default function SuperAdminPage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
-        <p className="text-muted-foreground">Manage all owner subscriptions and payments</p>
-      </div>
-
+    <div className="min-h-screen flex flex-col">
+      <AppBar 
+        role="super-admin" 
+        user={{
+          name: session?.user?.name,
+          email: session?.user?.email,
+          image: session?.user?.image
+        }}
+      />
+      <div className="container mx-auto p-6">
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>
@@ -331,6 +336,7 @@ export default function SuperAdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

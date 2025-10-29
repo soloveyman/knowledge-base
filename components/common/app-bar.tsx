@@ -4,7 +4,7 @@ import { UserMenu } from "./user-menu"
 import { useTranslation } from "@/lib/translation-context"
 
 interface AppBarProps {
-  role: 'owner' | 'manager' | 'employee'
+  role: 'super-admin' | 'owner' | 'manager' | 'employee'
   onSignOut?: () => void
   user?: {
     name?: string
@@ -18,6 +18,8 @@ export function AppBar({ role, onSignOut, user }: AppBarProps) {
 
   const getTitle = () => {
     switch (role) {
+      case 'super-admin':
+        return 'Super Admin Dashboard'
       case 'owner':
         return t('ownerDashboard')
       case 'manager':

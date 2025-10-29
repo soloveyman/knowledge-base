@@ -129,9 +129,42 @@ export async function GET() {
     
     const newThisMonth = Number(newSubscriptionsResult.rows?.[0]?.count || 0);
 
-    // Calculate churn rate (simplified - last month cancellations / total active)
-    // TODO: Implement proper churn rate calculation
-    const churnRate = 2.3;
+    // Calculate churn rate (cancellations in last month / active subscriptions at start of last month)
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const firstDayOfLastMonth = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+    const lastDayOfLastMonth = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+    
+    // Get subscriptions that were updated to cancelled/expired status in the last month
+    const cancellationsResult = await db.execute(sql`
+      SELECT COUNT(*) as count 
+      FROM subscriptions s
+      INNER JOIN users u ON s.user_id = u.id
+      WHERE u.role = 'owner'
+        AND s.status IN ('cancelled', 'expired')
+        AND s.updated_at >= ${firstDayOfLastMonth}
+        AND s.updated_at <= ${lastDayOfLastMonth}
+    `);
+    
+    const cancellations = Number(cancellationsResult.rows?.[0]?.count || 0);
+    
+    // Get active subscriptions at the start of last month
+    // Approximate by: currently active subscriptions created before last month + subscriptions cancelled in last month
+    const currentlyActiveResult = await db.execute(sql`
+      SELECT COUNT(*) as count 
+      FROM subscriptions s
+      INNER JOIN users u ON s.user_id = u.id
+      WHERE u.role = 'owner'
+        AND s.status = 'active'
+        AND s.created_at <= ${firstDayOfLastMonth}
+    `);
+    
+    // Active subscriptions at start = currently active (created before) + those cancelled during last month
+    const currentlyActive = Number(currentlyActiveResult.rows?.[0]?.count || 0);
+    const activeAtStart = currentlyActive + cancellations;
+    
+    // Calculate churn rate: (cancellations / active at start) * 100
+    const churnRate = activeAtStart > 0 ? (cancellations / activeAtStart) * 100 : 0;
 
     const stats = {
       totalRevenue,
