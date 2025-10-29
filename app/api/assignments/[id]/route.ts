@@ -91,12 +91,13 @@ export async function PUT(
       }, { status: 404 })
     }
 
-    // Update assignment dueDate, title, and description
+    // Update assignment dueDate, title, description, and testId
     const updateFields: {
       updatedAt: Date
       dueDate?: Date | null
       title?: string
       description?: string
+      testId?: string | null
     } = { updatedAt: new Date() }
     if (dueDate !== undefined) {
       updateFields.dueDate = dueDate ? new Date(dueDate) : null
@@ -141,7 +142,17 @@ export async function PUT(
     const skippedCount = userIds.length - usersToAssign.length
 
     // Add users to the assignment
-    const newAssignmentUsers = []
+    interface AssignmentUserRow {
+      id: string
+      assignmentId: string
+      userId: string
+      status: string
+      completedAt: Date | null
+      createdAt: Date | null
+      updatedAt: Date | null
+    }
+    
+    const newAssignmentUsers: AssignmentUserRow[] = []
     for (const userId of usersToAssign) {
       try {
         const result = await db.insert(assignmentUsers).values({
@@ -149,7 +160,9 @@ export async function PUT(
           userId,
           status: status || 'pending'
         }).returning()
-        newAssignmentUsers.push(result[0])
+        if (result[0]) {
+          newAssignmentUsers.push(result[0])
+        }
       } catch (error) {
         console.error(`Failed to add user ${userId} to assignment:`, error)
       }

@@ -192,7 +192,17 @@ export async function POST(request: Request) {
     console.log(`Adding ${usersToAssign.length} users to assignment, skipping ${skippedCount} existing ones`)
 
     // Add users to the assignment
-    const newAssignmentUsers = []
+    interface AssignmentUserRow {
+      id: string
+      assignmentId: string
+      userId: string
+      status: string
+      completedAt: Date | null
+      createdAt: Date | null
+      updatedAt: Date | null
+    }
+    
+    const newAssignmentUsers: AssignmentUserRow[] = []
     for (const userId of usersToAssign) {
       try {
         const result = await db.insert(assignmentUsers).values({
@@ -200,7 +210,9 @@ export async function POST(request: Request) {
           userId,
           status: status || 'pending'
         }).returning()
-        newAssignmentUsers.push(result[0])
+        if (result[0]) {
+          newAssignmentUsers.push(result[0])
+        }
       } catch (error) {
         console.error(`Failed to add user ${userId} to assignment:`, error)
       }
