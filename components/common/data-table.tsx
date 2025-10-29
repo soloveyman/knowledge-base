@@ -8,7 +8,7 @@ import { ReactNode } from "react"
 export interface Column<T> {
   key: string
   label: string
-  render?: (value: any, row: T, index: number) => ReactNode
+  render?: (value: unknown, row: T, index: number) => ReactNode
   className?: string
 }
 
@@ -20,7 +20,7 @@ interface DataTableProps<T> {
   className?: string
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   onRowClick,

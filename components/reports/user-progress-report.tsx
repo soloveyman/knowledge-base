@@ -54,11 +54,21 @@ interface UserProgress {
   overdueCount: number
 }
 
+interface Module {
+  id: string
+  title: string
+}
+
+interface Test {
+  id: string
+  title: string
+}
+
 interface UserProgressReportProps {
   users: User[]
   assignments: Assignment[]
-  modules?: any[]
-  tests?: any[]
+  modules?: Module[]
+  tests?: Test[]
 }
 
 export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
@@ -81,7 +91,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
       const userAssignments = assignments.filter(assignment => {
         // Check if this assignment has users array and contains the current user
         if (assignment.users && Array.isArray(assignment.users)) {
-          return assignment.users.some((au: any) => au.userId === user.id)
+          return assignment.users.some((au: AssignedUser) => au.userId === user.id)
         }
         return false
       })
@@ -286,7 +296,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                 <div className="flex items-center gap-1">
                                   <Target className="h-4 w-4" />
                                   <span>Test: {(() => {
-                                    const test = tests.find((t: any) => t.id === assignment.testId)
+                                    const test = tests.find((t: Test) => t.id === assignment.testId)
                                     return test?.title || assignment.testId.slice(0, 8)
                                   })()}</span>
                                 </div>

@@ -3,12 +3,8 @@
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { DocumentTypeBadge } from "@/lib/badges"
 import { useNavigateBack } from "@/lib/redirect-utils"
-import { processTextWithEnhancedFormatting } from '@/lib/text-formatting'
 import { renderFormattedText } from '@/lib/content-renderer'
 
 interface UserWithRole {
@@ -17,8 +13,8 @@ interface UserWithRole {
   role?: string
 }
 
-interface Document {
-  id: number
+interface DocumentData {
+  id: string | number
   name: string
   type: string
   content: string
@@ -31,10 +27,28 @@ interface Document {
   uploadedBy: string
   size: string
 }
-import { 
-  FileText, 
-  X
-} from "lucide-react"
+
+interface ApiDocument {
+  id: string | number
+  title?: string
+  originalFileName?: string
+  fileType?: string
+  createdAt?: string
+  uploadedBy?: string
+  fileSize?: number
+  parsedContent?: {
+    sections?: Array<{ content: string }>
+    tables?: Array<{
+      title: string
+      headers: string[]
+      rows: string[][]
+    }>
+    metadata?: {
+      parserVersion?: string
+    }
+  }
+}
+import { X } from "lucide-react"
 import { useParams } from "next/navigation"
 
 const formatFileSize = (bytes: number): string => {
@@ -52,7 +66,7 @@ export default function DocumentViewer() {
   const filename = params.filename as string
   const navigateBack = useNavigateBack()
 
-  const [documentData, setDocumentData] = useState<any>(null)
+  const [documentData, setDocumentData] = useState<DocumentData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -65,6 +79,7 @@ export default function DocumentViewer() {
 
     // Load document data from database
     loadDocumentData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status, router, filename])
 
   const loadDocumentData = async () => {
@@ -81,22 +96,22 @@ export default function DocumentViewer() {
       
       if (result.success) {
         // Find the document by filename
-        const document = result.data.documents.find((doc: any) => 
+        const document = (result.data.documents as ApiDocument[]).find((doc: ApiDocument) => 
           doc.originalFileName === decodeURIComponent(filename) || doc.title === decodeURIComponent(filename)
         )
 
         console.log('Found document:', document)
-        console.log('Document ID:', document.id)
 
         if (document) {
+          console.log('Document ID:', document.id)
           console.log('Document parsedContent:', document.parsedContent)
           console.log('Document sections:', document.parsedContent?.sections)
           console.log('Document tables:', document.parsedContent?.tables)
           
           // Extract content from sections
           let content = ''
-          if (document.parsedContent?.sections?.length > 0) {
-            content = document.parsedContent.sections.map(s => s.content).join('\n')
+          if (document.parsedContent?.sections && document.parsedContent.sections.length > 0) {
+            content = document.parsedContent.sections.map((s: { content: string }) => s.content).join('\n')
           }
           
           // Extract tables from parsedContent  
@@ -129,9 +144,9 @@ export default function DocumentViewer() {
           
           setDocumentData({
             id: document.id,
-            name: document.originalFileName || document.title,
+            name: document.originalFileName || document.title || 'Untitled Document',
             type: document.fileType?.toUpperCase() || 'DOCX',
-            uploadedAt: document.createdAt,
+            uploadedAt: document.createdAt || new Date().toISOString(),
             uploadedBy: document.uploadedBy || 'Unknown',
             size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
             content: content,
@@ -208,14 +223,14 @@ export default function DocumentViewer() {
       
       // Only render headers if they exist and are not empty
       const hasHeaders = table.headers && table.headers.length > 0 && table.headers.some(h => h.trim())
-      const headersHTML = hasHeaders ? table.headers.map((header, idx) => {
+      const headersHTML = hasHeaders ? table.headers.map((header) => {
         const escapedHeader = escapeHTML(header)
         // Use fit-content for natural width, with reasonable constraints
         return `<th class="px-2 md:px-4 py-2 text-left border-b border-border bg-muted/50 font-semibold text-xs md:text-sm" style="min-width: fit-content; white-space: normal;">${escapedHeader}</th>`
       }).join('') : ''
       
       const rowsHTML = nonEmptyRows.map(row => {
-        const cellsHTML = row.map((cell, idx) => {
+        const cellsHTML = row.map((cell) => {
           const escapedCell = escapeHTML(String(cell))
           return `<td class="px-2 md:px-4 py-2 border-b border-border text-xs md:text-sm" style="white-space: normal;">${escapedCell}</td>`
         }).join('')

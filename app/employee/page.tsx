@@ -37,24 +37,31 @@ interface Test {
 }
 
 interface AssignedUser {
-  id: number
-  name: string
-  email: string
-  role: string
-  department: string
+  id?: number
+  userId?: string
+  name?: string
+  email?: string
+  role?: string
+  department?: string
+  status?: string
+  testScore?: number | null
 }
 
 interface Assignment {
   id: string
-  name: string
-  description: string
-  document: Document
-  test: Test
-  assignedUsers: AssignedUser[]
-  dueDate?: string
-  createdAt: string
-  createdBy: string
-  status: string
+  name?: string
+  title?: string
+  description?: string
+  moduleId?: string | null
+  testId?: string | null
+  document?: Document
+  test?: Test
+  assignedUsers?: AssignedUser[]
+  users?: AssignedUser[]
+  dueDate?: string | null
+  createdAt?: string
+  createdBy?: string
+  status?: string
 }
 
 export default function EmployeePage() {
@@ -65,7 +72,16 @@ export default function EmployeePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [userAssignments, setUserAssignments] = useState<Assignment[]>([])
   const [currentTab, setCurrentTab] = useState('overview')
-  const [testAttempts, setTestAttempts] = useState<any[]>([])
+  interface TestAttempt {
+    id: string
+    testId: string
+    userId: string
+    score?: number | null
+    status: string
+    completedAt?: string | null
+  }
+  
+  const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([])
 
   // Load test attempts from API
   const loadTestAttempts = async () => {
@@ -94,10 +110,10 @@ export default function EmployeePage() {
         
         // Filter assignments for current user using the new assignment_users table
         const currentUserId = session?.user?.id
-        const userAssignments = allAssignments.filter((assignment: any) => {
+        const userAssignments = allAssignments.filter((assignment) => {
           // Check if this assignment has users array and contains the current user
           if (assignment.users && Array.isArray(assignment.users)) {
-            return assignment.users.some((au: any) => au.userId === currentUserId)
+            return assignment.users.some((au: AssignedUser) => au.userId === currentUserId)
           }
           return false
         })
@@ -199,7 +215,11 @@ export default function EmployeePage() {
         const docsResponse = await fetch('/api/documents')
         const docsResult = await docsResponse.json()
         if (docsResult.success && docsResult.data.documents) {
-          const document = docsResult.data.documents.find((d: any) => d.moduleId === assignment.moduleId)
+          interface ApiDoc {
+            id: string | number
+            moduleId?: string | null
+          }
+          const document = (docsResult.data.documents as ApiDoc[]).find((d: ApiDoc) => d.moduleId === assignment.moduleId)
           if (document) {
             // Navigate to document reader - ensure id is a string
             const documentId = String(document.id)
@@ -218,6 +238,9 @@ export default function EmployeePage() {
     if (assignment && assignment.testId) {
       // Navigate to test page using testId
       router.push(`/test/${assignment.testId}`)
+    } else if (assignment && assignment.test?.id) {
+      // Fallback to test.id if testId not available
+      router.push(`/test/${assignment.test.id}`)
     }
   }
 
@@ -225,7 +248,7 @@ export default function EmployeePage() {
   const transformedAssignments = userAssignments.map(assignment => {
     // Get the user's specific status from assignment_users
     const currentUserId = session?.user?.id
-    const userAssignment = assignment.users?.find((au: any) => au.userId === currentUserId)
+    const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === currentUserId)
     
     // Get the actual test score from the user assignment data
     const testScore = userAssignment?.testScore
@@ -407,7 +430,7 @@ export default function EmployeePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">{failedCount}</div>
-                  <p className="text-xs text-muted-foreground">{t('needRetake')}</p>
+                  <p className="text-xs text-muted-foreground">{t('retakeRequired') || 'Need to retake'}</p>
                 </CardContent>
               </Card>
             </div>

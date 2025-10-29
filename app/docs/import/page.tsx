@@ -33,7 +33,12 @@ interface UploadedFile {
   progress: number
   error?: string
   parsedContent?: ParsedContent
-  parsingLog?: any[]
+  parsingLog?: Array<{
+    level?: string
+    message?: string
+    timestamp?: string
+    [key: string]: unknown
+  }>
   file?: File // Store the actual File object
 }
 
@@ -239,7 +244,7 @@ export default function DocImportPage() {
             title: file.name,
             originalFileName: file.name,
             fileType: file.type.split('/')[1],
-            fileUrl: file.url || null,
+            fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
             fileSize: file.size,
             parsedContent: file.parsedContent || null,
             parsingLog: file.parsingLog || null,
@@ -303,6 +308,7 @@ export default function DocImportPage() {
   return (
     <PageLayout
       title={t('importDocuments')}
+      icon={<FileText className="h-6 w-6" />}
       onClose={() => router.push(safeReturnTo)}
     >
       <div className="max-w-4xl mx-auto space-y-6">

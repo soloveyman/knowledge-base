@@ -51,6 +51,13 @@ interface SavedTest {
   createdBy: string
 }
 
+interface AssignedUser {
+  userId?: string
+  id?: string
+  status?: string
+  testScore?: number | null
+}
+
 interface SavedAssignment {
   id: string
   moduleId: string
@@ -63,6 +70,7 @@ interface SavedAssignment {
   maxAttempts: number
   createdAt: string
   updatedAt: string
+  users?: AssignedUser[]
 }
 
 export default function ManagerPage() {
@@ -562,7 +570,7 @@ export default function ManagerPage() {
                       
                       savedAssignments.forEach(assignment => {
                         if (assignment.users && Array.isArray(assignment.users)) {
-                          assignment.users.forEach((au: any) => {
+                          assignment.users.forEach((au: AssignedUser) => {
                             totalUserAssignments++
                             if (au.status === 'completed') {
                               completedUserAssignments++
@@ -583,7 +591,7 @@ export default function ManagerPage() {
                       
                       savedAssignments.forEach(assignment => {
                         if (assignment.users && Array.isArray(assignment.users)) {
-                          assignment.users.forEach((au: any) => {
+                          assignment.users.forEach((au: AssignedUser) => {
                             totalUserAssignments++
                             if (au.status === 'completed') {
                               completedUserAssignments++
@@ -599,12 +607,30 @@ export default function ManagerPage() {
               </Card>
             </div>
 
-            {console.log('Manager: Rendering UserProgressReport with:', savedUsers.length, 'users and', savedAssignments.length, 'assignments')}
+            {(() => { console.log('Manager: Rendering UserProgressReport with:', savedUsers.length, 'users and', savedAssignments.length, 'assignments'); return null; })()}
             <UserProgressReport 
               users={savedUsers} 
-              assignments={savedAssignments}
-              modules={documents}
-              tests={savedTests}
+              assignments={savedAssignments.map(a => ({
+                id: a.id,
+                title: `${a.moduleId.slice(0, 8)}`,
+                description: '',
+                moduleId: a.moduleId,
+                testId: a.testId,
+                assignedTo: a.assignedTo,
+                assignedBy: a.assignedBy,
+                dueDate: a.dueDate,
+                status: a.status,
+                allowRetake: a.allowRetake,
+                maxAttempts: a.maxAttempts,
+                createdAt: a.createdAt,
+                updatedAt: a.updatedAt,
+                users: a.users?.map(u => ({
+                  userId: u.userId || u.id || '',
+                  status: u.status || 'pending'
+                })) || []
+              }))}
+              modules={documents.map(d => ({ id: String(d.id), title: d.name }))}
+              tests={savedTests.map(t => ({ id: t.id, title: t.title }))}
             />
 
           </TabsContent>
@@ -689,7 +715,18 @@ export default function ManagerPage() {
 
           <TabsContent value="assignments" className="space-y-3 md:space-y-6">
             <AssignmentsPage
-              assignments={savedAssignments}
+              assignments={savedAssignments.map(a => ({
+                id: a.id,
+                name: `Assignment ${a.id.slice(0, 8)}`,
+                description: '',
+                document: { id: 0, name: 'Document', type: 'DOCX', uploadedAt: a.createdAt },
+                test: { id: a.testId, title: 'Test', questionCount: 0 },
+                assignedUsers: [],
+                dueDate: a.dueDate,
+                createdAt: a.createdAt,
+                createdBy: a.assignedBy,
+                status: a.status
+              }))}
               onDeleteAssignment={handleDeleteAssignment}
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}

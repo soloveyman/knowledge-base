@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, users, subscriptions, subscriptionPlans, payments } from '@/lib/db';
-import { eq, and, desc, sql, gte, ne } from 'drizzle-orm';
+import { db, users } from '@/lib/db';
+import { eq, sql } from 'drizzle-orm';
 
 export async function GET() {
   try {
@@ -36,21 +36,38 @@ export async function GET() {
           LIMIT 1
         `);
 
-        let subscriptionData: any = null;
-        let planData: any = null;
+        let subscriptionData: {
+          status: string;
+          currentPeriodEnd: Date | string;
+          createdAt: Date | string;
+        } | null = null;
+        let planData: {
+          name: string | null;
+          displayName: string | null;
+          price: number | string | null;
+          currency: string | null;
+        } | null = null;
         
         if (ownerSubscriptions.rows && ownerSubscriptions.rows.length > 0) {
-          const sub = ownerSubscriptions.rows[0];
+          const sub = ownerSubscriptions.rows[0] as {
+            status?: string;
+            current_period_end?: Date | string;
+            created_at?: Date | string;
+            plan_name?: string | null;
+            plan_display_name?: string | null;
+            plan_price?: number | string | null;
+            plan_currency?: string | null;
+          };
           subscriptionData = {
-            status: sub.status,
-            currentPeriodEnd: sub.current_period_end,
-            createdAt: sub.created_at,
+            status: sub.status || '',
+            currentPeriodEnd: sub.current_period_end || new Date(),
+            createdAt: sub.created_at || new Date(),
           };
           planData = {
-            name: sub.plan_name,
-            displayName: sub.plan_display_name,
-            price: sub.plan_price,
-            currency: sub.plan_currency,
+            name: sub.plan_name ?? null,
+            displayName: sub.plan_display_name ?? null,
+            price: sub.plan_price ?? null,
+            currency: sub.plan_currency ?? null,
           };
         }
 
@@ -76,10 +93,10 @@ export async function GET() {
             `);
             if (latestPayment.rows && latestPayment.rows.length > 0) {
               revenue = Number(latestPayment.rows[0].amount) || 0;
-              provider = latestPayment.rows[0].provider || null;
+              provider = (latestPayment.rows[0].provider === 'stripe' ? 'stripe' : null) || null;
             }
           }
-        } catch (error) {
+        } catch {
           // Payments table might not exist yet or have different schema
           // This is OK - revenue will be 0
         }

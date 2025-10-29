@@ -92,7 +92,12 @@ export async function PUT(
     }
 
     // Update assignment dueDate, title, and description
-    const updateFields: any = { updatedAt: new Date() }
+    const updateFields: {
+      updatedAt: Date
+      dueDate?: Date | null
+      title?: string
+      description?: string
+    } = { updatedAt: new Date() }
     if (dueDate !== undefined) {
       updateFields.dueDate = dueDate ? new Date(dueDate) : null
     }

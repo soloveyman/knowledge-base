@@ -103,17 +103,28 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: any = {
-      title: body.title,
-      description: body.description,
-      passingScore: body.passingScore,
-      timeLimit: body.timeLimit,
-      maxAttempts: body.maxAttempts,
-      shuffleQuestions: body.shuffleQuestions,
-      showCorrectAnswers: body.showCorrectAnswers,
-      status: body.status,
+    const updateData: {
+      title?: string
+      description?: string | null
+      passingScore?: number | null
+      timeLimit?: number | null
+      maxAttempts?: number | null
+      shuffleQuestions?: boolean
+      showCorrectAnswers?: boolean
+      status?: string
+      updatedAt: Date
+    } = {
       updatedAt: new Date()
     }
+    
+    if (body.title !== undefined) updateData.title = body.title
+    if (body.description !== undefined) updateData.description = body.description
+    if (body.passingScore !== undefined) updateData.passingScore = body.passingScore
+    if (body.timeLimit !== undefined) updateData.timeLimit = body.timeLimit
+    if (body.maxAttempts !== undefined) updateData.maxAttempts = body.maxAttempts
+    if (body.shuffleQuestions !== undefined) updateData.shuffleQuestions = body.shuffleQuestions
+    if (body.showCorrectAnswers !== undefined) updateData.showCorrectAnswers = body.showCorrectAnswers
+    if (body.status !== undefined) updateData.status = body.status
 
     // Update the test
     await db.update(tests)

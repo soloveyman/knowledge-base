@@ -45,11 +45,11 @@ export async function POST(request: NextRequest) {
       const assignmentStatus = score >= 70 ? 'completed' : 'failed'
       
       // Update the assignment_user status for this user
+      // Note: testScore is stored in testAttempts, not assignmentUsers
       for (const assignment of assignmentsWithTest) {
         await db.update(assignmentUsers)
           .set({
             status: assignmentStatus,
-            testScore: score,
             completedAt: new Date(),
             updatedAt: new Date()
           })
@@ -90,17 +90,28 @@ export async function GET(request: NextRequest) {
     const testId = searchParams.get('testId')
     const userId = searchParams.get('userId')
 
-    let query = db.select().from(testAttempts)
-
-    if (userId) {
-      query = query.where(eq(testAttempts.userId, userId)) as any
+    let attempts
+    
+    if (userId && testId) {
+      // Both filters
+      attempts = await db.select().from(testAttempts)
+        .where(and(
+          eq(testAttempts.userId, userId),
+          eq(testAttempts.testId, testId)
+        ))
+    } else if (userId) {
+      // Only userId filter
+      attempts = await db.select().from(testAttempts)
+        .where(eq(testAttempts.userId, userId))
+    } else if (testId) {
+      // Only testId filter
+      attempts = await db.select().from(testAttempts)
+        .where(eq(testAttempts.testId, testId))
+    } else {
+      // No filters - get all for current user
+      attempts = await db.select().from(testAttempts)
+        .where(eq(testAttempts.userId, session.user.id))
     }
-
-    if (testId) {
-      query = query.where(eq(testAttempts.testId, testId)) as any
-    }
-
-    const attempts = await query
 
     return NextResponse.json({
       success: true,

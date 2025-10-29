@@ -78,7 +78,17 @@ export default function DocsPage() {
       if (result.success) {
         console.log('Raw documents from API:', result.data.documents)
         // Transform database documents to match the expected format
-        const transformedDocs = result.data.documents.map((doc: any) => ({
+        interface ApiDocument {
+          id: string | number
+          originalFileName?: string
+          title?: string
+          fileType?: string
+          createdAt?: string
+          fileSize?: number
+          status?: string
+        }
+        
+        const transformedDocs = (result.data.documents as ApiDocument[]).map((doc: ApiDocument) => ({
           id: doc.id,
           name: doc.originalFileName || doc.title,
           type: doc.fileType?.toUpperCase() || 'UNKNOWN',

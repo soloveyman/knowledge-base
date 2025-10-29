@@ -7,8 +7,21 @@ export interface Document {
   fileType?: string
   fileUrl?: string
   fileSize?: number
-  parsedContent?: any
-  parsingLog?: any[]
+  parsedContent?: {
+    sections?: Array<{ content: string }>
+    tables?: Array<{
+      title: string
+      headers: string[]
+      rows: string[][]
+    }>
+    metadata?: Record<string, unknown>
+  }
+  parsingLog?: Array<{
+    level?: string
+    message?: string
+    timestamp?: string
+    [key: string]: unknown
+  }>
   status: string
   uploadedBy: string
   createdAt: string

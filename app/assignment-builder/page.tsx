@@ -154,8 +154,13 @@ export default function AssignmentBuilderPage() {
         const assignment = result.data.assignment
         const users = result.data.users || []
         
+        interface UserWithAssignmentId {
+          userId?: string
+          id?: string
+        }
+        
         // Get all user IDs from assignmentUsers
-        const allUserIds = users.map((u: any) => u.userId)
+        const allUserIds = (users as UserWithAssignmentId[]).map((u: UserWithAssignmentId) => u.userId || u.id).filter(Boolean) as string[]
         
         // Find the document that has this moduleId
         let documentId = ''
@@ -163,7 +168,11 @@ export default function AssignmentBuilderPage() {
           const docsResponse = await fetch('/api/documents')
           const docsResult = await docsResponse.json()
           if (docsResult.success) {
-            const doc = docsResult.data.documents.find((d: any) => d.moduleId === assignment.moduleId)
+            interface ApiDoc {
+              id: string | number
+              moduleId?: string | null
+            }
+            const doc = (docsResult.data.documents as ApiDoc[]).find((d: ApiDoc) => d.moduleId === assignment.moduleId)
             documentId = doc ? doc.id : ''
           }
         } catch (err) {

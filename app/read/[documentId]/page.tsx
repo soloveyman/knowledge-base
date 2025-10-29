@@ -130,8 +130,27 @@ export default function DocumentReaderPage() {
           return
         }
         
+        interface ApiDocument {
+          id: string | number
+          originalFileName?: string
+          title?: string
+          fileType?: string
+          createdAt?: string
+          uploadedBy?: string
+          fileSize?: number
+          moduleId?: string | null
+          parsedContent?: {
+            sections?: Array<{ content: string }>
+            tables?: Array<{
+              title: string
+              headers: string[]
+              rows: string[][]
+            }>
+          }
+        }
+        
         // Find document by the documentId in the URL
-        const document = docResult.data.documents.find((doc: any) => doc.id === documentId)
+        const document = (docResult.data.documents as ApiDocument[]).find((doc: ApiDocument) => String(doc.id) === String(documentId))
         if (!document) {
           setLoading(false)
           return
@@ -211,8 +230,14 @@ export default function DocumentReaderPage() {
           const result = await response.json()
           
           if (result.success) {
+            interface AssignmentWithModule {
+              id: string
+              moduleId?: string | null
+              testId?: string | null
+            }
+            
             // Find assignment that has this moduleId
-            const assignment = result.data.assignments.find((a: any) => a.moduleId === document.moduleId)
+            const assignment = (result.data.assignments as AssignmentWithModule[]).find((a: AssignmentWithModule) => a.moduleId === document.moduleId)
             
             if (assignment) {
               // Fetch test data if testId exists

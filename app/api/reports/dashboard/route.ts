@@ -4,8 +4,8 @@ export async function GET() {
   try {
     // TODO: Replace with actual database queries
     // For now, return empty data to indicate no mock data
-    const reportData = []
-    const employeeProgress = []
+    const reportData: unknown[] = []
+    const employeeProgress: unknown[] = []
 
     return NextResponse.json({
       success: true,

@@ -145,8 +145,17 @@ export async function POST(request: Request) {
       throw new Error('Invalid JSON response from Grok API')
     }
 
+    interface GeneratedQuestionItem {
+      id?: string
+      prompt?: string
+      type?: string
+      choices?: string[]
+      correct_answer?: string
+      explanation?: string
+    }
+    
     // Add unique IDs to questions
-    const questionsWithIds = generatedQuestions.map((q: any, index: number) => ({
+    const questionsWithIds = generatedQuestions.map((q: GeneratedQuestionItem, index: number) => ({
       ...q,
       id: q.id || `q_${Date.now()}_${index}`
     }))

@@ -62,13 +62,21 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: any = {
-      name: body.name,
-      job: body.job,
-      email: body.email,
-      role: body.role,
+    const updateData: {
+      name?: string | null
+      job?: string | null
+      email?: string
+      role?: string
+      password?: string
+      updatedAt: Date
+    } = {
       updatedAt: new Date()
     }
+    
+    if (body.name !== undefined) updateData.name = body.name
+    if (body.job !== undefined) updateData.job = body.job
+    if (body.email !== undefined) updateData.email = body.email
+    if (body.role !== undefined) updateData.role = body.role
 
     // Only update password if provided
     if (body.password && body.password.trim()) {

@@ -4,7 +4,7 @@ export async function GET() {
   try {
     // TODO: Replace with actual database queries
     // For now, return empty data to indicate no mock data
-    const plans = []
+    const plans: unknown[] = []
     const currentSubscription = null
     const usage = null
 

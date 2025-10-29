@@ -25,7 +25,10 @@ export async function GET(
 
     // If just checking dependencies, return assignments info
     if (checkDependencies) {
-      const relatedAssignments = await db.select().from(assignments).where(eq(assignments.moduleId, doc[0].moduleId))
+      const moduleId = doc[0].moduleId
+      const relatedAssignments = moduleId 
+        ? await db.select().from(assignments).where(eq(assignments.moduleId, moduleId))
+        : []
       return NextResponse.json({
         success: true,
         hasAssignments: relatedAssignments.length > 0,

@@ -63,9 +63,19 @@ export async function POST(request: Request) {
         console.log('Saving questions to database...')
         console.log('Questions data:', JSON.stringify(questions, null, 2))
         
+        interface QuestionInput {
+          prompt?: string
+          title?: string
+          content?: string
+          type?: string
+          choices?: string[]
+          correct_answer?: string
+          explanation?: string
+        }
+        
         const questionData = questions
-          .filter((q: any) => q && typeof q === 'object') // Filter out undefined/null questions
-          .map((q: any, index: number) => {
+          .filter((q: unknown): q is QuestionInput => q !== null && typeof q === 'object')
+          .map((q: QuestionInput, index: number) => {
             try {
               console.log(`Processing question ${index}:`, q)
               const processed = {
