@@ -15,7 +15,7 @@ export function renderFormattedText(content: string): string {
   rendered = rendered.replace(/\[\/(?:BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]/g, '')
   
   // Remove any empty tag pairs like [CENTER][/CENTER]
-  rendered = rendered.replace(/\[(?:CENTER|RIGHT|JUSTIFY)\]\[\/\1\]/g, '')
+  rendered = rendered.replace(/\[(CENTER|RIGHT|JUSTIFY)\]\[\/\1\]/g, '')
   
   // Remove any standalone opening tags at the end (common with malformed tags)
   rendered = rendered.replace(/\[(?:CENTER|RIGHT|JUSTIFY)\](\s|\n)*$/gm, '')
@@ -24,11 +24,11 @@ export function renderFormattedText(content: string): string {
   
   // Now convert custom formatting tags to HTML
   // Handle complete paired tags first
-  rendered = rendered.replace(/\[BOLD\](.*?)\[\/BOLD\]/gs, '<strong class="font-bold">$1</strong>')
-  rendered = rendered.replace(/\[ITALIC\](.*?)\[\/ITALIC\]/gs, '<em class="italic">$1</em>')
-  rendered = rendered.replace(/\[CENTER\](.*?)\[\/CENTER\]/gs, '<div class="mb-5 text-center">$1</div>')
-  rendered = rendered.replace(/\[RIGHT\](.*?)\[\/RIGHT\]/gs, '<div class="mb-5 text-right">$1</div>')
-  rendered = rendered.replace(/\[JUSTIFY\](.*?)\[\/JUSTIFY\]/gs, '<div class="mb-5 text-justify">$1</div>')
+  rendered = rendered.replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '<strong class="font-bold">$1</strong>')
+  rendered = rendered.replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '<em class="italic">$1</em>')
+  rendered = rendered.replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '<div class="mb-5 text-center">$1</div>')
+  rendered = rendered.replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '<div class="mb-5 text-right">$1</div>')
+  rendered = rendered.replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '<div class="mb-5 text-justify">$1</div>')
   
   // Then handle individual opening/closing tags
   rendered = rendered.replace(/\[BOLD\]/g, '<strong class="font-bold">')

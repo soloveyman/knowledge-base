@@ -2,6 +2,14 @@
  * Utility functions for managing localStorage data
  */
 
+interface Document {
+  id: string
+  name?: string
+  type?: string
+  content?: string
+  [key: string]: unknown
+}
+
 const MANAGER_DOCUMENTS_KEY = 'manager-documents'
 
 /**
@@ -16,7 +24,7 @@ export function cleanupDocumentFromLocalStorage(documentId: string): void {
     if (savedDocuments && savedDocuments !== 'undefined' && savedDocuments !== 'null') {
       const documents = JSON.parse(savedDocuments)
       if (Array.isArray(documents)) {
-        const updatedDocuments = documents.filter((doc: any) => doc.id !== documentId)
+        const updatedDocuments = documents.filter((doc: Document) => doc.id !== documentId)
         localStorage.setItem(MANAGER_DOCUMENTS_KEY, JSON.stringify(updatedDocuments))
         console.log('LocalStorage: Cleaned up document from main storage:', documentId)
       } else {
@@ -82,7 +90,7 @@ export function clearAllDocumentLocalStorage(): void {
 /**
  * Get documents from localStorage
  */
-export function getDocumentsFromLocalStorage(): any[] {
+export function getDocumentsFromLocalStorage(): Document[] {
   try {
     const savedDocuments = localStorage.getItem(MANAGER_DOCUMENTS_KEY)
     if (savedDocuments && savedDocuments !== 'undefined' && savedDocuments !== 'null') {
@@ -109,7 +117,7 @@ export function getDocumentsFromLocalStorage(): any[] {
 /**
  * Save documents to localStorage
  */
-export function saveDocumentsToLocalStorage(documents: any[]): void {
+export function saveDocumentsToLocalStorage(documents: Document[]): void {
   try {
     localStorage.setItem(MANAGER_DOCUMENTS_KEY, JSON.stringify(documents))
     console.log('LocalStorage: Saved', documents.length, 'documents')
@@ -122,13 +130,13 @@ export function saveDocumentsToLocalStorage(documents: any[]): void {
  * Sync localStorage with database documents
  * Removes any localStorage documents that don't exist in the database
  */
-export function syncLocalStorageWithDatabase(databaseDocuments: any[]): void {
+export function syncLocalStorageWithDatabase(databaseDocuments: Document[]): void {
   try {
     const localDocuments = getDocumentsFromLocalStorage()
     const databaseIds = new Set(databaseDocuments.map(doc => doc.id))
     
     // Filter out documents that don't exist in the database
-    const validDocuments = localDocuments.filter((doc: any) => databaseIds.has(doc.id))
+    const validDocuments = localDocuments.filter((doc: Document) => databaseIds.has(doc.id))
     
     if (validDocuments.length !== localDocuments.length) {
       saveDocumentsToLocalStorage(validDocuments)
@@ -145,13 +153,13 @@ export function syncLocalStorageWithDatabase(databaseDocuments: any[]): void {
 /**
  * Check if localStorage has stale data
  */
-export function hasStaleLocalStorageData(databaseDocuments: any[]): boolean {
+export function hasStaleLocalStorageData(databaseDocuments: Document[]): boolean {
   try {
     const localDocuments = getDocumentsFromLocalStorage()
     const databaseIds = new Set(databaseDocuments.map(doc => doc.id))
     
     // Check if any local documents don't exist in the database
-    return localDocuments.some((doc: any) => !databaseIds.has(doc.id))
+    return localDocuments.some((doc: Document) => !databaseIds.has(doc.id))
   } catch (error) {
     console.error('LocalStorage: Failed to check for stale data:', error)
     return false
@@ -215,7 +223,7 @@ export function fixCorruptedLocalStorage(): void {
           localStorage.removeItem(MANAGER_DOCUMENTS_KEY)
           console.log('LocalStorage: Fixed corrupted data (not an array)')
         }
-      } catch (parseError) {
+      } catch {
         localStorage.removeItem(MANAGER_DOCUMENTS_KEY)
         console.log('LocalStorage: Fixed corrupted data (invalid JSON)')
       }

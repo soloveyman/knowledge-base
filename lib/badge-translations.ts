@@ -1,4 +1,5 @@
 import { useTranslation } from './translation-context'
+import type { TranslationKey } from './translations'
 
 // Badge translation mapping
 const badgeTranslationMap: Record<string, string> = {
@@ -65,8 +66,6 @@ const badgeTranslationMap: Record<string, string> = {
   
   // Invoice status
   'paid': 'paid',
-  'pending': 'pending',
-  'failed': 'failed',
   'refunded': 'refunded',
   
   // Special badges
@@ -102,6 +101,6 @@ export function useBadgeTranslation() {
     }
     
     const translationKey = translateBadgeLabel(label)
-    return t(translationKey as any) || label
+    return t(translationKey as TranslationKey) || label
   }
 }

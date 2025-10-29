@@ -41,6 +41,23 @@ export interface ParseMetadata {
   readonly fileSize?: number
   readonly parsedAt: Date
   readonly parserVersion: string
+  readonly parseTimestamp?: number
+  readonly cacheBusting?: boolean
+}
+
+interface MammothMessage {
+  type: string
+  message: string
+  image?: {
+    filename?: string
+    src: string
+    contentType?: string
+  }
+}
+
+interface PdfParseResult {
+  text: string
+  numpages: number
 }
 
 export interface ParsedContent {
@@ -66,6 +83,9 @@ export interface ParsedContent {
     totalTables: number
     wordCount: number
     totalImages: number
+    parseTimestamp?: number
+    parserVersion?: string
+    cacheBusting?: boolean
   }
 }
 
@@ -123,9 +143,9 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       // Extract images from Mammoth messages
       result.messages
-        .filter((msg: any) => msg.type === 'image')
-        .forEach((msg: any) => {
-          const image = (msg as any).image
+        .filter((msg: MammothMessage) => msg.type === 'image')
+        .forEach((msg: MammothMessage) => {
+          const image = msg.image
           if (image) {
             images.push({
               filename: image.filename || 'unknown.png',
@@ -168,8 +188,8 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       // Step 5: Convert lists
       workingText = workingText
-        .replace(/<ul[^>]*>(.*?)<\/ul>/gis, '\n\n$1\n\n')
-        .replace(/<ol[^>]*>(.*?)<\/ol>/gis, '\n\n$1\n\n')
+        .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, '\n\n$1\n\n')
+        .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, '\n\n$1\n\n')
         .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
       
       // Step 6: Remove remaining HTML tags
@@ -257,7 +277,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
     } : undefined
     
     // Return images if they were extracted
-    const result: any = { text, metadata }
+    const result: ParseResult & { images?: Array<{filename: string, data: string, type: string}> } = { text, metadata }
     if (images.length > 0) {
       result.images = images
     }
@@ -294,11 +314,11 @@ export async function parsePdf(buffer: ArrayBuffer, options: {
     
     // Use pdf-parse to extract text from PDF with timeout
     const data = await Promise.race([
-      pdfParse(pdfBuffer),
+      (pdfParse as unknown as (buffer: Buffer) => Promise<PdfParseResult>)(pdfBuffer),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('PDF parsing timeout after 15 seconds')), 15000)
       )
-    ]) as any
+    ]) as PdfParseResult
     
     let text = data.text
     
@@ -545,11 +565,11 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     // Remove any HTML tags
     .replace(/<html[^>]*>/gi, '')
     .replace(/<\/html>/gi, '')
-    .replace(/<head[^>]*>.*?<\/head>/gis, '')
+    .replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, '')
     .replace(/<body[^>]*>/gi, '')
     .replace(/<\/body>/gi, '')
-    .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove CSS
-    .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove JavaScript
+    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '') // Remove CSS
+    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '') // Remove JavaScript
     .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
     // Decode HTML entities
     .replace(/&lt;/g, '<')
@@ -670,10 +690,11 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         }
       } else {
         // Preserve empty lines
+        const section = currentSection as { content: string }
         if (trimmedLine.length === 0) {
-          currentSection.content += '\n\n'
+          section.content += '\n\n'
         } else {
-          currentSection.content += (currentSection.content ? '\n' : '') + line
+          section.content += (section.content ? '\n' : '') + line
         }
       }
     }
