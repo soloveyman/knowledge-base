@@ -60,7 +60,7 @@ export function StatCard({
                 <TrendingDown className="h-3 w-3 mr-1" />
               )}
               {trend.value}%
-              {trend.label && <span className="ml-1 text-gray-600">{trend.label}</span>}
+              {trend.label && <span className="ml-1 text-muted-foreground">{trend.label}</span>}
             </div>
           )}
         </div>

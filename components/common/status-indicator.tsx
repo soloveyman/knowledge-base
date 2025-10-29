@@ -24,7 +24,7 @@ const statusConfig: Record<StatusVariant, { icon: typeof CheckCircle; color: str
   error: { icon: XCircle, color: 'text-red-600' },
   warning: { icon: AlertCircle, color: 'text-yellow-600' },
   info: { icon: AlertCircle, color: 'text-blue-600' },
-  pending: { icon: Clock, color: 'text-gray-600' },
+  pending: { icon: Clock, color: 'text-muted-foreground' },
   loading: { icon: Loader2, color: 'text-blue-600' },
   completed: { icon: CheckCircle, color: 'text-green-600' },
 }
@@ -54,7 +54,7 @@ export function StatusIndicator({
         isAnimated && "animate-spin"
       )} />
       {label && (
-        <span className="text-sm text-gray-700">{label}</span>
+        <span className="text-sm text-foreground">{label}</span>
       )}
     </div>
   )

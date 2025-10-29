@@ -237,7 +237,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
                       <span className="text-2xl">{getModuleTypeIcon(module.type)}</span>
                       <div>
                         <h4 className="font-medium">{module.title}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{module.description}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge className={getModuleTypeColor(module.type)}>
                             {module.type}
@@ -299,7 +299,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
             {/* Selected Users */}
             {selectedUsers.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-700">Individual Users</h4>
+                <h4 className="text-sm font-medium text-foreground">Individual Users</h4>
                 <div className="flex flex-wrap gap-2">
                   {selectedUsers.map((user) => (
                     <Badge key={user.id} variant="secondary" className="flex items-center gap-1">
@@ -320,7 +320,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
             {/* Selected Groups */}
             {selectedGroups.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-700">Groups</h4>
+                <h4 className="text-sm font-medium text-foreground">Groups</h4>
                 <div className="flex flex-wrap gap-2">
                   {selectedGroups.map((group) => (
                     <Badge key={group.id} variant="secondary" className="flex items-center gap-1">

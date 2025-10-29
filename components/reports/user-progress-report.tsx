@@ -218,7 +218,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                     <div className="flex items-center justify-between md:justify-start gap-3">
                       <div className="text-left">
                         <div className="font-medium">{progress.user.name}</div>
-                        <div className="text-sm text-gray-600">{progress.user.job}</div>
+                        <div className="text-sm text-muted-foreground">{progress.user.job}</div>
                       </div>
                     </div>
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 text-sm">
@@ -226,20 +226,20 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                         <div className="text-left">
                           <div className="flex items-center gap-2">
                             <div className="font-medium">{progress.completedCount}/{progress.totalCount}</div>
-                            <div className="text-gray-600">{t('completed')}</div>
+                            <div className="text-muted-foreground">{t('completed')}</div>
                           </div>
                         </div>
                         <div className="text-left">
                           <div className="flex items-center gap-2">
                             <div className="font-medium">{progress.averageScore}%</div>
-                            <div className="text-gray-600">{t('avgScore')}</div>
+                            <div className="text-muted-foreground">{t('avgScore')}</div>
                           </div>
                         </div>
                         {progress.overdueCount > 0 && (
                           <div className="text-left">
                             <div className="flex items-center gap-2">
                               <div className="font-medium text-red-600">{progress.overdueCount}</div>
-                              <div className="text-gray-600">{t('overdue')}</div>
+                              <div className="text-muted-foreground">{t('overdue')}</div>
                             </div>
                           </div>
                         )}

@@ -35,7 +35,7 @@ export function ProgressCard({
   const trendConfig = {
     up: { color: 'text-green-600', icon: '↑' },
     down: { color: 'text-red-600', icon: '↓' },
-    neutral: { color: 'text-gray-600', icon: '' }
+    neutral: { color: 'text-muted-foreground', icon: '' }
   }
   
   const trendStyle = trendConfig[trend || 'neutral']

@@ -214,7 +214,7 @@ export const translations = {
     overview: "Обзор",
     users: "Пользователи",
     settings: "Настройки",
-    assignments: "Мои задания",
+    assignments: "Задания",
     progress: "Мой прогресс",
     tests: "Тесты",
     documents: "Документы",
