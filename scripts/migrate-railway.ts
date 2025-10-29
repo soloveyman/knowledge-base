@@ -20,7 +20,8 @@ async function runMigrations() {
     max: 2, // Use minimal connections for migration
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    // Railway always requires SSL, even in development
+    ssl: { rejectUnauthorized: false },
   });
 
   const db = drizzle(pool, { schema });

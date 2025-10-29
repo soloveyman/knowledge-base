@@ -1,9 +1,10 @@
 import { db } from './index';
+import { sql } from 'drizzle-orm';
 
 export async function testDatabaseConnection() {
   try {
     // Test the database connection
-    const result = await db.execute('SELECT NOW() as current_time');
+    const result = await db.execute(sql`SELECT NOW() as current_time`);
     console.log('✅ Database connection successful!');
     console.log('Current time:', result.rows[0]);
     return true;

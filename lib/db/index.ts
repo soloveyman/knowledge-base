@@ -2,6 +2,12 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 
+// Validate DATABASE_URL at startup
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is not set');
+  throw new Error('DATABASE_URL environment variable is required');
+}
+
 // Railway-optimized connection pool configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -12,9 +18,11 @@ const pool = new Pool({
   max: 10, // Conservative limit for Railway
   idleTimeoutMillis: 30000, // 30 seconds
   connectionTimeoutMillis: 10000, // 10 seconds
-  // SSL for production (Railway uses SSL)
+  // SSL for production and Railway (Railway uses SSL)
+  // Also enable SSL if connection string contains 'railway.app' (connecting to Railway from anywhere)
   ssl:
-    process.env.NODE_ENV === 'production'
+    process.env.NODE_ENV === 'production' ||
+    process.env.DATABASE_URL?.includes('railway.app')
       ? { rejectUnauthorized: false }
       : false,
   // Log connections in development
