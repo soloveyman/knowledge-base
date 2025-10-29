@@ -61,12 +61,16 @@ export async function PUT(
       }, { status: 404 })
     }
 
+    // Valid role types
+    type UserRole = 'super-admin' | 'owner' | 'manager' | 'employee'
+    const validRoles: UserRole[] = ['super-admin', 'owner', 'manager', 'employee']
+    
     // Prepare update data
     const updateData: {
       name?: string | null
       job?: string | null
       email?: string
-      role?: string
+      role?: UserRole
       password?: string
       updatedAt: Date
     } = {
@@ -76,7 +80,17 @@ export async function PUT(
     if (body.name !== undefined) updateData.name = body.name
     if (body.job !== undefined) updateData.job = body.job
     if (body.email !== undefined) updateData.email = body.email
-    if (body.role !== undefined) updateData.role = body.role
+    // Validate role before adding to updateData
+    if (body.role !== undefined) {
+      if (validRoles.includes(body.role as UserRole)) {
+        updateData.role = body.role as UserRole
+      } else {
+        return NextResponse.json({
+          success: false,
+          message: `Invalid role. Must be one of: ${validRoles.join(', ')}`
+        }, { status: 400 })
+      }
+    }
 
     // Only update password if provided
     if (body.password && body.password.trim()) {
