@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,20 +8,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Users, 
   User, 
-  Calendar, 
   Clock, 
   Target,
   Send,
   Plus,
   X,
   Search,
-  Filter,
-  CheckCircle,
-  AlertCircle
+  CheckCircle
 } from "lucide-react"
 
 interface User {
@@ -282,7 +278,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
             Assignment Details
           </CardTitle>
           <CardDescription>
-            Configure who gets the assignment and when it's due
+            Configure who gets the assignment and when it&apos;s due
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

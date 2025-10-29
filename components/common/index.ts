@@ -21,5 +21,6 @@ export { Toolbar } from "./toolbar"
 export { DataTable } from "./data-table"
 export { Modal } from "./modal"
 export { ThemeToggle } from "./theme-toggle"
+export { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar"
 export type { Column } from "./data-table"
 
