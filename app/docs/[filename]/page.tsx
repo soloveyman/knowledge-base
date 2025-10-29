@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
-import { navigateBack } from "@/lib/redirect-utils"
+import { useNavigateBack } from "@/lib/redirect-utils"
 import { processTextWithEnhancedFormatting } from '@/lib/text-formatting'
 import { renderFormattedText } from '@/lib/content-renderer'
 
@@ -50,6 +50,7 @@ export default function DocumentViewer() {
   const router = useRouter()
   const params = useParams()
   const filename = params.filename as string
+  const navigateBack = useNavigateBack()
 
   const [documentData, setDocumentData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -140,7 +141,7 @@ export default function DocumentViewer() {
           console.log('Document not found, redirecting back')
           // Document doesn't exist, redirect back to previous tab
           const userRole = (session?.user as UserWithRole)?.role || 'manager'
-          navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
+          navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
           return
         }
       } else {

@@ -7,6 +7,15 @@ export interface FormattedText {
   plainText: string
 }
 
+export interface ContentSection {
+  type: string
+  content?: string
+}
+
+export interface StructuredContent {
+  sections: ContentSection[]
+}
+
 /**
  * Process text with alignment markers and convert to HTML
  */
@@ -69,12 +78,12 @@ function escapeHtml(text: string): string {
 /**
  * Process structured content from parsers
  */
-export function processStructuredContent(content: any): FormattedText {
+export function processStructuredContent(content: StructuredContent): FormattedText {
   if (!content || !content.sections) {
     return { html: '', plainText: '' }
   }
 
-  const processedSections = content.sections.map((section: any) => {
+  const processedSections = content.sections.map((section: ContentSection) => {
     if (section.type === 'text' && section.content) {
       const processed = processTextWithAlignment(section.content)
       return `<div class="mb-4">${processed.html}</div>`
@@ -84,7 +93,7 @@ export function processStructuredContent(content: any): FormattedText {
 
   return {
     html: processedSections.join('\n'),
-    plainText: content.sections.map((section: any) => section.content || '').join('\n')
+    plainText: content.sections.map((section: ContentSection) => section.content || '').join('\n')
   }
 }
 
@@ -129,14 +138,14 @@ export function processTextWithEnhancedFormatting(text: string): FormattedText {
 
   // First pass: Process [BOLD] and [ITALIC] tags
   let html = text
-    .replace(/\[BOLD\](.*?)\[\/BOLD\]/gs, '<strong class="font-bold">$1</strong>')
-    .replace(/\[ITALIC\](.*?)\[\/ITALIC\]/gs, '<em class="italic">$1</em>')
+    .replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '<strong class="font-bold">$1</strong>')
+    .replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '<em class="italic">$1</em>')
   
   // Process alignment tags with block elements
   html = html
-    .replace(/\[CENTER\](.*?)\[\/CENTER\]/gs, '<div class="mb-4 text-center">$1</div>')
-    .replace(/\[RIGHT\](.*?)\[\/RIGHT\]/gs, '<div class="mb-4 text-right">$1</div>')
-    .replace(/\[JUSTIFY\](.*?)\[\/JUSTIFY\]/gs, '<div class="mb-4 text-justify">$1</div>')
+    .replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '<div class="mb-4 text-center">$1</div>')
+    .replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '<div class="mb-4 text-right">$1</div>')
+    .replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '<div class="mb-4 text-justify">$1</div>')
   
   // Process markdown-style formatting
   html = html

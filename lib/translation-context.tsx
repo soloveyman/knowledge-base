@@ -18,7 +18,10 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const savedLanguage = localStorage.getItem('language') as Language
     if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'ru')) {
-      setLanguage(savedLanguage)
+      // Use setTimeout to defer the state update
+      setTimeout(() => {
+        setLanguage(savedLanguage)
+      }, 0)
     }
   }, [])
 

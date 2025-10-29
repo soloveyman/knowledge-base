@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation"
 import { TestTube, Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
+import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
 
 interface Test {
   id: string
@@ -32,15 +34,17 @@ export function TestsPage({
   isLoading = false
 }: TestsPageProps) {
   const router = useRouter()
+  const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
 
   const testItems = tests.map((test) => ({
     id: test.id,
     title: test.title,
-    subtitle: `${test.type} • ${test.questionCount} questions • Created ${new Date(test.createdAt).toLocaleDateString()}`,
-    metadata: [`Source: ${test.sourceDocument}`],
+    subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${new Date(test.createdAt).toLocaleDateString()}`,
+    metadata: [`${t('source')}: ${test.sourceDocument}`],
     badges: [
-      { label: test.difficulty, variant: "outline" as const },
-      { label: test.locale, variant: "secondary" as const }
+      { label: translateBadge(test.difficulty || 'medium'), variant: "outline" as const },
+      { label: translateBadge(test.locale || 'en'), variant: "secondary" as const }
     ],
     onClick: () => onViewTest(test.id),
     onDelete: () => onDeleteTest(test.id),
@@ -49,11 +53,11 @@ export function TestsPage({
 
   return (
     <ManagementPage
-      title="Test Management"
-      description="Create and manage tests and assessments"
+      title={t('testManagement')}
+      description={t('createAndManageTests')}
       icon={<TestTube className="h-8 w-8" />}
       actionButton={{
-        label: "Create Test",
+        label: t('createTest'),
         icon: <Plus className="h-4 w-4" />,
         onClick: () => router.push('/test-builder')
       }}
@@ -62,9 +66,9 @@ export function TestsPage({
       isLoading={isLoading}
       emptyState={{
         icon: <TestTube className="h-12 w-12" />,
-        title: "No tests created yet",
-        description: "Create your first test using the Test Builder",
-        actionLabel: "Create Test",
+        title: t('noTestsCreated'),
+        description: t('getStartedCreateTest'),
+        actionLabel: t('createTest'),
         onAction: () => router.push('/test-builder')
       }}
     />

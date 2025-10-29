@@ -255,9 +255,9 @@ export default function EmployeePage() {
       type: type,
       status: userStatus,
       progress: userStatus === 'completed' ? 100 : 0,
-      dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : 'No due date',
-      description: assignment.description || `Complete assignment ${assignment.id.slice(0, 8)}`, // Use actual description or generate
-      estimatedTime: assignment.testId ? "15 min" : "30 min",
+      dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : t('noDueDate'),
+      description: assignment.description || `${t('completeAssignment')} ${assignment.id.slice(0, 8)}`, // Use actual description or generate
+      estimatedTime: assignment.testId ? `15 ${t('minutes')}` : `30 ${t('minutes')}`,
       score: testScore, // Use actual test score from database
       moduleId: assignment.moduleId,
       testId: assignment.testId
@@ -336,18 +336,18 @@ export default function EmployeePage() {
             {/* Overall Progress Card - Top */}
             <Card>
               <CardHeader>
-                <CardTitle>Overall Progress</CardTitle>
-                <CardDescription>Your learning journey progress</CardDescription>
+                <CardTitle>{t('overallProgress')}</CardTitle>
+                <CardDescription>{t('yourLearningJourneyProgress')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex justify-between text-sm">
-                    <span>Overall Completion</span>
+                    <span>{t('overallCompletion')}</span>
                     <span>{Math.round(totalProgress)}%</span>
                   </div>
                   <Progress value={totalProgress} className="h-3" />
                   <div className="text-xs text-muted-foreground">
-                    {completedCount} of {assignments.length} assignments completed
+                    {completedCount} of {assignments.length} {t('assignmentsCompleted')}
                   </div>
                 </div>
               </CardContent>
@@ -357,56 +357,56 @@ export default function EmployeePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('totalAssignments')}</CardTitle>
                   <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{assignments.length}</div>
-                  <p className="text-xs text-muted-foreground">All time</p>
+                  <p className="text-xs text-muted-foreground">{t('allTime')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('completed')}</CardTitle>
                   <CheckCircle className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">{completedCount}</div>
-                  <p className="text-xs text-muted-foreground">Ready for review</p>
+                  <p className="text-xs text-muted-foreground">{t('readyForReview')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('inProgress')}</CardTitle>
                   <Clock className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">{inProgressCount}</div>
-                  <p className="text-xs text-muted-foreground">Keep going!</p>
+                  <p className="text-xs text-muted-foreground">{t('keepGoing')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('pending')}</CardTitle>
                   <AlertCircle className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-yellow-600">{pendingCount}</div>
-                  <p className="text-xs text-muted-foreground">Not started</p>
+                  <p className="text-xs text-muted-foreground">{t('notStarted')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Failed</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('failed')}</CardTitle>
                   <AlertCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">{failedCount}</div>
-                  <p className="text-xs text-muted-foreground">Need retake</p>
+                  <p className="text-xs text-muted-foreground">{t('needRetake')}</p>
                 </CardContent>
               </Card>
             </div>
@@ -417,8 +417,8 @@ export default function EmployeePage() {
             {transformedAssignments.length === 0 ? (
               <EmptyState
                 icon={<ClipboardList className="h-12 w-12" />}
-                title="No assignments yet"
-                description="You don't have any assignments at the moment. Check back later or contact your manager if you're expecting assignments."
+                title={t('noAssignmentsYet')}
+                description={t('youDontHaveAnyAssignmentsAtTheMoment')}
               />
             ) : (
               <div className="grid gap-4">
@@ -449,7 +449,7 @@ export default function EmployeePage() {
                             {assignment.dueDate && (
                               <div className="flex items-center space-x-1">
                                 {getStatusIcon(assignment.status)}
-                                <span>Due: {assignment.dueDate}</span>
+                                <span>{t('due')}: {assignment.dueDate}</span>
                               </div>
                             )}
                             <div className="flex items-center space-x-1">
@@ -459,7 +459,7 @@ export default function EmployeePage() {
                             {assignment.score && (
                               <div className="flex items-center space-x-1">
                                 <BarChart3 className="h-5 w-5" />
-                                <span>Score: {assignment.score}%</span>
+                                <span>{t('score')}: {assignment.score}%</span>
                               </div>
                             )}
                           </div>
@@ -472,7 +472,7 @@ export default function EmployeePage() {
                                 onClick={() => handleReadDocument(assignment.id)}
                                 className="flex-1 text-primary border-primary hover:bg-primary hover:text-primary-foreground"
                               >
-                                Read
+                                {t('read')}
                               </Button>
                             )}
                             {(assignment.type === 'both' || assignment.type === 'test') && (
@@ -482,7 +482,7 @@ export default function EmployeePage() {
                                 onClick={() => handleTakeTest(assignment.id)}
                                 className="flex-1 text-primary border-primary hover:bg-primary hover:text-primary-foreground"
                               >
-                                Test
+                                {t('test')}
                               </Button>
                             )}
                           </div>
@@ -501,26 +501,26 @@ export default function EmployeePage() {
             <div className="grid gap-3 md:gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Learning Statistics</CardTitle>
-                  <CardDescription>Your performance and completion rates</CardDescription>
+                  <CardTitle>{t('learningStatistics')}</CardTitle>
+                  <CardDescription>{t('yourPerformanceAndCompletionRates')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap justify-between items-center gap-4">
                     <div className="text-center">
                       <div className="text-3xl font-bold text-green-600">{completedCount}</div>
-                      <div className="text-sm text-muted-foreground">Completed</div>
+                      <div className="text-sm text-muted-foreground">{t('completed')}</div>
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-blue-600">{inProgressCount}</div>
-                      <div className="text-sm text-muted-foreground">In Progress</div>
+                      <div className="text-sm text-muted-foreground">{t('inProgress')}</div>
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-yellow-600">{pendingCount}</div>
-                      <div className="text-sm text-muted-foreground">Pending</div>
+                      <div className="text-sm text-muted-foreground">{t('pending')}</div>
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-red-600">{failedCount}</div>
-                      <div className="text-sm text-muted-foreground">Failed</div>
+                      <div className="text-sm text-muted-foreground">{t('failed')}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -528,8 +528,8 @@ export default function EmployeePage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Your recent assignment activity and test scores</CardDescription>
+                  <CardTitle>{t('recentActivity')}</CardTitle>
+                  <CardDescription>{t('yourRecentAssignmentActivityAndTestScores')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -546,14 +546,14 @@ export default function EmployeePage() {
                               <StatusBadge status={assignment.status} />
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {assignment.dueDate && `Due: ${assignment.dueDate}`}
+                              {assignment.dueDate && `${t('due')}: ${assignment.dueDate}`}
                             </p>
                           </div>
                           <div className="text-right">
                             <div className={`text-lg font-bold ${assignment.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
                               {assignment.score}%
                             </div>
-                            <div className="text-xs text-muted-foreground">Score</div>
+                            <div className="text-xs text-muted-foreground">{t('score')}</div>
                           </div>
                         </div>
                       ))}
@@ -566,18 +566,18 @@ export default function EmployeePage() {
                         <div key={attempt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium">Test Attempt</h4>
+                              <h4 className="font-medium">{t('testAttempt')}</h4>
                               <StatusBadge status={attempt.status === 'completed' ? 'completed' : 'failed'} />
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {attempt.completedAt && `Completed: ${new Date(attempt.completedAt).toLocaleDateString()}`}
+                              {attempt.completedAt && `${t('completed')}: ${new Date(attempt.completedAt).toLocaleDateString()}`}
                             </p>
                           </div>
                           <div className="text-right">
                             <div className={`text-lg font-bold ${attempt.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
                               {attempt.score}%
                             </div>
-                            <div className="text-xs text-muted-foreground">Score</div>
+                            <div className="text-xs text-muted-foreground">{t('score')}</div>
                           </div>
                         </div>
                       ))}

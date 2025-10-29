@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ErrorMessage } from "@/components/common/error-message"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   FileText, 
   X,
@@ -57,6 +58,7 @@ const locales: Locale[] = [
 
 export default function TestBuilderPage() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation()
   const router = useRouter()
   
   const [documents, setDocuments] = useState<Document[]>([])
@@ -640,7 +642,7 @@ export default function TestBuilderPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
-                {isEditMode ? 'Edit Test' : 'Test Builder'}
+                {isEditMode ? t('editTest') : t('testBuilder')}
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -660,12 +662,12 @@ export default function TestBuilderPage() {
             {/* Test Configuration */}
             <Card className="overflow-hidden">
               <CardHeader>
-                <CardTitle>Test Configuration</CardTitle>
-                <CardDescription>Configure your test parameters</CardDescription>
+                <CardTitle>{t('testConfiguration')}</CardTitle>
+                <CardDescription>{t('configureTestParameters')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 overflow-hidden">
                 <div>
-                  <Label htmlFor="document-select">Select Document *</Label>
+                  <Label htmlFor="document-select">{t('selectDocument')} *</Label>
                   <Select 
                     value={selectedDocument?.id?.toString() || ""} 
                     onValueChange={(value) => {
@@ -674,7 +676,7 @@ export default function TestBuilderPage() {
                     }}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a document to generate questions from..." />
+                      <SelectValue placeholder={t('chooseDocumentToGenerate')} />
                     </SelectTrigger>
                     <SelectContent>
                       {documents.map((doc) => (
@@ -691,7 +693,7 @@ export default function TestBuilderPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="count">Number of Questions</Label>
+                    <Label htmlFor="count">{t('numberOfQuestions')}</Label>
                     <Input
                       id="count"
                       type="number"
@@ -703,7 +705,7 @@ export default function TestBuilderPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="type">Question Type</Label>
+                    <Label htmlFor="type">{t('questionType')}</Label>
                     <Select value={testConfig.type} onValueChange={(value) => setTestConfig(prev => ({ ...prev, type: value }))}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -711,7 +713,15 @@ export default function TestBuilderPage() {
                       <SelectContent>
                         {questionTypes.map((type) => (
                           <SelectItem key={type.value} value={type.value}>
-                            {type.label}
+                            {type.value === 'mcq' ? t('multipleChoiceSingle') :
+                             type.value === 'mcq_multi' ? t('multipleChoiceMultiple') :
+                             type.value === 'tf' ? t('trueFalse') :
+                             type.value === 'complete' ? t('fillInBlank') :
+                             type.value === 'cloze' ? t('clozeTest') :
+                             type.value === 'match' ? t('matching') :
+                             type.value === 'order' ? t('ordering') :
+                             type.value === 'mixed' ? t('mixedTypes') :
+                             type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -721,7 +731,7 @@ export default function TestBuilderPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="difficulty">Difficulty</Label>
+                    <Label htmlFor="difficulty">{t('difficulty')}</Label>
                     <Select value={testConfig.difficulty} onValueChange={(value) => setTestConfig(prev => ({ ...prev, difficulty: value }))}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -729,14 +739,17 @@ export default function TestBuilderPage() {
                       <SelectContent>
                         {difficultyLevels.map((level) => (
                           <SelectItem key={level.value} value={level.value}>
-                            {level.label}
+                            {level.value === 'easy' ? t('easy') :
+                             level.value === 'medium' ? t('medium') :
+                             level.value === 'hard' ? t('hard') :
+                             level.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="locale">Language</Label>
+                    <Label htmlFor="locale">{t('language')}</Label>
                     <Select value={testConfig.locale} onValueChange={(value) => setTestConfig(prev => ({ ...prev, locale: value }))}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -744,7 +757,9 @@ export default function TestBuilderPage() {
                       <SelectContent>
                         {locales.map((locale) => (
                           <SelectItem key={locale.value} value={locale.value}>
-                            {locale.label}
+                            {locale.value === 'ru' ? t('russian') :
+                             locale.value === 'en' ? t('english') :
+                             locale.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -761,12 +776,12 @@ export default function TestBuilderPage() {
                     {isGenerating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {generatedQuestions.length > 0 ? 'Adding More Questions...' : 'Generating...'}
+                        {generatedQuestions.length > 0 ? t('loading') + '...' : t('loading') + '...'}
                       </>
                     ) : (
                       <>
                         <TestTube className="h-4 w-4 mr-2" />
-                        {generatedQuestions.length > 0 ? 'Add More Questions' : 'Generate Questions'}
+                        {t('addQuestion')}
                       </>
                     )}
                   </Button>
@@ -785,15 +800,15 @@ export default function TestBuilderPage() {
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div className="min-w-0 flex-1">
-                      <CardTitle>Generated Questions</CardTitle>
+                      <CardTitle>{t('generatedQuestions')}</CardTitle>
                       <CardDescription className="wrap-break-word">
                         {isEditMode ? (
                           <>
-                            {generatedQuestions.length} questions total 
-                            ({originalQuestionCount} existing, {generatedQuestions.length - originalQuestionCount} new)
+                            {generatedQuestions.length} {t('questions')} {t('total')} 
+                            ({originalQuestionCount} {t('existing')}, {generatedQuestions.length - originalQuestionCount} {t('new')})
                           </>
                         ) : (
-                          `${generatedQuestions.length} questions generated successfully`
+                          `${generatedQuestions.length} ${t('questionsGeneratedSuccessfully')}`
                         )}
                         {aiProvider && (
                           <span className="ml-2 text-blue-600">
@@ -810,7 +825,7 @@ export default function TestBuilderPage() {
                           className="w-full sm:w-auto"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Clear All
+                          {t('clear')}
                         </Button>
                       )}
                       <Button 
@@ -821,12 +836,12 @@ export default function TestBuilderPage() {
                         {isSaving ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
+                            {t('loading')}...
                           </>
                         ) : (
                           <>
                             <Save className="h-4 w-4 mr-2" />
-                            {isEditMode ? 'Update Test' : 'Save Test'}
+                            {isEditMode ? t('save') : t('saveTest')}
                           </>
                         )}
                       </Button>
@@ -839,9 +854,9 @@ export default function TestBuilderPage() {
                       <div key={question.id || index} className="p-4 border rounded-lg overflow-hidden">
                         <div className="flex items-start justify-between mb-2 gap-2">
                           <div className="flex items-center space-x-2 min-w-0">
-                            <h4 className="font-medium truncate">Question {index + 1}</h4>
+                            <h4 className="font-medium truncate">{t('question')} {index + 1}</h4>
                             {isEditMode && index >= originalQuestionCount && (
-                              <Badge variant="default" className="text-xs shrink-0">New</Badge>
+                              <Badge variant="default" className="text-xs shrink-0">{t('new')}</Badge>
                             )}
                           </div>
                           <div className="flex items-center space-x-2 shrink-0">
@@ -858,7 +873,7 @@ export default function TestBuilderPage() {
                         
                         <div className="space-y-3">
                           <div>
-                            <Label>Question Text</Label>
+                            <Label>{t('questionText')}</Label>
                             <Textarea
                               value={question.prompt}
                               onChange={(e) => handleUpdateQuestionField(question.id, 'prompt', e.target.value)}
@@ -870,14 +885,14 @@ export default function TestBuilderPage() {
                           {question.choices && question.choices.length > 0 && (
                             <div>
                               <div className="flex items-center justify-between mb-2">
-                                <Label>Answer Choices</Label>
+                                <Label>{t('answerChoices')}</Label>
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleAddChoice(question.id)}
                                 >
                                   <Plus className="h-4 w-4 mr-1" />
-                                  Add Choice
+                                  {t('addChoice')}
                                 </Button>
                               </div>
                               <div className="space-y-2">
@@ -906,7 +921,7 @@ export default function TestBuilderPage() {
                           )}
                           
                           <div>
-                            <Label>Correct Answer</Label>
+                            <Label>{t('correctAnswer')}</Label>
                             <Input
                               value={question.correct_answer || ''}
                               onChange={(e) => handleUpdateQuestionField(question.id, 'correct_answer', e.target.value)}
@@ -916,7 +931,7 @@ export default function TestBuilderPage() {
                           </div>
                           
                           <div>
-                            <Label>Explanation</Label>
+                            <Label>{t('explanation')}</Label>
                             <Textarea
                               value={question.explanation || ''}
                               onChange={(e) => handleUpdateQuestionField(question.id, 'explanation', e.target.value)}

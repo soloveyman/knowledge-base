@@ -184,20 +184,20 @@ export default function OwnerPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('totalUsers')}</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedUsers.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    {savedUsers.filter(u => u.role === 'manager').length} managers, {savedUsers.filter(u => u.role === 'employee').length} employees
+                    {savedUsers.filter(u => u.role === 'manager').length} {t('managers')}, {savedUsers.filter(u => u.role === 'employee').length} {t('employees')}
                   </p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Training</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('activeTraining')}</CardTitle>
                   <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -222,7 +222,7 @@ export default function OwnerPage() {
                           })
                         }
                       })
-                      return `${activeCount} active, ${completedCount} completed`
+                      return `${activeCount} ${t('active')}, ${completedCount} ${t('completed')}`
                     })()}
                   </p>
                 </CardContent>
@@ -230,20 +230,20 @@ export default function OwnerPage() {
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Documents</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('documents')}</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedDocuments.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    {savedDocuments.filter(d => d.type === 'DOCX').length} DOCX, {savedDocuments.filter(d => d.type === 'XLSX').length} XLSX
+                    {savedDocuments.filter(d => d.type === 'DOCX').length} {t('docx')}, {savedDocuments.filter(d => d.type === 'XLSX').length} {t('xlsx')}
                   </p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('completionRate')}</CardTitle>
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -284,7 +284,7 @@ export default function OwnerPage() {
                         }
                       })
                       
-                      return `${completedUserAssignments} of ${totalUserAssignments} completed`
+                      return `${completedUserAssignments} of ${totalUserAssignments} ${t('completedOfTotal')}`
                     })()}
                   </p>
                 </CardContent>
@@ -293,7 +293,9 @@ export default function OwnerPage() {
 
             <UserProgressReport 
               users={savedUsers} 
-              assignments={savedAssignments as SavedAssignment[] & { users?: Array<{ userId: string; status: string; testScore?: number }> }[]}
+              assignments={[]}
+              modules={savedDocuments}
+              tests={[]}
             />
 
           </TabsContent>
@@ -311,13 +313,13 @@ export default function OwnerPage() {
           <TabsContent value="settings" className="space-y-3 md:space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>Configure system-wide settings and preferences</CardDescription>
+                <CardTitle>{t('systemSettings')}</CardTitle>
+                <CardDescription>{t('configureSystemWideSettings')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
                   <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p>System settings will be implemented here</p>
+                  <p>{t('systemSettingsWillBeImplementedHere')}</p>
                 </div>
               </CardContent>
             </Card>

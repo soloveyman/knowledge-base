@@ -1,6 +1,7 @@
 import React from "react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { useBadgeTranslation } from "./badge-translations"
 
 // Badge variant types
 export type BadgeVariant = "default" | "secondary" | "outline" | "destructive" | "success" | "warning" | "info"
@@ -153,6 +154,7 @@ interface CommonBadgeProps {
 }
 
 export function CommonBadge({ type, value, className, showIcon, icon }: CommonBadgeProps) {
+  const translateBadge = useBadgeTranslation()
   let config
   
   if (type === 'count') {
@@ -163,7 +165,10 @@ export function CommonBadge({ type, value, className, showIcon, icon }: CommonBa
   }
   
   const variant = config.variant as BadgeVariant
-  const label = config.label
+  const label = typeof config.label === 'function' ? config.label : config.label
+  
+  // Translate the label
+  const translatedLabel = translateBadge(label)
   
   // Special handling for failed status in status badges
   const isFailedStatus = type === 'status' && String(value).toLowerCase() === 'failed'
@@ -180,7 +185,7 @@ export function CommonBadge({ type, value, className, showIcon, icon }: CommonBa
       )}
     >
       {showIcon && icon}
-      {label}
+      {translatedLabel}
     </Badge>
   )
 }

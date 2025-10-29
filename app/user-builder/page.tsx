@@ -9,12 +9,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ErrorMessage } from "@/components/common/error-message"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   Users, 
   X, 
   Loader2,
   Save,
-  UserPlus
+  UserPlus,
+  Eye,
+  EyeOff
 } from "lucide-react"
 
 interface User {
@@ -40,6 +43,7 @@ interface UserConfig {
 export default function UserBuilderPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const { t } = useTranslation()
   
   const [userConfig, setUserConfig] = useState<UserConfig>({
     name: "",
@@ -53,6 +57,7 @@ export default function UserBuilderPage() {
   const [error, setError] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (status === "loading") return
@@ -222,7 +227,7 @@ export default function UserBuilderPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
-                {isEditMode ? 'Edit User' : 'User Builder'}
+                {isEditMode ? t('editUser') : t('userBuilder')}
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -242,9 +247,9 @@ export default function UserBuilderPage() {
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
-                  <CardTitle>User Information</CardTitle>
+                  <CardTitle>{t('userInformation')}</CardTitle>
                   <CardDescription>
-                    {isEditMode ? 'Update user details and role' : 'Create a new user account'}
+                    {isEditMode ? t('updateUserDetailsAndRole') : t('createNewUserAccount')}
                   </CardDescription>
                 </div>
                 <Button 
@@ -255,12 +260,12 @@ export default function UserBuilderPage() {
                   {isCreating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {isEditMode ? 'Updating...' : 'Creating...'}
+                      {isEditMode ? t('updating') : t('creating')}
                     </>
                   ) : (
                     <>
                       <UserPlus className="h-4 w-4 mr-2" />
-                      {isEditMode ? 'Update User' : 'Create User'}
+                      {isEditMode ? t('updateUser') : t('createUser')}
                     </>
                   )}
                 </Button>
@@ -270,87 +275,96 @@ export default function UserBuilderPage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
+                    <Label htmlFor="name">{t('fullName')} *</Label>
                     <Input
                       id="name"
                       value={userConfig.name}
                       onChange={(e) => handleInputChange('name', e.target.value)}
-                      placeholder="Enter full name"
+                      placeholder={t('enterFullName')}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="job">Job Title *</Label>
+                    <Label htmlFor="job">{t('jobTitle')} *</Label>
                     <Input
                       id="job"
                       value={userConfig.job}
                       onChange={(e) => handleInputChange('job', e.target.value)}
-                      placeholder="Enter job title"
+                      placeholder={t('enterJobTitle')}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address *</Label>
+                    <Label htmlFor="email">{t('emailAddress')} *</Label>
                     <Input
                       id="email"
                       type="email"
                       value={userConfig.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      placeholder="Enter email address"
+                      placeholder={t('enterEmailAddress')}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="password">
-                      Password {!isEditMode && '*'}
+                      {t('password')} {!isEditMode && '*'}
                       {isEditMode && <span className="text-sm text-muted-foreground ml-1">(leave blank to keep current)</span>}
                     </Label>
-                    
-                    
-                    <Input
-                      id="password"
-                      type="password"
-                      value={userConfig.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      placeholder={isEditMode ? "Enter new password (optional)" : "Enter password"}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={userConfig.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        placeholder={isEditMode ? "Enter new password (optional)" : t('enterPassword')}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2 md:col-span-1">
-                    <Label htmlFor="role">Role *</Label>
+                    <Label htmlFor="role">{t('role')} *</Label>
                     <Select value={userConfig.role} onValueChange={(value) => handleInputChange('role', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select user role" />
+                        <SelectValue placeholder={t('selectUserRole')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="manager">{t('manager')}</SelectItem>
+                        <SelectItem value="employee">{t('employee')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="bg-primary/10 p-4 rounded-lg">
-                  <h4 className="font-medium text-primary-foreground mb-2">Role Permissions</h4>
+                  <h4 className="font-medium text-primary-foreground mb-2">{t('rolePermissions')}</h4>
                   <div className="text-sm text-primary-foreground space-y-1">
                     {userConfig.role === 'manager' && (
                       <>
-                        <p>• Create and manage tests and assignments</p>
-                        <p>• View employee progress and results</p>
-                        <p>• Access management dashboard</p>
-                        <p>• Import and manage documents</p>
+                        <p>• {t('createAndManageTestsAndAssignments')}</p>
+                        <p>• {t('viewEmployeeProgressAndResults')}</p>
+                        <p>• {t('accessManagementDashboard')}</p>
+                        <p>• {t('importAndManageDocuments')}</p>
                       </>
                     )}
                     {userConfig.role === 'employee' && (
                       <>
-                        <p>• Take assigned tests and training</p>
-                        <p>• View personal progress and results</p>
-                        <p>• Access employee dashboard</p>
-                        <p>• View assigned documents</p>
+                        <p>• {t('takeAssignedTestsAndTraining')}</p>
+                        <p>• {t('viewPersonalProgressAndResults')}</p>
+                        <p>• {t('accessEmployeeDashboard')}</p>
+                        <p>• {t('viewAssignedDocuments')}</p>
                       </>
                     )}
                     {!userConfig.role && (
-                      <p className="text-muted-foreground">Select a role to see permissions</p>
+                      <p className="text-muted-foreground">{t('selectRoleToSeePermissions')}</p>
                     )}
                   </div>
                 </div>

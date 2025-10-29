@@ -615,15 +615,15 @@ export default function ManagerPage() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
-                    <CardTitle>Uploaded Documents</CardTitle>
-                    <CardDescription>View and manage your uploaded documents</CardDescription>
+                    <CardTitle>{t('uploadedDocuments')}</CardTitle>
+                    <CardDescription>{t('viewAndManageDocuments')}</CardDescription>
                   </div>
                   <Button 
                     className="w-full sm:w-auto"
                     onClick={handleImportDocument}
                   >
                     <FileText className="h-4 w-4 mr-2" />
-                    Import Document
+                    {t('importDocument')}
                   </Button>
                 </div>
               </CardHeader>
@@ -631,14 +631,14 @@ export default function ManagerPage() {
                 {isLoadingDocuments ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-                    <span className="ml-3 text-muted-foreground">Refreshing documents...</span>
+                    <span className="ml-3 text-muted-foreground">{t('refreshingDocuments')}</span>
                   </div>
                 ) : documents.length === 0 ? (
                   <EmptyState
                     icon={<FileText className="h-12 w-12" />}
-                    title="No documents uploaded yet"
-                    description="Get started by importing your first document to create training materials and tests."
-                    actionLabel="Import Document"
+                    title={t('noDocumentsUploaded')}
+                    description={t('getStartedImportDocument')}
+                    actionLabel={t('importDocument')}
                     onAction={handleImportDocument}
                   />
                 ) : (

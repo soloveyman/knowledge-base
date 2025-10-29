@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   Wand2, 
   Settings, 
@@ -78,6 +79,7 @@ export default function TestGenerator({
   onGenerate,
   onSave 
 }: TestGeneratorProps) {
+  const { t } = useTranslation()
   const [params, setParams] = useState<GenerationParams>({
     moduleId,
     sectionIds: [],
@@ -95,16 +97,16 @@ export default function TestGenerator({
   const [previewMode, setPreviewMode] = useState(false)
 
   const questionTypeOptions = [
-    { value: 'multiple_choice', label: 'Multiple Choice', icon: '○' },
-    { value: 'true_false', label: 'True/False', icon: '✓' },
-    { value: 'text', label: 'Text Answer', icon: 'T' }
+    { value: 'multiple_choice', label: t('multipleChoice'), icon: '○' },
+    { value: 'true_false', label: t('trueFalse'), icon: '✓' },
+    { value: 'text', label: t('textAnswer'), icon: 'T' }
   ]
 
   const difficultyOptions = [
-    { value: 'easy', label: 'Easy', color: 'bg-green-100 text-green-800' },
-    { value: 'medium', label: 'Medium', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'hard', label: 'Hard', color: 'bg-red-100 text-red-800' },
-    { value: 'mixed', label: 'Mixed', color: 'bg-blue-100 text-blue-800' }
+    { value: 'easy', label: t('easy'), color: 'bg-green-100 text-green-800' },
+    { value: 'medium', label: t('medium'), color: 'bg-yellow-100 text-yellow-800' },
+    { value: 'hard', label: t('hard'), color: 'bg-red-100 text-red-800' },
+    { value: 'mixed', label: t('mixed'), color: 'bg-blue-100 text-blue-800' }
   ]
 
   const handleParamChange = (field: keyof GenerationParams, value: GenerationParams[keyof GenerationParams]) => {
@@ -494,7 +496,7 @@ export default function TestGenerator({
                 </Button>
                 <Button onClick={() => onSave && onSave({ questions: generatedQuestions, params })}>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Create Test
+                  {t('createTest')}
                 </Button>
               </div>
             </div>

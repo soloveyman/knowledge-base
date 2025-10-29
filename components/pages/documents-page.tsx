@@ -1,6 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
 import { FileText, Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
 
@@ -27,18 +28,20 @@ export function DocumentsPage({
   onImportDocument
 }: DocumentsPageProps) {
   const router = useRouter()
+  const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
 
   const documentItems = documents.map((doc) => ({
     id: doc.id,
     title: doc.name,
-    subtitle: `Uploaded ${doc.uploadedAt}`,
+    subtitle: `${t('uploaded')} ${doc.uploadedAt.replace(/^Uploaded\s+/, '')}`,
     metadata: doc.size ? [doc.size] : undefined,
     badges: [
       {
-        label: doc.type,
+        label: translateBadge(doc.type),
         variant: doc.type === 'DOCX' ? 'default' : doc.type === 'XLSX' ? 'secondary' : 'outline'
       },
-      ...(doc.status === 'ready' ? [{ label: 'Ready', variant: 'default' as const }] : [])
+      ...(doc.status === 'ready' ? [{ label: translateBadge('ready'), variant: 'default' as const }] : [])
     ],
     onClick: () => onViewDocument(doc.name),
     onDelete: () => onDeleteDocument(doc.id)
@@ -46,20 +49,20 @@ export function DocumentsPage({
 
   return (
     <ManagementPage
-      title="Uploaded Documents"
-      description="View and manage your uploaded documents"
+      title={t('uploadedDocuments')}
+      description={t('viewAndManageDocuments')}
       icon={<FileText className="h-8 w-8" />}
       actionButton={{
-        label: "Import Document",
+        label: t('importDocument'),
         icon: <Plus className="h-4 w-4" />,
         onClick: onImportDocument || (() => router.push('/docs/import?returnTo=/docs'))
       }}
       items={documentItems}
       emptyState={{
         icon: <FileText className="h-12 w-12" />,
-        title: "No documents uploaded yet",
-        description: "Upload your first document to get started",
-        actionLabel: "Import Document",
+        title: t('noDocumentsUploaded'),
+        description: t('getStartedImportDocument'),
+        actionLabel: t('importDocument'),
         onAction: onImportDocument || (() => router.push('/docs/import?returnTo=/docs'))
       }}
     />

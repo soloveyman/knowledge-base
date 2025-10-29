@@ -22,7 +22,8 @@ import {
   AlertCircle,
   ArrowLeft
 } from "lucide-react"
-import { navigateBack } from "@/lib/redirect-utils"
+import { useNavigateBack } from "@/lib/redirect-utils"
+import { useTranslation } from "@/lib/translation-context"
 
 interface UserWithRole {
   name?: string | null
@@ -57,6 +58,8 @@ export default function TestPage() {
   const router = useRouter()
   const params = useParams()
   const testId = params.testId as string
+  const navigateBack = useNavigateBack()
+  const { t } = useTranslation()
 
   const [testData, setTestData] = useState<TestData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -200,7 +203,7 @@ export default function TestPage() {
     } else {
       // Determine user role from session or default to employee
       const userRole = (session?.user as UserWithRole)?.role || 'employee'
-      navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'assignments')
+      navigateBack(userRole as 'employee' | 'manager' | 'owner', 'assignments')
     }
   }
 
@@ -208,7 +211,7 @@ export default function TestPage() {
     setShowExitConfirm(false)
     // Determine user role from session or default to employee
     const userRole = (session?.user as UserWithRole)?.role || 'employee'
-    navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'assignments')
+    navigateBack(userRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
 
   const handleCancelExit = () => {
@@ -275,7 +278,7 @@ export default function TestPage() {
           <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">
-                {score >= 70 ? 'Congratulations!' : 'Test Completed'}
+                {score >= 70 ? t('congratulations') : t('testCompleted')}
               </CardTitle>
               <CardDescription>
                 {testData.title}
@@ -286,24 +289,24 @@ export default function TestPage() {
                 {score}%
               </div>
               <div className="text-lg text-muted-foreground">
-                {score >= 70 ? 'You passed the test!' : 'You need to score 70% or higher to pass.'}
+                {score >= 70 ? t('youPassedTheTest') : t('youNeedToScore70PercentOrHigherToPass')}
               </div>
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="text-2xl font-bold text-foreground">
                     {Object.keys(answers).length}
                   </div>
-                  <div className="text-sm text-muted-foreground">Questions Answered</div>
+                  <div className="text-sm text-muted-foreground">{t('questionsAnswered')}</div>
                 </div>
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="text-2xl font-bold text-foreground">
                     {testData.questions.length}
                   </div>
-                  <div className="text-sm text-muted-foreground">Total Questions</div>
+                  <div className="text-sm text-muted-foreground">{t('totalQuestions')}</div>
                 </div>
               </div>
               <Button onClick={handleBack} className="w-full max-w-xs">
-                Back to Assignments
+                {t('backToAssignments')}
               </Button>
             </CardContent>
           </Card>
@@ -327,7 +330,7 @@ export default function TestPage() {
                   {testData.title}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Question {currentQuestion + 1} of {testData.questions.length}
+                  {t('question')} {currentQuestion + 1} {t('of')} {testData.questions.length}
                 </p>
               </div>
             </div>
@@ -348,7 +351,7 @@ export default function TestPage() {
       <div className="bg-card border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-            <span>Progress</span>
+            <span>{t('progress')}</span>
             <span>{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} className="h-2" />
@@ -361,10 +364,10 @@ export default function TestPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TestTube className="h-5 w-5" />
-              Question {currentQuestion + 1}
+              {t('question')} {currentQuestion + 1}
             </CardTitle>
             <CardDescription>
-              {testData.difficulty.charAt(0).toUpperCase() + testData.difficulty.slice(1)} • {testData.type.toUpperCase()}
+              {testData.difficulty.charAt(0).toUpperCase() + testData.difficulty.slice(1)} • {testData.type.toUpperCase() === 'MCQ' ? t('mcq') : testData.type.toUpperCase()}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -410,17 +413,17 @@ export default function TestPage() {
                 onClick={handlePreviousQuestion}
                 disabled={currentQuestion === 0}
               >
-                Previous
+                {t('previous')}
               </Button>
               
               <div className="flex space-x-2">
                 {currentQuestion === testData.questions.length - 1 ? (
                   <Button onClick={handleSubmitTest} className="bg-green-600 hover:bg-green-700">
-                    Submit Test
+                    {t('submitTest')}
                   </Button>
                 ) : (
                   <Button onClick={handleNextQuestion}>
-                    Next
+                    {t('next')}
                   </Button>
                 )}
               </div>

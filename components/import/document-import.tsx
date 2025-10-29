@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { parseDocument, UnsupportedFileTypeError, FileReadError, ParseError, ParsedContent } from "@/lib/parsers"
 import { clearParsingCache } from "@/lib/localStorage-utils"
+import { useTranslation } from '@/lib/translation-context'
 
 interface ParsingLog {
   level: 'info' | 'warning' | 'error'
@@ -35,6 +36,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
   const [, setParsedContent] = useState<ParsedContent | null>(null)
   const [parsingLog, setParsingLog] = useState<ParsingLog[]>([])
   const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation()
 
   const handleFileSelect = useCallback((file: File) => {
     // Validate file type
@@ -197,10 +199,10 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {getStatusIcon()}
-            Document Import
+            {t('documentImport')}
           </CardTitle>
           <CardDescription>
-            Upload DOCX or XLSX files to create structured training modules
+            {t('uploadDocxXlsxFiles')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -217,9 +219,9 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
               onDrop={handleDrop}
             >
               <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg font-medium mb-2">Drop your file here</p>
+              <p className="text-lg font-medium mb-2">{t('dropYourFileHere')}</p>
               <p className="text-muted-foreground mb-4">
-                Supports DOCX and XLSX files up to 20MB
+                {t('supportsDocxXlsx20MB')}
               </p>
               <input
                 type="file"
@@ -230,7 +232,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
               />
               <Button asChild>
                 <label htmlFor="file-upload" className="cursor-pointer">
-                  Choose File
+                  {t('chooseFile')}
                 </label>
               </Button>
             </div>

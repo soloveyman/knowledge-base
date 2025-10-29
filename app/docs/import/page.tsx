@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { parseDocument, ParsedContent } from '@/lib/parsers'
 import { clearParsingCache } from '@/lib/localStorage-utils'
+import { useTranslation } from '@/lib/translation-context'
 
 interface UploadedFile {
   id: string
@@ -47,6 +48,7 @@ export default function DocImportPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { t } = useTranslation()
   
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
@@ -300,16 +302,16 @@ export default function DocImportPage() {
 
   return (
     <PageLayout
-      title="Import Documents"
+      title={t('importDocuments')}
       onClose={() => router.push(safeReturnTo)}
     >
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Upload Area */}
         <Card>
           <CardHeader>
-            <CardTitle>Upload Documents</CardTitle>
+            <CardTitle>{t('uploadDocuments')}</CardTitle>
             <CardDescription>
-              Upload Word and Excel files to your knowledge base
+              {t('uploadWordExcelFiles')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -327,10 +329,10 @@ export default function DocImportPage() {
               <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <div className="space-y-2">
                 <p className="text-lg font-medium text-foreground">
-                  Drop files here or click to browse
+                  {t('dropFilesHere')}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports DOCX and XLSX files up to 15MB
+                  {t('supportsDocxXlsx')}
                 </p>
               </div>
               <Input

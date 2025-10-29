@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
-import { navigateBack, getRedirectUrl } from "@/lib/redirect-utils"
+import { useNavigateBack, getRedirectUrl } from "@/lib/redirect-utils"
 import { renderFormattedText } from "@/lib/content-renderer"
+import { useTranslation } from "@/lib/translation-context"
 
 interface UserWithRole {
   name?: string | null
@@ -101,6 +102,8 @@ export default function DocumentReaderPage() {
   const router = useRouter()
   const params = useParams()
   const documentId = params.documentId as string
+  const navigateBack = useNavigateBack()
+  const { t } = useTranslation()
 
   const [documentData, setDocumentData] = useState<DocumentData | null>(null)
   const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null)
@@ -367,7 +370,7 @@ export default function DocumentReaderPage() {
   const handleBack = () => {
     // Determine user role from session or default to employee
     const userRole = (session?.user as UserWithRole)?.role || 'employee'
-    navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'assignments')
+    navigateBack(userRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
 
 
@@ -475,17 +478,17 @@ export default function DocumentReaderPage() {
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <TestTube className="h-5 w-5" />
-                      Test Available
+                      {t('testAvailable')}
                     </CardTitle>
                     <CardDescription>
-                      Complete the test after reading the document
+                      {t('completeTheTestAfterReadingTheDocument')}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-sm text-muted-foreground">
-                      <p><strong>Test:</strong> {assignmentData?.test?.title || 'Test'}</p>
-                      <p><strong>Questions:</strong> {assignmentData?.test?.questionCount || 0}</p>
-                      <p><strong>Estimated time:</strong> 15 minutes</p>
+                      <p><strong>{t('testLabel')}:</strong> {assignmentData?.test?.title || t('test')}</p>
+                      <p><strong>{t('questionsLabel')}:</strong> {assignmentData?.test?.questionCount || 0}</p>
+                      <p><strong>{t('estimatedTime')}:</strong> 15 {t('minutes')}</p>
                     </div>
                     
                     <Button 
@@ -494,7 +497,7 @@ export default function DocumentReaderPage() {
                       disabled={assignmentData?.status === 'completed'}
                     >
                       <TestTube className="h-4 w-4 mr-2" />
-                      {assignmentData?.status === 'completed' ? 'Test Completed' : 'Take Test'}
+                      {assignmentData?.status === 'completed' ? t('testCompleted') : t('takeTest')}
                     </Button>
                   </CardContent>
                 </Card>

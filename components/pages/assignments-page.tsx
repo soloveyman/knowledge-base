@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation"
 import { ClipboardList, Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
+import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
 
 interface Assignment {
   id: string
@@ -48,15 +50,17 @@ export function AssignmentsPage({
   isLoading = false
 }: AssignmentsPageProps) {
   const router = useRouter()
+  const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
 
   const assignmentItems = assignments.map((assignment) => ({
     id: assignment.id,
     title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
-    subtitle: `Due: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'} | Created: ${new Date(assignment.createdAt).toLocaleDateString()}`,
+    subtitle: `${t('due')}: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : t('noDueDate')} | ${t('created')}: ${new Date(assignment.createdAt).toLocaleDateString()}`,
     metadata: [],
     badges: [
       { 
-        label: assignment.status, 
+        label: translateBadge(assignment.status || 'pending'), 
         variant: assignment.status === 'completed' ? "default" as const : 
                 assignment.status === 'in_progress' ? "secondary" as const : 
                 "outline" as const 
@@ -69,11 +73,11 @@ export function AssignmentsPage({
 
   return (
     <ManagementPage
-      title="Assignments"
-      description="Assign training modules and tests to employees"
+      title={t('assignmentManagement')}
+      description={t('assignTrainingModules')}
       icon={<ClipboardList className="h-8 w-8" />}
       actionButton={{
-        label: "Create Assignment",
+        label: t('createAssignment'),
         icon: <Plus className="h-4 w-4" />,
         onClick: () => router.push('/assignment-builder')
       }}
@@ -82,9 +86,9 @@ export function AssignmentsPage({
       isLoading={isLoading}
       emptyState={{
         icon: <ClipboardList className="h-12 w-12" />,
-        title: "No assignments created yet",
-        description: "Create your first assignment using the Assignment Builder",
-        actionLabel: "Create Assignment",
+        title: t('noAssignmentsCreated'),
+        description: t('getStartedCreateAssignment'),
+        actionLabel: t('createAssignment'),
         onAction: () => router.push('/assignment-builder')
       }}
     />

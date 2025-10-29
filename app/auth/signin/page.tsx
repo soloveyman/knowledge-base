@@ -8,14 +8,17 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, Building2 } from "lucide-react"
+import { Loader2, Mail, Lock, Building2, Eye, EyeOff } from "lucide-react"
+import { useTranslation } from "@/lib/translation-context"
 
 export default function SignInPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const { t } = useTranslation()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,7 +33,7 @@ export default function SignInPage() {
       })
 
       if (result?.error) {
-        setError("Invalid email or password")
+        setError(t('invalidEmailOrPassword'))
       } else {
         // Get session to check user role and redirect accordingly
         const session = await getSession()
@@ -46,7 +49,7 @@ export default function SignInPage() {
         }
       }
     } catch (error) {
-      setError("An error occurred. Please try again.")
+      setError(t('errorOccurred'))
     } finally {
       setIsLoading(false)
     }
@@ -89,9 +92,9 @@ export default function SignInPage() {
             <Building2 className="h-12 w-12 text-primary" />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-2xl font-bold">Knowledge Base Platform</CardTitle>
+            <CardTitle className="text-2xl font-bold">{t('knowledgeBasePlatform')}</CardTitle>
             <CardDescription>
-              Sign in to access your learning management system
+              {t('signInToAccess')}
             </CardDescription>
           </div>
         </CardHeader>
@@ -104,13 +107,13 @@ export default function SignInPage() {
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email">{t('email')} *</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t('enterYourEmail')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
@@ -120,24 +123,32 @@ export default function SignInPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
+              <Label htmlFor="password">{t('password')} *</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
-                  placeholder="Enter your password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder={t('enterYourPassword')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
             
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              {t('signIn')}
             </Button>
           </form>
           
@@ -146,7 +157,7 @@ export default function SignInPage() {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-2 text-muted-foreground">{t('orContinueWith')}</span>
             </div>
           </div>
           
@@ -175,7 +186,7 @@ export default function SignInPage() {
                 fill="#EA4335"
               />
             </svg>
-            Google
+            {t('google')}
           </Button>
         </CardContent>
       </Card>

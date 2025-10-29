@@ -1,4 +1,4 @@
-import { AppRouterInstance } from "next/navigation"
+import { useRouter } from "next/navigation"
 
 // Define the role-based tab mappings
 const ROLE_TAB_MAPPINGS = {
@@ -18,6 +18,22 @@ const ROLE_TAB_MAPPINGS = {
 
 type UserRole = keyof typeof ROLE_TAB_MAPPINGS
 
+// Helper function to check if a tab is valid for a role
+function isValidTabForRole(role: UserRole, tab: string): tab is string {
+  const validTabs = ROLE_TAB_MAPPINGS[role].tabs
+  return validTabs.includes(tab as never)
+}
+
+// Hook for navigation with router
+export function useNavigateBack() {
+  const router = useRouter()
+  
+  return (role: UserRole, fallbackTab?: string) => {
+    const redirectUrl = getRedirectUrl(role, fallbackTab)
+    router.push(redirectUrl)
+  }
+}
+
 // Get the previous tab from sessionStorage or default to the role's default tab
 export function getPreviousTab(role: UserRole): string {
   if (typeof window === 'undefined') {
@@ -25,9 +41,8 @@ export function getPreviousTab(role: UserRole): string {
   }
   
   const storedTab = sessionStorage.getItem(`previousTab_${role}`)
-  const validTabs = ROLE_TAB_MAPPINGS[role].tabs
   
-  if (storedTab && validTabs.includes(storedTab as any)) {
+  if (storedTab && isValidTabForRole(role, storedTab)) {
     return storedTab
   }
   
@@ -38,8 +53,7 @@ export function getPreviousTab(role: UserRole): string {
 export function saveCurrentTab(role: UserRole, tab: string) {
   if (typeof window === 'undefined') return
   
-  const validTabs = ROLE_TAB_MAPPINGS[role].tabs
-  if (validTabs.includes(tab as any)) {
+  if (isValidTabForRole(role, tab)) {
     sessionStorage.setItem(`previousTab_${role}`, tab)
   }
 }
@@ -50,12 +64,6 @@ export function getRedirectUrl(role: UserRole, fallbackTab?: string): string {
   return `/${role}?tab=${tab}`
 }
 
-// Navigate back to the previous tab with proper URL construction
-export function navigateBack(router: AppRouterInstance, role: UserRole, fallbackTab?: string) {
-  const redirectUrl = getRedirectUrl(role, fallbackTab)
-  router.push(redirectUrl)
-}
-
 // Extract tab from URL search params
 export function getTabFromUrl(searchParams: URLSearchParams): string | null {
   return searchParams.get('tab')
@@ -63,8 +71,7 @@ export function getTabFromUrl(searchParams: URLSearchParams): string | null {
 
 // Check if a tab is valid for a given role
 export function isValidTab(role: UserRole, tab: string): boolean {
-  const validTabs = ROLE_TAB_MAPPINGS[role].tabs
-  return validTabs.includes(tab as any)
+  return isValidTabForRole(role, tab)
 }
 
 // Get the default tab for a role

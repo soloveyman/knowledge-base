@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ErrorMessage } from "@/components/common/error-message"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   FileText, 
   X,
@@ -98,6 +99,7 @@ interface Assignment {
 
 export default function AssignmentBuilderPage() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation()
   const router = useRouter()
   
   const [assignmentConfig, setAssignmentConfig] = useState<AssignmentConfig>({
@@ -406,7 +408,7 @@ export default function AssignmentBuilderPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
-                {isEditMode ? 'Edit Assignment' : 'Assignment Builder'}
+                {isEditMode ? t('edit') + ' ' + t('assignmentManagement') : t('assignmentBuilder')}
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -426,15 +428,15 @@ export default function AssignmentBuilderPage() {
             {/* Assignment Configuration */}
             <Card>
               <CardHeader>
-                <CardTitle>Assignment Configuration</CardTitle>
-                <CardDescription>Configure your assignment parameters</CardDescription>
+                <CardTitle>{t('assignmentConfiguration')}</CardTitle>
+                <CardDescription>{t('configureAssignmentParameters')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="assignment-name">Assignment Name *</Label>
+                  <Label htmlFor="assignment-name">{t('assignmentName')} *</Label>
                   <Input
                     id="assignment-name"
-                    placeholder="Enter assignment name..."
+                    placeholder={t('enterAssignmentName')}
                     value={assignmentConfig.name}
                     onChange={(e) => setAssignmentConfig(prev => ({ ...prev, name: e.target.value }))}
                     className="w-full"
@@ -442,10 +444,10 @@ export default function AssignmentBuilderPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="assignment-description">Description (Optional)</Label>
+                  <Label htmlFor="assignment-description">{t('descriptionOptional')}</Label>
                   <Input
                     id="assignment-description"
-                    placeholder="Enter assignment description..."
+                    placeholder={t('enterAssignmentDescription')}
                     value={assignmentConfig.description}
                     onChange={(e) => setAssignmentConfig(prev => ({ ...prev, description: e.target.value }))}
                     className="w-full"
@@ -453,13 +455,13 @@ export default function AssignmentBuilderPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="document-select">Select Document *</Label>
+                  <Label htmlFor="document-select">{t('selectDocument')} *</Label>
                   <Select 
                     value={assignmentConfig.documentId} 
                     onValueChange={(value) => setAssignmentConfig(prev => ({ ...prev, documentId: value }))}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a document..." />
+                      <SelectValue placeholder={t('chooseDocument')} />
                     </SelectTrigger>
                     <SelectContent>
                       {savedDocuments.map((doc) => (
@@ -475,13 +477,13 @@ export default function AssignmentBuilderPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="test-select">Select Test (Optional)</Label>
+                  <Label htmlFor="test-select">{t('selectTestOptional')}</Label>
                   <Select 
                     value={assignmentConfig.testId} 
                     onValueChange={(value) => setAssignmentConfig(prev => ({ ...prev, testId: value }))}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a test..." />
+                      <SelectValue placeholder={t('chooseTest')} />
                     </SelectTrigger>
                     <SelectContent>
                       {savedTests.length === 0 ? (
@@ -501,7 +503,7 @@ export default function AssignmentBuilderPage() {
                 </div>
 
                 <div>
-                  <Label>Due Date (Optional)</Label>
+                  <Label>{t('dueDateOptional')}</Label>
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -513,7 +515,7 @@ export default function AssignmentBuilderPage() {
                       >
                         <div className="flex items-center">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {assignmentConfig.dueDate ? format(assignmentConfig.dueDate, "PPP") : "Pick a date"}
+                          {assignmentConfig.dueDate ? format(assignmentConfig.dueDate, "PPP") : t('pickDate')}
                         </div>
                         {assignmentConfig.dueDate && (
                           <X 
@@ -550,12 +552,12 @@ export default function AssignmentBuilderPage() {
                     {isCreating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creating Assignment...
+                        {t('loading')}...
                       </>
                     ) : (
                       <>
                         <ClipboardList className="h-4 w-4 mr-2" />
-                        {isEditMode ? 'Update Assignment' : 'Create Assignment'}
+                        {isEditMode ? t('edit') + ' ' + t('assignmentManagement') : t('createAssignment')}
                       </>
                     )}
                   </Button>
@@ -572,9 +574,9 @@ export default function AssignmentBuilderPage() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
-                    <CardTitle>Select Employees</CardTitle>
+                    <CardTitle>{t('selectEmployees')}</CardTitle>
                     <CardDescription>
-                      Choose employees to assign this task to
+                      {t('chooseEmployeesToAssign')}
                     </CardDescription>
                   </div>
                   <div className="flex space-x-2">
@@ -584,7 +586,7 @@ export default function AssignmentBuilderPage() {
                       onClick={handleSelectAllUsers}
                       disabled={assignmentConfig.selectedUsers.length === savedUsers.filter(user => user.role === 'employee').length}
                     >
-                      Select All
+                      {t('selectAll')}
                     </Button>
                     <Button
                       variant="outline"
@@ -592,7 +594,7 @@ export default function AssignmentBuilderPage() {
                       onClick={handleDeselectAllUsers}
                       disabled={assignmentConfig.selectedUsers.length === 0}
                     >
-                      Deselect All
+                      {t('deselectAll')}
                     </Button>
                   </div>
                 </div>

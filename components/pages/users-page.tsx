@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation"
 import { ManagementPage } from "@/components/common/management-page"
 import { Users, Plus, UserCheck, UserX } from "lucide-react"
+import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
 
 interface User {
   id: string
@@ -29,22 +31,24 @@ export function UsersPage({
   onEditUser
 }: UsersPageProps) {
   const router = useRouter()
+  const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
 
   const userItems = users.map((user) => ({
     id: user.id,
     title: user.name,
     subtitle: `${user.job} • ${user.email}`,
     metadata: [
-      `Role: ${user.role.charAt(0).toUpperCase() + user.role.slice(1)}`,
-      `Created: ${new Date(user.createdAt).toLocaleDateString()}`
+      `${t('role')}: ${user.role.charAt(0).toUpperCase() + user.role.slice(1)}`,
+      `${t('created')}: ${new Date(user.createdAt).toLocaleDateString()}`
     ],
     badges: [
       { 
-        label: user.status, 
+        label: translateBadge(user.status), 
         variant: user.status === 'active' ? "default" as const : "secondary" as const 
       },
       { 
-        label: user.role, 
+        label: translateBadge(user.role), 
         variant: user.role === 'manager' ? "outline" as const : "secondary" as const 
       }
     ],
@@ -56,11 +60,11 @@ export function UsersPage({
 
   return (
     <ManagementPage
-      title="User Management"
-      description="Create and manage user accounts, roles, and permissions"
+      title={t('userManagement')}
+      description={t('createAndManageUserAccounts')}
       icon={<Users className="h-6 w-6" />}
       actionButton={{
-        label: "Add User",
+        label: t('addUser'),
         icon: <Plus className="h-4 w-4" />,
         onClick: () => router.push('/user-builder')
       }}
@@ -68,9 +72,9 @@ export function UsersPage({
       showEditButton={true}
       emptyState={{
         icon: <Users className="h-12 w-12" />,
-        title: "No users created yet",
-        description: "Create your first user account using the User Builder",
-        actionLabel: "Add User",
+        title: t('noUsersCreatedYet'),
+        description: t('createYourFirstUserAccount'),
+        actionLabel: t('addUser'),
         onAction: () => router.push('/user-builder')
       }}
     />
