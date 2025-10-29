@@ -3,8 +3,7 @@ nixPkgs = ["nodejs_20", "npm"]
 
 [phases.install]
 cmds = [
-  "rm -rf node_modules/.cache 2>/dev/null || true",
-  "npm ci --legacy-peer-deps"
+  "npm install --legacy-peer-deps"
 ]
 
 [phases.build]
