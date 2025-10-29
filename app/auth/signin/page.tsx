@@ -39,7 +39,9 @@ export default function SignInPage() {
         const session = await getSession()
         if (session?.user) {
           const role = session.user.role
-          if (role === 'owner') {
+          if (role === 'super-admin') {
+            router.push("/super-admin")
+          } else if (role === 'owner') {
             router.push("/owner")
           } else if (role === 'manager') {
             router.push("/manager")
@@ -68,7 +70,9 @@ export default function SignInPage() {
         const session = await getSession()
         if (session?.user) {
           const role = session.user.role
-          if (role === 'owner') {
+          if (role === 'super-admin') {
+            router.push("/super-admin")
+          } else if (role === 'owner') {
             router.push("/owner")
           } else if (role === 'manager') {
             router.push("/manager")

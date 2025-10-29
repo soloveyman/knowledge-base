@@ -10,7 +10,8 @@ export const users = pgTable('users', {
   password: text('password'), // Hashed password for authentication
   image: text('image'),
   emailVerified: timestamp('email_verified'),
-  role: text('role').notNull().$type<'owner' | 'manager' | 'employee'>(),
+  role: text('role').notNull().$type<'super-admin' | 'owner' | 'manager' | 'employee'>(),
+  country: text('country'), // for payment provider selection
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -229,12 +230,26 @@ export const subscriptionPlans = pgTable('subscription_plans', {
 
 export const subscriptions = pgTable('subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
+  ownerId: uuid('user_id').notNull().references(() => users.id), // only owners can have subscriptions - using user_id for compatibility
   planId: uuid('plan_id').notNull().references(() => subscriptionPlans.id),
   status: text('status').notNull().default('active'), // 'active', 'cancelled', 'expired'
   currentPeriodStart: timestamp('current_period_start').notNull(),
   currentPeriodEnd: timestamp('current_period_end').notNull(),
   cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const payments = pgTable('payments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id),
+  subscriptionId: uuid('subscription_id').references(() => subscriptions.id),
+  provider: text('provider').notNull(), // 'stripe' | 'interkassa'
+  providerPaymentId: text('provider_payment_id').notNull(),
+  amount: integer('amount').notNull(), // in cents/kopecks
+  currency: text('currency').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending', 'completed', 'failed', 'refunded'
+  metadata: json('metadata'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -260,6 +275,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   testAttempts: many(testAttempts),
   progress: many(progress),
   subscriptions: many(subscriptions),
+  payments: many(payments),
   usage: many(usage),
   userGroupMembers: many(userGroupMembers),
 }));
@@ -432,14 +448,26 @@ export const subscriptionPlansRelations = relations(subscriptionPlans, ({ many }
   subscriptions: many(subscriptions),
 }));
 
-export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
-  user: one(users, {
-    fields: [subscriptions.userId],
+export const subscriptionsRelations = relations(subscriptions, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [subscriptions.ownerId],
     references: [users.id],
   }),
   plan: one(subscriptionPlans, {
     fields: [subscriptions.planId],
     references: [subscriptionPlans.id],
+  }),
+  payments: many(payments),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  owner: one(users, {
+    fields: [payments.ownerId],
+    references: [users.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [payments.subscriptionId],
+    references: [subscriptions.id],
   }),
 }));
 

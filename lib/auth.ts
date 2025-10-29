@@ -95,7 +95,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 })
 
-export type UserRole = 'owner' | 'manager' | 'employee'
+export type UserRole = 'super-admin' | 'owner' | 'manager' | 'employee'
 
 export interface User {
   id: string
@@ -138,15 +138,17 @@ export const PERMISSIONS = {
   
   // Subscription
   SUBSCRIPTION: {
-    owner: ['manage'] as const,
+    'super-admin': ['manage_all', 'view_all', 'create', 'update', 'cancel'] as const,
+    owner: ['view_own', 'update_own'] as const,
     manager: [] as const,
     employee: [] as const
   }
 } as const
 
-type PermissionAction = 'create' | 'read' | 'update' | 'delete' | 'pass' | 'read_own' | 'manage'
+type PermissionAction = 'create' | 'read' | 'update' | 'delete' | 'pass' | 'read_own' | 'manage' | 'manage_all' | 'view_all' | 'view_own' | 'update_own' | 'cancel'
 
 export function hasPermission(role: UserRole, resource: keyof typeof PERMISSIONS, action: PermissionAction): boolean {
-  const rolePermissions = PERMISSIONS[resource][role]
+  const rolePermissions = PERMISSIONS[resource][role as keyof typeof PERMISSIONS[typeof resource]]
+  if (!rolePermissions) return false
   return (rolePermissions as readonly string[]).includes(action)
 }

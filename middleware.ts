@@ -34,7 +34,9 @@ export async function middleware(request: NextRequest) {
   // Handle root path redirect for authenticated users
   if (pathname === '/') {
     const userRole = token.role
-    if (userRole === 'owner') {
+    if (userRole === 'super-admin') {
+      return NextResponse.redirect(new URL('/super-admin', request.url))
+    } else if (userRole === 'owner') {
       return NextResponse.redirect(new URL('/owner', request.url))
     } else if (userRole === 'manager') {
       return NextResponse.redirect(new URL('/manager', request.url))
@@ -46,9 +48,23 @@ export async function middleware(request: NextRequest) {
   // Check if user is trying to access a role page that doesn't match their role
   const userRole = token.role
   
+  // Super-admin can only access super-admin pages
+  if (pathname.startsWith('/super-admin') && userRole !== 'super-admin') {
+    // Redirect based on role
+    if (userRole === 'owner') {
+      return NextResponse.redirect(new URL('/owner', request.url))
+    } else if (userRole === 'manager') {
+      return NextResponse.redirect(new URL('/manager', request.url))
+    } else {
+      return NextResponse.redirect(new URL('/employee', request.url))
+    }
+  }
+  
   if (pathname === '/owner' && userRole !== 'owner') {
     // Redirect to correct role page
-    if (userRole === 'manager') {
+    if (userRole === 'super-admin') {
+      return NextResponse.redirect(new URL('/super-admin', request.url))
+    } else if (userRole === 'manager') {
       return NextResponse.redirect(new URL('/manager', request.url))
     } else {
       return NextResponse.redirect(new URL('/employee', request.url))
@@ -56,7 +72,9 @@ export async function middleware(request: NextRequest) {
   }
   if (pathname === '/manager' && userRole !== 'manager') {
     // Redirect to correct role page
-    if (userRole === 'owner') {
+    if (userRole === 'super-admin') {
+      return NextResponse.redirect(new URL('/super-admin', request.url))
+    } else if (userRole === 'owner') {
       return NextResponse.redirect(new URL('/owner', request.url))
     } else {
       return NextResponse.redirect(new URL('/employee', request.url))
@@ -64,7 +82,9 @@ export async function middleware(request: NextRequest) {
   }
   if (pathname === '/employee' && userRole !== 'employee') {
     // Redirect to correct role page
-    if (userRole === 'owner') {
+    if (userRole === 'super-admin') {
+      return NextResponse.redirect(new URL('/super-admin', request.url))
+    } else if (userRole === 'owner') {
       return NextResponse.redirect(new URL('/owner', request.url))
     } else {
       return NextResponse.redirect(new URL('/manager', request.url))
