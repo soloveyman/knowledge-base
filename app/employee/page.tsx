@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   BookOpen, 
   ClipboardList, 
@@ -58,6 +59,7 @@ interface Assignment {
 
 export default function EmployeePage() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -302,24 +304,31 @@ export default function EmployeePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppBar role="employee" />
+      <AppBar 
+        role="employee" 
+        user={{
+          name: session.user?.name,
+          email: session.user?.email,
+          image: session.user?.image
+        }}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
-            Welcome back, {session.user?.name || 'Employee'}!
+            {t('welcome')}, {session.user?.name || t('employee')}!
           </h2>
           <p className="text-muted-foreground">
-            Your learning journey and assignment management
+            {t('learningJourney')}
           </p>
         </div>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="assignments">My Assignments</TabsTrigger>
-            <TabsTrigger value="progress">My Progress</TabsTrigger>
+            <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
+            <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
+            <TabsTrigger value="progress">{t('progress')}</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}

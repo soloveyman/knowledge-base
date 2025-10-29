@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsersPage } from "@/components/pages/users-page"
 import { AppBar } from "@/components/common/app-bar"
 import UserProgressReport from "@/components/reports/user-progress-report"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   Users, 
   FileText, 
@@ -53,6 +54,7 @@ interface SavedDocument {
 
 export default function OwnerPage() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation()
   const router = useRouter()
   
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
@@ -146,16 +148,23 @@ export default function OwnerPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppBar role="owner" />
+      <AppBar 
+        role="owner" 
+        user={{
+          name: session.user?.name,
+          email: session.user?.email,
+          image: session.user?.image
+        }}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
-            Welcome back, {session.user?.name || 'Owner'}!
+            {t('welcome')}, {session.user?.name || t('owner')}!
           </h2>
           <p className="text-muted-foreground">
-            Full system control and business management
+            {t('fullSystemControl')}
           </p>
         </div>
 
@@ -164,9 +173,9 @@ export default function OwnerPage() {
         <Tabs defaultValue="overview" className="space-y-3 md:space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="w-full min-w-max">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">{t('overview')}</TabsTrigger>
+              <TabsTrigger value="users" className="text-xs sm:text-sm">{t('users')}</TabsTrigger>
+              <TabsTrigger value="settings" className="text-xs sm:text-sm">{t('settings')}</TabsTrigger>
             </TabsList>
           </div>
 

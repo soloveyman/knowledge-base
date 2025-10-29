@@ -1,32 +1,29 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { LogOut } from "lucide-react"
-import { signOut } from "next-auth/react"
-import { ThemeToggle } from "./theme-toggle"
+import { UserMenu } from "./user-menu"
+import { useTranslation } from "@/lib/translation-context"
 
 interface AppBarProps {
   role: 'owner' | 'manager' | 'employee'
   onSignOut?: () => void
+  user?: {
+    name?: string
+    email?: string
+    image?: string
+  }
 }
 
-export function AppBar({ role, onSignOut }: AppBarProps) {
-  const handleSignOut = () => {
-    if (onSignOut) {
-      onSignOut()
-    } else {
-      signOut({ callbackUrl: "/auth/signin" })
-    }
-  }
+export function AppBar({ role, onSignOut, user }: AppBarProps) {
+  const { t } = useTranslation()
 
   const getTitle = () => {
     switch (role) {
       case 'owner':
-        return 'Owner Dashboard'
+        return t('ownerDashboard')
       case 'manager':
-        return 'Manager Dashboard'
+        return t('managerDashboard')
       case 'employee':
-        return 'Employee Dashboard'
+        return t('employeeDashboard')
       default:
         return 'Dashboard'
     }
@@ -44,11 +41,7 @@ export function AppBar({ role, onSignOut }: AppBarProps) {
             </h1>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <ThemeToggle />
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="text-xs sm:text-sm">
-              <LogOut className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
+            <UserMenu user={user} onSignOut={onSignOut} />
           </div>
         </div>
       </div>

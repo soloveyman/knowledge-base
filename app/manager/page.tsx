@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   Users, 
   ClipboardList, 
@@ -66,6 +67,7 @@ interface SavedAssignment {
 
 export default function ManagerPage() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Initialize tests from localStorage to prevent empty state on re-mount
@@ -480,16 +482,23 @@ export default function ManagerPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppBar role="manager" />
+      <AppBar 
+        role="manager" 
+        user={{
+          name: session.user?.name,
+          email: session.user?.email,
+          image: session.user?.image
+        }}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
-            Welcome back, {session.user?.name || 'Manager'}!
+            {t('welcome')}, {session.user?.name || t('manager')}!
           </h2>
           <p className="text-muted-foreground">
-            Manage your team&apos;s training and knowledge base
+            {t('manageTeam')}
           </p>
         </div>
 
@@ -497,10 +506,10 @@ export default function ManagerPage() {
         {/* Main Tabs */}
         <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="docs">Docs</TabsTrigger>
-            <TabsTrigger value="tests">Tests</TabsTrigger>
-            <TabsTrigger value="assignments">Assign</TabsTrigger>
+            <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
+            <TabsTrigger value="docs">{t('documents')}</TabsTrigger>
+            <TabsTrigger value="tests">{t('tests')}</TabsTrigger>
+            <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-3 md:space-y-6">
@@ -508,40 +517,40 @@ export default function ManagerPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('totalEmployees')}</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedUsers.length}</div>
-                  <p className="text-xs text-muted-foreground">Total employees</p>
+                  <p className="text-xs text-muted-foreground">{t('totalEmployeesDesc')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Training</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('activeTraining')}</CardTitle>
                   <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedAssignments.length}</div>
-                  <p className="text-xs text-muted-foreground">Total assignments</p>
+                  <p className="text-xs text-muted-foreground">{t('totalAssignments')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Documents</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('documents')}</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{documents.length}</div>
-                  <p className="text-xs text-muted-foreground">Total documents</p>
+                  <p className="text-xs text-muted-foreground">{t('totalDocuments')}</p>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('completionRate')}</CardTitle>
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -583,7 +592,7 @@ export default function ManagerPage() {
                         }
                       })
                       
-                      return `${completedUserAssignments} of ${totalUserAssignments} completed`
+                      return `${completedUserAssignments} of ${totalUserAssignments} ${t('completedOfTotal')}`
                     })()}
                   </p>
                 </CardContent>

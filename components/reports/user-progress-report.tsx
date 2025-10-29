@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   Users, 
   CheckCircle, 
@@ -61,6 +62,7 @@ interface UserProgressReportProps {
 
 export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
+  const { t } = useTranslation()
 
   useEffect(() => {
     console.log('UserProgressReport: useEffect triggered')
@@ -199,9 +201,9 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     <Card>
       <CardHeader>
         <CardTitle>
-          Employee Progress Report
+          {t('employeeProgressReport')}
         </CardTitle>
-        <CardDescription>Track employee progress and assignment completion</CardDescription>
+        <CardDescription>{t('trackEmployeeProgress')}</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" className="space-y-2">
@@ -224,20 +226,20 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                         <div className="text-left">
                           <div className="flex items-center gap-2">
                             <div className="font-medium">{progress.completedCount}/{progress.totalCount}</div>
-                            <div className="text-gray-600">Completed</div>
+                            <div className="text-gray-600">{t('completed')}</div>
                           </div>
                         </div>
                         <div className="text-left">
                           <div className="flex items-center gap-2">
                             <div className="font-medium">{progress.averageScore}%</div>
-                            <div className="text-gray-600">Avg Score</div>
+                            <div className="text-gray-600">{t('avgScore')}</div>
                           </div>
                         </div>
                         {progress.overdueCount > 0 && (
                           <div className="text-left">
                             <div className="flex items-center gap-2">
                               <div className="font-medium text-red-600">{progress.overdueCount}</div>
-                              <div className="text-gray-600">Overdue</div>
+                              <div className="text-gray-600">{t('overdue')}</div>
                             </div>
                           </div>
                         )}
