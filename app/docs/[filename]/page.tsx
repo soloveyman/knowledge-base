@@ -148,14 +148,14 @@ export default function DocumentViewer() {
         console.error('Failed to load documents:', result.message)
         // Redirect back on error
         const userRole = (session?.user as UserWithRole)?.role || 'manager'
-        navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
+        navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
         return
       }
     } catch (error) {
       console.error('Error loading document:', error)
       // Redirect back on error
       const userRole = (session?.user as UserWithRole)?.role || 'manager'
-      navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
+      navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
       return
     } finally {
       setLoading(false)
@@ -165,7 +165,7 @@ export default function DocumentViewer() {
   const handleClose = () => {
     // Navigate back to the previous tab
     const userRole = (session?.user as UserWithRole)?.role || 'manager'
-    navigateBack(router, userRole as 'employee' | 'manager' | 'owner', 'docs')
+    navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
   }
 
   // Helper function to escape HTML characters

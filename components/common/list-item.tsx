@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getStatusBadge, getRoleBadge, getCountBadge, getDifficultyBadge, getLocaleBadge } from "@/lib/badges"
+import { useBadgeTranslation } from "@/lib/badge-translations"
 import { DeleteConfirmation } from "./delete-confirmation"
 import { X, Edit } from "lucide-react"
 
@@ -34,6 +35,7 @@ export function ListItem({
   showEditButton = false,
   deleteDataLossWarning
 }: ListItemProps) {
+  const translateBadge = useBadgeTranslation()
   return (
     <div 
       className="p-4 border border-border rounded-lg hover:bg-accent cursor-pointer"
@@ -86,7 +88,7 @@ export function ListItem({
                   variant={config.variant || "outline"} 
                   className="text-xs"
                 >
-                  {config.label}
+                  {translateBadge(config.label)}
                 </Badge>
               )
             })}

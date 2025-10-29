@@ -201,8 +201,9 @@ export default function EmployeePage() {
         if (docsResult.success && docsResult.data.documents) {
           const document = docsResult.data.documents.find((d: any) => d.moduleId === assignment.moduleId)
           if (document) {
-            // Navigate to document reader
-            router.push(`/read/${document.id}`)
+            // Navigate to document reader - ensure id is a string
+            const documentId = String(document.id)
+            router.push(`/read/${documentId}`)
           }
         }
       } catch (error) {

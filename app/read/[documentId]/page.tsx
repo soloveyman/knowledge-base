@@ -363,14 +363,18 @@ export default function DocumentReaderPage() {
 
   const handleTakeTest = () => {
     if (assignmentData?.test) {
-      router.push(`/test/${assignmentData.test.id}`)
+      // Ensure test id is a string
+      const testId = String(assignmentData.test.id)
+      router.push(`/test/${testId}`)
     }
   }
 
   const handleBack = () => {
     // Determine user role from session or default to employee
     const userRole = (session?.user as UserWithRole)?.role || 'employee'
-    navigateBack(userRole as 'employee' | 'manager' | 'owner', 'assignments')
+    // Ensure userRole is a string and valid
+    const validRole = typeof userRole === 'string' ? userRole : 'employee'
+    navigateBack(validRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
 
 

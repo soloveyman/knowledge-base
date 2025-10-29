@@ -189,6 +189,7 @@ export const translations = {
     draft: "Draft",
     published: "Published",
     archived: "Archived",
+    overdue: "Overdue",
     admin: "Admin",
     pdf: "PDF",
     docx: "DOCX",
@@ -301,7 +302,6 @@ export const translations = {
     trackEmployeeProgress: "Track employee progress and assignment completion",
     avgScore: "Avg Score",
     issues: "Issues",
-    overdue: "Overdue",
     
     // Form Validation
     required: "This field is required",
@@ -582,6 +582,7 @@ export const translations = {
     draft: "Черновик",
     published: "Опубликовано",
     archived: "Архивный",
+    overdue: "Просрочено",
     admin: "Администратор",
     pdf: "PDF",
     docx: "DOCX",
@@ -694,7 +695,6 @@ export const translations = {
     trackEmployeeProgress: "Отслеживайте прогресс сотрудников и выполнение заданий",
     avgScore: "Средний балл",
     issues: "Проблемы",
-    overdue: "Просрочено",
     
     // Form Validation
     required: "Это поле обязательно",

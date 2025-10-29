@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
 import { 
   Users, 
   CheckCircle, 
@@ -63,6 +64,7 @@ interface UserProgressReportProps {
 export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
   const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
 
   useEffect(() => {
     console.log('UserProgressReport: useEffect triggered')
@@ -150,16 +152,16 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     switch (status) {
       case 'completed':
       case 'passed':
-        return <Badge className="bg-green-500/20 text-green-600 dark:text-green-400">Completed</Badge>
+        return <Badge className="bg-green-500/20 text-green-600 dark:text-green-400">{translateBadge('completed')}</Badge>
       case 'active':
       case 'in_progress':
-        return <Badge className="bg-primary/20 text-primary-foreground">In Progress</Badge>
+        return <Badge className="bg-primary/20 text-primary-foreground">{translateBadge('inProgress')}</Badge>
       case 'failed':
-        return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">Failed</Badge>
+        return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">{translateBadge('failed')}</Badge>
       case 'overdue':
-        return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">Overdue</Badge>
+        return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400">{translateBadge('overdue')}</Badge>
       default:
-        return <Badge className="bg-muted text-muted-foreground">Not Started</Badge>
+        return <Badge className="bg-muted text-muted-foreground">{translateBadge('notStarted')}</Badge>
     }
   }
 

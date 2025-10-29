@@ -16,6 +16,7 @@ const badgeTranslationMap: Record<string, string> = {
   'in progress': 'inProgress',
   'not_started': 'notStarted',
   'not started': 'notStarted',
+  'overdue': 'overdue',
   
   // Role badges
   'employee': 'employee',
