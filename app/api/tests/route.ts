@@ -70,6 +70,7 @@ export async function POST(request: Request) {
           type?: string
           choices?: string[]
           correct_answer?: string
+          correctAnswer?: string // Support both snake_case and camelCase
           explanation?: string
         }
         
