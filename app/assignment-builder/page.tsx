@@ -173,7 +173,7 @@ export default function AssignmentBuilderPage() {
               moduleId?: string | null
             }
             const doc = (docsResult.data.documents as ApiDoc[]).find((d: ApiDoc) => d.moduleId === assignment.moduleId)
-            documentId = doc ? doc.id : ''
+            documentId = doc ? String(doc.id) : ''
           }
         } catch (err) {
           console.error('Error fetching documents:', err)
