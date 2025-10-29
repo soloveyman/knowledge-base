@@ -89,10 +89,10 @@ export default function DocsPage() {
         }
         
         const transformedDocs = (result.data.documents as ApiDocument[]).map((doc: ApiDocument) => ({
-          id: doc.id,
-          name: doc.originalFileName || doc.title,
+          id: String(doc.id),
+          name: doc.originalFileName || doc.title || 'Untitled',
           type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-          uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+          uploadedAt: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
           size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
           status: doc.status || 'ready'
         }))
