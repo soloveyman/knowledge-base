@@ -17,7 +17,6 @@ import {
   XCircle,
   Filter
 } from "lucide-react";
-import { DataTable } from "@/components/common/data-table";
 
 interface OwnerSubscription {
   id: string;
@@ -210,7 +209,7 @@ export default function SuperAdminPage() {
       </div>
 
       <Tabs defaultValue="subscriptions" className="space-y-6">
-        <TabsList>
+        <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="subscriptions">Owner Subscriptions</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="settings">System Settings</TabsTrigger>
@@ -254,17 +253,12 @@ export default function SuperAdminPage() {
                 ) : (
                   filteredOwners.map((owner) => (
                     <div key={owner.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                          <Crown className="h-5 w-5 text-gray-500" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{owner.name || 'Unnamed Owner'}</div>
-                          <div className="text-sm text-gray-600">{owner.email}</div>
-                          {owner.country && (
-                            <div className="text-xs text-gray-500">{owner.country}</div>
-                          )}
-                        </div>
+                      <div>
+                        <div className="font-medium">{owner.name || 'Unnamed Owner'}</div>
+                        <div className="text-sm text-gray-600">{owner.email}</div>
+                        {owner.country && (
+                          <div className="text-xs text-gray-500">{owner.country}</div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-6">
@@ -293,15 +287,6 @@ export default function SuperAdminPage() {
                         <div className="text-right min-w-[80px]">
                           <div className="font-medium">${(owner.revenue / 100).toFixed(2)}</div>
                           <div className="text-xs text-gray-500">Monthly</div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            Manage
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            Details
-                          </Button>
                         </div>
                       </div>
                     </div>
