@@ -116,7 +116,7 @@ export async function POST(request: Request) {
         console.log('Processed question data:', JSON.stringify(questionData, null, 2))
         
         const savedQuestions = await db.insert(questionsTable).values(
-          questionData.map(q => ({ ...q, createdBy: session.user.id }))
+          questionData.map((q: typeof questionData[number]) => ({ ...q, createdBy: session.user.id }))
         ).returning()
 
         finalQuestionIds = savedQuestions.map(q => q.id)
