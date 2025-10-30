@@ -62,7 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
 
           // Return user object for NextAuth
-          const resolvedRole: UserRole = (dbUser.role as UserRole) ?? 'owner'
+          const resolvedRole = ((dbUser.role ?? 'owner') as string).toLowerCase() as UserRole
           const resolvedBusinessId: string = dbUser.businessId ?? dbUser.id
           return {
             id: dbUser.id,
@@ -96,10 +96,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           u.role = 'owner'
           u.businessId = created.id
         } else {
-          const dbUser = existing[0] as unknown as { id: string; role: UserRole; businessId?: string | null }
+          const dbUser = existing[0] as unknown as { id: string; role: string; businessId?: string | null }
           const u = user as { id?: string; role?: UserRole; businessId?: string }
           u.id = dbUser.id
-          u.role = dbUser.role
+          u.role = (dbUser.role as string).toLowerCase() as UserRole
           u.businessId = (dbUser.businessId ?? dbUser.id)
         }
       }
@@ -111,7 +111,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // so session.user.id matches our users.id UUID everywhere
         const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string }
         token.sub = u.id ?? token.sub
-        token.role = (u.role as UserRole) ?? (token.role as UserRole)
+        token.role = ((u.role as string | undefined)?.toLowerCase() as UserRole) ?? (token.role as UserRole)
         token.businessId = u.businessId ?? token.businessId
         token.businessName = u.businessName ?? token.businessName
       } else {
@@ -120,8 +120,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           try {
             const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
             if (dbUsers.length > 0) {
-              const dbUser = dbUsers[0] as { role: UserRole | null; businessId?: string | null }
-              if (!token.role) token.role = (dbUser.role as UserRole) ?? 'employee'
+              const dbUser = dbUsers[0] as { role: string | null; businessId?: string | null }
+              if (!token.role) token.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
               if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
             }
           } catch {
