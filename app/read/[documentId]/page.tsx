@@ -163,12 +163,12 @@ export default function DocumentReaderPage() {
         let content = ''
         
         // Handle sections (for docx files)
-        if (document.parsedContent?.sections?.length > 0) {
-          content = document.parsedContent.sections.map(s => s.content).join('\n')
+        if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
+          content = document.parsedContent!.sections.map(s => s.content).join('\n')
         }
         
         // Handle tables (for xlsx files)
-        if (document.parsedContent?.tables?.length > 0) {
+        if (Array.isArray(document.parsedContent?.tables) && document.parsedContent!.tables.length > 0) {
           const tablesContent = document.parsedContent.tables.map(table => {
             let tableText = `<div class="mb-6"><h3 class="text-xl font-semibold mb-3">${table.title}</h3><div class="overflow-x-auto"><table class="min-w-full border-collapse"><tbody>`
             
