@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server'
-import { db, assignments, documents, modules, assignmentUsers, testAttempts } from '@/lib/db'
+import { db, assignments, documents, modules, assignmentUsers, testAttempts, users } from '@/lib/db'
 import { eq, and, desc } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
-    // Fetch assignments from database with their users
-    const assignmentsData = await db.select().from(assignments)
+    const session = await auth()
+    const tenantId = session?.user?.businessId
+    // Fetch assignments scoped to tenant via the assigner (owner/manager within tenant)
+    const rows = await db
+      .select({ assignment: assignments, assignerBusinessId: users.businessId })
+      .from(assignments)
+      .leftJoin(users, eq(assignments.assignedBy, users.id))
+      .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+
+    const assignmentsData = rows.map(r => r.assignment)
     
     // Fetch users for each assignment
     const assignmentsWithUsers = await Promise.all(
@@ -61,6 +70,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     console.log('Create assignment request:', body)
 
@@ -72,7 +85,7 @@ export async function POST(request: Request) {
       description,
       dueDate,
       status = 'pending',
-      assignedBy = '3e1b5c25-7785-41b3-9c1f-68453a28bc90' // Owner user ID
+      assignedBy = session.user.id
     } = body
 
     console.log('Parsed assignment data:', {

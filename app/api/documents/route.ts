@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server'
-import { db, documents } from '@/lib/db'
-import { desc } from 'drizzle-orm'
+import { db, documents, users } from '@/lib/db'
+import { desc, eq } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
-    const allDocuments = await db.select().from(documents).orderBy(desc(documents.createdAt))
+    const session = await auth()
+    const tenantId = session?.user?.businessId
+    const rows = await db
+      .select({ document: documents, uploaderBusinessId: users.businessId })
+      .from(documents)
+      .leftJoin(users, eq(documents.uploadedBy, users.id))
+      .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+      .orderBy(desc(documents.createdAt))
+    const allDocuments = rows.map(r => r.document)
 
     return NextResponse.json({
       success: true,
@@ -24,14 +33,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
-    const { title, originalFileName, fileType, fileUrl, fileSize, parsedContent, parsingLog, uploadedBy } = body
+    const { title, originalFileName, fileType, fileUrl, fileSize, parsedContent, parsingLog } = body
 
     // Validate required fields
-    if (!title || !uploadedBy) {
+    if (!title) {
       return NextResponse.json({
         success: false,
-        message: 'Title and uploadedBy are required'
+        message: 'Title is required'
       }, { status: 400 })
     }
 
@@ -44,7 +57,7 @@ export async function POST(request: Request) {
       fileSize,
       parsedContent,
       parsingLog,
-      uploadedBy,
+      uploadedBy: session.user.id,
       status: 'ready' // Set status to 'ready' since parsing is complete
     }).returning()
 

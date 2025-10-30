@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions as questionsTable } from '@/lib/db'
+import { db, tests, questions as questionsTable, users } from '@/lib/db'
+import { eq } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
-    const allTests = await db.select().from(tests)
+    const session = await auth()
+    const tenantId = session?.user?.businessId
+    const rows = await db
+      .select({ test: tests, creatorBusinessId: users.businessId })
+      .from(tests)
+      .leftJoin(users, eq(tests.createdBy, users.id))
+      .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+    const allTests = rows.map(r => r.test)
 
     return NextResponse.json({
       success: true,
@@ -23,6 +32,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { 
       title, 
@@ -102,7 +115,9 @@ export async function POST(request: Request) {
         
         console.log('Processed question data:', JSON.stringify(questionData, null, 2))
         
-        const savedQuestions = await db.insert(questionsTable).values(questionData).returning()
+        const savedQuestions = await db.insert(questionsTable).values(
+          questionData.map(q => ({ ...q, createdBy: session.user.id }))
+        ).returning()
 
         finalQuestionIds = savedQuestions.map(q => q.id)
         console.log('Questions saved:', savedQuestions.length)
@@ -124,7 +139,7 @@ export async function POST(request: Request) {
       shuffleQuestions: shuffleQuestions || false,
       showCorrectAnswers: showCorrectAnswers !== false, // Default to true
       status: status || 'draft',
-      createdBy: '3e1b5c25-7785-41b3-9c1f-68453a28bc90' // Owner user ID
+      createdBy: session.user.id
     }).returning()
 
     console.log('Test created successfully:', newTest[0])
