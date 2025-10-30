@@ -430,7 +430,7 @@ export default function EmployeePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">{failedCount}</div>
-                  <p className="text-xs text-muted-foreground">{t('retakeRequired') || 'Need to retake'}</p>
+                  <p className="text-xs text-muted-foreground">Retake required</p>
                 </CardContent>
               </Card>
             </div>
