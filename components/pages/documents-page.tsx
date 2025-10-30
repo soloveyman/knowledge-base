@@ -4,6 +4,7 @@ import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { FileText, Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
+import { useRouter } from "next/navigation"
 
 interface Document {
   id: string
