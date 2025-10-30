@@ -13,7 +13,7 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:migrate:railway": "tsx scripts/migrate-railway.ts",
+    "db:migrate:railway": "node scripts/migrate-railway.js",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:health": "tsx scripts/check-health.ts",
