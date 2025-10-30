@@ -19,6 +19,15 @@ export async function POST(req: Request) {
 
     const existing = await db.select().from(users).where(eq(users.email, email)).limit(1)
     if (existing.length > 0) {
+      // If the user already exists and has a password, allow seamless sign-in by
+      // validating the provided password and returning success instead of 409.
+      const existingUser = existing[0] as { id: string; password: string | null }
+      if (existingUser.password) {
+        const ok = await bcrypt.compare(password, existingUser.password)
+        if (ok) {
+          return NextResponse.json({ success: true, id: existingUser.id, existing: true })
+        }
+      }
       return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
     }
 
