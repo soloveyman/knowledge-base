@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -64,7 +64,7 @@ interface Assignment {
   status?: string
 }
 
-export default function EmployeePage() {
+function EmployeePageInner() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
   const router = useRouter()
@@ -628,5 +628,13 @@ export default function EmployeePage() {
         </Tabs>
       </main>
     </div>
+  )
+}
+
+export default function EmployeePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div></div>}>
+      <EmployeePageInner />
+    </Suspense>
   )
 }
