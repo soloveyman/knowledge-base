@@ -214,10 +214,10 @@ export default function DocumentReaderPage() {
           console.log('Final content for display:', content.substring(0, 200))
           
           documentData = {
-            id: document.id,
-            name: document.originalFileName || document.title,
+            id: String(document.id),
+            name: document.originalFileName || document.title || 'Untitled',
             type: document.fileType?.toUpperCase() || 'DOCX',
-            uploadedAt: document.createdAt,
+            uploadedAt: document.createdAt || new Date().toISOString(),
             uploadedBy: document.uploadedBy || 'Unknown',
             size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
             content: content
@@ -269,7 +269,7 @@ export default function DocumentReaderPage() {
               })
             } else {
               setAssignmentData({
-                id: document.id,
+                id: String(document.id),
                 name: document.title || 'Document',
                 description: '',
                 document: documentData,
