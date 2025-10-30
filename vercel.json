@@ -2,11 +2,6 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm ci --legacy-peer-deps",
-  "functions": {
-    "api/**/*": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "regions": ["iad"],
   "env": {
     "NEXT_TELEMETRY_DISABLED": "1"
