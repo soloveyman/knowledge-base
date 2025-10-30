@@ -4,6 +4,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { params, context } = body
+    console.log('Generate test request:', { 
+      params, 
+      contextTextLength: context?.text?.length || 0,
+      hasApiKey: !!process.env.GROK_API_KEY
+    })
 
     // Check if Grok API key is available
     if (!process.env.GROK_API_KEY) {
@@ -89,7 +94,8 @@ export async function POST(request: Request) {
     })
 
     if (!grokResponse.ok) {
-      console.error(`Grok API error: ${grokResponse.status} - ${grokResponse.statusText}`)
+      const errorBody = await grokResponse.text().catch(() => 'Unable to read error body')
+      console.error(`Grok API error: ${grokResponse.status} - ${grokResponse.statusText}`, errorBody)
       
       // Fallback to mock questions when API fails
       const mockQuestions = [
@@ -133,6 +139,7 @@ export async function POST(request: Request) {
     const content = grokData.choices?.[0]?.message?.content
 
     if (!content) {
+      console.error('Grok API response:', JSON.stringify(grokData, null, 2))
       throw new Error('No content received from Grok API')
     }
 
@@ -140,8 +147,13 @@ export async function POST(request: Request) {
     let generatedQuestions
     try {
       generatedQuestions = JSON.parse(content)
+      if (!Array.isArray(generatedQuestions)) {
+        console.error('Grok API did not return an array:', generatedQuestions)
+        throw new Error('Grok API did not return an array')
+      }
     } catch (parseError) {
-      console.error('Failed to parse Grok response:', content)
+      console.error('Failed to parse Grok response:', content.substring(0, 500))
+      console.error('Parse error:', parseError)
       throw new Error('Invalid JSON response from Grok API')
     }
 
