@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { PageLayout } from "@/components/common/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -49,7 +49,7 @@ const ACCEPTED_FILE_TYPES = {
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
 
-export default function DocImportPage() {
+function DocImportPageInner() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -423,5 +423,13 @@ export default function DocImportPage() {
         )}
       </div>
     </PageLayout>
+  )
+}
+
+export default function DocImportPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div></div>}>
+      <DocImportPageInner />
+    </Suspense>
   )
 }
