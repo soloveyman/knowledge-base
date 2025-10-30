@@ -234,6 +234,10 @@ export default function DocumentReaderPage() {
               id: string
               moduleId?: string | null
               testId?: string | null
+              title?: string
+              description?: string
+              dueDate?: string
+              status?: string
             }
             
             // Find assignment that has this moduleId
