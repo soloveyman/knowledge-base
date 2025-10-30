@@ -88,14 +88,22 @@ export default function DocsPage() {
           status?: string
         }
         
-        const transformedDocs = (result.data.documents as ApiDocument[]).map((doc: ApiDocument) => ({
-          id: String(doc.id),
-          name: doc.originalFileName || doc.title || 'Untitled',
-          type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-          uploadedAt: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
-          size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-          status: doc.status || 'ready'
-        }))
+        const transformedDocs = (result.data.documents as ApiDocument[]).map((doc: ApiDocument) => {
+          // Normalize status to our discriminated union
+          const normalizedStatus: Document['status'] =
+            doc.status === 'processing' ? 'processing'
+            : doc.status === 'error' ? 'error'
+            : 'ready'
+
+          return {
+            id: String(doc.id),
+            name: doc.originalFileName || doc.title || 'Untitled',
+            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+            uploadedAt: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+            size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+            status: normalizedStatus,
+          }
+        })
         console.log('Transformed documents:', transformedDocs)
         setDocumentsWithLog(transformedDocs)
       } else {
