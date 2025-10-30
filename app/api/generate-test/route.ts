@@ -157,7 +157,7 @@ export async function POST(request: Request) {
           totalGenerated: mockQuestions.length
         },
         provider: "mock",
-        message: `Grok API failed (${grokResponse.status}) - using mock questions`
+        message: `Grok API failed - using mock questions. ${lastError ? `Errors: ${lastError}` : ''}`
       })
     }
 
