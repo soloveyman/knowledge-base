@@ -40,7 +40,7 @@ export async function middleware(request: NextRequest) {
   
   // Handle root path redirect for authenticated users
   if (pathname === '/') {
-    const userRole = token.role
+    const userRole = token?.role as string | undefined
     if (userRole === 'super-admin') {
       return NextResponse.redirect(new URL('/super-admin', request.url))
     } else if (userRole === 'owner') {
