@@ -5,6 +5,7 @@
 
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const { randomUUID } = require('crypto');
 
 async function reset() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -26,6 +27,9 @@ async function reset() {
 
     // Ensure tables exist; if not, let errors bubble
     const q = (text, params) => client.query(text, params);
+
+    // Ensure UUID function exists (best-effort)
+    try { await client.query('CREATE EXTENSION IF NOT EXISTS pgcrypto'); } catch {}
 
     // Child tables first
     await q('DELETE FROM assignment_users');
@@ -68,24 +72,31 @@ async function reset() {
       await q('DELETE FROM users WHERE role <> $1', ['super-admin']);
     }
 
+    // Helper to get a UUID (prefers DB fn, falls back to Node)
+    async function getUuid() {
+      try { const r = await q('SELECT gen_random_uuid() as id'); return r.rows[0].id; } catch { return randomUUID(); }
+    }
+
     // Upsert default super-admin
     const superEmail = 'superadmin@test.com';
     const superPass = await bcrypt.hash('admin123', 12);
+    const superId = await getUuid();
     await q(
       `INSERT INTO users (id, email, name, role, password, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, 'super-admin', $3, NOW(), NOW())
+       VALUES ($4, $1, $2, 'super-admin', $3, NOW(), NOW())
        ON CONFLICT (email) DO UPDATE SET role = 'super-admin', password = EXCLUDED.password, name = EXCLUDED.name, updated_at = NOW()`,
-      [superEmail, 'Super Admin', superPass]
+      [superEmail, 'Super Admin', superPass, superId]
     );
 
     // Ensure single owner exists
     const ownerEmail = 'owner@test.com';
     const ownerPass = await bcrypt.hash('password123', 12);
+    const ownerId = await getUuid();
     await q(
       `INSERT INTO users (id, email, name, role, password, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, 'owner', $3, NOW(), NOW())
+       VALUES ($4, $1, $2, 'owner', $3, NOW(), NOW())
        ON CONFLICT (email) DO UPDATE SET role = 'owner', password = EXCLUDED.password, name = EXCLUDED.name, updated_at = NOW()`,
-      [ownerEmail, 'Test Owner', ownerPass]
+      [ownerEmail, 'Test Owner', ownerPass, ownerId]
     );
 
     await client.query('COMMIT');
