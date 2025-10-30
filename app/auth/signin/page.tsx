@@ -38,32 +38,13 @@ export default function SignInPage() {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error || 'Registration failed')
         }
+        // Immediately sign in after successful registration with server redirect
+        await signIn("credentials", { email, password, redirect: true, callbackUrl: '/owner' })
+        return
       }
 
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        setError(t('invalidEmailOrPassword'))
-      } else {
-        // Get session to check user role and redirect accordingly
-        const session = await getSession()
-        if (session?.user) {
-          const role = session.user.role
-          if (role === 'super-admin') {
-            router.push("/super-admin")
-          } else if (role === 'owner') {
-            router.push("/owner")
-          } else if (role === 'manager') {
-            router.push("/manager")
-          } else {
-            router.push("/employee")
-          }
-        }
-      }
+      await signIn("credentials", { email, password, redirect: true, callbackUrl: '/owner' })
+      return
     } catch (error) {
       setError(t('errorOccurred'))
     } finally {
