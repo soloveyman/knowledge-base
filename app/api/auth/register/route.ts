@@ -1,3 +1,5 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
@@ -31,8 +33,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, id: created.id })
   } catch (err) {
-    console.error('Register error:', err)
-    return NextResponse.json({ error: 'Failed to register' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('Register error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
