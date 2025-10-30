@@ -30,6 +30,7 @@ interface User {
 
 interface Assignment {
   id: string
+  name?: string
   title?: string
   description?: string
   moduleId: string
