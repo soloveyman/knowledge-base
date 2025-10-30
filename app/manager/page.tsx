@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo, useLayoutEffect, useCallback } from "react"
+import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -73,7 +73,7 @@ interface SavedAssignment {
   users?: AssignedUser[]
 }
 
-export default function ManagerPage() {
+function ManagerPageInner() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
   const router = useRouter()
@@ -737,5 +737,13 @@ export default function ManagerPage() {
         </Tabs>
       </main>
     </div>
+  )
+}
+
+export default function ManagerPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div></div>}>
+      <ManagerPageInner />
+    </Suspense>
   )
 }
