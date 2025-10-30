@@ -45,6 +45,12 @@ interface Assignment {
   users?: Array<{ userId: string; status: string }>
 }
 
+interface AssignedUser {
+  userId: string
+  status?: string
+  testScore?: number | null
+}
+
 interface UserProgress {
   user: User
   assignments: Assignment[]
@@ -98,20 +104,20 @@ export default function UserProgressReport({ users, assignments, modules = [], t
 
       // Use the actual user's status from assignment_users instead of the generic assignment status
       const completedCount = userAssignments.filter(assignment => {
-        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === user.id)
         return userAssignment?.status === 'completed' || userAssignment?.status === 'passed'
       }).length
 
       const overdueCount = userAssignments.filter(assignment => {
         if (!assignment.dueDate) return false
-        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === user.id)
         const dueDate = new Date(assignment.dueDate)
         const now = new Date()
         return dueDate < now && userAssignment?.status !== 'completed' && userAssignment?.status !== 'passed'
       }).length
 
       const completedWithScores = userAssignments.filter(assignment => {
-        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === user.id)
         return userAssignment?.status === 'completed'
       })
 
@@ -119,7 +125,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
       const scores: number[] = []
       for (const assignment of completedWithScores) {
         // Find the user's test score from the assignment's users array
-        const userAssignment = assignment.users?.find((au: any) => au.userId === user.id)
+        const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === user.id)
         if (userAssignment?.testScore !== undefined && userAssignment.testScore !== null) {
           scores.push(userAssignment.testScore)
         }
@@ -276,7 +282,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                   ) : (
                     progress.assignments.map((assignment) => {
                       // Get the user's specific assignment details
-                      const userAssignment = assignment.users?.find((au: any) => au.userId === progress.user.id)
+                      const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === progress.user.id)
                       const actualStatus = userAssignment?.status || assignment.status || 'pending'
                       const actualTitle = assignment.title || assignment.name || `Assignment ${assignment.id.slice(0, 8)}`
                       const actualDescription = assignment.description || assignment.title || assignment.name || `Complete assignment ${assignment.id.slice(0, 8)}`

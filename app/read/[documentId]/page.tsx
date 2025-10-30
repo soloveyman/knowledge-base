@@ -268,8 +268,8 @@ export default function DocumentReaderPage() {
                 description: assignment.description || '',
                 document: documentData,
                 test: testData,
-                dueDate: assignment.dueDate,
-                status: assignment.status
+                dueDate: assignment.dueDate || '',
+                status: assignment.status || 'in_progress'
               })
             } else {
               setAssignmentData({
