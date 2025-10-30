@@ -294,7 +294,7 @@ export default function OwnerPage() {
             <UserProgressReport 
               users={savedUsers} 
               assignments={[]}
-              modules={savedDocuments}
+              modules={savedDocuments.map(d => ({ id: String(d.id), title: d.name }))}
               tests={[]}
             />
 
@@ -313,13 +313,13 @@ export default function OwnerPage() {
           <TabsContent value="settings" className="space-y-3 md:space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>{t('systemSettings')}</CardTitle>
-                <CardDescription>{t('configureSystemWideSettings')}</CardDescription>
+                <CardTitle>System settings</CardTitle>
+                <CardDescription>Configure system-wide settings</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
                   <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p>{t('systemSettingsWillBeImplementedHere')}</p>
+                  <p>System settings will be implemented here</p>
                 </div>
               </CardContent>
             </Card>
