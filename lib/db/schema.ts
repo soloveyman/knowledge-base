@@ -11,6 +11,7 @@ export const users = pgTable('users', {
   image: text('image'),
   emailVerified: timestamp('email_verified'),
   role: text('role').notNull().$type<'super-admin' | 'owner' | 'manager' | 'employee'>(),
+  businessId: uuid('business_id'),
   country: text('country'), // for payment provider selection
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

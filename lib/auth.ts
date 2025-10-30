@@ -90,16 +90,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: 'owner',
             country: 'US',
           }).returning()
+          await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
           const u = user as { id?: string; role?: UserRole; businessId?: string }
           u.id = created.id
           u.role = 'owner'
           u.businessId = created.id
         } else {
-          const dbUser = existing[0] as unknown as { id: string; role: UserRole }
+          const dbUser = existing[0] as unknown as { id: string; role: UserRole; businessId?: string | null }
           const u = user as { id?: string; role?: UserRole; businessId?: string }
           u.id = dbUser.id
           u.role = dbUser.role
-          u.businessId = dbUser.id
+          u.businessId = (dbUser.businessId ?? dbUser.id)
         }
       }
       return true

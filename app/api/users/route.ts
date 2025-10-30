@@ -9,7 +9,10 @@ export async function GET() {
   try {
     const session = await auth()
     const tenantDb = getTenantDb(session?.user.businessId)
-    const allUsers = await tenantDb.select().from(users)
+    const allUsers = await tenantDb
+      .select()
+      .from(users)
+      .where(eq(users.businessId, session?.user.businessId))
 
     return NextResponse.json({
       success: true,
@@ -43,7 +46,8 @@ export async function POST(request: Request) {
     }
 
     // Check if user already exists
-    const existingUser = await tenantDb.select().from(users).where(eq(users.email, email)).limit(1)
+    const normalizedEmail = String(email).toLowerCase().trim()
+    const existingUser = await tenantDb.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
     if (existingUser.length > 0) {
       return NextResponse.json({
         success: false,
@@ -58,9 +62,10 @@ export async function POST(request: Request) {
     const newUser = await tenantDb.insert(users).values({
       name,
       job,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       role: role as 'owner' | 'manager' | 'employee',
+      businessId: session?.user.businessId,
     }).returning()
 
     return NextResponse.json({
