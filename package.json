@@ -25,7 +25,8 @@
     "db:seed:railway": "tsx scripts/seed-railway.ts",
     "test:smoke": "tsx scripts/smoke-test.ts",
     "typecheck": "tsc --noEmit",
-    "lint:ci": "next lint --max-warnings=0"
+    "lint:ci": "next lint --max-warnings=0",
+    "db:reset:test": "node scripts/reset-for-testing.js"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",
