@@ -562,25 +562,29 @@ export default function EmployeePage() {
                       .filter(a => a.score !== undefined && a.score !== null && (a.status === 'completed' || a.status === 'failed'))
                       .sort((a, b) => new Date(b.dueDate || '').getTime() - new Date(a.dueDate || '').getTime())
                       .slice(0, 5)
-                      .map((assignment) => (
-                        <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium">{assignment.title}</h4>
-                              <StatusBadge status={assignment.status} />
+                      .map((assignment) => {
+                        const score = assignment.score ?? 0
+                        const colorClass = score >= 70 ? 'text-green-600' : 'text-red-600'
+                        return (
+                          <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium">{assignment.title}</h4>
+                                <StatusBadge status={assignment.status} />
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {assignment.dueDate && `${t('due')}: ${assignment.dueDate}`}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              {assignment.dueDate && `${t('due')}: ${assignment.dueDate}`}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-lg font-bold ${assignment.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
-                              {assignment.score}%
+                            <div className="text-right">
+                              <div className={`text-lg font-bold ${colorClass}`}>
+                                {score}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">{t('score')}</div>
                             </div>
-                            <div className="text-xs text-muted-foreground">{t('score')}</div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     
                     {/* Show test attempts */}
                     {testAttempts
