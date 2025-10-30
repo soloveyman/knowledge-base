@@ -51,14 +51,21 @@ export async function POST(request: Request) {
     }
 
     // Generate questions using Grok API
-    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'grok-beta',
+    // Try different model names: grok-4 (latest), grok-beta (beta), grok-2 (older)
+    const models = ['grok-4', 'grok-beta', 'grok-2']
+    let grokResponse: Response | null = null
+    let lastError: string | null = null
+    
+    for (const model of models) {
+      try {
+        grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model,
         messages: [
           {
             role: 'system',
@@ -92,16 +99,29 @@ export async function POST(request: Request) {
         max_tokens: 2000
       })
     })
-
-    if (!grokResponse.ok) {
-      let errorBody
-      try {
-        const errorJson = await grokResponse.json()
-        errorBody = JSON.stringify(errorJson, null, 2)
-      } catch {
-        errorBody = await grokResponse.text().catch(() => 'Unable to read error body')
+        
+        if (grokResponse.ok) {
+          // Success with this model, break out of loop
+          console.log(`Grok API success with model: ${model}`)
+          break
+        } else {
+          // Try next model, but save error for logging
+          const errorText = await grokResponse.text().catch(() => 'Unknown error')
+          lastError = `${model}: ${errorText.substring(0, 200)}`
+          console.log(`Grok API failed with model ${model}, trying next...`)
+          grokResponse = null
+        }
+      } catch (err) {
+        lastError = `${model}: ${err instanceof Error ? err.message : 'Unknown error'}`
+        console.log(`Grok API error with model ${model}:`, lastError)
+        grokResponse = null
+        continue
       }
-      console.error(`Grok API error: ${grokResponse.status} - ${grokResponse.statusText}`, errorBody)
+    }
+
+    if (!grokResponse || !grokResponse.ok) {
+      let errorBody = lastError || 'All models failed'
+      console.error(`Grok API error: All models failed. Last error: ${errorBody}`)
       
       // Fallback to mock questions when API fails
       const mockQuestions = [
