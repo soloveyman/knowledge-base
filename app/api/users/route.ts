@@ -8,11 +8,15 @@ import bcrypt from 'bcryptjs'
 export async function GET() {
   try {
     const session = await auth()
-    const tenantDb = getTenantDb(session?.user.businessId)
+    if (!session?.user?.businessId) {
+      return NextResponse.json({ success: false, message: 'Unauthorized: missing tenant' }, { status: 401 })
+    }
+    const tenantDb = getTenantDb(session.user.businessId)
+    const tenantId = session.user.businessId
     const allUsers = await tenantDb
       .select()
       .from(users)
-      .where(eq(users.businessId, session?.user.businessId))
+      .where(eq(users.businessId, tenantId))
 
     return NextResponse.json({
       success: true,
@@ -33,7 +37,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await auth()
-    const tenantDb = getTenantDb(session?.user.businessId)
+    if (!session?.user?.businessId) {
+      return NextResponse.json({ success: false, message: 'Unauthorized: missing tenant' }, { status: 401 })
+    }
+    const tenantDb = getTenantDb(session.user.businessId)
+    const tenantId = session.user.businessId
     const body = await request.json()
     const { name, job, email, password, role } = body
 
@@ -65,7 +73,7 @@ export async function POST(request: Request) {
       email: normalizedEmail,
       password: hashedPassword,
       role: role as 'owner' | 'manager' | 'employee',
-      businessId: session?.user.businessId,
+      businessId: tenantId,
     }).returning()
 
     return NextResponse.json({

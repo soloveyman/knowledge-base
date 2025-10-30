@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signIn, getSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,43 +56,13 @@ export default function SignInPage() {
       }
       router.push('/owner')
       return
-    } catch (error) {
+    } catch {
       setError(t('errorOccurred'))
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true)
-    setError("")
-    try {
-      const result = await signIn("google", { redirect: false })
-      
-      if (result?.error) {
-        setError("Google sign-in failed. Please try again.")
-      } else {
-        // Get session to check user role and redirect accordingly
-        const session = await getSession()
-        if (session?.user) {
-          const role = session.user.role
-          if (role === 'super-admin') {
-            router.push("/super-admin")
-          } else if (role === 'owner') {
-            router.push("/owner")
-          } else if (role === 'manager') {
-            router.push("/manager")
-          } else {
-            router.push("/employee")
-          }
-        }
-      }
-    } catch (error) {
-      setError("Google sign-in failed. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] p-4">
