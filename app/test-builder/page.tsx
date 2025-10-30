@@ -147,14 +147,15 @@ export default function TestBuilderPage() {
             let documentContent = ''
             
             // Extract content from sections
-            if (document.parsedContent?.sections?.length > 0) {
+            if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
+              type Section = { content: string; title?: string }
               documentContent = document.parsedContent.sections
-                .map((section: { title: string; content: string }) => `${section.title}\n${section.content}`)
+                .map((section: Section) => `${section.title ? section.title + '\n' : ''}${section.content}`)
                 .join('\n\n')
             }
             
             // Extract content from tables (for xlsx files)
-            if (document.parsedContent?.tables?.length > 0) {
+            if (Array.isArray(document.parsedContent?.tables) && document.parsedContent!.tables.length > 0) {
               const tablesContent = document.parsedContent.tables
                 .map((table: { title: string; headers: string[]; rows: string[][] }) => {
                   let tableText = `${table.title}\n`
@@ -248,14 +249,15 @@ export default function TestBuilderPage() {
     let documentContent = ''
     
     // Extract content from sections
-    if (doc.parsedContent?.sections?.length > 0) {
+    if (Array.isArray(doc.parsedContent?.sections) && doc.parsedContent!.sections.length > 0) {
+      type Section = { content: string; title?: string }
       documentContent = doc.parsedContent.sections
-        .map((section: { title: string; content: string }) => `${section.title}\n${section.content}`)
+        .map((section: Section) => `${section.title ? section.title + '\n' : ''}${section.content}`)
         .join('\n\n')
     }
     
     // Extract content from tables (for xlsx files)
-    if (doc.parsedContent?.tables?.length > 0) {
+    if (Array.isArray(doc.parsedContent?.tables) && doc.parsedContent!.tables.length > 0) {
       const tablesContent = doc.parsedContent.tables
         .map((table: { title: string; headers: string[]; rows: string[][] }) => {
           let tableText = `${table.title}\n`
