@@ -8,6 +8,7 @@ import { useBadgeTranslation } from "@/lib/badge-translations"
 
 interface Assignment {
   id: string
+  title?: string
   name: string
   description: string
   document: {
@@ -55,7 +56,7 @@ export function AssignmentsPage({
 
   const assignmentItems = assignments.map((assignment) => ({
     id: assignment.id,
-    title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
+    title: assignment.title || assignment.name || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
     subtitle: `${t('due')}: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : t('noDueDate')} | ${t('created')}: ${new Date(assignment.createdAt).toLocaleDateString()}`,
     metadata: [],
     badges: [
