@@ -153,14 +153,16 @@ async function migrateAssignments() {
   for (const assignment of savedAssignments) {
     try {
       await db.insert(assignments).values({
-        moduleId: assignment.document.id.toString(), // Map to actual module ID
+        // If you have a real module UUID mapping, set it here; otherwise null
+        moduleId: null,
         testId: assignment.test.id,
-        assignedTo: assignment.assignedUsers[0]?.id.toString(), // Map to actual user ID
-        assignedBy: 'migration-user-id', // You'll need to map this to actual user ID
+        assignedBy: 'migration-user-id', // TODO: replace with a real user UUID
         dueDate: new Date(assignment.dueDate),
         status: assignment.status === 'active' ? 'pending' : assignment.status,
         allowRetake: false,
-        maxAttempts: 1
+        maxAttempts: 1,
+        title: assignment.name,
+        description: assignment.description
       })
       
       console.log(`✅ Migrated assignment: ${assignment.name}`)
