@@ -15,7 +15,12 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { email, password, name } = schema.parse(body)
+    // Normalize email before validation
+    const normalizedBody = {
+      ...body,
+      email: typeof body.email === 'string' ? body.email.toLowerCase().trim() : body.email
+    }
+    const { email, password, name } = schema.parse(normalizedBody)
     const normalizedEmail = email.toLowerCase().trim()
 
     const existing = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
@@ -49,6 +54,14 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ success: true, id: created.id, businessId: created.id })
   } catch (err) {
+    // Handle Zod validation errors
+    if (err && typeof err === 'object' && 'issues' in err) {
+      const zodError = err as z.ZodError
+      const firstError = zodError.issues[0]
+      const message = firstError?.message || 'Validation error'
+      console.error('Register validation error:', zodError.issues)
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Register error:', message)
     return NextResponse.json({ error: message }, { status: 500 })

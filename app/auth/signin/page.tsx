@@ -29,19 +29,34 @@ export default function SignInPage() {
 
     try {
       if (isRegister) {
+        // Validate required fields
+        if (!email.trim()) {
+          setError('Email is required')
+          setIsLoading(false)
+          return
+        }
+        if (!password || password.length < 8) {
+          setError('Password must be at least 8 characters')
+          setIsLoading(false)
+          return
+        }
+        
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.toLowerCase().trim(), password, name }),
+          body: JSON.stringify({ email: email.toLowerCase().trim(), password, name: name.trim() || undefined }),
         })
+        const body = await res.json().catch(() => ({}))
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body?.error || 'Registration failed')
+          setError(body?.error || `Registration failed: ${res.status} ${res.statusText}`)
+          setIsLoading(false)
+          return
         }
         // Immediately sign in after successful registration
         const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
         if (result?.error) {
           setError(result.error || t('errorOccurred'))
+          setIsLoading(false)
           return
         }
         // route by role
@@ -67,9 +82,8 @@ export default function SignInPage() {
       else if (role === 'manager') router.push('/manager')
       else router.push('/employee')
       return
-    } catch {
-      setError(t('errorOccurred'))
-    } finally {
+    } catch (error) {
+      setError(error instanceof Error ? error.message : t('errorOccurred'))
       setIsLoading(false)
     }
   }
