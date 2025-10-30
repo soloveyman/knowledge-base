@@ -23,11 +23,12 @@ export async function middleware(request: NextRequest) {
       secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development"
     })
     if (token) {
-      const userRole = token.role as string | undefined
+      const userRole = (token.role as string | undefined)?.toLowerCase()
       if (userRole === 'super-admin') return NextResponse.redirect(new URL('/super-admin', request.url))
       if (userRole === 'owner') return NextResponse.redirect(new URL('/owner', request.url))
       if (userRole === 'manager') return NextResponse.redirect(new URL('/manager', request.url))
-      return NextResponse.redirect(new URL('/employee', request.url))
+      // Default to owner dashboard if role is missing/unknown
+      return NextResponse.redirect(new URL('/owner', request.url))
     }
     return NextResponse.next()
   }
@@ -40,7 +41,7 @@ export async function middleware(request: NextRequest) {
   
   // Handle root path redirect for authenticated users
   if (pathname === '/') {
-    const userRole = token?.role as string | undefined
+    const userRole = (token?.role as string | undefined)?.toLowerCase()
     if (userRole === 'super-admin') {
       return NextResponse.redirect(new URL('/super-admin', request.url))
     } else if (userRole === 'owner') {
@@ -48,7 +49,8 @@ export async function middleware(request: NextRequest) {
     } else if (userRole === 'manager') {
       return NextResponse.redirect(new URL('/manager', request.url))
     } else {
-      return NextResponse.redirect(new URL('/employee', request.url))
+      // Default to owner if role missing/unknown
+      return NextResponse.redirect(new URL('/owner', request.url))
     }
   }
   
