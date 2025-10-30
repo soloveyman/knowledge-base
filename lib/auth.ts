@@ -45,7 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null
           }
 
-          const dbUser = dbUsers[0]
+          const dbUser = dbUsers[0] as { id: string; email: string; name: string | null; role: UserRole | null; password: string | null; businessId?: string | null }
           
           // Check if user has a password (some users might not have one if created via OAuth)
           if (!dbUser.password) {
@@ -63,7 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           // Return user object for NextAuth
           const resolvedRole: UserRole = (dbUser.role as UserRole) ?? 'owner'
-          const resolvedBusinessId: string = dbUser.id
+          const resolvedBusinessId: string = dbUser.businessId ?? dbUser.id
           return {
             id: dbUser.id,
             email: dbUser.email,
@@ -114,6 +114,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = (u.role as UserRole) ?? (token.role as UserRole)
         token.businessId = u.businessId ?? token.businessId
         token.businessName = u.businessName ?? token.businessName
+      } else {
+        // Fallback: if role/businessId missing, hydrate from DB
+        if ((!token.role || !token.businessId) && token.sub) {
+          try {
+            const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
+            if (dbUsers.length > 0) {
+              const dbUser = dbUsers[0] as { role: UserRole | null; businessId?: string | null }
+              if (!token.role) token.role = (dbUser.role as UserRole) ?? 'employee'
+              if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
+            }
+          } catch {
+            // non-fatal; leave token as-is
+          }
+        }
       }
       return token
     },
