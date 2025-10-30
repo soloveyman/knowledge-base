@@ -42,7 +42,7 @@ interface Assignment {
   maxAttempts: number
   createdAt: string
   updatedAt: string
-  users?: Array<{ userId: string; status: string }>
+  users?: AssignedUser[]
 }
 
 interface AssignedUser {
