@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'grok-2',
+        model: 'grok-beta',
         messages: [
           {
             role: 'system',
@@ -94,7 +94,13 @@ export async function POST(request: Request) {
     })
 
     if (!grokResponse.ok) {
-      const errorBody = await grokResponse.text().catch(() => 'Unable to read error body')
+      let errorBody
+      try {
+        const errorJson = await grokResponse.json()
+        errorBody = JSON.stringify(errorJson, null, 2)
+      } catch {
+        errorBody = await grokResponse.text().catch(() => 'Unable to read error body')
+      }
       console.error(`Grok API error: ${grokResponse.status} - ${grokResponse.statusText}`, errorBody)
       
       // Fallback to mock questions when API fails
