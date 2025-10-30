@@ -32,18 +32,29 @@ export default function SignInPage() {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email: email.toLowerCase().trim(), password, name }),
         })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error || 'Registration failed')
         }
-        // Immediately sign in after successful registration with server redirect
-        await signIn("credentials", { email, password, redirect: true, callbackUrl: '/owner' })
+        // Immediately sign in after successful registration
+        const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
+        if (result?.error) {
+          setError(result.error || t('errorOccurred'))
+          return
+        }
+        // success: route to owner by default
+        router.push('/owner')
         return
       }
 
-      await signIn("credentials", { email, password, redirect: true, callbackUrl: '/owner' })
+      const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
+      if (result?.error) {
+        setError('Invalid email or password')
+        return
+      }
+      router.push('/owner')
       return
     } catch (error) {
       setError(t('errorOccurred'))

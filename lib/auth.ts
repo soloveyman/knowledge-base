@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs"
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
 })
 
 const oauthProviders = (
@@ -35,9 +35,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         try {
           const { email, password } = loginSchema.parse(credentials)
+          const normalizedEmail = email.toLowerCase().trim()
           
           // Find user in database
-          const dbUsers = await db.select().from(users).where(eq(users.email, email)).limit(1)
+          const dbUsers = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
           
           if (dbUsers.length === 0) {
             console.log("User not found:", email)

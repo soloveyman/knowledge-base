@@ -16,8 +16,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { email, password, name } = schema.parse(body)
+    const normalizedEmail = email.toLowerCase().trim()
 
-    const existing = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    const existing = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
     if (existing.length > 0) {
       // If the user already exists and has a password, allow seamless sign-in by
       // validating the provided password and returning success instead of 409.
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
 
     const hashed = await bcrypt.hash(password, 12)
     const [created] = await db.insert(users).values({
-      email,
+      email: normalizedEmail,
       name: name ?? null,
       role: 'owner',
       password: hashed,
