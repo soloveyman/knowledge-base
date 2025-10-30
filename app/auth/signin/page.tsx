@@ -126,11 +126,11 @@ export default function SignInPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {isRegister && (
               <div className="space-y-2">
-                <Label htmlFor="name">{t('name')}</Label>
+                <Label htmlFor="name">Name</Label>
                 <Input
                   id="name"
                   type="text"
-                  placeholder={t('enterYourName')}
+                  placeholder="Enter your name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
@@ -178,7 +178,7 @@ export default function SignInPage() {
             
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isRegister ? t('signUp') : t('signIn')}
+              {isRegister ? 'Sign Up' : t('signIn')}
             </Button>
             <div className="text-center text-sm text-muted-foreground">
               <button
@@ -186,7 +186,7 @@ export default function SignInPage() {
                 onClick={() => { setIsRegister(!isRegister); setError("") }}
                 className="underline hover:text-foreground"
               >
-                {isRegister ? t('haveAccountSignIn') : t('noAccountSignUp')}
+                {isRegister ? 'Have an account? Sign in' : 'No account? Sign up'}
               </button>
             </div>
           </form>
