@@ -105,12 +105,12 @@ export default function EmployeePage() {
       const result = await response.json()
       
       if (result.success) {
-        const allAssignments = result.data.assignments
+        const allAssignments: Assignment[] = (result.data.assignments || []) as Assignment[]
         setAssignments(allAssignments)
         
         // Filter assignments for current user using the new assignment_users table
         const currentUserId = session?.user?.id
-        const userAssignments = allAssignments.filter((assignment) => {
+        const userAssignments = allAssignments.filter((assignment: Assignment) => {
           // Check if this assignment has users array and contains the current user
           if (assignment.users && Array.isArray(assignment.users)) {
             return assignment.users.some((au: AssignedUser) => au.userId === currentUserId)
