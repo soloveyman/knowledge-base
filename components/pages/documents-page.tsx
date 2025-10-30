@@ -40,7 +40,11 @@ export function DocumentsPage({
     badges: [
       {
         label: translateBadge(doc.type),
-        variant: doc.type === 'DOCX' ? 'default' : doc.type === 'XLSX' ? 'secondary' : 'outline'
+        variant: (doc.type === 'DOCX'
+          ? 'default' as const
+          : doc.type === 'XLSX'
+            ? 'secondary' as const
+            : 'outline' as const)
       },
       ...(doc.status === 'ready' ? [{ label: translateBadge('ready'), variant: 'default' as const }] : [])
     ],
