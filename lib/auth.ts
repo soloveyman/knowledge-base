@@ -71,6 +71,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // Ensure token.sub is always the DB user id (important for OAuth providers)
+        // so session.user.id matches our users.id UUID everywhere
+        token.sub = user.id
         token.role = user.role as UserRole
         token.businessId = user.businessId
         token.businessName = user.businessName
