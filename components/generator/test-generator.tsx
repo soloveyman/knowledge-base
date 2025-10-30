@@ -494,7 +494,24 @@ export default function TestGenerator({
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Regenerate
                 </Button>
-                <Button onClick={() => onSave && onSave({ questions: generatedQuestions, params })}>
+                <Button onClick={() => {
+                  if (!onSave) return
+                  const testData: TestData = {
+                    id: (globalThis.crypto && 'randomUUID' in globalThis.crypto)
+                      ? (globalThis.crypto as any).randomUUID()
+                      : `${Date.now()}`,
+                    title: 'Generated Test',
+                    type: 'generated',
+                    difficulty: params.difficulty,
+                    locale: 'en',
+                    questionCount: generatedQuestions.length,
+                    questions: generatedQuestions,
+                    sourceDocument: 'Generated from selected sections',
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'system'
+                  }
+                  onSave(testData)
+                }}>
                   <CheckCircle className="h-4 w-4 mr-2" />
                   {t('createTest')}
                 </Button>
