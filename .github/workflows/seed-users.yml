@@ -1,0 +1,32 @@
+name: Seed Users (Prod)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'YES' to create/update superadmin and owner in PROD"
+        required: true
+
+jobs:
+  seed:
+    if: ${{ github.event.inputs.confirm == 'YES' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run reset-for-testing (creates superadmin and owner)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/reset-for-testing.js
+
+
