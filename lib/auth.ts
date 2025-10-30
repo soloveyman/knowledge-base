@@ -63,13 +63,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           // Return user object for NextAuth
           const resolvedRole: UserRole = (dbUser.role as UserRole) ?? 'owner'
+          const resolvedBusinessId: string = dbUser.id
           return {
             id: dbUser.id,
             email: dbUser.email,
             name: dbUser.name || undefined,
             role: resolvedRole,
-            businessId: 'business-1', // You can add this to your schema later
-            businessName: 'Knowledge Base', // You can add this to your schema later
+            businessId: resolvedBusinessId,
+            businessName: 'Knowledge Base',
           }
         } catch (error) {
           console.error("Auth error:", error)
@@ -89,14 +90,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: 'owner',
             country: 'US',
           }).returning()
-          const u = user as { id?: string; role?: UserRole }
+          const u = user as { id?: string; role?: UserRole; businessId?: string }
           u.id = created.id
           u.role = 'owner'
+          u.businessId = created.id
         } else {
           const dbUser = existing[0] as unknown as { id: string; role: UserRole }
-          const u = user as { id?: string; role?: UserRole }
+          const u = user as { id?: string; role?: UserRole; businessId?: string }
           u.id = dbUser.id
           u.role = dbUser.role
+          u.businessId = dbUser.id
         }
       }
       return true

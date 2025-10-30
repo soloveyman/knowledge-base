@@ -41,7 +41,8 @@ export async function POST(req: Request) {
       country: 'US',
     }).returning()
 
-    return NextResponse.json({ success: true, id: created.id })
+    // For now, businessId is the owner's user id
+    return NextResponse.json({ success: true, id: created.id, businessId: created.id })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Register error:', message)

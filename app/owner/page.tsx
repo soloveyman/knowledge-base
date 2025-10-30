@@ -68,7 +68,8 @@ export default function OwnerPage() {
       const usersResponse = await fetch('/api/users')
       const usersResult = await usersResponse.json()
       if (usersResult.success) {
-        setSavedUsers(usersResult.data.users)
+        // Exclude the signed-in owner from the Users tab to reflect team members only
+        setSavedUsers((usersResult.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
       }
 
       // Load assignments
@@ -87,7 +88,7 @@ export default function OwnerPage() {
     } catch (error) {
       console.error('Error loading data:', error)
     }
-  }, [])
+  }, [session?.user?.id])
 
   useEffect(() => {
     if (status === "loading") return

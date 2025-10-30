@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { db, users } from '@/lib/db'
+import { users } from '@/lib/db'
+import { getTenantDb } from '@/lib/db/tenant'
+import { auth } from '@/lib/auth'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
 export async function GET() {
   try {
-    const allUsers = await db.select().from(users)
+    const session = await auth()
+    const tenantDb = getTenantDb(session?.user.businessId)
+    const allUsers = await tenantDb.select().from(users)
 
     return NextResponse.json({
       success: true,
@@ -25,6 +29,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth()
+    const tenantDb = getTenantDb(session?.user.businessId)
     const body = await request.json()
     const { name, job, email, password, role } = body
 
@@ -37,7 +43,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user already exists
-    const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    const existingUser = await tenantDb.select().from(users).where(eq(users.email, email)).limit(1)
     if (existingUser.length > 0) {
       return NextResponse.json({
         success: false,
@@ -49,7 +55,7 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Create new user
-    const newUser = await db.insert(users).values({
+    const newUser = await tenantDb.insert(users).values({
       name,
       job,
       email,
