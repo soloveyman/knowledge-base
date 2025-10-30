@@ -23,7 +23,9 @@
     "docker:reset": "docker-compose down -v && docker-compose up -d",
     "db:setup": "npm run docker:up && npm run db:push",
     "db:seed:railway": "tsx scripts/seed-railway.ts",
-    "test:smoke": "tsx scripts/smoke-test.ts"
+    "test:smoke": "tsx scripts/smoke-test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint:ci": "next lint --max-warnings=0"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",
