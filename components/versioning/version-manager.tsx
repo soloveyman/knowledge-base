@@ -147,9 +147,9 @@ export default function VersionManager({
   }
 
   const handlePublish = (version: Version) => {
-    const updatedVersions = versions.map(v => ({
+    const updatedVersions: Version[] = versions.map(v => ({
       ...v,
-      status: v.id === version.id ? 'published' : 'archived',
+      status: (v.id === version.id ? 'published' : 'archived') as const,
       isCurrent: v.id === version.id,
       publishedAt: v.id === version.id ? new Date().toISOString() : v.publishedAt
     }))
