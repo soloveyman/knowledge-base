@@ -41,8 +41,12 @@ export async function POST(req: Request) {
       businessId: undefined, // set after we get id below for clarity
       country: 'US',
     }).returning()
-    // Immediately set businessId = owner id
-    await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
+    // Immediately set businessId = owner id (best-effort; ignore if column not present yet)
+    try {
+      await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
+    } catch {
+      console.warn('Register: failed to set businessId, proceeding anyway')
+    }
     return NextResponse.json({ success: true, id: created.id, businessId: created.id })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
