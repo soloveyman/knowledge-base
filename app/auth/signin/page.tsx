@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { signIn, getSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,8 +44,13 @@ export default function SignInPage() {
           setError(result.error || t('errorOccurred'))
           return
         }
-        // success: route to owner by default
-        router.push('/owner')
+        // route by role
+        const session = await getSession()
+        const role = session?.user?.role
+        if (role === 'super-admin') router.push('/super-admin')
+        else if (role === 'owner') router.push('/owner')
+        else if (role === 'manager') router.push('/manager')
+        else router.push('/employee')
         return
       }
 
@@ -54,7 +59,13 @@ export default function SignInPage() {
         setError('Invalid email or password')
         return
       }
-      router.push('/owner')
+      // route by role
+      const session = await getSession()
+      const role = session?.user?.role
+      if (role === 'super-admin') router.push('/super-admin')
+      else if (role === 'owner') router.push('/owner')
+      else if (role === 'manager') router.push('/manager')
+      else router.push('/employee')
       return
     } catch {
       setError(t('errorOccurred'))
