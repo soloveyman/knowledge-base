@@ -61,11 +61,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
 
           // Return user object for NextAuth
+          const resolvedRole: UserRole = (dbUser.role as UserRole) ?? 'owner'
           return {
             id: dbUser.id,
             email: dbUser.email,
             name: dbUser.name || undefined,
-            role: dbUser.role as UserRole,
+            role: resolvedRole,
             businessId: 'business-1', // You can add this to your schema later
             businessName: 'Knowledge Base', // You can add this to your schema later
           }

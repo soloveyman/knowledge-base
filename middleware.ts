@@ -17,6 +17,18 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
   
   if (isPublicRoute) {
+    // If already authenticated, avoid staying on auth pages
+    const token = await getToken({ 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development"
+    })
+    if (token) {
+      const userRole = token.role as string | undefined
+      if (userRole === 'super-admin') return NextResponse.redirect(new URL('/super-admin', request.url))
+      if (userRole === 'owner') return NextResponse.redirect(new URL('/owner', request.url))
+      if (userRole === 'manager') return NextResponse.redirect(new URL('/manager', request.url))
+      return NextResponse.redirect(new URL('/employee', request.url))
+    }
     return NextResponse.next()
   }
   
