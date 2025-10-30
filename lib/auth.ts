@@ -77,14 +77,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'google' && user?.email) {
+        const existing = await db.select().from(users).where(eq(users.email, user.email)).limit(1)
+        if (existing.length === 0) {
+          const [created] = await db.insert(users).values({
+            email: user.email,
+            name: user.name ?? null,
+            role: 'owner',
+            country: 'US',
+          }).returning()
+          const u = user as { id?: string; role?: UserRole }
+          u.id = created.id
+          u.role = 'owner'
+        } else {
+          const dbUser = existing[0] as unknown as { id: string; role: UserRole }
+          const u = user as { id?: string; role?: UserRole }
+          u.id = dbUser.id
+          u.role = dbUser.role
+        }
+      }
+      return true
+    },
     async jwt({ token, user }) {
       if (user) {
         // Ensure token.sub is always the DB user id (important for OAuth providers)
         // so session.user.id matches our users.id UUID everywhere
-        token.sub = user.id
-        token.role = user.role as UserRole
-        token.businessId = user.businessId
-        token.businessName = user.businessName
+        const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string }
+        token.sub = u.id ?? token.sub
+        token.role = (u.role as UserRole) ?? (token.role as UserRole)
+        token.businessId = u.businessId ?? token.businessId
+        token.businessName = u.businessName ?? token.businessName
       }
       return token
     },
