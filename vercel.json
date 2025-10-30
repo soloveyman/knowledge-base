@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install --legacy-peer-deps",
-  "regions": ["iad"],
+  "regions": ["iad1"],
   "env": {
     "NEXT_TELEMETRY_DISABLED": "1"
   }
