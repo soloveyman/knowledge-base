@@ -590,25 +590,29 @@ export default function EmployeePage() {
                     {testAttempts
                       .sort((a, b) => new Date(b.completedAt || '').getTime() - new Date(a.completedAt || '').getTime())
                       .slice(0, 5)
-                      .map((attempt) => (
-                        <div key={attempt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium">{t('testAttempt')}</h4>
-                              <StatusBadge status={attempt.status === 'completed' ? 'completed' : 'failed'} />
+                      .map((attempt) => {
+                        const score = attempt.score ?? 0
+                        const colorClass = score >= 70 ? 'text-green-600' : 'text-red-600'
+                        return (
+                          <div key={attempt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium">{t('testAttempt')}</h4>
+                                <StatusBadge status={attempt.status === 'completed' ? 'completed' : 'failed'} />
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {attempt.completedAt && `${t('completed')}: ${new Date(attempt.completedAt).toLocaleDateString()}`}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              {attempt.completedAt && `${t('completed')}: ${new Date(attempt.completedAt).toLocaleDateString()}`}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-lg font-bold ${attempt.score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
-                              {attempt.score}%
+                            <div className="text-right">
+                              <div className={`text-lg font-bold ${colorClass}`}>
+                                {score}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">{t('score')}</div>
                             </div>
-                            <div className="text-xs text-muted-foreground">{t('score')}</div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     
                     {transformedAssignments.filter(a => a.score !== undefined && a.score !== null).length === 0 && testAttempts.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
