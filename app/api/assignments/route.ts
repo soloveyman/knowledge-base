@@ -6,15 +6,28 @@ import { auth } from '@/lib/auth'
 export async function GET() {
   try {
     const session = await auth()
-    const tenantId = session?.user?.businessId
-    // Fetch assignments scoped to tenant via the assigner (owner/manager within tenant)
-    const rows = await db
-      .select({ assignment: assignments, assignerBusinessId: users.businessId })
-      .from(assignments)
-      .leftJoin(users, eq(assignments.assignedBy, users.id))
-      .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
-
-    const assignmentsData = rows.map(r => r.assignment)
+    const userRole = session?.user?.role
+    
+    let assignmentsData
+    
+    // Owner sees all assignments regardless of businessId
+    if (userRole === 'owner') {
+      assignmentsData = await db
+        .select()
+        .from(assignments)
+        .orderBy(desc(assignments.createdAt))
+    } else {
+      // Manager and other roles filter by businessId (tenant isolation)
+      const tenantId = session?.user?.businessId
+      // Fetch assignments scoped to tenant via the assigner (owner/manager within tenant)
+      const rows = await db
+        .select({ assignment: assignments, assignerBusinessId: users.businessId })
+        .from(assignments)
+        .leftJoin(users, eq(assignments.assignedBy, users.id))
+        .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+      
+      assignmentsData = rows.map(r => r.assignment)
+    }
     
     // Fetch users for each assignment
     const assignmentsWithUsers = await Promise.all(

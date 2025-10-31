@@ -6,6 +6,24 @@ import { auth } from '@/lib/auth'
 export async function GET() {
   try {
     const session = await auth()
+    const userRole = session?.user?.role
+    
+    // Owner sees all documents regardless of businessId
+    if (userRole === 'owner') {
+      const allDocuments = await db
+        .select()
+        .from(documents)
+        .orderBy(desc(documents.createdAt))
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          documents: allDocuments
+        }
+      })
+    }
+    
+    // Manager and other roles filter by businessId (tenant isolation)
     const tenantId = session?.user?.businessId
     const rows = await db
       .select({ document: documents, uploaderBusinessId: users.businessId })

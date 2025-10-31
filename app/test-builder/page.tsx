@@ -92,7 +92,17 @@ export default function TestBuilderPage() {
         const result = await response.json()
         
         if (result.success) {
-          setDocuments(result.data.documents)
+          const docs = result.data.documents.map((doc: {
+            id: string | number
+            title: string
+            originalFileName?: string
+            fileType?: string
+            [key: string]: unknown
+          }) => ({
+            ...doc,
+            id: String(doc.id) // Ensure ID is always a string for consistency
+          }))
+          setDocuments(docs)
         } else {
           console.error('Failed to load documents:', result.message)
           setDocuments([])
@@ -106,14 +116,39 @@ export default function TestBuilderPage() {
     loadDocuments()
   }, [])
 
+  // When in edit mode and we have a selectedDocument but it's not in documents list,
+  // ensure it gets added and selected
+  useEffect(() => {
+    if (isEditMode && selectedDocument && documents.length > 0) {
+      const docExists = documents.find(d => String(d.id) === String(selectedDocument.id))
+      if (!docExists) {
+        console.log('Selected document not in list, adding it:', selectedDocument.id)
+        setDocuments(prevDocs => {
+          const exists = prevDocs.find(d => String(d.id) === String(selectedDocument.id))
+          if (!exists) {
+            return [...prevDocs, selectedDocument]
+          }
+          return prevDocs
+        })
+      }
+    }
+  }, [isEditMode, selectedDocument, documents])
+
   const loadTestForEditing = useCallback(async (testId: string) => {
     try {
+      console.log('Test Builder: Loading test for editing, testId:', testId)
       const response = await fetch(`/api/tests/${testId}`)
       const result = await response.json()
+      
+      console.log('Test Builder: Test API response:', result)
       
       if (result.success && result.data.test) {
         const test = result.data.test
         const questions = result.data.questions || []
+        
+        console.log('Test Builder: Test data:', test)
+        console.log('Test Builder: Test moduleId:', test.moduleId)
+        console.log('Test Builder: Questions count:', questions.length)
         
         // Load test configuration
         setTestConfig({
@@ -124,72 +159,140 @@ export default function TestBuilderPage() {
         })
 
         // Load document if available
+        // Note: test.moduleId might be a document ID (when created via test builder)
+        // or a module ID (if created via other means)
         if (test.moduleId) {
-          const docResponse = await fetch(`/api/documents/${test.moduleId}`)
-          const docResult = await docResponse.json()
-          if (docResult.success && docResult.data.document) {
-            const document = docResult.data.document
-            setSelectedDocument({
-              id: document.id,
-              title: document.title,
-              originalFileName: document.originalFileName,
-              fileType: document.fileType,
-              fileUrl: document.fileUrl,
-              fileSize: document.fileSize,
-              parsedContent: document.parsedContent,
-              parsingLog: document.parsingLog,
-              status: document.status,
-              uploadedBy: document.uploadedBy,
-              createdAt: document.createdAt,
-              updatedAt: document.updatedAt
-            })
-            // Use actual document content from parsedContent
-            let documentContent = ''
+          console.log('Test Builder: Loading document with moduleId:', test.moduleId)
+          try {
+            // First try to fetch as document ID (most common case)
+            const docResponse = await fetch(`/api/documents/${test.moduleId}`)
+            const docResult = await docResponse.json()
             
-            // Extract content from sections
-            if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
-              type Section = { content: string; title?: string }
-              documentContent = document.parsedContent.sections
-                .map((section: Section) => `${section.title ? section.title + '\n' : ''}${section.content}`)
-                .join('\n\n')
-            }
+            console.log('Test Builder: Document API response:', docResult)
             
-            // Extract content from tables (for xlsx files)
-            if (Array.isArray(document.parsedContent?.tables) && document.parsedContent!.tables.length > 0) {
-              const tablesContent = document.parsedContent.tables
-                .map((table: { title: string; headers: string[]; rows: string[][] }) => {
-                  let tableText = `${table.title}\n`
-                  
-                  // Add headers if they exist
-                  if (table.headers && table.headers.some(h => h)) {
-                    tableText += table.headers.join(' | ') + '\n'
-                  }
-                  
-                  // Add rows
-                  table.rows.forEach(row => {
-                    if (row && row.some(cell => cell)) {
-                      tableText += row.join(' | ') + '\n'
-                    }
-                  })
-                  
-                  return tableText
-                })
-                .join('\n\n')
+            if (docResult.success && docResult.data.document) {
+              const document = docResult.data.document
+              console.log('Test Builder: Found document:', document.id, document.title)
               
-              documentContent += (documentContent ? '\n\n' : '') + tablesContent
+              const documentToSet = {
+                id: String(document.id), // Ensure ID is always a string
+                title: document.title,
+                originalFileName: document.originalFileName,
+                fileType: document.fileType,
+                fileUrl: document.fileUrl,
+                fileSize: document.fileSize,
+                parsedContent: document.parsedContent,
+                parsingLog: document.parsingLog,
+                status: document.status,
+                uploadedBy: document.uploadedBy,
+                createdAt: document.createdAt,
+                updatedAt: document.updatedAt
+              }
+              
+              console.log('Test Builder: Document to set:', documentToSet)
+              console.log('Test Builder: Document ID as string:', String(documentToSet.id))
+              
+              // Ensure the document is in the documents list for the Select dropdown FIRST
+              setDocuments(prevDocs => {
+                console.log('Test Builder: Current documents list length:', prevDocs.length)
+                const existingDoc = prevDocs.find(d => String(d.id) === String(documentToSet.id))
+                if (!existingDoc) {
+                  // Add document to list if not present
+                  console.log('Test Builder: Adding document to documents list:', documentToSet.id)
+                  const newList = [...prevDocs, documentToSet]
+                  console.log('Test Builder: New documents list length:', newList.length)
+                  return newList
+                } else {
+                  console.log('Test Builder: Document already in list:', documentToSet.id)
+                }
+                return prevDocs
+              })
+              
+              // Use requestAnimationFrame to ensure state updates are processed
+              requestAnimationFrame(() => {
+                console.log('Test Builder: Setting selectedDocument via requestAnimationFrame to:', documentToSet.id)
+                setSelectedDocument(documentToSet)
+                
+                // Double-check after a brief delay
+                setTimeout(() => {
+                  console.log('Test Builder: Verifying selectedDocument after delay')
+                }, 200)
+              })
+              
+              // Use actual document content from parsedContent
+              let documentContent = ''
+              
+              // Extract content from sections
+              if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
+                type Section = { content: string; title?: string }
+                documentContent = document.parsedContent.sections
+                  .map((section: Section) => `${section.title ? section.title + '\n' : ''}${section.content}`)
+                  .join('\n\n')
+              }
+              
+              // Extract content from tables (for xlsx files)
+              if (Array.isArray(document.parsedContent?.tables) && document.parsedContent!.tables.length > 0) {
+                const tablesContent = document.parsedContent.tables
+                  .map((table: { title: string; headers: string[]; rows: string[][] }) => {
+                    let tableText = `${table.title}\n`
+                    
+                    // Add headers if they exist
+                    if (table.headers && table.headers.some(h => h)) {
+                      tableText += table.headers.join(' | ') + '\n'
+                    }
+                    
+                    // Add rows
+                    table.rows.forEach(row => {
+                      if (row && row.some(cell => cell)) {
+                        tableText += row.join(' | ') + '\n'
+                      }
+                    })
+                    
+                    return tableText
+                  })
+                  .join('\n\n')
+                
+                documentContent += (documentContent ? '\n\n' : '') + tablesContent
+              }
+              
+              // Fallback to mock content if no parsed content
+              if (!documentContent) {
+                documentContent = getDocumentContent(document.title)
+              }
+              setContext(prev => ({
+                ...prev,
+                text: documentContent,
+                facts: extractFacts(documentContent),
+                steps: extractSteps(documentContent),
+                definitions: extractDefinitions(documentContent)
+              }))
+            } else {
+              console.warn('Test Builder: Failed to load document for test.moduleId:', test.moduleId, 'Response:', docResult)
             }
-            
-            // Fallback to mock content if no parsed content
-            if (!documentContent) {
-              documentContent = getDocumentContent(document.title)
-            }
-            setContext(prev => ({
-              ...prev,
-              text: documentContent,
-              facts: extractFacts(documentContent),
-              steps: extractSteps(documentContent),
-              definitions: extractDefinitions(documentContent)
-            }))
+          } catch (error) {
+            console.error('Error loading document for editing:', error)
+            // If document fetch fails, try to find it in the documents list by ID
+            setDocuments(prevDocs => {
+              const docInList = prevDocs.find(d => String(d.id) === String(test.moduleId))
+              if (docInList) {
+                // Document already in list, set it as selected
+                setSelectedDocument({
+                  id: docInList.id,
+                  title: docInList.title,
+                  originalFileName: docInList.originalFileName,
+                  fileType: docInList.fileType,
+                  fileUrl: docInList.fileUrl || '',
+                  fileSize: docInList.fileSize || 0,
+                  parsedContent: docInList.parsedContent || undefined,
+                  parsingLog: docInList.parsingLog || undefined,
+                  status: docInList.status || 'ready',
+                  uploadedBy: docInList.uploadedBy || '',
+                  createdAt: docInList.createdAt,
+                  updatedAt: docInList.updatedAt
+                })
+              }
+              return prevDocs
+            })
           }
         }
 
@@ -220,10 +323,13 @@ export default function TestBuilderPage() {
         }
       }
     } catch (error) {
-      console.error('Error loading test for editing:', error)
+      console.error('Test Builder: Error loading test for editing:', error)
       setError('Failed to load test for editing')
     }
   }, [])
+
+  // Track if we've already loaded the test to prevent multiple loads
+  const [testLoaded, setTestLoaded] = useState(false)
 
   useEffect(() => {
     if (status === "loading") return
@@ -236,12 +342,31 @@ export default function TestBuilderPage() {
     // Check if we're in edit mode via URL parameter
     const urlParams = new URLSearchParams(window.location.search)
     const editingId = urlParams.get('edit')
-    if (editingId) {
+    if (editingId && !testLoaded) {
+      console.log('Test Builder: Edit mode detected, editingId:', editingId)
+      console.log('Test Builder: Documents count:', documents.length)
       setIsEditMode(true)
       setEditingTestId(editingId)
-      loadTestForEditing(editingId)
+      
+      // Wait for documents to load before loading test (ensures document can be selected)
+      if (documents.length === 0) {
+        console.log('Test Builder: Waiting for documents to load...')
+        // Wait a bit for documents to load, then load test
+        const timer = setTimeout(() => {
+          console.log('Test Builder: Documents should be loaded now, loading test...')
+          loadTestForEditing(editingId).then(() => {
+            setTestLoaded(true)
+          })
+        }, 1000) // Increased timeout to ensure documents are loaded
+        return () => clearTimeout(timer)
+      } else {
+        console.log('Test Builder: Documents already loaded, loading test immediately...')
+        loadTestForEditing(editingId).then(() => {
+          setTestLoaded(true)
+        })
+      }
     }
-  }, [session, status, router, loadTestForEditing])
+  }, [session, status, router, loadTestForEditing, documents.length, testLoaded])
 
   const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc)
@@ -516,7 +641,20 @@ export default function TestBuilderPage() {
   }
 
   const handleClose = () => {
-    router.push('/manager?tab=tests')
+    // Redirect based on returnTo parameter or user role
+    const urlParams = new URLSearchParams(window.location.search)
+    const returnTo = urlParams.get('returnTo')
+    if (returnTo) {
+      router.push(returnTo)
+    } else {
+      // Fallback: redirect based on user role
+      const userRole = session?.user?.role
+      if (userRole === 'owner') {
+        router.push('/owner?tab=tests')
+      } else {
+        router.push('/manager?tab=tests')
+      }
+    }
   }
 
 
@@ -645,8 +783,20 @@ export default function TestBuilderPage() {
         alert(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
       }
       
-      // Redirect to tests list
-      router.push('/manager?tab=tests')
+      // Redirect based on returnTo parameter or user role
+      const urlParams = new URLSearchParams(window.location.search)
+      const returnTo = urlParams.get('returnTo')
+      if (returnTo) {
+        router.push(returnTo)
+      } else {
+        // Fallback: redirect based on user role
+        const userRole = session?.user?.role
+        if (userRole === 'owner') {
+          router.push('/owner?tab=tests')
+        } else {
+          router.push('/manager?tab=tests')
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save test')
     } finally {
@@ -700,25 +850,44 @@ export default function TestBuilderPage() {
               <CardContent className="space-y-4 overflow-hidden">
                 <div>
                   <Label htmlFor="document-select">{t('selectDocument')} *</Label>
+                  {(() => {
+                    const selectValue = selectedDocument?.id ? String(selectedDocument.id) : ""
+                    const docInList = documents.find(d => String(d.id) === selectValue)
+                    console.log('Select render - selectedDocument ID:', selectedDocument?.id, 'selectValue:', selectValue, 'docInList:', !!docInList, 'documents count:', documents.length)
+                    return null
+                  })()}
                   <Select 
-                    value={selectedDocument?.id?.toString() || ""} 
+                    value={selectedDocument?.id ? String(selectedDocument.id) : ""} 
                     onValueChange={(value) => {
-                      const doc = documents.find(d => d.id.toString() === value)
-                      if (doc) handleDocumentSelect(doc)
+                      const doc = documents.find(d => String(d.id) === String(value))
+                      if (doc) {
+                        handleDocumentSelect(doc)
+                      } else {
+                        console.warn('Document not found in list for value:', value)
+                      }
                     }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t('chooseDocumentToGenerate')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {documents.map((doc) => (
-                        <SelectItem key={doc.id} value={doc.id.toString()}>
-                          <div className="flex items-center space-x-2">
-                            <FileText className="h-4 w-4" />
-                            <span>{doc.title || doc.originalFileName || 'Untitled Document'}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {documents.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground">No documents available</div>
+                      ) : (
+                        documents.map((doc) => {
+                          const docId = String(doc.id)
+                          const isSelected = selectedDocument && String(selectedDocument.id) === docId
+                          return (
+                            <SelectItem key={docId} value={docId}>
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4" />
+                                <span>{doc.title || doc.originalFileName || 'Untitled Document'}</span>
+                                {isSelected && <span className="text-blue-600">✓</span>}
+                              </div>
+                            </SelectItem>
+                          )
+                        })
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

@@ -12,7 +12,7 @@ const ROLE_TAB_MAPPINGS = {
   },
   owner: {
     defaultTab: 'overview',
-    tabs: ['overview', 'users', 'reports', 'settings']
+    tabs: ['overview', 'users', 'docs', 'tests', 'assignments', 'settings']
   }
 } as const
 

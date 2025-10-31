@@ -1,11 +1,29 @@
 import { NextResponse } from 'next/server'
 import { db, tests, questions as questionsTable, users } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
     const session = await auth()
+    const userRole = session?.user?.role
+    
+    // Owner sees all tests regardless of businessId
+    if (userRole === 'owner') {
+      const allTests = await db
+        .select()
+        .from(tests)
+        .orderBy(desc(tests.createdAt))
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          tests: allTests
+        }
+      })
+    }
+    
+    // Manager and other roles filter by businessId (tenant isolation)
     const tenantId = session?.user?.businessId
     const rows = await db
       .select({ test: tests, creatorBusinessId: users.businessId })

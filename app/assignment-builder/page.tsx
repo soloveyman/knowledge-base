@@ -384,8 +384,20 @@ export default function AssignmentBuilderPage() {
         }
       }
       
-      // Redirect to manager assignments tab
-      router.push('/manager?tab=assignments')
+      // Redirect based on returnTo parameter or user role
+      const urlParams = new URLSearchParams(window.location.search)
+      const returnTo = urlParams.get('returnTo')
+      if (returnTo) {
+        router.push(returnTo)
+      } else {
+        // Fallback: redirect based on user role
+        const userRole = session?.user?.role
+        if (userRole === 'owner') {
+          router.push('/owner?tab=assignments')
+        } else {
+          router.push('/manager?tab=assignments')
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create assignment')
     } finally {
@@ -394,7 +406,20 @@ export default function AssignmentBuilderPage() {
   }
 
   const handleClose = () => {
-    router.push('/manager?tab=assignments')
+    // Redirect based on returnTo parameter or user role
+    const urlParams = new URLSearchParams(window.location.search)
+    const returnTo = urlParams.get('returnTo')
+    if (returnTo) {
+      router.push(returnTo)
+    } else {
+      // Fallback: redirect based on user role
+      const userRole = session?.user?.role
+      if (userRole === 'owner') {
+        router.push('/owner?tab=assignments')
+      } else {
+        router.push('/manager?tab=assignments')
+      }
+    }
   }
 
   if (status === "loading") {
