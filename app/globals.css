@@ -576,9 +576,17 @@
   }
 }
 
+/* Ensure sticky headers work on all screen sizes */
+header[class*="sticky"] {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+}
+
 /* Sticky headers on mobile */
 @media (max-width: 640px) {
   header[class*="sticky"] {
+    position: -webkit-sticky;
     position: sticky;
     top: 0;
     z-index: 50;
@@ -684,12 +692,70 @@
     cursor: text;
   }
   
-  /* Interactive cards (when they have click handlers) */
+  /* Interactive cards and containers (when they have click handlers) */
   div[onclick],
   div[role="button"],
   article[onclick],
-  section[onclick] {
+  section[onclick],
+  tr[onclick],
+  td[onclick],
+  th[onclick] {
     cursor: pointer;
+  }
+  
+  /* Table rows with onClick handlers */
+  tr[onclick],
+  [data-slot="table-row"][onclick] {
+    cursor: pointer;
+  }
+  
+  /* Cards and containers with hover effects that indicate interactivity */
+  [data-slot="card"][onclick],
+  [data-slot="card"]:has(button):has([onclick]) {
+    cursor: pointer;
+  }
+  
+  /* Elements with specific hover classes that indicate interactivity */
+  [class*="hover:shadow-lg"],
+  [class*="hover:bg-accent"][onclick],
+  [class*="hover:opacity"][onclick] {
+    cursor: pointer;
+  }
+  
+  /* Avatar and image click handlers */
+  [data-slot="avatar"][onclick],
+  [data-slot="avatar"][class*="cursor-pointer"],
+  img[onclick],
+  img[class*="cursor-pointer"] {
+    cursor: pointer;
+  }
+  
+  /* Label elements are clickable */
+  label,
+  label[for] {
+    cursor: pointer;
+  }
+  
+  /* Ensure elements with cursor-pointer class get pointer cursor */
+  [class*="cursor-pointer"] {
+    cursor: pointer !important;
+  }
+  
+  /* Dialog and Sheet components */
+  [data-slot="dialog-trigger"],
+  [data-slot="dialog-close"],
+  [data-slot="sheet-trigger"],
+  [data-slot="sheet-close"],
+  button[data-slot] {
+    cursor: pointer;
+  }
+  
+  /* Overlay elements should have default cursor */
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  [role="dialog"],
+  [role="alertdialog"] {
+    cursor: default;
   }
 }
 

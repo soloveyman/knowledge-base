@@ -51,7 +51,6 @@ export function DataTable<T extends Record<string, unknown>>({
           {data.map((row, rowIndex) => (
             <TableRow
               key={rowIndex}
-              className={onRowClick ? "cursor-pointer" : ""}
               onClick={() => onRowClick?.(row, rowIndex)}
             >
               {columns.map((column) => (

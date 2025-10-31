@@ -12,6 +12,7 @@ import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
+import { GreetingCard } from "@/components/common/greeting-card"
 import UserProgressReport from "@/components/reports/user-progress-report"
 import { useTranslation } from "@/lib/translation-context"
 import { 
@@ -530,15 +531,11 @@ function OwnerPageInner() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
-            {t('welcome')}, {session.user?.name || t('owner')}!
-          </h2>
-          <p className="text-muted-foreground">
-            {t('fullSystemControl')}
-          </p>
-        </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+        <GreetingCard
+          name={`${t('welcome')}, ${session.user?.name || t('owner')}!`}
+          description={t('fullSystemControl')}
+        />
 
         {/* Main Tabs */}
         <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">

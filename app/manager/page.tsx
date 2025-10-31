@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
+import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
 import { 
   Users, 
@@ -500,15 +501,11 @@ function ManagerPageInner() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
-            {t('welcome')}, {session.user?.name || t('manager')}!
-          </h2>
-          <p className="text-muted-foreground">
-            {t('manageTeam')}
-          </p>
-        </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+        <GreetingCard
+          name={`${t('welcome')}, ${session.user?.name || t('manager')}!`}
+          description={t('manageTeam')}
+        />
 
 
         {/* Main Tabs */}

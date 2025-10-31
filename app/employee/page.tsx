@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
+import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
 import { 
   BookOpen, 
@@ -338,17 +339,13 @@ function EmployeePageInner() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
-            {t('welcome')}, {session.user?.name || t('employee')}!
-          </h2>
-          <p className="text-muted-foreground">
-            {t('learningJourney')}
-          </p>
-        </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+        <GreetingCard
+          name={`${t('welcome')}, ${session.user?.name || t('employee')}!`}
+          description={t('learningJourney')}
+        />
 
-        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-3 md:space-y-6">
           <div className="tabs-scroll-container">
             <TabsList className="grid w-full min-w-max grid-cols-3">
             <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
