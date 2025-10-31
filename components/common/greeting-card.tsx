@@ -12,7 +12,7 @@ interface GreetingCardProps {
 export function GreetingCard({ name, description, className }: GreetingCardProps) {
   return (
     <Card className={cn(
-      "mb-4 md:mb-6 bg-gradient-to-br from-card/90 to-blue-400/60 dark:to-blue-900/30 backdrop-blur-md supports-[backdrop-filter]:bg-card/70 border-border/60",
+      "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 backdrop-blur-md supports-[backdrop-filter]:bg-card/70 border-border/60",
       className
     )}>
       <CardContent>

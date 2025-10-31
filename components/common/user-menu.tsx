@@ -82,7 +82,7 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
       <DropdownMenuTrigger asChild>
         <Avatar className="size-8 cursor-pointer hover:opacity-80 transition-opacity">
           <AvatarImage src={user.image} alt={user.name || user.email || "User"} />
-          <AvatarFallback>
+          <AvatarFallback className="bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-200">
             {getInitials()}
           </AvatarFallback>
         </Avatar>
