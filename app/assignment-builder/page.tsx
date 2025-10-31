@@ -41,7 +41,7 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-interface AssignmentConfig extends Record<string, unknown> {
+interface AssignmentConfig {
   name: string
   documentId: string
   testId: string
@@ -106,16 +106,16 @@ export default function AssignmentBuilderPage() {
   const { t } = useTranslation()
   const router = useRouter()
   
-  const initialConfig: AssignmentConfig = {
+  const initialConfig = {
     name: "",
     documentId: "",
     testId: "",
-    selectedUsers: [],
-    dueDate: undefined,
+    selectedUsers: [] as string[],
+    dueDate: undefined as Date | undefined,
     description: ""
-  }
+  } satisfies AssignmentConfig
 
-  const validation = useFormValidation<AssignmentConfig>({
+  const validation = useFormValidation({
     name: [validationRules.required, validationRules.minLength(3), validationRules.maxLength(200)],
     documentId: [validationRules.required],
     selectedUsers: [validationRules.minItems(1)],

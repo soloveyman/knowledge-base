@@ -3,7 +3,7 @@
  */
 
 // Validation rule types
-export type ValidationRule<T = string> = (value: T) => string | true
+export type ValidationRule<T = unknown> = (value: T) => string | true
 
 // Validation result
 export type ValidationResult = string | true
@@ -20,9 +20,7 @@ export const validationRules = {
   /**
    * Required field validation
    */
-  required: <T extends string | number | boolean | null | undefined>(
-    value: T
-  ): ValidationResult => {
+  required: (value: unknown): ValidationResult => {
     if (typeof value === 'string') {
       return value.trim().length > 0 || 'This field is required'
     }
@@ -38,8 +36,8 @@ export const validationRules = {
   /**
    * Email format validation
    */
-  email: (value: string): ValidationResult => {
-    if (!value || value.trim().length === 0) {
+  email: (value: unknown): ValidationResult => {
+    if (typeof value !== 'string' || !value || value.trim().length === 0) {
       return true // Let required handle empty values
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -49,8 +47,8 @@ export const validationRules = {
   /**
    * Minimum length validation
    */
-  minLength: (length: number) => (value: string): ValidationResult => {
-    if (!value || value.trim().length === 0) {
+  minLength: (length: number) => (value: unknown): ValidationResult => {
+    if (typeof value !== 'string' || !value || value.trim().length === 0) {
       return true // Let required handle empty values
     }
     return (
@@ -62,8 +60,8 @@ export const validationRules = {
   /**
    * Maximum length validation
    */
-  maxLength: (length: number) => (value: string): ValidationResult => {
-    if (!value || value.trim().length === 0) {
+  maxLength: (length: number) => (value: unknown): ValidationResult => {
+    if (typeof value !== 'string' || !value || value.trim().length === 0) {
       return true // Let required handle empty values
     }
     return (
@@ -75,8 +73,8 @@ export const validationRules = {
   /**
    * Password strength validation
    */
-  password: (value: string): ValidationResult => {
-    if (!value || value.trim().length === 0) {
+  password: (value: unknown): ValidationResult => {
+    if (typeof value !== 'string' || !value || value.trim().length === 0) {
       return true // Let required handle empty values
     }
     if (value.length < 6) {
@@ -97,11 +95,14 @@ export const validationRules = {
   /**
    * Future date validation
    */
-  futureDate: (value: string | Date): ValidationResult => {
+  futureDate: (value: unknown): ValidationResult => {
     if (!value) {
       return true // Let required handle empty values
     }
-    const date = typeof value === 'string' ? new Date(value) : value
+    const date = typeof value === 'string' ? new Date(value) : value instanceof Date ? value : null
+    if (!date || isNaN(date.getTime())) {
+      return 'Must be a valid date'
+    }
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return date > today || 'Date must be in the future'
@@ -110,11 +111,11 @@ export const validationRules = {
   /**
    * Positive number validation
    */
-  positiveNumber: (value: string | number): ValidationResult => {
+  positiveNumber: (value: unknown): ValidationResult => {
     if (value === '' || value === null || value === undefined) {
       return true // Let required handle empty values
     }
-    const num = typeof value === 'string' ? parseFloat(value) : value
+    const num = typeof value === 'string' ? parseFloat(value) : typeof value === 'number' ? value : NaN
     if (isNaN(num)) {
       return 'Must be a valid number'
     }
@@ -124,11 +125,11 @@ export const validationRules = {
   /**
    * Integer validation
    */
-  integer: (value: string | number): ValidationResult => {
+  integer: (value: unknown): ValidationResult => {
     if (value === '' || value === null || value === undefined) {
       return true // Let required handle empty values
     }
-    const num = typeof value === 'string' ? parseFloat(value) : value
+    const num = typeof value === 'string' ? parseFloat(value) : typeof value === 'number' ? value : NaN
     if (isNaN(num)) {
       return 'Must be a valid number'
     }
@@ -138,11 +139,11 @@ export const validationRules = {
   /**
    * Minimum value validation
    */
-  min: (minValue: number) => (value: string | number): ValidationResult => {
+  min: (minValue: number) => (value: unknown): ValidationResult => {
     if (value === '' || value === null || value === undefined) {
       return true // Let required handle empty values
     }
-    const num = typeof value === 'string' ? parseFloat(value) : value
+    const num = typeof value === 'string' ? parseFloat(value) : typeof value === 'number' ? value : NaN
     if (isNaN(num)) {
       return 'Must be a valid number'
     }
@@ -152,11 +153,11 @@ export const validationRules = {
   /**
    * Maximum value validation
    */
-  max: (maxValue: number) => (value: string | number): ValidationResult => {
+  max: (maxValue: number) => (value: unknown): ValidationResult => {
     if (value === '' || value === null || value === undefined) {
       return true // Let required handle empty values
     }
-    const num = typeof value === 'string' ? parseFloat(value) : value
+    const num = typeof value === 'string' ? parseFloat(value) : typeof value === 'number' ? value : NaN
     if (isNaN(num)) {
       return 'Must be a valid number'
     }
@@ -166,7 +167,7 @@ export const validationRules = {
   /**
    * Array minimum length validation
    */
-  minItems: (minLength: number) => <T>(value: T[]): ValidationResult => {
+  minItems: (minLength: number) => (value: unknown): ValidationResult => {
     if (!Array.isArray(value)) {
       return 'Must be an array'
     }
@@ -179,11 +180,11 @@ export const validationRules = {
   /**
    * Optional validation - only validate if value exists
    */
-  optional: <T>(rule: ValidationRule<T>) => (value: T | null | undefined): ValidationResult => {
+  optional: <T>(rule: ValidationRule<T>) => (value: unknown): ValidationResult => {
     if (value === null || value === undefined || value === '') {
       return true
     }
-    return rule(value)
+    return rule(value as T)
   }
 }
 

@@ -56,13 +56,13 @@ export default function UserBuilderPage() {
   const [showPassword, setShowPassword] = useState(false)
   
   // Validation setup
-  const initialFormData: UserConfig = {
+  const initialFormData = {
     name: "",
     job: "",
     email: "",
     password: "",
     role: ""
-  }
+  } satisfies UserConfig
   
   const validation = useFormValidation({
     name: [validationRules.required],
@@ -317,7 +317,7 @@ export default function UserBuilderPage() {
                     label={t('password')}
                     required={!isEditMode}
                     error={touched.password ? errors.password : undefined}
-                    description={isEditMode ? "(leave blank to keep current)" : undefined}
+                    helpText={isEditMode ? "(leave blank to keep current)" : undefined}
                   >
                     <div className="relative">
                       <Input

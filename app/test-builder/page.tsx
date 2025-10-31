@@ -188,13 +188,13 @@ export default function TestBuilderPage() {
         }
         
         // Update validation values for test config (documentId will be set when document loads)
-        validation.setValues(prev => ({
-          ...prev,
+        validation.setValues({
+          ...validation.values,
           count: loadedConfig.count,
           type: loadedConfig.type,
           difficulty: loadedConfig.difficulty,
           locale: loadedConfig.locale
-        }))
+        })
 
         // Load document if available
         // Note: test.moduleId might be a document ID (when created via test builder)
@@ -250,14 +250,14 @@ export default function TestBuilderPage() {
               requestAnimationFrame(() => {
                 console.log('Test Builder: Setting selectedDocument via requestAnimationFrame to:', documentToSet.id)
                 setSelectedDocument(documentToSet)
-                validation.setValues(prev => ({ 
-                  ...prev, 
+                validation.setValues({ 
+                  ...validation.values, 
                   documentId: String(documentToSet.id),
                   count: loadedConfig.count,
                   type: loadedConfig.type,
                   difficulty: loadedConfig.difficulty,
                   locale: loadedConfig.locale
-                }))
+                })
                 
                 // Double-check after a brief delay
                 setTimeout(() => {
@@ -337,14 +337,14 @@ export default function TestBuilderPage() {
                   updatedAt: docInList.updatedAt
                 }
                 setSelectedDocument(docObj)
-                validation.setValues(prev => ({ 
-                  ...prev, 
+                validation.setValues({ 
+                  ...validation.values, 
                   documentId: String(docObj.id),
                   count: loadedConfig.count,
                   type: loadedConfig.type,
                   difficulty: loadedConfig.difficulty,
                   locale: loadedConfig.locale
-                }))
+                })
               }
               return prevDocs
             })

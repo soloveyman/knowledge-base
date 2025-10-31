@@ -31,6 +31,7 @@ export function FormField({
   const id = htmlFor || fieldId
   
   // Clone child element and add validation props
+  const childProps = children.props as { className?: string } & Record<string, unknown>
   const childWithProps = React.cloneElement(children, {
     id,
     'aria-invalid': error ? 'true' : 'false',
@@ -40,10 +41,10 @@ export function FormField({
         ? `${id}-help` 
         : undefined,
     className: cn(
-      children.props.className,
+      childProps.className,
       error && 'border-destructive focus-visible:ring-destructive/20'
     )
-  })
+  } as Partial<unknown>)
 
   return (
     <FormGroup
