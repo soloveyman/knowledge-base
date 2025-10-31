@@ -542,12 +542,14 @@
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE and Edge */
-    position: relative;
+    position: static; /* Static positioning, no layout shifts */
     touch-action: pan-x; /* Allow horizontal panning on mobile */
     overscroll-behavior-x: contain; /* Prevent pull-to-refresh interference */
+    width: 100%; /* Full width container */
+    max-width: 100%; /* Prevent overflow */
   }
   
   .tabs-scroll-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none; /* Chrome, Safari, Opera - invisible scrollbar */
   }
 }
