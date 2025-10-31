@@ -576,6 +576,23 @@
   }
 }
 
+/* Sticky headers on mobile */
+@media (max-width: 640px) {
+  header[class*="sticky"] {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: var(--card);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  
+  /* Ensure backdrop blur works on mobile */
+  header[class*="backdrop-blur"] {
+    background-color: var(--card) !important;
+  }
+}
+
 /* Tabs scrollbar styles */
 @layer utilities {
   .tabs-scroll-container {

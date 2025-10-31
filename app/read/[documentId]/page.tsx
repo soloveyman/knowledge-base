@@ -342,7 +342,7 @@ export default function DocumentReaderPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card/95 backdrop-blur-sm shadow-sm border-b border-border sticky top-0 z-10">
+      <header className="bg-card/95 backdrop-blur-sm shadow-sm border-b border-border sticky sm:static top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
