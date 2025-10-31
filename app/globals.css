@@ -539,10 +539,12 @@
   .tabs-scroll-container {
     overflow-x: auto;
     overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE and Edge */
     position: relative;
+    touch-action: pan-x; /* Allow horizontal panning on mobile */
+    overscroll-behavior-x: contain; /* Prevent pull-to-refresh interference */
   }
   
   .tabs-scroll-container::-webkit-scrollbar {
