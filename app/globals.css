@@ -546,7 +546,7 @@
     touch-action: pan-x; /* Allow horizontal panning on mobile */
     overscroll-behavior-x: contain; /* Prevent pull-to-refresh interference */
     width: 100%; /* Full width container */
-    max-width: 100%; /* Prevent overflow */
+    max-width: 100%; /* Prevent container from overflowing */
   }
   
   .tabs-scroll-container::-webkit-scrollbar {
@@ -563,10 +563,41 @@
     display: none !important;
   }
   
-  /* Ensure TabsList inside can overflow */
+  /* Ensure TabsList fills 100% width on desktop, natural width on mobile for scrolling */
   .tabs-scroll-container > [data-slot="tabs-list"] {
-    width: auto !important;
-    min-width: 100% !important;
-    max-width: none !important;
+    width: 100% !important; /* Always start at full width on desktop */
+    min-width: 100% !important; /* Minimum full width on desktop */
+    max-width: none !important; /* Can grow beyond container when tabs overflow */
+    display: flex !important; /* Use flex for horizontal layout */
+    flex-wrap: nowrap !important; /* Prevent wrapping to allow horizontal scroll */
+  }
+  
+  /* On mobile, use natural width to allow proper scrolling */
+  @media (max-width: 640px) {
+    .tabs-scroll-container > [data-slot="tabs-list"] {
+      width: max-content !important; /* Natural width on mobile */
+      min-width: 100% !important; /* But still respect minimum */
+    }
+  }
+  
+  /* Override grid classes when inside scroll container */
+  .tabs-scroll-container > [data-slot="tabs-list"].grid {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+  
+  /* Ensure TabsTrigger distributes evenly on desktop, natural width on mobile */
+  .tabs-scroll-container [data-slot="tabs-trigger"] {
+    flex: 1 1 0% !important; /* Equal width distribution to fill container */
+    min-width: fit-content !important; /* But respect content minimum */
+    white-space: nowrap !important; /* Prevent text wrapping */
+  }
+  
+  /* On mobile, use natural content width for proper scrolling */
+  @media (max-width: 640px) {
+    .tabs-scroll-container [data-slot="tabs-trigger"] {
+      flex: 0 1 auto !important; /* Natural width on mobile */
+      min-width: fit-content !important;
+    }
   }
 }
