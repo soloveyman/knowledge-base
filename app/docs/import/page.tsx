@@ -324,7 +324,7 @@ function DocImportPageInner() {
             <div
               className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragActive 
-                  ? 'border-primary bg-primary/10' 
+                  ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300' 
                   : 'border-border hover:border-accent'
               }`}
               onDragEnter={handleDrag}

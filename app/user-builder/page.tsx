@@ -345,8 +345,8 @@ export default function UserBuilderPage() {
                 </div>
 
                 <div className="bg-primary/10 p-4 rounded-lg">
-                  <h4 className="font-medium text-primary-foreground mb-2">{t('rolePermissions')}</h4>
-                  <div className="text-sm text-primary-foreground space-y-1">
+                  <h4 className="font-medium text-primary-700 dark:text-primary-300 mb-2">{t('rolePermissions')}</h4>
+                  <div className="text-sm text-primary-700 dark:text-primary-300 space-y-1">
                     {userConfig.role === 'manager' && (
                       <>
                         <p>• {t('createAndManageTestsAndAssignments')}</p>

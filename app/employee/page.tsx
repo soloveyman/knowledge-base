@@ -311,7 +311,7 @@ function EmployeePageInner() {
       case 'failed':
         return 'bg-red-500/20 text-red-600 dark:text-red-400'
       case 'in_progress':
-        return 'bg-primary/20 text-primary-foreground'
+        return 'bg-primary/20 text-primary-700 dark:text-primary-300'
       case 'pending':
         return 'bg-destructive/20 text-destructive-foreground'
       default:

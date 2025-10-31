@@ -116,7 +116,7 @@ export default function ReportingDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-500/20 text-green-600 dark:text-green-400'
-      case 'in_progress': return 'bg-primary/20 text-primary-foreground'
+      case 'in_progress': return 'bg-primary/20 text-primary-700 dark:text-primary-300'
       case 'not_started': return 'bg-muted text-muted-foreground'
       case 'overdue': return 'bg-red-500/20 text-red-600 dark:text-red-400'
       default: return 'bg-muted text-muted-foreground'

@@ -664,8 +664,8 @@ export default function AssignmentBuilderPage() {
                 
                 {assignmentConfig.selectedUsers.length > 0 && (
                   <div className="mt-4 p-3 bg-primary/10 rounded-lg">
-                    <p className="text-sm text-primary-foreground">
-                      <strong>{assignmentConfig.selectedUsers.length}</strong> employee(s) selected
+                    <p className="text-sm text-primary-700 dark:text-primary-300 font-medium">
+                      <strong className="font-semibold">{assignmentConfig.selectedUsers.length}</strong> employee(s) selected
                     </p>
                   </div>
                 )}

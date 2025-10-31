@@ -387,7 +387,7 @@ export default function TestPage() {
                       onClick={() => handleAnswerSelect(currentQ.id, letter)}
                       className={`w-full p-4 text-left border rounded-lg transition-colors ${
                         isSelected
-                          ? 'border-primary bg-primary/10 text-primary-foreground'
+                          ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300'
                           : 'border-border hover:border-accent hover:bg-accent'
                       }`}
                     >
