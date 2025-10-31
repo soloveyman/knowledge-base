@@ -533,3 +533,43 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Tabs scrollbar styles for mobile */
+@layer utilities {
+  .tabs-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .tabs-scroll-container::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  
+  /* Show scrollbar on larger screens */
+  @media (min-width: 640px) {
+    .tabs-scroll-container {
+      scrollbar-width: thin;
+      -ms-overflow-style: auto;
+    }
+    
+    .tabs-scroll-container::-webkit-scrollbar {
+      display: block;
+      height: 6px;
+    }
+    
+    .tabs-scroll-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .tabs-scroll-container::-webkit-scrollbar-thumb {
+      background-color: oklch(0.55 0.015 285.938);
+      border-radius: 3px;
+    }
+    
+    .dark .tabs-scroll-container::-webkit-scrollbar-thumb {
+      background-color: oklch(0.705 0.015 286.067);
+    }
+  }
+}

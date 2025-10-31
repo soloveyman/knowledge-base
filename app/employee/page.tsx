@@ -349,11 +349,13 @@ function EmployeePageInner() {
         </div>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <div className="tabs-scroll-container">
+            <TabsList className="grid w-full min-w-max grid-cols-3">
             <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
             <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
             <TabsTrigger value="progress">{t('progress')}</TabsTrigger>
           </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">

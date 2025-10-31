@@ -565,7 +565,7 @@ function OwnerPageInner() {
 
         {/* Main Tabs */}
         <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
-          <div className="overflow-x-auto">
+          <div className="tabs-scroll-container">
             <TabsList className="w-full min-w-max grid grid-cols-3 sm:grid-cols-6">
               <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
               <TabsTrigger value="users">{t('users')}</TabsTrigger>

@@ -513,12 +513,14 @@ function ManagerPageInner() {
 
         {/* Main Tabs */}
         <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <div className="tabs-scroll-container">
+            <TabsList className="grid w-full min-w-max grid-cols-4">
             <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
             <TabsTrigger value="docs">{t('documents')}</TabsTrigger>
             <TabsTrigger value="tests">{t('tests')}</TabsTrigger>
             <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
           </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-3 md:space-y-6">
             {/* Overview Metrics */}
