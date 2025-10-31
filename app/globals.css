@@ -572,7 +572,7 @@
     flex-wrap: nowrap !important; /* Prevent wrapping to allow horizontal scroll */
   }
   
-  /* On mobile, fill container width and justify tabs evenly */
+  /* On mobile when no overflow, behave like tablet/desktop */
   @media (max-width: 640px) {
     .tabs-scroll-container > [data-slot="tabs-list"] {
       width: 100% !important; /* Fill full width on mobile by default */
@@ -595,24 +595,41 @@
     }
   }
   
+  /* Tablet and desktop (640px+) - always fill 100% width */
+  @media (min-width: 640px) {
+    .tabs-scroll-container > [data-slot="tabs-list"] {
+      width: 100% !important; /* Always fit 100% screen width on tablet/desktop */
+      min-width: 100% !important; /* Minimum is full width */
+      max-width: 100% !important; /* Maximum is also full width - tabs will scroll if they overflow */
+    }
+  }
+  
   /* Override grid classes when inside scroll container */
   .tabs-scroll-container > [data-slot="tabs-list"].grid {
     display: flex !important;
     grid-template-columns: none !important;
   }
   
-  /* Ensure TabsTrigger distributes evenly on desktop, natural width on mobile */
+  /* Ensure TabsTrigger distributes evenly to fill container */
   .tabs-scroll-container [data-slot="tabs-trigger"] {
     flex: 1 1 0% !important; /* Equal width distribution to fill container */
     min-width: fit-content !important; /* But respect content minimum */
     white-space: nowrap !important; /* Prevent text wrapping */
   }
   
-  /* On mobile, justify tabs evenly to fill width */
-  @media (max-width: 640px) {
+  /* On tablet and desktop (640px+), distribute evenly to fill width */
+  @media (min-width: 640px) {
     .tabs-scroll-container [data-slot="tabs-trigger"] {
-      flex: 1 1 0% !important; /* Equal distribution to fill width */
-      min-width: 0 !important; /* Allow flex to shrink if needed */
+      flex: 1 1 0% !important; /* Equal distribution to fill width on tablet/desktop */
+      min-width: fit-content !important; /* But respect content minimum */
+    }
+  }
+  
+  /* On mobile when no overflow, behave like tablet/desktop */
+  @media (max-width: 640px) {
+    .tabs-scroll-container:not(.tabs-overflow) [data-slot="tabs-trigger"] {
+      flex: 1 1 0% !important; /* Equal distribution to fill width - same as tablet */
+      min-width: fit-content !important; /* But respect content minimum - same as tablet */
       width: auto !important; /* Let flex control width */
     }
     
