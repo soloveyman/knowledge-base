@@ -16,6 +16,7 @@ import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { validationRules } from "@/lib/validation"
+import { toast } from "sonner"
 import { 
   FileText, 
   X,
@@ -720,7 +721,7 @@ export default function TestBuilderPage() {
           throw new Error('Failed to update test')
         }
 
-        alert(`Test updated successfully! ${generatedQuestions.length} questions updated.`)
+        toast.success(`Test updated successfully! ${generatedQuestions.length} questions updated.`)
       } else {
         // Create new test
         const response = await fetch('/api/tests', {
@@ -746,7 +747,7 @@ export default function TestBuilderPage() {
           throw new Error('Failed to create test')
         }
 
-        alert(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
+        toast.success(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
       }
       
       // Redirect based on returnTo parameter or user role

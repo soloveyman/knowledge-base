@@ -15,6 +15,7 @@ import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 import { GreetingCard } from "@/components/common/greeting-card"
 import UserProgressReport from "@/components/reports/user-progress-report"
 import { useTranslation } from "@/lib/translation-context"
+import { toast } from "sonner"
 import { 
   Users, 
   FileText, 
@@ -401,15 +402,17 @@ function OwnerPageInner() {
         // Clean up localStorage when document is deleted
         cleanupDocumentFromLocalStorage(id)
         
+        toast.success('Document deleted successfully')
+        
         // Ensure we stay on the docs tab after deletion
         router.push('/owner?tab=docs')
       } else {
         console.error('Failed to delete document:', result.message)
-        alert(result.message)
+        toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
-      alert('Error deleting document')
+      toast.error('Error deleting document')
     }
   }
 
@@ -434,13 +437,14 @@ function OwnerPageInner() {
       if (result.success) {
         setSavedTestsWithLog(savedTests.filter(t => t.id !== id))
         setTimeout(() => loadData(true), 0)
+        toast.success('Test deleted successfully')
       } else {
         console.error('Failed to delete test:', result.message)
-        alert(result.message)
+        toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
       console.error('Error deleting test:', error)
-      alert('Error deleting test')
+      toast.error('Error deleting test')
     }
   }
 
@@ -463,13 +467,14 @@ function OwnerPageInner() {
       if (result.success) {
         setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
         setTimeout(() => loadData(true), 0)
+        toast.success('Assignment deleted successfully')
       } else {
         console.error('Failed to delete assignment:', result.message)
-        alert(result.message)
+        toast.error(result.message || 'Failed to delete assignment')
       }
     } catch (error) {
       console.error('Error deleting assignment:', error)
-      alert('Error deleting assignment')
+      toast.error('Error deleting assignment')
     }
   }
 

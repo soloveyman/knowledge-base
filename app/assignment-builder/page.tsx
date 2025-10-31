@@ -18,6 +18,7 @@ import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { validationRules } from "@/lib/validation"
 import { FormField } from "@/components/common/form-field"
+import { toast } from "sonner"
 import { 
   FileText, 
   X,
@@ -345,9 +346,9 @@ export default function AssignmentBuilderPage() {
         const skippedCount = result.data?.skippedCount || 0
         
         if (skippedCount > 0) {
-          alert(`Updated ${assignmentCount} assignment(s). ${skippedCount} user(s) already had this assignment.`)
+          toast.success(`Updated ${assignmentCount} assignment(s). ${skippedCount} user(s) already had this assignment.`)
         } else {
-          alert(`Successfully updated ${assignmentCount} assignment(s)!`)
+          toast.success(`Successfully updated ${assignmentCount} assignment(s)!`)
         }
       } else {
         // Create new assignment
@@ -387,9 +388,9 @@ export default function AssignmentBuilderPage() {
         const skippedCount = result.data?.skippedCount || 0
         
         if (skippedCount > 0) {
-          alert(`Created ${assignmentCount} new assignment(s). ${skippedCount} user(s) already had this assignment.`)
+          toast.success(`Created ${assignmentCount} new assignment(s). ${skippedCount} user(s) already had this assignment.`)
         } else {
-          alert(`Successfully created ${assignmentCount} assignment(s)!`)
+          toast.success(`Successfully created ${assignmentCount} assignment(s)!`)
         }
       }
       

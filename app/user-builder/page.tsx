@@ -13,6 +13,7 @@ import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { validationRules } from "@/lib/validation"
+import { toast } from "sonner"
 import { 
   Users, 
   X, 
@@ -161,7 +162,7 @@ export default function UserBuilderPage() {
           throw new Error(result.message || 'Failed to update user')
         }
 
-        alert(`User updated successfully!`)
+        toast.success('User updated successfully!')
       } else {
         // Create new user via API
         const response = await fetch('/api/users', {
@@ -184,7 +185,7 @@ export default function UserBuilderPage() {
           throw new Error(result.message || 'Failed to create user')
         }
 
-        alert(`User created successfully!`)
+        toast.success('User created successfully!')
       }
       
       // Redirect to owner users tab

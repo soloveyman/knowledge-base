@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { PageLayout } from "@/components/common/page-layout"
 import { DocumentsPage } from "@/components/pages/documents-page"
 import { cleanupDocumentFromLocalStorage } from "@/lib/localStorage-utils"
+import { toast } from "sonner"
 import { FileText } from "lucide-react"
 
 interface Document {
@@ -124,7 +125,9 @@ export default function DocsPage() {
         method: 'DELETE'
       })
       
-      if (response.ok) {
+      const result = await response.json()
+      
+      if (result.success) {
         // Remove from local state
         const updatedDocs = documents.filter(doc => doc.id !== id)
         setDocumentsWithLog(updatedDocs)
@@ -132,10 +135,12 @@ export default function DocsPage() {
         // Clean up localStorage when document is deleted
         cleanupDocumentFromLocalStorage(id)
       } else {
-        console.error('Failed to delete document')
+        console.error('Failed to delete document:', result.message)
+        toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
+      toast.error('Error deleting document')
     }
   }
 

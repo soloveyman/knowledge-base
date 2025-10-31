@@ -10,6 +10,7 @@ import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
 import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
+import { toast } from "sonner"
 import { 
   Users, 
   ClipboardList, 
@@ -399,15 +400,17 @@ function ManagerPageInner() {
         // Clean up localStorage when document is deleted
         cleanupDocumentFromLocalStorage(id)
         
+        toast.success('Document deleted successfully')
+        
         // Ensure we stay on the docs tab after deletion
         router.push('/manager?tab=docs')
       } else {
         console.error('Failed to delete document:', result.message)
-        alert(result.message)
+        toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
       console.error('Error deleting document:', error)
-      alert('Error deleting document')
+      toast.error('Error deleting document')
     }
   }
 
@@ -431,13 +434,14 @@ function ManagerPageInner() {
       
       if (result.success) {
         setSavedTestsWithLog(savedTests.filter(t => t.id !== id))
+        toast.success('Test deleted successfully')
       } else {
         console.error('Failed to delete test:', result.message)
-        alert(result.message)
+        toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
       console.error('Error deleting test:', error)
-      alert('Error deleting test')
+      toast.error('Error deleting test')
     }
   }
 
