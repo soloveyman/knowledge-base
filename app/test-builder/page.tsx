@@ -464,22 +464,52 @@ export default function TestBuilderPage() {
         body: JSON.stringify(requestData)
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       const result = await response.json()
-      
-      if (result.success) {
-        const newQuestions = result.data?.questions || []
-        // Always add new questions to existing ones (never replace)
-        setGeneratedQuestions(prev => [...prev, ...newQuestions])
-        setAiProvider(result.provider || 'unknown')
-      } else {
-        throw new Error(result.message || 'Failed to generate questions')
+
+      if (!response.ok || !result.success) {
+        // Build detailed error message from API response
+        let errorMessage = result.message || 'Failed to generate questions'
+        
+        if (result.debug) {
+          const debug = result.debug
+          const debugParts: string[] = []
+          
+          if (!debug.hasApiKey) {
+            debugParts.push('GROK_API_KEY is not set in environment variables')
+          } else {
+            debugParts.push(`API key is set (length: ${debug.apiKeyLength})`)
+          }
+          
+          if (debug.lastStatus) {
+            debugParts.push(`Last HTTP status: ${debug.lastStatus}`)
+          }
+          
+          if (debug.errorsByModel && Object.keys(debug.errorsByModel).length > 0) {
+            debugParts.push(`Errors by model: ${JSON.stringify(debug.errorsByModel, null, 2)}`)
+          }
+          
+          if (debug.modelsAttempted) {
+            debugParts.push(`Models attempted: ${debug.modelsAttempted.join(', ')}`)
+          }
+          
+          errorMessage += '\n\nDebug info:\n' + debugParts.join('\n')
+        }
+        
+        if (result.error) {
+          errorMessage += `\n\nError details: ${result.error}`
+        }
+        
+        throw new Error(errorMessage)
       }
+      
+      const newQuestions = result.data?.questions || []
+      // Always add new questions to existing ones (never replace)
+      setGeneratedQuestions(prev => [...prev, ...newQuestions])
+      setAiProvider(result.provider || 'unknown')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate test')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate test'
+      console.error('Test generation error:', err)
+      setError(errorMessage)
     } finally {
       setIsGenerating(false)
     }

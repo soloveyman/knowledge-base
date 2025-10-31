@@ -55,9 +55,14 @@ export async function POST(request: Request) {
     const models = ['grok-4', 'grok-beta', 'grok-2']
     let grokResponse: Response | null = null
     let lastError: string | null = null
+    let lastStatus: number | null = null
+    const errorsByModel: Record<string, string> = {}
     
     for (const model of models) {
       try {
+        const startTime = Date.now()
+        console.log(`Attempting Grok API call with model: ${model}`)
+        
         grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -100,20 +105,31 @@ export async function POST(request: Request) {
       })
     })
         
+        const duration = Date.now() - startTime
+        lastStatus = grokResponse.status
+        console.log(`Grok API request to ${model} took ${duration}ms, status: ${grokResponse.status}`)
+        
         if (grokResponse.ok) {
           // Success with this model, break out of loop
-          console.log(`Grok API success with model: ${model}`)
+          console.log(`Grok API success with model: ${model} (${duration}ms)`)
           break
         } else {
           // Try next model, but save error for logging
           const errorText = await grokResponse.text().catch(() => 'Unknown error')
-          lastError = `${model}: ${errorText.substring(0, 200)}`
-          console.log(`Grok API failed with model ${model}, trying next...`)
+          const errorMessage = `${grokResponse.status}: ${errorText.substring(0, 300)}`
+          lastError = errorMessage
+          errorsByModel[model] = errorMessage
+          console.error(`Grok API failed with model ${model} (${duration}ms):`, errorMessage)
           grokResponse = null
         }
       } catch (err) {
-        lastError = `${model}: ${err instanceof Error ? err.message : 'Unknown error'}`
-        console.log(`Grok API error with model ${model}:`, lastError)
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+        lastError = errorMessage
+        errorsByModel[model] = errorMessage
+        console.error(`Grok API error with model ${model}:`, errorMessage)
+        if (err instanceof Error && err.stack) {
+          console.error('Stack trace:', err.stack)
+        }
         grokResponse = null
         continue
       }
@@ -122,43 +138,23 @@ export async function POST(request: Request) {
     if (!grokResponse || !grokResponse.ok) {
       let errorBody = lastError || 'All models failed'
       console.error(`Grok API error: All models failed. Last error: ${errorBody}`)
+      console.error(`All errors by model:`, JSON.stringify(errorsByModel, null, 2))
       
-      // Fallback to mock questions when API fails
-      const mockQuestions = [
-        {
-          id: `q_${Date.now()}_1`,
-          type: "mcq",
-          prompt: "What is the main topic of this document?",
-          choices: ["Menu items", "Pricing", "Restaurant hours", "Contact information"],
-          correct_answer: "0",
-          explanation: "The document contains menu items and pricing information."
-        },
-        {
-          id: `q_${Date.now()}_2`,
-          type: "tf",
-          prompt: "This document contains pricing information.",
-          correct_answer: "true",
-          explanation: "The document includes prices for various menu items."
-        },
-        {
-          id: `q_${Date.now()}_3`,
-          type: "mcq",
-          prompt: "What type of cuisine is featured in this menu?",
-          choices: ["Italian", "Russian", "Mixed", "Fast food"],
-          correct_answer: "2",
-          explanation: "The menu contains a mix of different cuisines and styles."
-        }
-      ]
-
+      // Return detailed error information instead of silently falling back
       return NextResponse.json({
-        success: true,
-        data: {
-          questions: mockQuestions,
-          totalGenerated: mockQuestions.length
-        },
-        provider: "mock",
-        message: `Grok API failed - using mock questions. ${lastError ? `Errors: ${lastError}` : ''}`
-      })
+        success: false,
+        message: `Grok API failed - unable to generate questions`,
+        provider: "grok",
+        error: errorBody,
+        debug: {
+          hasApiKey: !!process.env.GROK_API_KEY,
+          apiKeyLength: process.env.GROK_API_KEY?.length || 0,
+          apiKeyPrefix: process.env.GROK_API_KEY?.substring(0, 10) || 'N/A',
+          lastStatus,
+          errorsByModel,
+          modelsAttempted: models
+        }
+      }, { status: 500 })
     }
 
     const grokData = await grokResponse.json()
