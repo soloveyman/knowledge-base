@@ -12,7 +12,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ErrorMessage } from "@/components/common/error-message"
+import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
+import { useFormValidation } from "@/lib/hooks/use-form-validation"
+import { validationRules } from "@/lib/validation"
 import { 
   FileText, 
   X,
@@ -63,12 +66,37 @@ export default function TestBuilderPage() {
   
   const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
-  const [testConfig, setTestConfig] = useState<TestConfig>({
+  
+  // Validation state
+  const initialFormData = {
+    documentId: "",
     count: 5,
-    type: "mcq",
-    difficulty: "medium",
-    locale: "ru"
-  })
+    type: "mcq" as string,
+    difficulty: "medium" as string,
+    locale: "ru" as string
+  }
+  
+  const validation = useFormValidation({
+    documentId: [validationRules.required],
+    count: [
+      validationRules.required,
+      validationRules.integer,
+      validationRules.min(1),
+      validationRules.max(50)
+    ],
+    type: [validationRules.required],
+    difficulty: [validationRules.required],
+    locale: [validationRules.required]
+  }, initialFormData)
+  
+  const { values, errors, touched, setValue, setFieldTouched, validateAll } = validation
+  
+  const testConfig: TestConfig = {
+    count: values.count,
+    type: values.type,
+    difficulty: values.difficulty,
+    locale: values.locale
+  }
   const [context, setContext] = useState<Context>({
     text: "",
     facts: [],
@@ -151,12 +179,21 @@ export default function TestBuilderPage() {
         console.log('Test Builder: Questions count:', questions.length)
         
         // Load test configuration
-        setTestConfig({
+        const loadedConfig = {
           count: test.questionIds?.length || 5,
           type: questions.length > 0 ? questions[0].type || 'mcq' : 'mcq',
           difficulty: questions.length > 0 ? questions[0].difficulty || 'medium' : 'medium',
           locale: 'ru' // Default locale
-        })
+        }
+        
+        // Update validation values for test config (documentId will be set when document loads)
+        validation.setValues(prev => ({
+          ...prev,
+          count: loadedConfig.count,
+          type: loadedConfig.type,
+          difficulty: loadedConfig.difficulty,
+          locale: loadedConfig.locale
+        }))
 
         // Load document if available
         // Note: test.moduleId might be a document ID (when created via test builder)
@@ -212,6 +249,14 @@ export default function TestBuilderPage() {
               requestAnimationFrame(() => {
                 console.log('Test Builder: Setting selectedDocument via requestAnimationFrame to:', documentToSet.id)
                 setSelectedDocument(documentToSet)
+                validation.setValues(prev => ({ 
+                  ...prev, 
+                  documentId: String(documentToSet.id),
+                  count: loadedConfig.count,
+                  type: loadedConfig.type,
+                  difficulty: loadedConfig.difficulty,
+                  locale: loadedConfig.locale
+                }))
                 
                 // Double-check after a brief delay
                 setTimeout(() => {
@@ -276,7 +321,7 @@ export default function TestBuilderPage() {
               const docInList = prevDocs.find(d => String(d.id) === String(test.moduleId))
               if (docInList) {
                 // Document already in list, set it as selected
-                setSelectedDocument({
+                const docObj = {
                   id: docInList.id,
                   title: docInList.title,
                   originalFileName: docInList.originalFileName,
@@ -289,7 +334,16 @@ export default function TestBuilderPage() {
                   uploadedBy: docInList.uploadedBy || '',
                   createdAt: docInList.createdAt,
                   updatedAt: docInList.updatedAt
-                })
+                }
+                setSelectedDocument(docObj)
+                validation.setValues(prev => ({ 
+                  ...prev, 
+                  documentId: String(docObj.id),
+                  count: loadedConfig.count,
+                  type: loadedConfig.type,
+                  difficulty: loadedConfig.difficulty,
+                  locale: loadedConfig.locale
+                }))
               }
               return prevDocs
             })
@@ -370,6 +424,8 @@ export default function TestBuilderPage() {
 
   const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc)
+    setValue('documentId', doc.id)
+    setFieldTouched('documentId')
     // Use actual document content from parsedContent
     let documentContent = ''
     
@@ -461,6 +517,12 @@ export default function TestBuilderPage() {
   }
 
   const handleGenerateTest = async () => {
+    // Validate all fields before generating
+    if (!validateAll()) {
+      setError("Please fix the errors below")
+      return
+    }
+    
     if (!selectedDocument) {
       setError("Please select a document first")
       return
@@ -752,16 +814,13 @@ export default function TestBuilderPage() {
                 <CardDescription>{t('configureTestParameters')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 overflow-hidden">
-                <div>
-                  <Label htmlFor="document-select">{t('selectDocument')} *</Label>
-                  {(() => {
-                    const selectValue = selectedDocument?.id ? String(selectedDocument.id) : ""
-                    const docInList = documents.find(d => String(d.id) === selectValue)
-                    console.log('Select render - selectedDocument ID:', selectedDocument?.id, 'selectValue:', selectValue, 'docInList:', !!docInList, 'documents count:', documents.length)
-                    return null
-                  })()}
+                <FormField
+                  label={t('selectDocument')}
+                  required
+                  error={touched.documentId ? errors.documentId : undefined}
+                >
                   <Select 
-                    value={selectedDocument?.id ? String(selectedDocument.id) : ""} 
+                    value={values.documentId} 
                     onValueChange={(value) => {
                       const doc = documents.find(d => String(d.id) === String(value))
                       if (doc) {
@@ -794,24 +853,36 @@ export default function TestBuilderPage() {
                       )}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormField>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="count">{t('numberOfQuestions')}</Label>
+                  <FormField
+                    label={t('numberOfQuestions')}
+                    required
+                    error={touched.count ? errors.count : undefined}
+                  >
                     <Input
-                      id="count"
                       type="number"
                       min="1"
                       max="50"
                       value={testConfig.count}
-                      onChange={(e) => setTestConfig(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
+                      onChange={(e) => setValue('count', parseInt(e.target.value) || 1)}
+                      onBlur={() => setFieldTouched('count')}
                       className="w-full"
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="type">{t('questionType')}</Label>
-                    <Select value={testConfig.type} onValueChange={(value) => setTestConfig(prev => ({ ...prev, type: value }))}>
+                  </FormField>
+                  <FormField
+                    label={t('questionType')}
+                    required
+                    error={touched.type ? errors.type : undefined}
+                  >
+                    <Select 
+                      value={testConfig.type} 
+                      onValueChange={(value) => {
+                        setValue('type', value)
+                        setFieldTouched('type')
+                      }}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
@@ -831,13 +902,22 @@ export default function TestBuilderPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormField>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="difficulty">{t('difficulty')}</Label>
-                    <Select value={testConfig.difficulty} onValueChange={(value) => setTestConfig(prev => ({ ...prev, difficulty: value }))}>
+                  <FormField
+                    label={t('difficulty')}
+                    required
+                    error={touched.difficulty ? errors.difficulty : undefined}
+                  >
+                    <Select 
+                      value={testConfig.difficulty} 
+                      onValueChange={(value) => {
+                        setValue('difficulty', value)
+                        setFieldTouched('difficulty')
+                      }}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
@@ -852,10 +932,19 @@ export default function TestBuilderPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="locale">{t('language')}</Label>
-                    <Select value={testConfig.locale} onValueChange={(value) => setTestConfig(prev => ({ ...prev, locale: value }))}>
+                  </FormField>
+                  <FormField
+                    label={t('language')}
+                    required
+                    error={touched.locale ? errors.locale : undefined}
+                  >
+                    <Select 
+                      value={testConfig.locale} 
+                      onValueChange={(value) => {
+                        setValue('locale', value)
+                        setFieldTouched('locale')
+                      }}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
@@ -869,7 +958,7 @@ export default function TestBuilderPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormField>
                 </div>
 
                 <div className="pt-4">

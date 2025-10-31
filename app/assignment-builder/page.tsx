@@ -15,6 +15,9 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ErrorMessage } from "@/components/common/error-message"
 import { useTranslation } from "@/lib/translation-context"
+import { useFormValidation } from "@/lib/hooks/use-form-validation"
+import { validationRules } from "@/lib/validation"
+import { FormField } from "@/components/common/form-field"
 import { 
   FileText, 
   X,
@@ -102,14 +105,26 @@ export default function AssignmentBuilderPage() {
   const { t } = useTranslation()
   const router = useRouter()
   
-  const [assignmentConfig, setAssignmentConfig] = useState<AssignmentConfig>({
+  const initialConfig: AssignmentConfig = {
     name: "",
     documentId: "",
     testId: "",
     selectedUsers: [],
     dueDate: undefined,
     description: ""
-  })
+  }
+
+  const validation = useFormValidation<AssignmentConfig>({
+    name: [validationRules.required, validationRules.minLength(3), validationRules.maxLength(200)],
+    documentId: [validationRules.required],
+    selectedUsers: [validationRules.minItems(1)],
+    description: [validationRules.optional(validationRules.maxLength(1000))],
+    testId: [], // Optional
+    dueDate: [validationRules.optional(validationRules.futureDate)] // Optional, but if provided must be future
+  }, initialConfig)
+
+  const assignmentConfig = validation.values
+  const { setValue, setFieldTouched, validateAll, validateField, errors, touched } = validation
   
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedUsers, setSavedUsers] = useState<User[]>([])
@@ -180,7 +195,7 @@ export default function AssignmentBuilderPage() {
         }
         
         // Load assignment configuration
-        setAssignmentConfig({
+        validation.setValues({
           name: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use title if exists, otherwise ID
           documentId: documentId,
           testId: assignment.testId || '',
@@ -258,41 +273,35 @@ export default function AssignmentBuilderPage() {
   }, [])
 
   const handleUserToggle = (userId: string) => {
-    setAssignmentConfig(prev => ({
-      ...prev,
-      selectedUsers: prev.selectedUsers.includes(userId)
-        ? prev.selectedUsers.filter(id => id !== userId)
-        : [...prev.selectedUsers, userId]
-    }))
+    const newUsers = assignmentConfig.selectedUsers.includes(userId)
+      ? assignmentConfig.selectedUsers.filter(id => id !== userId)
+      : [...assignmentConfig.selectedUsers, userId]
+    setValue('selectedUsers', newUsers)
+    // Validate immediately after change if touched
+    if (touched.selectedUsers) {
+      validateField('selectedUsers')
+    }
   }
 
   const handleSelectAllUsers = () => {
-    setAssignmentConfig(prev => ({
-      ...prev,
-      selectedUsers: savedUsers.filter(user => user.role === 'employee').map(user => user.id)
-    }))
+    const allUserIds = savedUsers.filter(user => user.role === 'employee').map(user => user.id)
+    setValue('selectedUsers', allUserIds)
+    if (touched.selectedUsers) {
+      validateField('selectedUsers')
+    }
   }
 
   const handleDeselectAllUsers = () => {
-    setAssignmentConfig(prev => ({
-      ...prev,
-      selectedUsers: []
-    }))
+    setValue('selectedUsers', [])
+    if (touched.selectedUsers) {
+      validateField('selectedUsers')
+    }
   }
 
   const handleCreateAssignment = async () => {
-    if (!assignmentConfig.name.trim()) {
-      setError("Please enter assignment name")
-      return
-    }
-
-    if (!assignmentConfig.documentId) {
-      setError("Please select a document")
-      return
-    }
-
-    if (assignmentConfig.selectedUsers.length === 0) {
-      setError("Please select at least one employee")
+    // Validate all fields before submission
+    if (!validateAll()) {
+      setError("Please fix the errors below")
       return
     }
 
@@ -466,33 +475,44 @@ export default function AssignmentBuilderPage() {
                 <CardDescription>{t('configureAssignmentParameters')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="assignment-name">{t('assignmentName')} *</Label>
+                <FormField
+                  label={t('assignmentName')}
+                  required
+                  error={touched.name ? errors.name : undefined}
+                >
                   <Input
-                    id="assignment-name"
                     placeholder={t('enterAssignmentName')}
                     value={assignmentConfig.name}
-                    onChange={(e) => setAssignmentConfig(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setValue('name', e.target.value)}
+                    onBlur={() => setFieldTouched('name')}
                     className="w-full"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <Label htmlFor="assignment-description">{t('descriptionOptional')}</Label>
+                <FormField
+                  label={t('descriptionOptional')}
+                  error={touched.description ? errors.description : undefined}
+                >
                   <Input
-                    id="assignment-description"
                     placeholder={t('enterAssignmentDescription')}
                     value={assignmentConfig.description}
-                    onChange={(e) => setAssignmentConfig(prev => ({ ...prev, description: e.target.value }))}
+                    onChange={(e) => setValue('description', e.target.value)}
+                    onBlur={() => setFieldTouched('description')}
                     className="w-full"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <Label htmlFor="document-select">{t('selectDocument')} *</Label>
+                <FormField
+                  label={t('selectDocument')}
+                  required
+                  error={touched.documentId ? errors.documentId : undefined}
+                >
                   <Select 
                     value={assignmentConfig.documentId} 
-                    onValueChange={(value) => setAssignmentConfig(prev => ({ ...prev, documentId: value }))}
+                    onValueChange={(value) => {
+                      setValue('documentId', value)
+                      setFieldTouched('documentId')
+                    }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t('chooseDocument')} />
@@ -508,13 +528,14 @@ export default function AssignmentBuilderPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormField>
 
-                <div>
-                  <Label htmlFor="test-select">{t('selectTestOptional')}</Label>
+                <FormField
+                  label={t('selectTestOptional')}
+                >
                   <Select 
                     value={assignmentConfig.testId} 
-                    onValueChange={(value) => setAssignmentConfig(prev => ({ ...prev, testId: value }))}
+                    onValueChange={(value) => setValue('testId', value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t('chooseTest')} />
@@ -534,18 +555,22 @@ export default function AssignmentBuilderPage() {
                       )}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormField>
 
-                <div>
-                  <Label>{t('dueDateOptional')}</Label>
+                <FormField
+                  label={t('dueDateOptional')}
+                  error={touched.dueDate ? errors.dueDate : undefined}
+                >
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-between text-left font-normal relative",
-                          !assignmentConfig.dueDate && "text-muted-foreground"
+                          !assignmentConfig.dueDate && "text-muted-foreground",
+                          touched.dueDate && errors.dueDate && "border-destructive"
                         )}
+                        onClick={() => setFieldTouched('dueDate')}
                       >
                         <div className="flex items-center">
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -556,7 +581,8 @@ export default function AssignmentBuilderPage() {
                             className="h-4 w-4" 
                             onClick={(e) => {
                               e.stopPropagation()
-                              setAssignmentConfig(prev => ({ ...prev, dueDate: undefined }))
+                              setValue('dueDate', undefined)
+                              setFieldTouched('dueDate')
                             }}
                           />
                         )}
@@ -567,20 +593,21 @@ export default function AssignmentBuilderPage() {
                         mode="single"
                         selected={assignmentConfig.dueDate}
                         onSelect={(date) => {
-                          setAssignmentConfig(prev => ({ ...prev, dueDate: date }))
+                          setValue('dueDate', date)
                           setIsCalendarOpen(false)
+                          setFieldTouched('dueDate')
                         }}
                         disabled={(date) => date < new Date()}
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
-                </div>
+                </FormField>
 
                 <div className="pt-4">
                   <Button 
                     onClick={handleCreateAssignment}
-                    disabled={isCreating || !assignmentConfig.name || !assignmentConfig.documentId || assignmentConfig.selectedUsers.length === 0}
+                    disabled={isCreating || !validateAll()}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     {isCreating ? (
@@ -608,10 +635,15 @@ export default function AssignmentBuilderPage() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
-                    <CardTitle>{t('selectEmployees')}</CardTitle>
+                    <CardTitle>
+                      {t('selectEmployees')} <span className="text-red-500">*</span>
+                    </CardTitle>
                     <CardDescription>
                       {t('chooseEmployeesToAssign')}
                     </CardDescription>
+                    {touched.selectedUsers && errors.selectedUsers && (
+                      <p className="text-sm text-red-600 mt-1">{errors.selectedUsers}</p>
+                    )}
                   </div>
                   <div className="flex space-x-2">
                     <Button

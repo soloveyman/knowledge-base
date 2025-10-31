@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ErrorMessage } from "@/components/common/error-message"
+import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
+import { useFormValidation } from "@/lib/hooks/use-form-validation"
+import { validationRules } from "@/lib/validation"
 import { 
   Users, 
   X, 
@@ -45,19 +48,43 @@ export default function UserBuilderPage() {
   const router = useRouter()
   const { t } = useTranslation()
   
-  const [userConfig, setUserConfig] = useState<UserConfig>({
-    name: "",
-    job: "",
-    email: "",
-    password: "",
-    role: ""
-  })
-  
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  
+  // Validation setup
+  const initialFormData: UserConfig = {
+    name: "",
+    job: "",
+    email: "",
+    password: "",
+    role: ""
+  }
+  
+  const validation = useFormValidation({
+    name: [validationRules.required],
+    job: [validationRules.required],
+    email: [validationRules.required, validationRules.email],
+    password: [
+      // Required only if not in edit mode
+      ...(isEditMode ? [] : [validationRules.required]),
+      validationRules.minLength(6)
+    ],
+    role: [validationRules.required]
+  }, initialFormData)
+  
+  const { values, errors, touched, setValue, setFieldTouched, validateAll } = validation
+  
+  // Sync validation values with userConfig for backwards compatibility
+  const userConfig: UserConfig = {
+    name: values.name,
+    job: values.job,
+    email: values.email,
+    password: values.password,
+    role: values.role
+  }
 
   useEffect(() => {
     if (status === "loading") return
@@ -84,7 +111,7 @@ export default function UserBuilderPage() {
       
       if (result.success && result.data.user) {
         const user = result.data.user
-        setUserConfig({
+        validation.setValues({
           name: user.name || '',
           job: user.job || '',
           email: user.email || '',
@@ -101,47 +128,12 @@ export default function UserBuilderPage() {
     }
   }
 
-  const handleInputChange = (field: keyof UserConfig, value: string) => {
-    setUserConfig(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
-
-  const validateForm = () => {
-    if (!userConfig.name.trim()) {
-      setError("Name is required")
-      return false
-    }
-    if (!userConfig.job.trim()) {
-      setError("Job title is required")
-      return false
-    }
-    if (!userConfig.email.trim()) {
-      setError("Email is required")
-      return false
-    }
-    if (!userConfig.email.includes('@')) {
-      setError("Please enter a valid email address")
-      return false
-    }
-    if (!userConfig.password.trim() && !isEditMode) {
-      setError("Password is required")
-      return false
-    }
-    if (userConfig.password.trim() && userConfig.password.length < 6) {
-      setError("Password must be at least 6 characters")
-      return false
-    }
-    if (!userConfig.role) {
-      setError("Please select a role")
-      return false
-    }
-    return true
-  }
-
   const handleCreateUser = async () => {
-    if (!validateForm()) return
+    // Validate all fields
+    if (!validateAll()) {
+      setError("Please fix the errors below")
+      return
+    }
 
     setIsCreating(true)
     setError(null)
@@ -274,48 +266,66 @@ export default function UserBuilderPage() {
             <CardContent>
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">{t('fullName')} *</Label>
+                  <FormField
+                    label={t('fullName')}
+                    required
+                    error={touched.name ? errors.name : undefined}
+                  >
                     <Input
-                      id="name"
                       value={userConfig.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      onChange={(e) => {
+                        setValue('name', e.target.value)
+                      }}
+                      onBlur={() => setFieldTouched('name')}
                       placeholder={t('enterFullName')}
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="job">{t('jobTitle')} *</Label>
+                  <FormField
+                    label={t('jobTitle')}
+                    required
+                    error={touched.job ? errors.job : undefined}
+                  >
                     <Input
-                      id="job"
                       value={userConfig.job}
-                      onChange={(e) => handleInputChange('job', e.target.value)}
+                      onChange={(e) => {
+                        setValue('job', e.target.value)
+                      }}
+                      onBlur={() => setFieldTouched('job')}
                       placeholder={t('enterJobTitle')}
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t('emailAddress')} *</Label>
+                  <FormField
+                    label={t('emailAddress')}
+                    required
+                    error={touched.email ? errors.email : undefined}
+                  >
                     <Input
-                      id="email"
                       type="email"
                       value={userConfig.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      onChange={(e) => {
+                        setValue('email', e.target.value)
+                      }}
+                      onBlur={() => setFieldTouched('email')}
                       placeholder={t('enterEmailAddress')}
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="password">
-                      {t('password')} {!isEditMode && '*'}
-                      {isEditMode && <span className="text-sm text-muted-foreground ml-1">(leave blank to keep current)</span>}
-                    </Label>
+                  <FormField
+                    label={t('password')}
+                    required={!isEditMode}
+                    error={touched.password ? errors.password : undefined}
+                    description={isEditMode ? "(leave blank to keep current)" : undefined}
+                  >
                     <div className="relative">
                       <Input
-                        id="password"
                         type={showPassword ? "text" : "password"}
                         value={userConfig.password}
-                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        onChange={(e) => {
+                          setValue('password', e.target.value)
+                        }}
+                        onBlur={() => setFieldTouched('password')}
                         placeholder={isEditMode ? "Enter new password (optional)" : t('enterPassword')}
                         className="pr-10"
                       />
@@ -328,11 +338,20 @@ export default function UserBuilderPage() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                  </div>
+                  </FormField>
 
-                  <div className="space-y-2 md:col-span-1">
-                    <Label htmlFor="role">{t('role')} *</Label>
-                    <Select value={userConfig.role} onValueChange={(value) => handleInputChange('role', value)}>
+                  <FormField
+                    label={t('role')}
+                    required
+                    error={touched.role ? errors.role : undefined}
+                  >
+                    <Select 
+                      value={userConfig.role} 
+                      onValueChange={(value) => {
+                        setValue('role', value)
+                        setFieldTouched('role')
+                      }}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={t('selectUserRole')} />
                       </SelectTrigger>
@@ -341,7 +360,7 @@ export default function UserBuilderPage() {
                         <SelectItem value="employee">{t('employee')}</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormField>
                 </div>
 
                 <div className="bg-primary/10 p-4 rounded-lg">
