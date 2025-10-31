@@ -76,48 +76,9 @@ export default function VersionManager({
   }, [currentVersion])
 
   const loadVersions = () => {
-    // Mock data - in production, this would come from API
-    const mockVersions: Version[] = [
-      {
-        id: '1',
-        version: 1,
-        title: 'Food Safety Training v1.0',
-        description: 'Initial version of food safety training module',
-        content: 'Initial content...',
-        status: 'published',
-        changeLog: 'Initial release with basic food safety concepts',
-        createdBy: 'John Manager',
-        createdAt: '2024-01-01T10:00:00Z',
-        publishedAt: '2024-01-01T10:00:00Z',
-        isCurrent: true
-      },
-      {
-        id: '2',
-        version: 2,
-        title: 'Food Safety Training v2.0',
-        description: 'Updated version with new regulations',
-        content: 'Updated content with new regulations...',
-        status: 'draft',
-        changeLog: 'Added new FDA regulations and updated procedures',
-        createdBy: 'Jane Manager',
-        createdAt: '2024-01-15T14:30:00Z',
-        isCurrent: false
-      },
-      {
-        id: '3',
-        version: 3,
-        title: 'Food Safety Training v3.0',
-        description: 'Latest version with comprehensive updates',
-        content: 'Latest comprehensive content...',
-        status: 'draft',
-        changeLog: 'Major overhaul with new interactive elements and updated content',
-        createdBy: 'Mike Manager',
-        createdAt: '2024-01-20T09:15:00Z',
-        isCurrent: false
-      }
-    ]
-
-    setVersions(mockVersions)
+    // Load versions from API - start with empty array
+    setVersions([])
+    // TODO: Fetch versions from API endpoint
   }
 
   const handleCreateDraft = () => {

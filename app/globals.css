@@ -540,8 +540,8 @@
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none !important; /* Firefox - force hide */
+    -ms-overflow-style: none !important; /* IE and Edge - force hide */
     position: static; /* Static positioning, no layout shifts */
     touch-action: pan-x; /* Allow horizontal panning on mobile */
     overscroll-behavior-x: contain; /* Prevent pull-to-refresh interference */
@@ -550,6 +550,23 @@
   }
   
   .tabs-scroll-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera - invisible scrollbar */
+    display: none !important; /* Chrome, Safari, Opera - invisible scrollbar */
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  .tabs-scroll-container::-webkit-scrollbar-track {
+    display: none !important;
+  }
+  
+  .tabs-scroll-container::-webkit-scrollbar-thumb {
+    display: none !important;
+  }
+  
+  /* Ensure TabsList inside can overflow */
+  .tabs-scroll-container > [data-slot="tabs-list"] {
+    width: auto !important;
+    min-width: 100% !important;
+    max-width: none !important;
   }
 }

@@ -104,44 +104,14 @@ function OwnerPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Initialize tests from localStorage to prevent empty state on re-mount
-  const [savedTests, setSavedTests] = useState<SavedTest[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('owner-tests')
-        return saved ? JSON.parse(saved) : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+  // Initialize with empty arrays - data will come from API
+  const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   
-  // Initialize assignments from localStorage to prevent empty state on re-mount
-  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('owner-assignments')
-        return saved ? JSON.parse(saved) : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+  // Initialize with empty arrays - data will come from API
+  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
   
-  // Initialize documents from localStorage to prevent empty state on re-mount
-  const [documents, setDocuments] = useState<SavedDocument[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('owner-documents')
-        return saved ? JSON.parse(saved) : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+  // Initialize with empty arrays - data will come from API
+  const [documents, setDocuments] = useState<SavedDocument[]>([])
   
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
   
@@ -149,77 +119,34 @@ function OwnerPageInner() {
   const [isLoadingTests, setIsLoadingTests] = useState(false)
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
 
-  // Debug wrapper for setDocuments
+  // Set documents - no localStorage persistence for clean state
   const setDocumentsWithLog = (newDocuments: SavedDocument[]) => {
-    console.log('Owner: setDocuments called with:', newDocuments.length, 'documents')
-    // Only warn if we're clearing documents that existed before
-    if (newDocuments.length === 0 && documents.length > 0) {
-      console.log('Owner: WARNING - Documents being cleared!')
-      console.trace('Owner: Stack trace for document clearing:')
-    }
-    // Always save to localStorage to persist across re-mounts (even if empty)
-    try {
-      localStorage.setItem('owner-documents', JSON.stringify(newDocuments))
-    } catch (error) {
-      console.error('Failed to save documents to localStorage:', error)
-    }
     setDocuments(newDocuments)
   }
 
-  // Debug wrapper for setSavedTests
+  // Set tests - no localStorage persistence for clean state
   const setSavedTestsWithLog = (newTests: SavedTest[]) => {
-    console.log('Owner: setSavedTests called with:', newTests.length, 'tests')
-    // Only warn if we're clearing tests that existed before
-    if (newTests.length === 0 && savedTests.length > 0) {
-      console.log('Owner: WARNING - Tests being cleared!')
-      console.trace('Owner: Stack trace for test clearing:')
-    }
-    // Always save to localStorage to persist across re-mounts (even if empty)
-    try {
-      localStorage.setItem('owner-tests', JSON.stringify(newTests))
-    } catch (error) {
-      console.error('Failed to save tests to localStorage:', error)
-    }
     setSavedTests(newTests)
   }
 
-  // Debug wrapper for setSavedAssignments
+  // Set assignments - no localStorage persistence for clean state
   const setSavedAssignmentsWithLog = (newAssignments: SavedAssignment[]) => {
-    console.log('Owner: setSavedAssignments called with:', newAssignments.length, 'assignments')
-    // Only warn if we're clearing assignments that existed before
-    if (newAssignments.length === 0 && savedAssignments.length > 0) {
-      console.log('Owner: WARNING - Assignments being cleared!')
-      console.trace('Owner: Stack trace for assignment clearing:')
-    }
-    // Always save to localStorage to persist across re-mounts (even if empty)
-    try {
-      localStorage.setItem('owner-assignments', JSON.stringify(newAssignments))
-    } catch (error) {
-      console.error('Failed to save assignments to localStorage:', error)
-    }
     setSavedAssignments(newAssignments)
   }
 
-  // Fix any corrupted localStorage data on initialization
+  // Clear localStorage on mount to ensure clean state for new owners
   useEffect(() => {
-    fixCorruptedLocalStorage()
-  }, [])
-
-  // Monitor documents state changes
-  useEffect(() => {
-    console.log('Owner: Documents state changed to:', documents.length, 'documents')
-    console.log('Owner: Current documents:', documents)
-    
-    // Check localStorage
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('owner-documents')
-        console.log('Owner: localStorage documents:', saved ? JSON.parse(saved) : null)
-      } catch (e) {
-        console.error('Owner: Error reading localStorage:', e)
+        localStorage.removeItem('owner-tests')
+        localStorage.removeItem('owner-assignments')
+        localStorage.removeItem('owner-documents')
+        fixCorruptedLocalStorage()
+      } catch (error) {
+        console.error('Error clearing localStorage:', error)
       }
     }
-  }, [documents])
+  }, [])
 
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {

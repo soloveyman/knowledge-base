@@ -77,27 +77,10 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
   const [showUserSelection, setShowUserSelection] = useState(false)
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
-  // Mock data - in production, this would come from API
-  const [users] = useState<User[]>([
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'employee' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'employee' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'employee' },
-    { id: '4', name: 'Sarah Wilson', email: 'sarah@example.com', role: 'employee' },
-    { id: '5', name: 'Tom Brown', email: 'tom@example.com', role: 'employee' }
-  ])
-
-  const [groups] = useState<Group[]>([
-    { id: '1', name: 'Kitchen Staff', description: 'All kitchen employees', memberCount: 12 },
-    { id: '2', name: 'Front of House', description: 'Waiters and hosts', memberCount: 8 },
-    { id: '3', name: 'Management', description: 'Managers and supervisors', memberCount: 4 }
-  ])
-
-  const [modules] = useState<Module[]>([
-    { id: '1', title: 'Food Safety Training', description: 'Basic food safety protocols', type: 'module', duration: 30, status: 'published' },
-    { id: '2', title: 'Customer Service Excellence', description: 'Customer service best practices', type: 'module', duration: 45, status: 'published' },
-    { id: '3', title: 'Food Safety Assessment', description: 'Test knowledge of food safety', type: 'test', duration: 15, status: 'published' },
-    { id: '4', title: 'Hygiene Standards', description: 'Personal hygiene requirements', type: 'module', duration: 20, status: 'draft' }
-  ])
+  // Load data from API - start with empty arrays
+  const [users, setUsers] = useState<User[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
+  const [modules, setModules] = useState<Module[]>([])
 
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
