@@ -41,7 +41,7 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-interface AssignmentConfig {
+interface AssignmentConfig extends Record<string, unknown> {
   name: string
   documentId: string
   testId: string
