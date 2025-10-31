@@ -116,7 +116,13 @@ export async function POST(request: Request) {
         } else {
           // Try next model, but save error for logging
           const errorText = await grokResponse.text().catch(() => 'Unknown error')
-          const errorMessage = `${grokResponse.status}: ${errorText.substring(0, 300)}`
+          let errorMessage = `${grokResponse.status}: ${errorText.substring(0, 300)}`
+          
+          // Check if it's an API key error
+          if (grokResponse.status === 400 && errorText.includes('Incorrect API key')) {
+            errorMessage = `Invalid API key. Please update GROK_API_KEY in Vercel environment variables. ${errorText.substring(0, 200)}`
+          }
+          
           lastError = errorMessage
           errorsByModel[model] = errorMessage
           console.error(`Grok API failed with model ${model} (${duration}ms):`, errorMessage)
@@ -140,10 +146,15 @@ export async function POST(request: Request) {
       console.error(`Grok API error: All models failed. Last error: ${errorBody}`)
       console.error(`All errors by model:`, JSON.stringify(errorsByModel, null, 2))
       
+      // Check if it's an API key issue
+      const isApiKeyError = lastStatus === 400 && errorBody.includes('Incorrect API key')
+      
       // Return detailed error information instead of silently falling back
       return NextResponse.json({
         success: false,
-        message: `Grok API failed - unable to generate questions`,
+        message: isApiKeyError 
+          ? 'Grok API key is invalid. Please update GROK_API_KEY in Vercel environment variables.'
+          : 'Grok API failed - unable to generate questions',
         provider: "grok",
         error: errorBody,
         debug: {
@@ -152,7 +163,8 @@ export async function POST(request: Request) {
           apiKeyPrefix: process.env.GROK_API_KEY?.substring(0, 10) || 'N/A',
           lastStatus,
           errorsByModel,
-          modelsAttempted: models
+          modelsAttempted: models,
+          isApiKeyError
         }
       }, { status: 500 })
     }

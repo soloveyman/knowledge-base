@@ -150,6 +150,7 @@ export default function SignInPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
+                  minLength={isRegister ? 8 : undefined}
                   required
                 />
                 <button
@@ -161,6 +162,19 @@ export default function SignInPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {isRegister && (
+                <p className="text-xs text-muted-foreground">
+                  {password.length > 0 && password.length < 8 && (
+                    <span className="text-destructive">
+                      Password must be at least 8 characters ({password.length}/8)
+                    </span>
+                  )}
+                  {password.length >= 8 && (
+                    <span className="text-green-600">Password length is valid</span>
+                  )}
+                  {password.length === 0 && 'Password must be at least 8 characters'}
+                </p>
+              )}
             </div>
             
             <Button type="submit" className="w-full" disabled={isLoading}>

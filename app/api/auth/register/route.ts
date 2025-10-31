@@ -58,7 +58,21 @@ export async function POST(req: Request) {
     if (err && typeof err === 'object' && 'issues' in err) {
       const zodError = err as z.ZodError
       const firstError = zodError.issues[0]
-      const message = firstError?.message || 'Validation error'
+      
+      // Create user-friendly error messages
+      let message = 'Validation error'
+      if (firstError?.path?.includes('password')) {
+        if (firstError.code === 'too_small') {
+          message = `Password must be at least ${firstError.minimum || 8} characters long`
+        } else {
+          message = firstError.message || 'Invalid password'
+        }
+      } else if (firstError?.path?.includes('email')) {
+        message = firstError.message || 'Invalid email address'
+      } else {
+        message = firstError?.message || 'Validation error'
+      }
+      
       console.error('Register validation error:', zodError.issues)
       return NextResponse.json({ error: message }, { status: 400 })
     }
