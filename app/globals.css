@@ -593,6 +593,106 @@
   }
 }
 
+/* Proper cursor states for desktop view */
+@media (min-width: 641px) {
+  /* Buttons and clickable elements */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a,
+  a[href],
+  a[href="#"],
+  a[href="javascript:void(0)"],
+  a[href="javascript:;"],
+  [data-slot="button"]:not(:disabled),
+  [data-slot="tabs-trigger"]:not([data-disabled]),
+  [data-slot="menuitem"]:not([data-disabled]),
+  label[for],
+  label:has(input),
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+  
+  /* Disabled/interactive elements */
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  [data-slot="button"]:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  
+  /* Text inputs and editable content */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  textarea,
+  [contenteditable="true"],
+  [role="textbox"]:not([aria-disabled="true"]) {
+    cursor: text;
+  }
+  
+  /* Selectable text */
+  p,
+  span:not([role]),
+  div:not([role]):not([contenteditable]),
+  h1, h2, h3, h4, h5, h6,
+  li,
+  td,
+  th {
+    cursor: default;
+    user-select: text;
+  }
+  
+  /* Draggable elements */
+  [draggable="true"] {
+    cursor: grab;
+  }
+  
+  [draggable="true"]:active {
+    cursor: grabbing;
+  }
+  
+  /* Resizable elements */
+  textarea[resize] {
+    cursor: text;
+  }
+  
+  /* Cards and clickable containers */
+  [onclick] {
+    cursor: pointer;
+  }
+  
+  /* Focusable interactive elements */
+  [tabindex]:not([tabindex="-1"]):not(input):not(textarea):not(select) {
+    cursor: pointer;
+  }
+  
+  /* Specific UI components */
+  [data-slot="input"]:not(:disabled) {
+    cursor: text;
+  }
+  
+  /* Interactive cards (when they have click handlers) */
+  div[onclick],
+  div[role="button"],
+  article[onclick],
+  section[onclick] {
+    cursor: pointer;
+  }
+}
+
 /* Tabs scrollbar styles */
 @layer utilities {
   .tabs-scroll-container {
