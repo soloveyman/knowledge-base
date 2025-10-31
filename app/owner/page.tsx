@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense } from "react"
+import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -24,6 +24,56 @@ import {
 } from "lucide-react"
 import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
 import { cleanupDocumentFromLocalStorage, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
+
+// Component to handle tabs overflow detection
+function TabsContainer({ children }: { children: React.ReactNode }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (!containerRef.current) return
+      
+      const container = containerRef.current
+      const tabsList = container.querySelector('[data-slot="tabs-list"]') as HTMLElement
+      
+      if (!tabsList) return
+      
+      // Check if tabs list overflows container
+      const hasOverflow = tabsList.scrollWidth > container.clientWidth
+      
+      if (hasOverflow) {
+        container.classList.add('tabs-overflow')
+      } else {
+        container.classList.remove('tabs-overflow')
+      }
+    }
+
+    // Check on mount with a small delay to ensure DOM is ready
+    setTimeout(checkOverflow, 0)
+    window.addEventListener('resize', checkOverflow)
+    
+    // Use ResizeObserver for more accurate detection
+    const resizeObserver = new ResizeObserver(checkOverflow)
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+      const tabsList = containerRef.current.querySelector('[data-slot="tabs-list"]')
+      if (tabsList) {
+        resizeObserver.observe(tabsList)
+      }
+    }
+
+    return () => {
+      window.removeEventListener('resize', checkOverflow)
+      resizeObserver.disconnect()
+    }
+  }, [])
+
+  return (
+    <div ref={containerRef} className="tabs-scroll-container">
+      {children}
+    </div>
+  )
+}
 
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes'
@@ -492,7 +542,7 @@ function OwnerPageInner() {
 
         {/* Main Tabs */}
         <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
-          <div className="tabs-scroll-container">
+          <TabsContainer>
             <TabsList className="w-full min-w-max grid grid-cols-3 sm:grid-cols-6">
               <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
               <TabsTrigger value="users">{t('users')}</TabsTrigger>
@@ -501,7 +551,7 @@ function OwnerPageInner() {
               <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
               <TabsTrigger value="settings">{t('settings')}</TabsTrigger>
             </TabsList>
-          </div>
+          </TabsContainer>
 
           <TabsContent value="overview" className="space-y-3 md:space-y-6">
             {/* Overview Metrics */}

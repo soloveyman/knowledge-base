@@ -534,73 +534,94 @@
   }
 }
 
-/* Tabs scrollbar styles - outside layer for higher specificity */
-.tabs-scroll-container {
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  -webkit-overflow-scrolling: touch !important; /* Smooth scrolling on iOS */
-  scrollbar-width: none !important; /* Firefox - force hide */
-  -ms-overflow-style: none !important; /* IE and Edge - force hide */
-  position: static !important; /* Static positioning, no layout shifts */
-  touch-action: pan-x !important; /* Allow horizontal panning on mobile */
-  overscroll-behavior-x: contain !important; /* Prevent pull-to-refresh interference */
-  width: 100% !important; /* Full width container */
-  max-width: 100% !important; /* Prevent container from overflowing */
-}
-
-.tabs-scroll-container::-webkit-scrollbar {
-  display: none !important; /* Chrome, Safari, Opera - invisible scrollbar */
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.tabs-scroll-container::-webkit-scrollbar-track {
-  display: none !important;
-}
-
-.tabs-scroll-container::-webkit-scrollbar-thumb {
-  display: none !important;
-}
-
-/* Ensure TabsList uses natural width on mobile, fills width on tablet/desktop */
-.tabs-scroll-container > [data-slot="tabs-list"],
-.tabs-scroll-container > [data-slot="tabs-list"].w-full,
-.tabs-scroll-container > [data-slot="tabs-list"].grid,
-.tabs-scroll-container > [data-slot="tabs-list"].min-w-max {
-  width: max-content !important; /* Natural width based on content - mobile default */
-  min-width: max-content !important; /* Minimum is content width - mobile default */
-  max-width: none !important; /* Can grow beyond when tabs don't fit */
-  display: flex !important; /* Use flex for horizontal layout */
-  flex-wrap: nowrap !important; /* Prevent wrapping to allow horizontal scroll */
-  grid-template-columns: none !important; /* Override grid columns */
-}
-
-/* On tablet and desktop (640px+), always fit 100% screen width */
-@media (min-width: 640px) {
-  .tabs-scroll-container > [data-slot="tabs-list"],
-  .tabs-scroll-container > [data-slot="tabs-list"].w-full,
-  .tabs-scroll-container > [data-slot="tabs-list"].grid,
-  .tabs-scroll-container > [data-slot="tabs-list"].min-w-max {
-    width: 100% !important; /* Always fit 100% screen width on tablet/desktop */
-    min-width: 100% !important; /* Minimum is full width */
-    max-width: 100% !important; /* Maximum is also full width - tabs will scroll if they overflow */
+/* Tabs scrollbar styles */
+@layer utilities {
+  .tabs-scroll-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    scrollbar-width: none !important; /* Firefox - force hide */
+    -ms-overflow-style: none !important; /* IE and Edge - force hide */
+    position: static; /* Static positioning, no layout shifts */
+    touch-action: pan-x; /* Allow horizontal panning on mobile */
+    overscroll-behavior-x: contain; /* Prevent pull-to-refresh interference */
+    width: 100%; /* Full width container */
+    max-width: 100%; /* Prevent container from overflowing */
   }
-}
-
-/* Ensure TabsTrigger uses natural width on mobile, distributes evenly on tablet/desktop */
-.tabs-scroll-container [data-slot="tabs-trigger"],
-.tabs-scroll-container [data-slot="tabs-trigger"].flex-1 {
-  flex: 0 0 auto !important; /* Natural width - mobile default */
-  min-width: fit-content !important; /* Minimum width based on content */
-  white-space: nowrap !important; /* Prevent text wrapping */
-  /* Keep default padding for readability - px-2 py-1 from component */
-}
-
-/* On tablet and desktop (640px+), distribute evenly to fill width */
-@media (min-width: 640px) {
-  .tabs-scroll-container [data-slot="tabs-trigger"],
-  .tabs-scroll-container [data-slot="tabs-trigger"].flex-1 {
-    flex: 1 1 0% !important; /* Equal distribution to fill width on tablet/desktop */
+  
+  .tabs-scroll-container::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera - invisible scrollbar */
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  .tabs-scroll-container::-webkit-scrollbar-track {
+    display: none !important;
+  }
+  
+  .tabs-scroll-container::-webkit-scrollbar-thumb {
+    display: none !important;
+  }
+  
+  /* Ensure TabsList fills 100% width on desktop, natural width on mobile for scrolling */
+  .tabs-scroll-container > [data-slot="tabs-list"] {
+    width: 100% !important; /* Always start at full width on desktop */
+    min-width: 100% !important; /* Minimum full width on desktop */
+    max-width: none !important; /* Can grow beyond container when tabs overflow */
+    display: flex !important; /* Use flex for horizontal layout */
+    flex-wrap: nowrap !important; /* Prevent wrapping to allow horizontal scroll */
+  }
+  
+  /* On mobile, fill container width and justify tabs evenly */
+  @media (max-width: 640px) {
+    .tabs-scroll-container > [data-slot="tabs-list"] {
+      width: 100% !important; /* Fill full width on mobile by default */
+      min-width: 100% !important; /* Minimum is full width */
+      max-width: 100% !important; /* Prevent overflow initially */
+    }
+    
+    /* When tabs overflow, allow natural width for scrolling */
+    .tabs-scroll-container.tabs-overflow {
+      overflow-x: auto !important; /* Enable horizontal scrolling */
+      overflow-y: hidden !important;
+    }
+    
+    .tabs-scroll-container.tabs-overflow > [data-slot="tabs-list"] {
+      width: max-content !important; /* Natural width when overflowing */
+      min-width: max-content !important; /* Natural width based on content */
+      max-width: max-content !important; /* Allow growth beyond container */
+      justify-content: flex-start !important; /* Natural spacing, start from left */
+      gap: 0 !important; /* No gap between tabs */
+    }
+  }
+  
+  /* Override grid classes when inside scroll container */
+  .tabs-scroll-container > [data-slot="tabs-list"].grid {
+    display: flex !important;
+    grid-template-columns: none !important;
+  }
+  
+  /* Ensure TabsTrigger distributes evenly on desktop, natural width on mobile */
+  .tabs-scroll-container [data-slot="tabs-trigger"] {
+    flex: 1 1 0% !important; /* Equal width distribution to fill container */
     min-width: fit-content !important; /* But respect content minimum */
+    white-space: nowrap !important; /* Prevent text wrapping */
+  }
+  
+  /* On mobile, justify tabs evenly to fill width */
+  @media (max-width: 640px) {
+    .tabs-scroll-container [data-slot="tabs-trigger"] {
+      flex: 1 1 0% !important; /* Equal distribution to fill width */
+      min-width: 0 !important; /* Allow flex to shrink if needed */
+      width: auto !important; /* Let flex control width */
+    }
+    
+    /* When overflow occurs, use natural width for scrolling */
+    .tabs-scroll-container.tabs-overflow [data-slot="tabs-trigger"] {
+      flex: 0 0 auto !important; /* Natural width when overflowing, no stretching */
+      min-width: fit-content !important; /* Respect content minimum */
+      width: auto !important; /* Natural content width */
+      margin: 0 !important; /* No margins */
+    }
   }
 }
