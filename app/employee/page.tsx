@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, Suspense, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -85,7 +85,7 @@ function EmployeePageInner() {
   const [testAttempts, setTestAttempts] = useState<TestAttempt[]>([])
 
   // Load test attempts from API
-  const loadTestAttempts = async () => {
+  const loadTestAttempts = useCallback(async () => {
     try {
       const response = await fetch(`/api/test-attempts?userId=${session?.user?.id}`)
       const result = await response.json()
@@ -97,10 +97,10 @@ function EmployeePageInner() {
       console.error('Error loading test attempts:', error)
       setTestAttempts([])
     }
-  }
+  }, [session?.user?.id])
 
   // Load assignments from API
-  const loadAssignments = async () => {
+  const loadAssignments = useCallback(async () => {
     try {
       const response = await fetch('/api/assignments')
       const result = await response.json()
@@ -129,7 +129,7 @@ function EmployeePageInner() {
       setAssignments([])
       setUserAssignments([])
     }
-  }
+  }, [session?.user?.id])
 
   useEffect(() => {
     if (status === "loading") return
@@ -139,20 +139,22 @@ function EmployeePageInner() {
       return
     }
 
-    // Handle tab from URL
+    // Handle tab from URL - use setTimeout to avoid synchronous setState
     const tabFromUrl = getTabFromUrl(searchParams)
     if (tabFromUrl) {
-      setCurrentTab(tabFromUrl)
+      setTimeout(() => {
+        setCurrentTab(tabFromUrl)
+      }, 0)
     }
 
-    // Load assignments from API
-    loadAssignments()
-    
-    // Load test attempts
-    loadTestAttempts()
+    // Load assignments and test attempts - use setTimeout to avoid synchronous setState
+    setTimeout(() => {
+      loadAssignments()
+      loadTestAttempts()
+    }, 0)
 
     // Role-based redirects are now handled by middleware
-  }, [session, status, router, searchParams])
+  }, [session, status, router, searchParams, loadAssignments, loadTestAttempts])
 
   // Save current tab when it changes
   useEffect(() => {

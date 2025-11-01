@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -64,22 +64,25 @@ export default function VersionManager({
   })
   const [showDiff, setShowDiff] = useState(false)
 
-  useEffect(() => {
-    // Load versions for the module
-    loadVersions()
-  }, [moduleId])
-
-  useEffect(() => {
-    if (currentVersion) {
-      setSelectedVersion(currentVersion)
-    }
-  }, [currentVersion])
-
-  const loadVersions = () => {
+  const loadVersions = useCallback(() => {
     // Load versions from API - start with empty array
     setVersions([])
     // TODO: Fetch versions from API endpoint
-  }
+  }, [])
+
+  useEffect(() => {
+    // Load versions for the module
+    loadVersions()
+  }, [moduleId, loadVersions])
+
+  useEffect(() => {
+    if (currentVersion) {
+      // Use setTimeout to avoid synchronous setState
+      setTimeout(() => {
+        setSelectedVersion(currentVersion)
+      }, 0)
+    }
+  }, [currentVersion])
 
   const handleCreateDraft = () => {
     if (!selectedVersion) return

@@ -116,7 +116,7 @@ export async function GET(
     console.log('Question IDs:', testData.questionIds)
     
     // If we have question IDs, fetch the actual questions
-    let questionsArray = []
+    const questionsArray = []
     if (testData.questionIds && Array.isArray(testData.questionIds) && testData.questionIds.length > 0) {
       console.log('Processing question IDs:', testData.questionIds.length)
       // Filter out non-UUID question IDs (like "q1", "q2" from mock data)

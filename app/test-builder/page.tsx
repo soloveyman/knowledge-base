@@ -209,13 +209,10 @@ export default function TestBuilderPage() {
         }
         
         // Update validation values for test config - documentId will be set when document loads
-        validation.setValues({
-          ...validation.values,
-          count: loadedConfig.count,
-          type: loadedConfig.type,
-          difficulty: loadedConfig.difficulty,
-          locale: loadedConfig.locale
-        })
+        validation.setValue('count', loadedConfig.count)
+        validation.setValue('type', loadedConfig.type)
+        validation.setValue('difficulty', loadedConfig.difficulty)
+        validation.setValue('locale', loadedConfig.locale)
 
         // Load document if available
         // Note: test.moduleId might be a document ID (when created via test builder)
@@ -355,14 +352,11 @@ export default function TestBuilderPage() {
                 }
                 // Set selectedDocument and documentId synchronously
                 setSelectedDocument(docObj)
-                validation.setValues({ 
-                  ...validation.values, 
-                  documentId: String(docObj.id),
-                  count: loadedConfig.count,
-                  type: loadedConfig.type,
-                  difficulty: loadedConfig.difficulty,
-                  locale: loadedConfig.locale
-                })
+                validation.setValue('documentId', String(docObj.id))
+                validation.setValue('count', loadedConfig.count)
+                validation.setValue('type', loadedConfig.type)
+                validation.setValue('difficulty', loadedConfig.difficulty)
+                validation.setValue('locale', loadedConfig.locale)
               }
               return prevDocs
             })

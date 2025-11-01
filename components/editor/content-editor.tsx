@@ -188,7 +188,7 @@ export default function ContentEditor({
 
   const renderPreview = () => {
     // Simple markdown to HTML conversion (in production, use a proper markdown parser)
-    let html = content
+    const html = content
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')

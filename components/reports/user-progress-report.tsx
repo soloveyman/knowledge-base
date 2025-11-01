@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -249,7 +249,10 @@ export default function UserProgressReport({ users, assignments, modules = [], t
       }
     })
 
-    setUserProgress(progressData)
+    // Use setTimeout to avoid synchronous setState in effect
+    setTimeout(() => {
+      setUserProgress(progressData)
+    }, 0)
   }, [users, assignments, userAttemptScores])
 
   const getStatusIcon = (status: string) => {

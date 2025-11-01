@@ -112,13 +112,11 @@ export default function UserBuilderPage() {
       
       if (result.success && result.data.user) {
         const user = result.data.user
-        validation.setValues({
-          name: user.name || '',
-          job: user.job || '',
-          email: user.email || '',
-          password: '', // New password field
-          role: user.role || ''
-        })
+        validation.setValue('name', user.name || '')
+        validation.setValue('job', user.job || '')
+        validation.setValue('email', user.email || '')
+        validation.setValue('password', '') // New password field
+        validation.setValue('role', user.role || 'employee')
         setError(null)
       } else {
         setError('Failed to load user data')

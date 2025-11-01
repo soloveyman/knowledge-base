@@ -79,7 +79,10 @@ export default function QuestionEditor({
 
   useEffect(() => {
     if (question) {
-      setFormData(question)
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setFormData(question)
+      }, 0)
     }
   }, [question])
 

@@ -145,7 +145,7 @@ function AssignmentBuilderPageContent() {
   const hasLoadedAssignmentRef = useRef(false)
   const lastEditingIdRef = useRef<string | null>(null)
 
-  const loadAssignmentForEditingRef = useRef<(assignmentId: string) => Promise<void>>(null as any)
+  const loadAssignmentForEditingRef = useRef<((assignmentId: string) => Promise<void>) | null>(null)
   
   // Store the latest loadAssignmentForEditing function in a ref
   const loadAssignmentForEditing = useCallback(async (assignmentId: string) => {

@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     if (!grokResponse || !grokResponse.ok) {
-      let errorBody = lastError || 'All models failed'
+      const errorBody = lastError || 'All models failed'
       console.error(`Grok API error: All models failed. Last error: ${errorBody}`)
       console.error(`All errors by model:`, JSON.stringify(errorsByModel, null, 2))
       

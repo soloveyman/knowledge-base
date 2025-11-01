@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -74,11 +74,7 @@ export default function SubscriptionManager({
   const [usage, setUsage] = useState<Usage | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadSubscriptionData()
-  }, [])
-
-  const loadSubscriptionData = async () => {
+  const loadSubscriptionData = useCallback(async () => {
     try {
       const response = await fetch('/api/subscription')
       const result = await response.json()
@@ -99,7 +95,11 @@ export default function SubscriptionManager({
       setCurrentSubscription(null)
       setUsage(null)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadSubscriptionData()
+  }, [loadSubscriptionData])
 
   const formatPrice = (price: number, currency: string) => {
     if (price === 0) return 'Free'
@@ -273,7 +273,7 @@ export default function SubscriptionManager({
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
-                You've reached your user limit. Upgrade your plan to add more users.
+                You&apos;ve reached your user limit. Upgrade your plan to add more users.
               </AlertDescription>
             </Alert>
           )}
@@ -282,7 +282,7 @@ export default function SubscriptionManager({
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
-                You've reached your monthly import limit. Upgrade your plan for more imports.
+                You&apos;ve reached your monthly import limit. Upgrade your plan for more imports.
               </AlertDescription>
             </Alert>
           )}
@@ -291,7 +291,7 @@ export default function SubscriptionManager({
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
-                You've reached your monthly AI generation limit. Upgrade your plan for more generations.
+                You&apos;ve reached your monthly AI generation limit. Upgrade your plan for more generations.
               </AlertDescription>
             </Alert>
           )}
@@ -300,7 +300,7 @@ export default function SubscriptionManager({
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                You're approaching your user limit. Consider upgrading your plan.
+                You&apos;re approaching your user limit. Consider upgrading your plan.
               </AlertDescription>
             </Alert>
           )}
@@ -387,7 +387,7 @@ export default function SubscriptionManager({
                 <div>
                   <h4 className="font-medium">Ready to upgrade?</h4>
                   <p className="text-sm text-gray-600">
-                    You'll be charged immediately and your new plan will be active right away.
+                    You&apos;ll be charged immediately and your new plan will be active right away.
                   </p>
                 </div>
                 <Button onClick={handleUpgrade}>

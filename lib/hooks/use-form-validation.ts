@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { validate, validateField, ValidationSchema } from '@/lib/validation'
 
 /**
@@ -19,49 +19,72 @@ export function useFormValidation<T extends Record<string, unknown>>(
   const errorsRef = useRef(errors)
   const touchedRef = useRef(touched)
   
-  // Keep refs in sync with state
-  valuesRef.current = values
-  errorsRef.current = errors
-  touchedRef.current = touched
+  // Keep refs in sync with state - use useEffect to avoid updating refs during render
+  useEffect(() => {
+    valuesRef.current = values
+    errorsRef.current = errors
+    touchedRef.current = touched
+  }, [values, errors, touched])
 
   /**
    * Update a single field value - simplified, no auto-validation
    */
   const setValue = useCallback(
     (field: keyof T, value: T[keyof T]) => {
-      setValues(prev => ({ ...prev, [field]: value }))
+      setValues((prev) => ({
+        ...prev,
+        [field]: value,
+      }))
     },
-    [] // No dependencies - stable
+    []
   )
 
   /**
-   * Mark a field as touched
+   * Set touched state for a field
    */
-  const setFieldTouched = useCallback((field: keyof T) => {
-    setTouched(prev => (prev[field] ? prev : { ...prev, [field]: true }))
+  const setFieldTouched = useCallback((field: keyof T, isTouched = true) => {
+    setTouched((prev) => ({
+      ...prev,
+      [field]: isTouched,
+    }))
   }, [])
 
   /**
    * Validate a single field
    */
-  const validateSingleField = useCallback(
-    (field: keyof T) => {
-      const rules = schema[field]
-      if (!rules) return true
-
-      const value = valuesRef.current[field]
-      const error = validateField(value, rules)
-      
-      if (error) {
-        setErrors(prev => ({ ...prev, [field]: error }))
-        return false
-      } else {
-        setErrors(prev => {
-          const next = { ...prev }
-          delete next[field]
-          return next
+  const validateFieldValue = useCallback(
+    (field: keyof T): string | undefined => {
+      // Get rules for this field from schema
+      const fieldRules = schema[field]
+      if (!fieldRules || fieldRules.length === 0) {
+        // No rules, clear any existing error
+        setErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[field]
+          return newErrors
         })
-        return true
+        return undefined
+      }
+      
+      // Get current value for this field
+      const fieldValue = valuesRef.current[field]
+      
+      // Validate using validateField function
+      const fieldError = validateField(fieldValue, fieldRules)
+      
+      if (fieldError) {
+        setErrors((prev) => ({
+          ...prev,
+          [field]: fieldError,
+        }))
+        return fieldError
+      } else {
+        setErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[field]
+          return newErrors
+        })
+        return undefined
       }
     },
     [schema]
@@ -70,21 +93,16 @@ export function useFormValidation<T extends Record<string, unknown>>(
   /**
    * Validate all fields
    */
-  const validateAll = useCallback(() => {
-    const result = validate(valuesRef.current, schema)
-    setErrors(result.errors)
-    
+  const validateAll = useCallback((): boolean => {
+    const validationResult = validate(valuesRef.current, schema)
     // Mark all fields as touched
-    const allTouched = Object.keys(schema).reduce(
-      (acc, key) => {
-        acc[key as keyof T] = true
-        return acc
-      },
-      {} as Partial<Record<keyof T, boolean>>
-    )
+    const allTouched: Partial<Record<keyof T, boolean>> = {}
+    Object.keys(valuesRef.current).forEach((key) => {
+      allTouched[key as keyof T] = true
+    })
     setTouched(allTouched)
-    
-    return result.isValid
+
+    return validationResult.isValid
   }, [schema])
 
   /**
@@ -97,23 +115,37 @@ export function useFormValidation<T extends Record<string, unknown>>(
   }, [initialValues])
 
   /**
-   * Update multiple values at once
+   * Reset errors only
    */
-  const setValuesBulk = useCallback((newValues: Partial<T>) => {
-    setValues(prev => ({ ...prev, ...newValues }))
+  const resetErrors = useCallback(() => {
+    setErrors({})
   }, [])
 
-  // Memoize return object to prevent reference changes when values haven't changed
-  // This prevents infinite loops from components that depend on the validation object
-  return useMemo(() => ({
+  /**
+   * Check if form is valid
+   */
+  const isValid = useMemo(() => {
+    return Object.keys(errors).length === 0
+  }, [errors])
+
+  /**
+   * Check if form has been touched
+   */
+  const isTouched = useMemo(() => {
+    return Object.keys(touched).length > 0
+  }, [touched])
+
+  return {
     values,
     errors,
     touched,
+    isValid,
+    isTouched,
     setValue,
     setFieldTouched,
-    validateField: validateSingleField,
+    validateField: validateFieldValue,
     validateAll,
     reset,
-    setValues: setValuesBulk
-  }), [values, errors, touched, setValue, setFieldTouched, validateSingleField, validateAll, reset, setValuesBulk])
+    resetErrors,
+  }
 }

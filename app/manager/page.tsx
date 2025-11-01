@@ -787,7 +787,7 @@ function ManagerPageInner() {
                 const test = a.testId ? savedTests.find(t => t.id === a.testId) : null
                 
                 // Map assigned users from the users array
-                const assignedUsers = (a.users || []).map((user: any) => {
+                const assignedUsers = (a.users || []).map((user: AssignedUser) => {
                   // Find the full user details from savedUsers
                   const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
                   return {

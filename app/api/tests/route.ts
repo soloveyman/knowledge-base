@@ -385,7 +385,7 @@ export async function POST(request: Request) {
     } catch (insertError: unknown) {
       // If insert fails due to missing columns, try without new columns
       // Drizzle errors can be deeply nested, so we need to check all levels
-      let errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
+      const errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
       let errorCause = (insertError as any)?.cause
       let nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
       

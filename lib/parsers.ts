@@ -963,7 +963,6 @@ function isDayOfWeekHeading(line: string): boolean {
   
   // Normalize line - remove trailing punctuation but keep for matching
   const normalized = line.trim()
-  const lineLower = normalized.toLowerCase()
   
   // Russian days of the week (case-insensitive)
   const russianDays = [

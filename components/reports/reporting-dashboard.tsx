@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -69,11 +69,7 @@ export default function ReportingDashboard() {
   const [selectedModule, setSelectedModule] = useState<string>('all')
   const [isExporting, setIsExporting] = useState(false)
 
-  useEffect(() => {
-    loadReportData()
-  }, [filters])
-
-  const loadReportData = async () => {
+  const loadReportData = useCallback(async () => {
     try {
       const response = await fetch('/api/reports/dashboard')
       const result = await response.json()
@@ -91,7 +87,11 @@ export default function ReportingDashboard() {
       setReportData([])
       setEmployeeProgress([])
     }
-  }
+  }, [filters])
+
+  useEffect(() => {
+    loadReportData()
+  }, [loadReportData])
 
   const handleFilterChange = (field: keyof ReportFilters, value: ReportFilters[keyof ReportFilters]) => {
     setFilters(prev => ({
