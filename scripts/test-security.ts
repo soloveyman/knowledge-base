@@ -7,7 +7,7 @@
  * Or: tsx scripts/test-security.ts
  */
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
+const SECURITY_TEST_SECURITY_TEST_BASE_URL = process.env.SECURITY_TEST_BASE_URL || 'http://localhost:3000'
 
 interface TestResult {
   name: string
@@ -44,7 +44,7 @@ async function testRateLimit(endpoint: string, maxRequests: number): Promise<boo
     
     // Make requests up to the limit
     for (let i = 1; i <= maxRequests; i++) {
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
+      const response = await fetch(`${SECURITY_TEST_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -65,7 +65,7 @@ async function testRateLimit(endpoint: string, maxRequests: number): Promise<boo
     }
     
     // Make one more request - should be rate limited
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    const response = await fetch(`${SECURITY_TEST_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -95,7 +95,7 @@ async function testSecurityHeaders(): Promise<boolean> {
   try {
     log('Testing security headers', 'info')
     
-    const response = await fetch(`${BASE_URL}/`)
+    const response = await fetch(`${SECURITY_TEST_BASE_URL}/`)
     const headers = {
       'strict-transport-security': response.headers.get('strict-transport-security'),
       'x-frame-options': response.headers.get('x-frame-options'),
@@ -125,7 +125,7 @@ async function testApiRateLimit(): Promise<boolean> {
     // Make a few requests to any API endpoint
     // Note: This will fail auth but should still respect rate limits
     for (let i = 1; i <= 5; i++) {
-      const response = await fetch(`${BASE_URL}/api/users`, {
+      const response = await fetch(`${SECURITY_TEST_BASE_URL}/api/users`, {
         method: 'GET',
       })
       
@@ -134,7 +134,7 @@ async function testApiRateLimit(): Promise<boolean> {
     }
     
     // Check if rate limit headers are present
-    const response = await fetch(`${BASE_URL}/api/users`, {
+    const response = await fetch(`${SECURITY_TEST_BASE_URL}/api/users`, {
       method: 'GET',
     })
     
@@ -181,7 +181,7 @@ async function testHoneypot(): Promise<boolean> {
     log('Testing honeypot field', 'info')
     
     // Test that honeypot field exists in the signin page
-    const response = await fetch(`${BASE_URL}/auth/signin`)
+    const response = await fetch(`${SECURITY_TEST_BASE_URL}/auth/signin`)
     const html = await response.text()
     
     // Check for honeypot field indicators
@@ -252,11 +252,11 @@ async function testLint(): Promise<boolean> {
 
 async function main() {
   console.log('\n🔒 Security & Rate Limiting Test Suite\n')
-  console.log(`Testing against: ${BASE_URL}\n`)
+  console.log(`Testing against: ${SECURITY_TEST_BASE_URL}\n`)
   
   // Check if server is running
   try {
-    const healthCheck = await fetch(`${BASE_URL}/api/health`).catch(() => null)
+    const healthCheck = await fetch(`${SECURITY_TEST_BASE_URL}/api/health`).catch(() => null)
     if (!healthCheck) {
       log('⚠️  Server may not be running. Start with: npm run dev', 'warn')
       log('⚠️  Some tests may fail if server is not running\n', 'warn')

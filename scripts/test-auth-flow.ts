@@ -11,7 +11,8 @@
  * 2. Ensure database is running
  */
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
+// Wrap in function scope to avoid redeclaration errors when multiple test files are checked
+const AUTH_TEST_BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
 const TEST_EMAIL = `test-${Date.now()}@test.com`
 const TEST_PASSWORD = 'testpassword123'
 const TEST_NAME = 'Test User'
@@ -47,7 +48,7 @@ function addResult(name: string, passed: boolean, error?: string, details?: stri
 
 async function checkServerRunning(): Promise<boolean> {
   try {
-    const response = await fetch(`${BASE_URL}/api/health`)
+    const response = await fetch(`${AUTH_TEST_BASE_URL}/api/health`)
     return response.ok
   } catch {
     return false
@@ -58,7 +59,7 @@ async function testRegistration(): Promise<{ success: boolean; userId?: string; 
   try {
     log(`Testing registration with email: ${TEST_EMAIL}`, 'info')
     
-    const response = await fetch(`${BASE_URL}/api/auth/register`, {
+    const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -93,7 +94,7 @@ async function testRegistrationWithExistingEmail(email: string): Promise<boolean
   try {
     log(`Testing registration with existing email: ${email}`, 'info')
     
-    const response = await fetch(`${BASE_URL}/api/auth/register`, {
+    const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -124,7 +125,7 @@ async function testLogin(email: string, password: string): Promise<{ success: bo
   try {
     log(`Testing login with email: ${email}`, 'info')
     
-    const response = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
+    const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/callback/credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -140,7 +141,7 @@ async function testLogin(email: string, password: string): Promise<{ success: bo
       log(`  Login successful (status: ${response.status})`, 'success')
       
       // Check session
-      const sessionResponse = await fetch(`${BASE_URL}/api/auth/session`, {
+      const sessionResponse = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/session`, {
         credentials: 'include'
       })
       
@@ -170,7 +171,7 @@ async function testInvalidLogin(): Promise<boolean> {
   try {
     log(`Testing login with invalid credentials`, 'info')
     
-    const response = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
+    const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/callback/credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -210,7 +211,7 @@ async function testRateLimitRegistration(): Promise<boolean> {
     // Make 6 rapid registration attempts (limit is 5)
     let rateLimited = false
     for (let i = 1; i <= 6; i++) {
-      const response = await fetch(`${BASE_URL}/api/auth/register`, {
+      const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,7 +286,7 @@ async function testRegistrationValidation(): Promise<boolean> {
 
 async function main() {
   console.log('\n🔐 Authentication Flow Test Suite\n')
-  console.log(`Testing against: ${BASE_URL}\n`)
+  console.log(`Testing against: ${AUTH_TEST_BASE_URL}\n`)
   
   // Check if server is running
   log('Checking if server is running...', 'info')
