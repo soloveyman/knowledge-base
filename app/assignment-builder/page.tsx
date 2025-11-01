@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { useEffect, useState, useCallback, useRef, useMemo } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -99,7 +99,7 @@ interface Assignment {
   status: string
 }
 
-export default function AssignmentBuilderPage() {
+function AssignmentBuilderPageContent() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
   const router = useRouter()
@@ -145,7 +145,7 @@ export default function AssignmentBuilderPage() {
   const hasLoadedAssignmentRef = useRef(false)
   const lastEditingIdRef = useRef<string | null>(null)
 
-  const loadAssignmentForEditingRef = useRef<(assignmentId: string) => Promise<void>>()
+  const loadAssignmentForEditingRef = useRef<(assignmentId: string) => Promise<void>>(null as any)
   
   // Store the latest loadAssignmentForEditing function in a ref
   const loadAssignmentForEditing = useCallback(async (assignmentId: string) => {
@@ -509,7 +509,7 @@ export default function AssignmentBuilderPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
           {/* Configuration Panel */}
           <div className="space-y-3 md:space-y-6">
@@ -736,5 +736,17 @@ export default function AssignmentBuilderPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function AssignmentBuilderPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    }>
+      <AssignmentBuilderPageContent />
+    </Suspense>
   )
 }
