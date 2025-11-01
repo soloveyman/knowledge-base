@@ -225,7 +225,7 @@ export const translations = {
     ready: "Ready",
     uploaded: "Uploaded",
     // Sign In Page
-    knowledgeBasePlatform: "Knowledge Base Platform",
+    knowledgeBasePlatform: "Uppstaff",
     signInToAccess: "Sign in to access your learning management system",
     email: "Email",
     enterYourEmail: "Enter your email",
@@ -618,7 +618,7 @@ export const translations = {
     ready: "Готов",
     uploaded: "Загружено",
     // Sign In Page
-    knowledgeBasePlatform: "Платформа базы знаний",
+    knowledgeBasePlatform: "Uppstaff",
     signInToAccess: "Войдите в систему для доступа к вашей системе управления обучением",
     email: "Email",
     enterYourEmail: "Введите ваш email",

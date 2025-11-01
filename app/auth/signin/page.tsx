@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, Building2, Eye, EyeOff } from "lucide-react"
+import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 
 export default function SignInPage() {
@@ -103,9 +103,6 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] p-4">
       <Card className="w-full max-w-md bg-card/95 border-border">
         <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
-            <Building2 className="h-12 w-12 text-primary" />
-          </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl font-bold">{t('knowledgeBasePlatform')}</CardTitle>
             <CardDescription>
