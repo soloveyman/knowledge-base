@@ -1,8 +1,8 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,8 +15,6 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ErrorMessage } from "@/components/common/error-message"
 import { useTranslation } from "@/lib/translation-context"
-import { useFormValidation } from "@/lib/hooks/use-form-validation"
-import { validationRules } from "@/lib/validation"
 import { FormField } from "@/components/common/form-field"
 import { toast } from "sonner"
 import { 
@@ -105,27 +103,29 @@ export default function AssignmentBuilderPage() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   
-  const initialConfig = {
+  // Simple state management - no validation hook
+  const [assignmentConfig, setAssignmentConfig] = useState<AssignmentConfig>({
     name: "",
     documentId: "",
     testId: "",
-    selectedUsers: [] as string[],
-    dueDate: undefined as Date | undefined,
+    selectedUsers: [],
+    dueDate: undefined,
     description: ""
-  } satisfies AssignmentConfig
-
-  const validation = useFormValidation({
-    name: [validationRules.required, validationRules.minLength(3), validationRules.maxLength(200)],
-    documentId: [validationRules.required],
-    selectedUsers: [validationRules.minItems(1)],
-    description: [validationRules.optional(validationRules.maxLength(1000))],
-    testId: [], // Optional
-    dueDate: [validationRules.optional(validationRules.futureDate)] // Optional, but if provided must be future
-  }, initialConfig)
-
-  const assignmentConfig = validation.values
-  const { setValue, setFieldTouched, validateAll, validateField, errors, touched } = validation
+  })
+  
+  // Helper to update a single field
+  const setValue = useCallback((field: keyof AssignmentConfig, value: AssignmentConfig[keyof AssignmentConfig]) => {
+    setAssignmentConfig(prev => ({ ...prev, [field]: value }))
+  }, [])
+  
+  // Helper to update multiple fields
+  const setValues = useCallback((newValues: Partial<AssignmentConfig>) => {
+    setAssignmentConfig(prev => ({ ...prev, ...newValues }))
+  }, [])
+  
   
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedUsers, setSavedUsers] = useState<User[]>([])
@@ -142,26 +142,13 @@ export default function AssignmentBuilderPage() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
+  const hasLoadedAssignmentRef = useRef(false)
+  const lastEditingIdRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (status === "loading") return
-    
-    if (!session) {
-      router.push("/auth/signin")
-      return
-    }
-
-    // Check if we're in edit mode via URL parameter
-    const urlParams = new URLSearchParams(window.location.search)
-    const editingId = urlParams.get('edit')
-    if (editingId) {
-      setIsEditMode(true)
-      setEditingAssignmentId(editingId)
-      loadAssignmentForEditing(editingId)
-    }
-  }, [session, status, router])
-
-  const loadAssignmentForEditing = async (assignmentId: string) => {
+  const loadAssignmentForEditingRef = useRef<(assignmentId: string) => Promise<void>>()
+  
+  // Store the latest loadAssignmentForEditing function in a ref
+  const loadAssignmentForEditing = useCallback(async (assignmentId: string) => {
     try {
       const response = await fetch(`/api/assignments/${assignmentId}`)
       const result = await response.json()
@@ -196,7 +183,16 @@ export default function AssignmentBuilderPage() {
         }
         
         // Load assignment configuration
-        validation.setValues({
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AssignmentBuilder] loadAssignmentForEditing: Calling setValues', {
+            assignmentId,
+            name: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`,
+            documentId,
+            testId: assignment.testId || '',
+            selectedUsersCount: allUserIds.length
+          })
+        }
+        setValues({
           name: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use title if exists, otherwise ID
           documentId: documentId,
           testId: assignment.testId || '',
@@ -204,12 +200,70 @@ export default function AssignmentBuilderPage() {
           dueDate: assignment.dueDate ? new Date(assignment.dueDate) : undefined,
           description: assignment.description || '' // Load the actual description
         })
+        hasLoadedAssignmentRef.current = true
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AssignmentBuilder] loadAssignmentForEditing: setValues completed')
+        }
       }
     } catch (error) {
       console.error('Error loading assignment for editing:', error)
       setError('Failed to load assignment for editing')
     }
-  }
+  }, [setValues, pathname])
+
+  // Store the latest function in the ref - use useEffect to avoid render-phase side effects
+  useEffect(() => {
+    loadAssignmentForEditingRef.current = loadAssignmentForEditing
+  }, [loadAssignmentForEditing])
+
+  // Handle auth check
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      router.push("/auth/signin")
+      return
+    }
+  }, [session, status, router])
+
+  // Memoize editingId to prevent unnecessary effect runs
+  const editingId = useMemo(() => searchParams.get('edit'), [searchParams])
+
+  // Handle edit mode - track URL changes
+  useEffect(() => {
+    if (status === "loading") {
+      return
+    }
+    if (!session) {
+      return
+    }
+    
+    // Only process if editingId value actually changed
+    if (editingId === lastEditingIdRef.current) {
+      return
+    }
+    
+    const previousEditingId = lastEditingIdRef.current
+    lastEditingIdRef.current = editingId
+    
+    // Check if we're in edit mode via URL parameter
+    if (editingId) {
+      // Only load if we haven't loaded this assignment yet or it's a different assignment
+      if (!hasLoadedAssignmentRef.current || previousEditingId !== editingId) {
+        hasLoadedAssignmentRef.current = true
+        setIsEditMode(true)
+        setEditingAssignmentId(editingId)
+        if (loadAssignmentForEditingRef.current) {
+          loadAssignmentForEditingRef.current(editingId)
+        }
+      }
+    } else if (previousEditingId) {
+      // Reset edit mode if no edit parameter
+      hasLoadedAssignmentRef.current = false
+      setIsEditMode(false)
+      setEditingAssignmentId(null)
+    }
+  }, [session, status, pathname, editingId]) // Use memoized editingId
 
   useEffect(() => {
     // Load tests from API
@@ -278,31 +332,21 @@ export default function AssignmentBuilderPage() {
       ? assignmentConfig.selectedUsers.filter(id => id !== userId)
       : [...assignmentConfig.selectedUsers, userId]
     setValue('selectedUsers', newUsers)
-    // Validate immediately after change if touched
-    if (touched.selectedUsers) {
-      validateField('selectedUsers')
-    }
   }
 
   const handleSelectAllUsers = () => {
     const allUserIds = savedUsers.filter(user => user.role === 'employee').map(user => user.id)
     setValue('selectedUsers', allUserIds)
-    if (touched.selectedUsers) {
-      validateField('selectedUsers')
-    }
   }
 
   const handleDeselectAllUsers = () => {
     setValue('selectedUsers', [])
-    if (touched.selectedUsers) {
-      validateField('selectedUsers')
-    }
   }
 
   const handleCreateAssignment = async () => {
-    // Validate all fields before submission
-    if (!validateAll()) {
-      setError("Please fix the errors below")
+    // Basic validation - check required fields
+    if (!assignmentConfig.name.trim() || !assignmentConfig.documentId || assignmentConfig.selectedUsers.length === 0) {
+      setError("Please fill in all required fields")
       return
     }
 
@@ -479,26 +523,22 @@ export default function AssignmentBuilderPage() {
                 <FormField
                   label={t('assignmentName')}
                   required
-                  error={touched.name ? errors.name : undefined}
                 >
                   <Input
                     placeholder={t('enterAssignmentName')}
                     value={assignmentConfig.name}
                     onChange={(e) => setValue('name', e.target.value)}
-                    onBlur={() => setFieldTouched('name')}
                     className="w-full"
                   />
                 </FormField>
 
                 <FormField
                   label={t('descriptionOptional')}
-                  error={touched.description ? errors.description : undefined}
                 >
                   <Input
                     placeholder={t('enterAssignmentDescription')}
                     value={assignmentConfig.description}
                     onChange={(e) => setValue('description', e.target.value)}
-                    onBlur={() => setFieldTouched('description')}
                     className="w-full"
                   />
                 </FormField>
@@ -506,14 +546,10 @@ export default function AssignmentBuilderPage() {
                 <FormField
                   label={t('selectDocument')}
                   required
-                  error={touched.documentId ? errors.documentId : undefined}
                 >
                   <Select 
                     value={assignmentConfig.documentId} 
-                    onValueChange={(value) => {
-                      setValue('documentId', value)
-                      setFieldTouched('documentId')
-                    }}
+                    onValueChange={(value) => setValue('documentId', value)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={t('chooseDocument')} />
@@ -535,7 +571,7 @@ export default function AssignmentBuilderPage() {
                   label={t('selectTestOptional')}
                 >
                   <Select 
-                    value={assignmentConfig.testId} 
+                    value={assignmentConfig.testId || ""} 
                     onValueChange={(value) => setValue('testId', value)}
                   >
                     <SelectTrigger className="w-full">
@@ -560,7 +596,6 @@ export default function AssignmentBuilderPage() {
 
                 <FormField
                   label={t('dueDateOptional')}
-                  error={touched.dueDate ? errors.dueDate : undefined}
                 >
                   <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
@@ -568,10 +603,8 @@ export default function AssignmentBuilderPage() {
                         variant="outline"
                         className={cn(
                           "w-full justify-between text-left font-normal relative",
-                          !assignmentConfig.dueDate && "text-muted-foreground",
-                          touched.dueDate && errors.dueDate && "border-destructive"
+                          !assignmentConfig.dueDate && "text-muted-foreground"
                         )}
-                        onClick={() => setFieldTouched('dueDate')}
                       >
                         <div className="flex items-center">
                           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -583,7 +616,6 @@ export default function AssignmentBuilderPage() {
                             onClick={(e) => {
                               e.stopPropagation()
                               setValue('dueDate', undefined)
-                              setFieldTouched('dueDate')
                             }}
                           />
                         )}
@@ -596,7 +628,6 @@ export default function AssignmentBuilderPage() {
                         onSelect={(date) => {
                           setValue('dueDate', date)
                           setIsCalendarOpen(false)
-                          setFieldTouched('dueDate')
                         }}
                         disabled={(date) => date < new Date()}
                         initialFocus
@@ -608,7 +639,7 @@ export default function AssignmentBuilderPage() {
                 <div className="pt-4">
                   <Button 
                     onClick={handleCreateAssignment}
-                    disabled={isCreating || !validateAll()}
+                    disabled={isCreating || !assignmentConfig.name.trim() || !assignmentConfig.documentId || assignmentConfig.selectedUsers.length === 0}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     {isCreating ? (
@@ -642,9 +673,6 @@ export default function AssignmentBuilderPage() {
                     <CardDescription>
                       {t('chooseEmployeesToAssign')}
                     </CardDescription>
-                    {touched.selectedUsers && errors.selectedUsers && (
-                      <p className="text-sm text-red-600 mt-1">{errors.selectedUsers}</p>
-                    )}
                   </div>
                   <div className="flex space-x-2">
                     <Button

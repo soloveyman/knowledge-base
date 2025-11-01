@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useCallback } from 'react'
-import { validate, validateField, ValidationSchema, ValidationRule } from '@/lib/validation'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import { validate, validateField, ValidationSchema } from '@/lib/validation'
 
 /**
- * Custom hook for form validation
+ * Custom hook for form validation - simplified for stability
  */
 export function useFormValidation<T extends Record<string, unknown>>(
   schema: ValidationSchema<T>,
@@ -13,52 +13,33 @@ export function useFormValidation<T extends Record<string, unknown>>(
   const [values, setValues] = useState<T>(initialValues)
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({})
   const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({})
+  
+  // Use refs to access current state in callbacks without dependencies
+  const valuesRef = useRef(values)
+  const errorsRef = useRef(errors)
+  const touchedRef = useRef(touched)
+  
+  // Keep refs in sync with state
+  valuesRef.current = values
+  errorsRef.current = errors
+  touchedRef.current = touched
 
   /**
-   * Update a single field value
+   * Update a single field value - simplified, no auto-validation
    */
   const setValue = useCallback(
     (field: keyof T, value: T[keyof T]) => {
       setValues(prev => ({ ...prev, [field]: value }))
-      
-      // Clear error when user starts typing (if field was touched)
-      if (errors[field] && touched[field]) {
-        const rules = schema[field]
-        if (rules) {
-          const error = validateField(value, rules)
-          if (error) {
-            setErrors(prev => ({ ...prev, [field]: error }))
-          } else {
-            setErrors(prev => {
-              const next = { ...prev }
-              delete next[field]
-              return next
-            })
-          }
-        }
-      }
     },
-    [errors, touched, schema]
+    [] // No dependencies - stable
   )
 
   /**
-   * Mark a field as touched (user has interacted with it)
+   * Mark a field as touched
    */
   const setFieldTouched = useCallback((field: keyof T) => {
-    if (!touched[field]) {
-      setTouched(prev => ({ ...prev, [field]: true }))
-      
-      // Validate field when it's first touched
-      const rules = schema[field]
-      if (rules) {
-        const value = values[field]
-        const error = validateField(value, rules)
-        if (error) {
-          setErrors(prev => ({ ...prev, [field]: error }))
-        }
-      }
-    }
-  }, [touched, schema, values])
+    setTouched(prev => (prev[field] ? prev : { ...prev, [field]: true }))
+  }, [])
 
   /**
    * Validate a single field
@@ -66,11 +47,9 @@ export function useFormValidation<T extends Record<string, unknown>>(
   const validateSingleField = useCallback(
     (field: keyof T) => {
       const rules = schema[field]
-      if (!rules) {
-        return true
-      }
+      if (!rules) return true
 
-      const value = values[field]
+      const value = valuesRef.current[field]
       const error = validateField(value, rules)
       
       if (error) {
@@ -85,14 +64,14 @@ export function useFormValidation<T extends Record<string, unknown>>(
         return true
       }
     },
-    [values, schema]
+    [schema]
   )
 
   /**
    * Validate all fields
    */
   const validateAll = useCallback(() => {
-    const result = validate(values, schema)
+    const result = validate(valuesRef.current, schema)
     setErrors(result.errors)
     
     // Mark all fields as touched
@@ -106,7 +85,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
     setTouched(allTouched)
     
     return result.isValid
-  }, [values, schema])
+  }, [schema])
 
   /**
    * Reset form to initial values
@@ -124,7 +103,9 @@ export function useFormValidation<T extends Record<string, unknown>>(
     setValues(prev => ({ ...prev, ...newValues }))
   }, [])
 
-  return {
+  // Memoize return object to prevent reference changes when values haven't changed
+  // This prevents infinite loops from components that depend on the validation object
+  return useMemo(() => ({
     values,
     errors,
     touched,
@@ -134,5 +115,5 @@ export function useFormValidation<T extends Record<string, unknown>>(
     validateAll,
     reset,
     setValues: setValuesBulk
-  }
+  }), [values, errors, touched, setValue, setFieldTouched, validateSingleField, validateAll, reset, setValuesBulk])
 }
