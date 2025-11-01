@@ -141,7 +141,7 @@ export default function SignInPage() {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] px-4 py-8 md:py-12">
+    <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] px-4 py-8 md:py-12 pb-16 md:pb-20">
       <Card className="w-full max-w-md bg-card/95 border-border">
         <CardHeader className="text-center space-y-4">
           <div className="space-y-2">
@@ -151,7 +151,7 @@ export default function SignInPage() {
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pb-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
