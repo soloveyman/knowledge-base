@@ -7,18 +7,18 @@
  * Or: tsx scripts/test-security.ts
  */
 
-const SECURITY_TEST_SECURITY_TEST_BASE_URL = process.env.SECURITY_TEST_BASE_URL || 'http://localhost:3000'
+const SECURITY_TEST_BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
 
-interface TestResult {
+interface SecurityTestResult {
   name: string
   passed: boolean
   error?: string
   details?: string
 }
 
-const results: TestResult[] = []
+const securityTestResults: SecurityTestResult[] = []
 
-function log(message: string, type: 'info' | 'success' | 'error' | 'warn' = 'info') {
+function securityLog(message: string, type: 'info' | 'success' | 'error' | 'warn' = 'info') {
   const symbols = {
     info: 'ℹ️',
     success: '✅',
@@ -28,19 +28,19 @@ function log(message: string, type: 'info' | 'success' | 'error' | 'warn' = 'inf
   console.log(`${symbols[type]} ${message}`)
 }
 
-function addResult(name: string, passed: boolean, error?: string, details?: string) {
-  results.push({ name, passed, error, details })
+function addSecurityResult(name: string, passed: boolean, error?: string, details?: string) {
+  securityTestResults.push({ name, passed, error, details })
   if (passed) {
-    log(`${name}: PASSED`, 'success')
+    securityLog(`${name}: PASSED`, 'success')
   } else {
-    log(`${name}: FAILED${error ? ` - ${error}` : ''}`, 'error')
-    if (details) log(`  Details: ${details}`, 'info')
+    securityLog(`${name}: FAILED${error ? ` - ${error}` : ''}`, 'error')
+    if (details) securityLog(`  Details: ${details}`, 'info')
   }
 }
 
 async function testRateLimit(endpoint: string, maxRequests: number): Promise<boolean> {
   try {
-    log(`Testing rate limit: ${endpoint} (max ${maxRequests} requests)`, 'info')
+    securityLog(`Testing rate limit: ${endpoint} (max ${maxRequests} requests)`, 'info')
     
     // Make requests up to the limit
     for (let i = 1; i <= maxRequests; i++) {
@@ -57,10 +57,10 @@ async function testRateLimit(endpoint: string, maxRequests: number): Promise<boo
       
       if (i <= maxRequests) {
         if (response.status === 429) {
-          log(`  Request ${i}: Rate limited (expected after limit)`, 'info')
+          securityLog(`  Request ${i}: Rate limited (expected after limit)`, 'info')
           break
         }
-        log(`  Request ${i}: Status ${response.status}, Remaining: ${rateLimitRemaining || 'N/A'}`, 'info')
+        securityLog(`  Request ${i}: Status ${response.status}, Remaining: ${rateLimitRemaining || 'N/A'}`, 'info')
       }
     }
     
@@ -79,21 +79,21 @@ async function testRateLimit(endpoint: string, maxRequests: number): Promise<boo
       const limit = response.headers.get('X-RateLimit-Limit')
       const remaining = response.headers.get('X-RateLimit-Remaining')
       
-      log(`  Rate limit triggered correctly (429)`, 'success')
-      log(`  Headers: Limit=${limit}, Remaining=${remaining}, Retry-After=${retryAfter}`, 'info')
+      securityLog(`  Rate limit triggered correctly (429)`, 'success')
+      securityLog(`  Headers: Limit=${limit}, Remaining=${remaining}, Retry-After=${retryAfter}`, 'info')
       return true
     }
     
     return false
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testSecurityHeaders(): Promise<boolean> {
   try {
-    log('Testing security headers', 'info')
+    securityLog('Testing security headers', 'info')
     
     const response = await fetch(`${SECURITY_TEST_BASE_URL}/`)
     const headers = {
@@ -105,22 +105,22 @@ async function testSecurityHeaders(): Promise<boolean> {
       'permissions-policy': response.headers.get('permissions-policy'),
     }
     
-    log(`  Headers received:`, 'info')
+    securityLog(`  Headers received:`, 'info')
     Object.entries(headers).forEach(([key, value]) => {
-      log(`    ${key}: ${value || '❌ MISSING'}`, value ? 'success' : 'error')
+      securityLog(`    ${key}: ${value || '❌ MISSING'}`, value ? 'success' : 'error')
     })
     
     const allPresent = Object.values(headers).every(h => h !== null)
     return allPresent
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testApiRateLimit(): Promise<boolean> {
   try {
-    log('Testing API rate limiting (middleware)', 'info')
+    securityLog('Testing API rate limiting (middleware)', 'info')
     
     // Make a few requests to any API endpoint
     // Note: This will fail auth but should still respect rate limits
@@ -130,7 +130,7 @@ async function testApiRateLimit(): Promise<boolean> {
       })
       
       const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining')
-      log(`  Request ${i}: Status ${response.status}, Remaining: ${rateLimitRemaining || 'N/A'}`, 'info')
+      securityLog(`  Request ${i}: Status ${response.status}, Remaining: ${rateLimitRemaining || 'N/A'}`, 'info')
     }
     
     // Check if rate limit headers are present
@@ -144,41 +144,41 @@ async function testApiRateLimit(): Promise<boolean> {
     
     return hasRateLimitHeaders
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testBuild(): Promise<boolean> {
   try {
-    log('Testing production build', 'info')
+    securityLog('Testing production build', 'info')
     
     // Check if build works without errors
     const { execSync } = await import('child_process')
-    log('  Running: npm run build', 'info')
+    securityLog('  Running: npm run build', 'info')
     
     try {
       execSync('npm run build', { 
         stdio: 'pipe',
         env: { ...process.env, NODE_ENV: 'production' }
       })
-      log('  Build completed successfully', 'success')
+      securityLog('  Build completed successfully', 'success')
       return true
     } catch (error: any) {
-      log(`  Build failed: ${error.message}`, 'error')
-      if (error.stdout) log(`  stdout: ${error.stdout.toString()}`, 'info')
-      if (error.stderr) log(`  stderr: ${error.stderr.toString()}`, 'error')
+      securityLog(`  Build failed: ${error.message}`, 'error')
+      if (error.stdout) securityLog(`  stdout: ${error.stdout.toString()}`, 'info')
+      if (error.stderr) securityLog(`  stderr: ${error.stderr.toString()}`, 'error')
       return false
     }
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testHoneypot(): Promise<boolean> {
   try {
-    log('Testing honeypot field', 'info')
+    securityLog('Testing honeypot field', 'info')
     
     // Test that honeypot field exists in the signin page
     const response = await fetch(`${SECURITY_TEST_BASE_URL}/auth/signin`)
@@ -190,21 +190,21 @@ async function testHoneypot(): Promise<boolean> {
                        html.includes('display: none')
     
     if (hasHoneypot) {
-      log('  Honeypot field detected in HTML', 'success')
+      securityLog('  Honeypot field detected in HTML', 'success')
       return true
     }
     
-    log('  Honeypot field not found', 'error')
+    securityLog('  Honeypot field not found', 'error')
     return false
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testTypeCheck(): Promise<boolean> {
   try {
-    log('Running TypeScript type check', 'info')
+    securityLog('Running TypeScript type check', 'info')
     
     const { execSync } = await import('child_process')
     
@@ -212,23 +212,23 @@ async function testTypeCheck(): Promise<boolean> {
       execSync('npm run typecheck', { 
         stdio: 'pipe'
       })
-      log('  Type check passed', 'success')
+      securityLog('  Type check passed', 'success')
       return true
     } catch (error: any) {
-      log(`  Type check failed: ${error.message}`, 'error')
-      if (error.stdout) log(`  stdout: ${error.stdout.toString()}`, 'info')
-      if (error.stderr) log(`  stderr: ${error.stderr.toString()}`, 'error')
+      securityLog(`  Type check failed: ${error.message}`, 'error')
+      if (error.stdout) securityLog(`  stdout: ${error.stdout.toString()}`, 'info')
+      if (error.stderr) securityLog(`  stderr: ${error.stderr.toString()}`, 'error')
       return false
     }
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testLint(): Promise<boolean> {
   try {
-    log('Running ESLint check', 'info')
+    securityLog('Running ESLint check', 'info')
     
     const { execSync } = await import('child_process')
     
@@ -236,16 +236,16 @@ async function testLint(): Promise<boolean> {
       execSync('npm run lint', { 
         stdio: 'pipe'
       })
-      log('  Lint check passed', 'success')
+      securityLog('  Lint check passed', 'success')
       return true
     } catch (error: any) {
-      log(`  Lint check failed: ${error.message}`, 'error')
-      if (error.stdout) log(`  stdout: ${error.stdout.toString()}`, 'info')
-      if (error.stderr) log(`  stderr: ${error.stderr.toString()}`, 'error')
+      securityLog(`  Lint check failed: ${error.message}`, 'error')
+      if (error.stdout) securityLog(`  stdout: ${error.stdout.toString()}`, 'info')
+      if (error.stderr) securityLog(`  stderr: ${error.stderr.toString()}`, 'error')
       return false
     }
   } catch (error) {
-    log(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    securityLog(`  Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
@@ -258,54 +258,54 @@ async function main() {
   try {
     const healthCheck = await fetch(`${SECURITY_TEST_BASE_URL}/api/health`).catch(() => null)
     if (!healthCheck) {
-      log('⚠️  Server may not be running. Start with: npm run dev', 'warn')
-      log('⚠️  Some tests may fail if server is not running\n', 'warn')
+      securityLog('⚠️  Server may not be running. Start with: npm run dev', 'warn')
+      securityLog('⚠️  Some tests may fail if server is not running\n', 'warn')
     } else {
-      log('✅ Server is running\n', 'success')
+      securityLog('✅ Server is running\n', 'success')
     }
   } catch {
-    log('⚠️  Could not verify server status\n', 'warn')
+    securityLog('⚠️  Could not verify server status\n', 'warn')
   }
   
   // Run all tests
-  log('\n=== Running Tests ===\n', 'info')
+  securityLog('\n=== Running Tests ===\n', 'info')
   
   // Test 1: Type checking
   const typeCheckPassed = await testTypeCheck()
-  addResult('TypeScript Type Check', typeCheckPassed)
+  addSecurityResult('TypeScript Type Check', typeCheckPassed)
   
   // Test 2: Linting
   const lintPassed = await testLint()
-  addResult('ESLint Check', lintPassed)
+  addSecurityResult('ESLint Check', lintPassed)
   
   // Test 3: Security Headers
   const headersPassed = await testSecurityHeaders()
-  addResult('Security Headers', headersPassed)
+  addSecurityResult('Security Headers', headersPassed)
   
   // Test 4: Honeypot Field
   const honeypotPassed = await testHoneypot()
-  addResult('Honeypot Field', honeypotPassed)
+  addSecurityResult('Honeypot Field', honeypotPassed)
   
   // Test 5: Registration Rate Limiting
   const registrationRateLimitPassed = await testRateLimit('/api/auth/register', 5)
-  addResult('Registration Rate Limiting', registrationRateLimitPassed)
+  addSecurityResult('Registration Rate Limiting', registrationRateLimitPassed)
   
   // Test 6: API Rate Limiting (Middleware)
   const apiRateLimitPassed = await testApiRateLimit()
-  addResult('API Rate Limiting (Middleware)', apiRateLimitPassed)
+  addSecurityResult('API Rate Limiting (Middleware)', apiRateLimitPassed)
   
   // Test 7: Production Build
   const buildPassed = await testBuild()
-  addResult('Production Build', buildPassed)
+  addSecurityResult('Production Build', buildPassed)
   
   // Summary
   console.log('\n=== Test Summary ===\n')
   
-  const passed = results.filter(r => r.passed).length
-  const failed = results.filter(r => !r.passed).length
-  const total = results.length
-  
-  results.forEach(result => {
+  const passed = securityTestResults.filter(r => r.passed).length
+  const failed = securityTestResults.filter(r => !r.passed).length
+  const total = securityTestResults.length
+
+  securityTestResults.forEach(result => {
     const icon = result.passed ? '✅' : '❌'
     console.log(`${icon} ${result.name}`)
     if (result.error) {

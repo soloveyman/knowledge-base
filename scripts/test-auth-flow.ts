@@ -17,16 +17,16 @@ const TEST_EMAIL = `test-${Date.now()}@test.com`
 const TEST_PASSWORD = 'testpassword123'
 const TEST_NAME = 'Test User'
 
-interface TestResult {
+interface AuthTestResult {
   name: string
   passed: boolean
   error?: string
   details?: string
 }
 
-const results: TestResult[] = []
+const authTestResults: AuthTestResult[] = []
 
-function log(message: string, type: 'info' | 'success' | 'error' | 'warn' = 'info') {
+function authLog(message: string, type: 'info' | 'success' | 'error' | 'warn' = 'info') {
   const symbols = {
     info: 'ℹ️',
     success: '✅',
@@ -36,13 +36,13 @@ function log(message: string, type: 'info' | 'success' | 'error' | 'warn' = 'inf
   console.log(`${symbols[type]} ${message}`)
 }
 
-function addResult(name: string, passed: boolean, error?: string, details?: string) {
-  results.push({ name, passed, error, details })
+function addAuthResult(name: string, passed: boolean, error?: string, details?: string) {
+  authTestResults.push({ name, passed, error, details })
   if (passed) {
-    log(`${name}: PASSED`, 'success')
+    authLog(`${name}: PASSED`, 'success')
   } else {
-    log(`${name}: FAILED${error ? ` - ${error}` : ''}`, 'error')
-    if (details) log(`  Details: ${details}`, 'info')
+    authLog(`${name}: FAILED${error ? ` - ${error}` : ''}`, 'error')
+    if (details) authLog(`  Details: ${details}`, 'info')
   }
 }
 
@@ -57,7 +57,7 @@ async function checkServerRunning(): Promise<boolean> {
 
 async function testRegistration(): Promise<{ success: boolean; userId?: string; error?: string }> {
   try {
-    log(`Testing registration with email: ${TEST_EMAIL}`, 'info')
+    authLog(`Testing registration with email: ${TEST_EMAIL}`, 'info')
     
     const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
       method: 'POST',
@@ -73,26 +73,26 @@ async function testRegistration(): Promise<{ success: boolean; userId?: string; 
     
     if (!response.ok) {
       const errorMsg = data.error || `Registration failed: ${response.status} ${response.statusText}`
-      log(`  Registration failed: ${errorMsg}`, 'error')
+      authLog(`  Registration failed: ${errorMsg}`, 'error')
       return { success: false, error: errorMsg }
     }
     
     if (data.success && data.id) {
-      log(`  Registration successful! User ID: ${data.id}`, 'success')
+      authLog(`  Registration successful! User ID: ${data.id}`, 'success')
       return { success: true, userId: data.id }
     }
     
     return { success: false, error: 'Registration response missing success or id' }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    log(`  Registration error: ${errorMsg}`, 'error')
+    authLog(`  Registration error: ${errorMsg}`, 'error')
     return { success: false, error: errorMsg }
   }
 }
 
 async function testRegistrationWithExistingEmail(email: string): Promise<boolean> {
   try {
-    log(`Testing registration with existing email: ${email}`, 'info')
+    authLog(`Testing registration with existing email: ${email}`, 'info')
     
     const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
       method: 'POST',
@@ -108,22 +108,22 @@ async function testRegistrationWithExistingEmail(email: string): Promise<boolean
     
     // Should return 409 (Conflict) or handle gracefully
     if (response.status === 409 || (data.success && data.existing)) {
-      log(`  Correctly handled existing email (status: ${response.status})`, 'success')
+      authLog(`  Correctly handled existing email (status: ${response.status})`, 'success')
       return true
     }
     
-    log(`  Unexpected response: ${response.status}`, 'error')
+    authLog(`  Unexpected response: ${response.status}`, 'error')
     return false
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    log(`  Error: ${errorMsg}`, 'error')
+    authLog(`  Error: ${errorMsg}`, 'error')
     return false
   }
 }
 
 async function testLogin(email: string, password: string): Promise<{ success: boolean; session?: any; error?: string }> {
   try {
-    log(`Testing login with email: ${email}`, 'info')
+    authLog(`Testing login with email: ${email}`, 'info')
     
     const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/callback/credentials`, {
       method: 'POST',
@@ -138,7 +138,7 @@ async function testLogin(email: string, password: string): Promise<{ success: bo
     
     // NextAuth might return different status codes
     if (response.status === 200 || response.status === 302) {
-      log(`  Login successful (status: ${response.status})`, 'success')
+      authLog(`  Login successful (status: ${response.status})`, 'success')
       
       // Check session
       const sessionResponse = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/session`, {
@@ -148,7 +148,7 @@ async function testLogin(email: string, password: string): Promise<{ success: bo
       if (sessionResponse.ok) {
         const session = await sessionResponse.json().catch(() => ({}))
         if (session.user) {
-          log(`  Session retrieved - User: ${session.user.email}, Role: ${session.user.role}`, 'success')
+          authLog(`  Session retrieved - User: ${session.user.email}, Role: ${session.user.role}`, 'success')
           return { success: true, session }
         }
       }
@@ -157,19 +157,19 @@ async function testLogin(email: string, password: string): Promise<{ success: bo
     } else {
       const data = await response.json().catch(() => ({}))
       const errorMsg = data.error || `Login failed: ${response.status} ${response.statusText}`
-      log(`  Login failed: ${errorMsg}`, 'error')
+      authLog(`  Login failed: ${errorMsg}`, 'error')
       return { success: false, error: errorMsg }
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    log(`  Login error: ${errorMsg}`, 'error')
+    authLog(`  Login error: ${errorMsg}`, 'error')
     return { success: false, error: errorMsg }
   }
 }
 
 async function testInvalidLogin(): Promise<boolean> {
   try {
-    log(`Testing login with invalid credentials`, 'info')
+    authLog(`Testing login with invalid credentials`, 'info')
     
     const response = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/callback/credentials`, {
       method: 'POST',
@@ -184,29 +184,29 @@ async function testInvalidLogin(): Promise<boolean> {
     
     // Should return 401 or 403 for invalid credentials
     if (response.status === 401 || response.status === 403 || response.status === 400) {
-      log(`  Correctly rejected invalid credentials (status: ${response.status})`, 'success')
+      authLog(`  Correctly rejected invalid credentials (status: ${response.status})`, 'success')
       return true
     }
     
     // Check if error message indicates failure
     const data = await response.json().catch(() => ({}))
     if (data.error || response.status !== 200) {
-      log(`  Correctly rejected invalid credentials (status: ${response.status})`, 'success')
+      authLog(`  Correctly rejected invalid credentials (status: ${response.status})`, 'success')
       return true
     }
     
-    log(`  Unexpected response: ${response.status}`, 'error')
+    authLog(`  Unexpected response: ${response.status}`, 'error')
     return false
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    log(`  Error: ${errorMsg}`, 'error')
+    authLog(`  Error: ${errorMsg}`, 'error')
     return false
   }
 }
 
 async function testRateLimitRegistration(): Promise<boolean> {
   try {
-    log(`Testing registration rate limiting`, 'info')
+    authLog(`Testing registration rate limiting`, 'info')
     
     // Make 6 rapid registration attempts (limit is 5)
     let rateLimited = false
@@ -222,7 +222,7 @@ async function testRateLimitRegistration(): Promise<boolean> {
       })
       
       if (response.status === 429) {
-        log(`  Rate limit triggered on request ${i} (expected)`, 'success')
+        authLog(`  Rate limit triggered on request ${i} (expected)`, 'success')
         rateLimited = true
         break
       }
@@ -233,14 +233,14 @@ async function testRateLimitRegistration(): Promise<boolean> {
     
     return rateLimited
   } catch (error) {
-    log(`  Rate limit test error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    authLog(`  Rate limit test error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
 
 async function testRegistrationValidation(): Promise<boolean> {
   try {
-    log(`Testing registration validation`, 'info')
+    authLog(`Testing registration validation`, 'info')
     
     // Test with invalid email
     const invalidEmailResponse = await fetch(`${BASE_URL}/api/auth/register`, {
@@ -254,9 +254,9 @@ async function testRegistrationValidation(): Promise<boolean> {
     })
     
     if (invalidEmailResponse.status === 400) {
-      log(`  Correctly rejected invalid email`, 'success')
+      authLog(`  Correctly rejected invalid email`, 'success')
     } else {
-      log(`  Unexpected response for invalid email: ${invalidEmailResponse.status}`, 'error')
+      authLog(`  Unexpected response for invalid email: ${invalidEmailResponse.status}`, 'error')
       return false
     }
     
@@ -272,14 +272,14 @@ async function testRegistrationValidation(): Promise<boolean> {
     })
     
     if (shortPasswordResponse.status === 400) {
-      log(`  Correctly rejected short password`, 'success')
+      authLog(`  Correctly rejected short password`, 'success')
       return true
     } else {
-      log(`  Unexpected response for short password: ${shortPasswordResponse.status}`, 'error')
+      authLog(`  Unexpected response for short password: ${shortPasswordResponse.status}`, 'error')
       return false
     }
   } catch (error) {
-    log(`  Validation test error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    authLog(`  Validation test error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     return false
   }
 }
@@ -293,8 +293,8 @@ async function main() {
   const serverRunning = await checkServerRunning()
   
   if (!serverRunning) {
-    log('❌ Server is not running!', 'error')
-    log('⚠️  Start the dev server first: npm run dev', 'warn')
+    authLog('❌ Server is not running!', 'error')
+    authLog('⚠️  Start the dev server first: npm run dev', 'warn')
     process.exit(1)
   }
   
@@ -305,7 +305,7 @@ async function main() {
   
   // Test 1: Registration
   const registrationResult = await testRegistration()
-  addResult('Registration (Sign Up)', registrationResult.success, registrationResult.error)
+  addAuthResult('Registration (Sign Up)', registrationResult.success, registrationResult.error)
   
   // Test 2: Login with new user
   if (registrationResult.success) {
@@ -313,39 +313,39 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 500))
     
     const loginResult = await testLogin(TEST_EMAIL, TEST_PASSWORD)
-    addResult('Login (Sign In) with New User', loginResult.success, loginResult.error)
+    addAuthResult('Login (Sign In) with New User', loginResult.success, loginResult.error)
   } else {
-    addResult('Login (Sign In) with New User', false, 'Skipped - registration failed')
+    addAuthResult('Login (Sign In) with New User', false, 'Skipped - registration failed')
   }
   
   // Test 3: Registration with existing email
   const existingEmailResult = await testRegistrationWithExistingEmail(TEST_EMAIL)
-  addResult('Registration with Existing Email', existingEmailResult)
+  addAuthResult('Registration with Existing Email', existingEmailResult)
   
   // Test 4: Invalid login
   const invalidLoginResult = await testInvalidLogin()
-  addResult('Invalid Login Credentials', invalidLoginResult)
+  addAuthResult('Invalid Login Credentials', invalidLoginResult)
   
   // Test 5: Registration validation
   const validationResult = await testRegistrationValidation()
-  addResult('Registration Validation', validationResult)
+  addAuthResult('Registration Validation', validationResult)
   
   // Test 6: Rate limiting (optional - might skip if already rate limited)
   try {
     const rateLimitResult = await testRateLimitRegistration()
-    addResult('Registration Rate Limiting', rateLimitResult, undefined, rateLimitResult ? 'Rate limit working' : 'Rate limit not triggered')
+    addAuthResult('Registration Rate Limiting', rateLimitResult, undefined, rateLimitResult ? 'Rate limit working' : 'Rate limit not triggered')
   } catch {
-    addResult('Registration Rate Limiting', false, 'Skipped - may already be rate limited')
+    addAuthResult('Registration Rate Limiting', false, 'Skipped - may already be rate limited')
   }
   
   // Summary
   console.log('\n=== Test Summary ===\n')
   
-  const passed = results.filter(r => r.passed).length
-  const failed = results.filter(r => !r.passed).length
-  const total = results.length
-  
-  results.forEach(result => {
+  const passed = authTestResults.filter(r => r.passed).length
+  const failed = authTestResults.filter(r => !r.passed).length
+  const total = authTestResults.length
+
+  authTestResults.forEach(result => {
     const icon = result.passed ? '✅' : '❌'
     console.log(`${icon} ${result.name}`)
     if (result.error) {
