@@ -64,9 +64,11 @@ export async function POST(req: NextRequest) {
     if (error instanceof Error && (
       error.message.includes("Failed to parse URL") || 
       error.message.includes("Invalid URL") ||
-      error.cause instanceof Error && error.cause.message.includes("Invalid URL")
+      (error.cause && error.cause instanceof Error && error.cause.message.includes("Invalid URL"))
     )) {
-      const invalidUrl = error.message.match(/\/[^\s]+/)?.[0] || error.cause instanceof Error ? error.cause.message.match(/\/[^\s]+/)?.[0] : 'unknown'
+      const invalidUrl = error.message.match(/\/[^\s]+/)?.[0] || 
+        (error.cause && error.cause instanceof Error ? error.cause.message.match(/\/[^\s]+/)?.[0] : null) || 
+        'unknown'
       console.error(`URL parsing error - tried to parse: ${invalidUrl}`)
       console.error('Check NEXTAUTH_URL environment variable or ensure trustHost: true is working')
       return NextResponse.json(
