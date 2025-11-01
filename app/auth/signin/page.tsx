@@ -19,11 +19,21 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isRegister, setIsRegister] = useState(false)
   const [name, setName] = useState("")
+  const [honeypot, setHoneypot] = useState("") // Honeypot field for bot detection
   const router = useRouter()
   const { t } = useTranslation()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Honeypot check - if filled, it's likely a bot
+    if (honeypot) {
+      console.warn("Bot detected: honeypot field was filled")
+      setError("Invalid request")
+      setIsLoading(false)
+      return
+    }
+    
     setIsLoading(true)
     setError("")
 
@@ -111,6 +121,17 @@ export default function SignInPage() {
           )}
           
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Honeypot field - hidden from users but visible to bots */}
+            <input
+              type="text"
+              name="website"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              style={{ display: 'none' }}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
             {isRegister && (
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>

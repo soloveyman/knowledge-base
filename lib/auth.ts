@@ -5,6 +5,7 @@ import { z } from "zod"
 import { db, users } from "./db"
 import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
+// Rate limiting is handled in the NextAuth route handler (app/api/auth/[...nextauth]/route.ts)
 
 const loginSchema = z.object({
   email: z.string().email(),

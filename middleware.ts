@@ -1,13 +1,48 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
+import { apiRateLimiter, getClientIp, checkRateLimit } from "@/lib/rate-limit"
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // Skip middleware for API routes
+  // Apply rate limiting to API routes
   if (pathname.startsWith('/api/')) {
-    return NextResponse.next()
+    // Skip rate limiting for NextAuth internal routes and health checks
+    if (
+      pathname.startsWith('/api/auth/') || 
+      pathname.startsWith('/api/health')
+    ) {
+      return NextResponse.next()
+    }
+    
+    const ip = getClientIp(request)
+    const rateLimitResult = await checkRateLimit(
+      apiRateLimiter,
+      `api:${ip}`,
+      100, // fallback: 100 requests per minute
+      60 * 1000 // fallback: 1 minute
+    )
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please slow down.' },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'Retry-After': rateLimitResult.reset.toString(),
+          }
+        }
+      )
+    }
+    
+    // Add rate limit headers to successful responses
+    const response = NextResponse.next()
+    response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString())
+    response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString())
+    return response
   }
   
   // Public routes that don't require authentication

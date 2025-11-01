@@ -4,6 +4,7 @@ import { getTenantDb } from '@/lib/db/tenant'
 import { auth } from '@/lib/auth'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { strictRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
 
 export async function GET() {
   try {
@@ -40,6 +41,34 @@ export async function POST(request: Request) {
     if (!session?.user?.businessId) {
       return NextResponse.json({ success: false, message: 'Unauthorized: missing tenant' }, { status: 401 })
     }
+    
+    // Rate limiting for user creation (per user, not per IP)
+    const identifier = session.user.id || getClientIp(request)
+    const rateLimitResult = await checkRateLimit(
+      strictRateLimiter,
+      `create-user:${identifier}`,
+      3, // fallback: 3 requests per hour
+      60 * 60 * 1000 // fallback: 1 hour
+    )
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Too many user creation attempts. Please try again later.',
+          retryAfter: rateLimitResult.reset
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'Retry-After': rateLimitResult.reset.toString(),
+          }
+        }
+      )
+    }
+    
     const tenantDb = getTenantDb(session.user.businessId)
     const tenantId = session.user.businessId
     const body = await request.json()

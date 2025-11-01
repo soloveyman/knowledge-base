@@ -5,6 +5,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
 
 const schema = z.object({
   email: z.string().email(),
@@ -14,6 +15,32 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Rate limiting check
+    const ip = getClientIp(req)
+    const rateLimitResult = await checkRateLimit(
+      registrationRateLimiter,
+      `register:${ip}`,
+      5, // fallback: 5 requests
+      15 * 60 * 1000 // fallback: 15 minutes
+    )
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { 
+          error: 'Too many registration attempts. Please try again later.',
+          retryAfter: rateLimitResult.reset
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'Retry-After': rateLimitResult.reset.toString(),
+          }
+        }
+      )
+    }
+    
     const body = await req.json()
     // Normalize email before validation
     const normalizedBody = {
