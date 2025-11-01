@@ -70,7 +70,7 @@ Accordion.displayName = "Accordion"
 const AccordionItem = React.forwardRef<HTMLDivElement, AccordionItemProps>(
   ({ value, children, className, ...props }, ref) => {
     return (
-      <div ref={ref} className={cn("border rounded-3xl", className)} {...props}>
+      <div ref={ref} className={cn("border rounded-3xl overflow-hidden", className)} {...props}>
         {children}
       </div>
     )
@@ -88,7 +88,8 @@ const AccordionTrigger = React.forwardRef<HTMLButtonElement, AccordionTriggerPro
       <button
         ref={ref}
         className={cn(
-          "flex w-full items-start justify-between p-4 text-left font-medium transition-all hover:bg-accent [&[data-state=open]>svg]:rotate-180",
+          "flex w-full items-start justify-between p-4 text-left font-medium transition-all hover:bg-accent rounded-t-3xl [&[data-state=open]>svg]:rotate-180",
+          !isOpen && "rounded-b-3xl",
           className
         )}
         onClick={() => toggleItem(itemValue)}
@@ -117,7 +118,7 @@ const AccordionContent = React.forwardRef<HTMLDivElement, AccordionContentProps 
       <div
         ref={ref}
         className={cn(
-          "overflow-hidden transition-all duration-200",
+          "overflow-hidden transition-all duration-200 rounded-b-3xl",
           isOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0",
           className
         )}

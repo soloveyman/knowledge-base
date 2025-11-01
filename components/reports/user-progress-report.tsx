@@ -218,10 +218,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          {t('employeeProgressReport')}
-        </CardTitle>
-        <CardDescription>{t('trackEmployeeProgress')}</CardDescription>
+        <div>
+          <CardTitle>
+            {t('employeeProgressReport')}
+          </CardTitle>
+          <CardDescription>{t('trackEmployeeProgress')}</CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" className="space-y-2">
@@ -276,7 +278,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                 <div className="space-y-3">
                   {progress.assignments.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
-                      <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <span className="text-4xl block mb-2">📋</span>
                       <p>No assignments assigned</p>
                     </div>
                   ) : (
