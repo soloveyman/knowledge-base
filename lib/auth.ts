@@ -24,8 +24,12 @@ const oauthProviders = (
 )
 
 // Ensure NEXTAUTH_URL is set in production
-if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_URL) {
+const nextAuthUrl = process.env.NEXTAUTH_URL || 
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+
+if (process.env.NODE_ENV === 'production' && !nextAuthUrl) {
   console.warn('NEXTAUTH_URL is not set in production. This may cause authentication errors.')
+  console.warn('Using trustHost: true as fallback - ensure Vercel URL is properly configured')
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
