@@ -311,7 +311,7 @@ function DocImportPageInner() {
       icon={<FileText className="h-6 w-6" />}
       onClose={() => router.push(safeReturnTo)}
     >
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-3 md:space-y-6">
         {/* Upload Area */}
         <Card>
           <CardHeader>
