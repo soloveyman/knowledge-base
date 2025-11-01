@@ -21,7 +21,7 @@ export function LoadingOverlay({
   const getContainerClass = () => {
     switch (variant) {
       case 'overlay':
-        return 'fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center'
+        return 'fixed inset-0 bg-white/80 z-50 flex items-center justify-center'
       case 'fullscreen':
         return 'fixed inset-0 bg-white z-50 flex flex-col items-center justify-center'
       default:

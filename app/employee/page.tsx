@@ -447,7 +447,7 @@ function EmployeePageInner() {
             ) : (
               <div className="grid gap-4">
                 {transformedAssignments.map((assignment) => (
-                <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
+                <Card key={assignment.id} className="transition-shadow">
                   <CardContent className="p-3 md:p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">

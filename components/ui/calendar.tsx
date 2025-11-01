@@ -29,7 +29,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "bg-card border rounded-3xl p-3 shadow-sm",
+        "bg-card border rounded-3xl p-3",
         className
       )}
       captionLayout={captionLayout}
@@ -68,7 +68,7 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "relative has-focus:border-ring border border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] rounded-xl",
+          "relative has-focus:border-ring border border-input has-focus:ring-ring/50 has-focus:ring-[3px] rounded-xl",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(

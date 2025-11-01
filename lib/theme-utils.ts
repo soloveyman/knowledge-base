@@ -42,7 +42,7 @@ export function getThemeClass(type: keyof typeof themeColors): string {
  */
 export const themeClasses = {
   pageLayout: "min-h-screen bg-background",
-  header: "bg-card dark:bg-gray-900 shadow-sm border-b border-border",
+  header: "bg-card dark:bg-gray-900 border-b border-border",
   title: "text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate",
   heading2: "text-2xl font-bold text-foreground dark:text-white mb-2",
   heading3: "text-lg font-semibold text-foreground dark:text-white",

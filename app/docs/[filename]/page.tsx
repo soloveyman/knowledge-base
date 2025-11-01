@@ -285,7 +285,7 @@ export default function DocumentViewer() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50 w-full">
+      <header className="bg-card border-b border-border sticky top-0 z-50 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center min-w-0">

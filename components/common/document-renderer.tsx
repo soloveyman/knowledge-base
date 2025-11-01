@@ -49,7 +49,7 @@ function DocumentContent({ content }: { content: string }) {
         h1: ({ children }) => {
           // Главный заголовок - самый крупный и выразительный
           return (
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border/60 pb-4 leading-tight tracking-tight">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border pb-4 leading-tight tracking-tight">
               {children}
             </h1>
           )
@@ -57,7 +57,7 @@ function DocumentContent({ content }: { content: string }) {
         h2: ({ children }) => {
           // Подзаголовок первого уровня - крупный и четкий
           return (
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border/40 pb-3 leading-tight tracking-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border pb-3 leading-tight tracking-tight">
               {children}
             </h2>
           )
@@ -148,7 +148,7 @@ function DocumentContent({ content }: { content: string }) {
           </pre>
         ),
         table: ({ children }) => (
-          <div className="overflow-x-auto my-6 rounded-lg border border-border shadow-sm -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+          <div className="overflow-x-auto my-6 rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
             <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
               {children}
             </table>
@@ -299,7 +299,7 @@ function TableRenderer({ table }: {
           <span>Таблица</span>
         </h3>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border shadow-sm -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+      <div className="overflow-x-auto rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
         <table className="w-full divide-y divide-border bg-background border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
           {hasHeaders && (
             <thead className="bg-muted/50">
