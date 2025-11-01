@@ -672,13 +672,13 @@ function ManagerPageInner() {
               users={savedUsers} 
               assignments={savedAssignments.map(a => ({
                 id: a.id,
-                title: `${a.moduleId.slice(0, 8)}`,
-                description: '',
+                title: a.title || `${a.moduleId.slice(0, 8)}`,
+                description: a.description || '',
                 moduleId: a.moduleId,
-                testId: a.testId,
+                testId: a.testId || '',
                 assignedTo: a.assignedTo,
                 assignedBy: a.assignedBy,
-                dueDate: a.dueDate,
+                dueDate: a.dueDate || undefined,
                 status: a.status,
                 allowRetake: a.allowRetake,
                 maxAttempts: a.maxAttempts,
@@ -777,13 +777,8 @@ function ManagerPageInner() {
             <AssignmentsPage
               assignments={savedAssignments.map(a => {
                 // Find the document that matches this assignment's moduleId
-                const document = documents.find(doc => {
-                  // Match document's moduleId with assignment's moduleId
-                  if (doc.moduleId && a.moduleId) {
-                    return String(doc.moduleId) === String(a.moduleId)
-                  }
-                  return false
-                }) || documents.find(doc => String(doc.id) === String(a.moduleId)) // Fallback: try direct ID match (for backwards compatibility)
+                // Documents in manager page don't have moduleId, so match by ID
+                const document = documents.find(doc => String(doc.id) === String(a.moduleId))
                 
                 // Find the test that matches this assignment's testId
                 const test = a.testId ? savedTests.find(t => t.id === a.testId) : null

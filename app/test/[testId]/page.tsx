@@ -180,9 +180,10 @@ export default function TestPage() {
         }
       }
       // If correct_answer matches one of the choice texts, find its index
-      else if (question.choices) {
+      else if (question.choices && question.correct_answer) {
+        const correctAnswerText = question.correct_answer
         const choiceIndex = question.choices.findIndex(
-          choice => choice.trim().toLowerCase() === question.correct_answer.trim().toLowerCase()
+          choice => choice.trim().toLowerCase() === correctAnswerText.trim().toLowerCase()
         )
         if (choiceIndex >= 0) {
           correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
