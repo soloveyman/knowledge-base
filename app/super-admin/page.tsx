@@ -163,7 +163,7 @@ export default function SuperAdminPage() {
           image: session?.user?.image
         }}
       />
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto px-4 sm:px-6 pt-6 pb-4 md:p-8">
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>

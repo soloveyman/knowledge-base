@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, tests, questions as questionsTable, users } from '@/lib/db'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, sql } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 export async function GET() {
@@ -176,10 +176,16 @@ export async function GET() {
     }
   } catch (error) {
     console.error('Tests API error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCause = (error as any)?.cause
+    const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+    const fullErrorText = `${errorMessage} ${nestedMessage}`
+    console.error('Full tests API error:', fullErrorText)
+    
     return NextResponse.json({
       success: false,
       message: 'Failed to fetch tests',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: fullErrorText || 'Unknown error'
     }, { status: 500 })
   }
 }
@@ -225,7 +231,7 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    let finalQuestionIds = questionIds
+    let finalQuestionIds: string[] = questionIds || []
 
     // If questions are provided, save them to database first
     if (questions && questions.length > 0) {
@@ -255,12 +261,12 @@ export async function POST(request: Request) {
                 type: q.type === 'mcq' ? 'multiple_choice' : 
                       q.type === 'tf' ? 'true_false' : 
                       q.type === 'complete' ? 'text' : 'multiple_choice',
-                options: q.choices ? JSON.stringify(q.choices) : null,
+                options: q.choices || null,
                 correctAnswer: q.correct_answer || q.correctAnswer || '',
                 explanation: q.explanation || '',
                 difficulty: 'medium',
                 moduleId: null, // Documents are not modules, so set to null
-                createdBy: '3e1b5c25-7785-41b3-9c1f-68453a28bc90' // Owner user ID
+                createdBy: session.user.id
               }
               console.log(`Processed question ${index}:`, processed)
               return processed
@@ -280,27 +286,18 @@ export async function POST(request: Request) {
         console.log('Questions saved:', savedQuestions.length)
       } catch (questionError) {
         console.error('Error saving questions:', questionError)
-        throw new Error(`Failed to save questions: ${questionError instanceof Error ? questionError.message : 'Unknown error'}`)
+        const errorMessage = questionError instanceof Error ? questionError.message : String(questionError)
+        const errorCause = (questionError as any)?.cause
+        const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+        const fullErrorText = `${errorMessage} ${nestedMessage}`
+        console.error('Full question error:', fullErrorText)
+        throw new Error(`Failed to save questions: ${fullErrorText}`)
       }
     }
 
     // Create the test - handle missing columns gracefully
-    const testValues: {
-      title: string
-      description: string
-      moduleId: null
-      questionIds: string[]
-      type?: string | null
-      difficulty?: string | null
-      locale?: string | null
-      passingScore: number
-      timeLimit: number | null
-      maxAttempts: number
-      shuffleQuestions: boolean
-      showCorrectAnswers: boolean
-      status: string
-      createdBy: string
-    } = {
+    // Don't include type, difficulty, locale initially (they might not exist in DB)
+    const baseTestValues = {
       title,
       description: description || '',
       moduleId: null, // Documents are not modules, so set to null
@@ -314,36 +311,109 @@ export async function POST(request: Request) {
       createdBy: session.user.id
     }
     
-    // Only add new columns if they're provided (they might not exist in DB yet)
-    if (type !== undefined) testValues.type = type || null
-    if (difficulty !== undefined) testValues.difficulty = difficulty || null
-    if (locale !== undefined) testValues.locale = locale || null
-    
     let newTest
     try {
-      newTest = await db.insert(tests).values(testValues).returning()
+      // First try with new columns if provided
+      const testValuesWithNewColumns = {
+        ...baseTestValues,
+        ...(type !== undefined && { type: type || null }),
+        ...(difficulty !== undefined && { difficulty: difficulty || null }),
+        ...(locale !== undefined && { locale: locale || null })
+      }
+      newTest = await db.insert(tests).values(testValuesWithNewColumns).returning()
     } catch (insertError: unknown) {
       // If insert fails due to missing columns, try without new columns
-      const errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
-      const errorCause = (insertError as any)?.cause
-      const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
-      const fullErrorText = `${errorMessage} ${nestedMessage}`
+      // Drizzle errors can be deeply nested, so we need to check all levels
+      let errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
+      let errorCause = (insertError as any)?.cause
+      let nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
       
-      if (fullErrorText.includes('column "type"') || 
-          fullErrorText.includes('column "difficulty"') ||
-          fullErrorText.includes('column "locale"')) {
+      // Check for nested causes (Drizzle can nest errors deeply)
+      while (errorCause && typeof errorCause === 'object' && 'cause' in errorCause) {
+        const deeperCause = errorCause.cause
+        if (deeperCause instanceof Error) {
+          nestedMessage += ' ' + deeperCause.message
+          errorCause = deeperCause
+        } else if (typeof deeperCause === 'string') {
+          nestedMessage += ' ' + deeperCause
+          errorCause = null
+        } else {
+          break
+        }
+      }
+      
+      // Also check the error object's string representation
+      const errorString = insertError?.toString() || ''
+      const fullErrorText = `${errorMessage} ${nestedMessage} ${errorString}`.trim()
+      
+      console.log('Insert error details:', { 
+        errorMessage, 
+        nestedMessage, 
+        errorString,
+        fullErrorText,
+        errorObject: JSON.stringify(insertError, Object.getOwnPropertyNames(insertError))
+      })
+      
+      // Check for missing column errors - handle various quote formats and relation text
+      // Pattern: column "type" of relation "tests" does not exist
+      const hasTypeError = /column\s+["\']type["\']/i.test(fullErrorText) && 
+                          /does not exist/i.test(fullErrorText)
+      const hasDifficultyError = /column\s+["\']difficulty["\']/i.test(fullErrorText) && 
+                                /does not exist/i.test(fullErrorText)
+      const hasLocaleError = /column\s+["\']locale["\']/i.test(fullErrorText) && 
+                            /does not exist/i.test(fullErrorText)
+      
+      console.log('Column error checks:', { hasTypeError, hasDifficultyError, hasLocaleError })
+      
+      if (hasTypeError || hasDifficultyError || hasLocaleError) {
         console.log('New columns not available, creating test without type/difficulty/locale')
-        delete testValues.type
-        delete testValues.difficulty
-        delete testValues.locale
-        newTest = await db.insert(tests).values(testValues).returning()
-        // Add default values to returned test
-        newTest = newTest.map(test => ({
-          ...test,
-          type: null,
-          difficulty: null,
-          locale: null
-        }))
+        
+        try {
+          // Use raw SQL to insert without the non-existent columns
+          // This bypasses Drizzle's schema inference
+          const result = await db.execute(sql`
+            INSERT INTO tests (
+              module_id, title, description, question_ids,
+              passing_score, time_limit, max_attempts,
+              shuffle_questions, show_correct_answers, status, created_by
+            )
+            VALUES (
+              ${baseTestValues.moduleId}, ${baseTestValues.title}, ${baseTestValues.description}, ${JSON.stringify(baseTestValues.questionIds)}::jsonb,
+              ${baseTestValues.passingScore}, ${baseTestValues.timeLimit}, ${baseTestValues.maxAttempts},
+              ${baseTestValues.shuffleQuestions}, ${baseTestValues.showCorrectAnswers}, ${baseTestValues.status}, ${baseTestValues.createdBy}
+            )
+            RETURNING id, module_id, title, description, question_ids,
+              passing_score, time_limit, max_attempts,
+              shuffle_questions, show_correct_answers, status, is_active,
+              created_by, created_at, updated_at
+          `)
+          
+          // Transform the result to match the expected format
+          const inserted = result.rows[0]
+          newTest = [{
+            id: inserted.id,
+            moduleId: inserted.module_id,
+            title: inserted.title,
+            description: inserted.description,
+            questionIds: inserted.question_ids,
+            passingScore: inserted.passing_score,
+            timeLimit: inserted.time_limit,
+            maxAttempts: inserted.max_attempts,
+            shuffleQuestions: inserted.shuffle_questions,
+            showCorrectAnswers: inserted.show_correct_answers,
+            status: inserted.status,
+            isActive: inserted.is_active,
+            createdBy: inserted.created_by,
+            createdAt: inserted.created_at,
+            updatedAt: inserted.updated_at,
+            type: null,
+            difficulty: null,
+            locale: null
+          }]
+        } catch (retryError: unknown) {
+          console.error('Retry insert also failed:', retryError)
+          throw retryError
+        }
       } else {
         throw insertError
       }
@@ -360,10 +430,16 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Create test API error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCause = (error as any)?.cause
+    const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+    const fullErrorText = `${errorMessage} ${nestedMessage}`
+    console.error('Full test creation error:', fullErrorText)
+    
     return NextResponse.json({
       success: false,
       message: 'Failed to save test',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: fullErrorText || 'Unknown error'
     }, { status: 500 })
   }
 }

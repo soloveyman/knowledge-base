@@ -366,7 +366,7 @@ export default function DocumentReaderPage() {
 
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-6 pb-4 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Document Content */}
           <div className="lg:col-span-3">

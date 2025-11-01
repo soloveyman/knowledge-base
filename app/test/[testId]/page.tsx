@@ -274,7 +274,7 @@ export default function TestPage() {
         </header>
 
         {/* Results */}
-        <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
+        <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
           <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">
@@ -359,7 +359,7 @@ export default function TestPage() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
