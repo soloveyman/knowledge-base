@@ -12,9 +12,6 @@ import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
 import { toast } from "sonner"
 import { 
-  Users, 
-  ClipboardList, 
-  BarChart3, 
   FileText,
   X
 } from "lucide-react"
@@ -63,10 +60,12 @@ interface AssignedUser {
 interface SavedAssignment {
   id: string
   moduleId: string
-  testId: string
+  testId?: string | null
+  title?: string
+  description?: string
   assignedTo: string
   assignedBy: string
-  dueDate: string
+  dueDate?: string | null
   status: string
   allowRetake: boolean
   maxAttempts: number
@@ -384,6 +383,19 @@ function ManagerPageInner() {
     }
   }, [defaultTab, loadData])
 
+  // Reload tests when returning from test-builder (detected via URL change)
+  useEffect(() => {
+    const tab = getTabFromUrl(searchParams)
+    if (tab === 'tests') {
+      // Small delay to ensure router has finished navigation
+      const timer = setTimeout(() => {
+        console.log('Manager: Detected tests tab in URL, reloading tests...')
+        loadData(true)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, loadData])
+
   // Reload data when tab changes to assignments
   useEffect(() => {
     if (defaultTab === 'assignments') {
@@ -477,7 +489,8 @@ function ManagerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        setSavedTestsWithLog(savedTests.filter(t => t.id !== id))
+        // Reload tests from API to ensure synchronization
+        setTimeout(() => loadData(true), 0)
         toast.success('Test deleted successfully')
       } else {
         console.error('Failed to delete test:', result.message)
@@ -494,8 +507,8 @@ function ManagerPageInner() {
   }
 
   const handleEditTest = (id: string) => {
-    // Redirect to test builder with edit parameter
-    router.push(`/test-builder?edit=${id}`)
+    // Redirect to test builder with edit parameter and returnTo
+    router.push(`/test-builder?edit=${id}&returnTo=/manager?tab=tests`)
   }
 
   // Assignment handlers
@@ -573,7 +586,7 @@ function ManagerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total employees</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">👥</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedUsers.length}</div>
@@ -584,7 +597,7 @@ function ManagerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('activeTraining')}</CardTitle>
-                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">📋</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedAssignments.length}</div>
@@ -595,7 +608,7 @@ function ManagerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('documents')}</CardTitle>
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">📄</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{documents.length}</div>
@@ -606,7 +619,7 @@ function ManagerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('completionRate')}</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">📊</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
@@ -762,18 +775,55 @@ function ManagerPageInner() {
 
           <TabsContent value="assignments" className="space-y-3 md:space-y-6">
             <AssignmentsPage
-              assignments={savedAssignments.map(a => ({
-                id: a.id,
-                name: `Assignment ${a.id.slice(0, 8)}`,
-                description: '',
-                document: { id: 0, name: 'Document', type: 'DOCX', uploadedAt: a.createdAt },
-                test: { id: a.testId, title: 'Test', questionCount: 0 },
-                assignedUsers: [],
-                dueDate: a.dueDate,
-                createdAt: a.createdAt,
-                createdBy: a.assignedBy,
-                status: a.status
-              }))}
+              assignments={savedAssignments.map(a => {
+                // Find the document that matches this assignment's moduleId
+                const document = documents.find(doc => {
+                  // Match document's moduleId with assignment's moduleId
+                  if (doc.moduleId && a.moduleId) {
+                    return String(doc.moduleId) === String(a.moduleId)
+                  }
+                  return false
+                }) || documents.find(doc => String(doc.id) === String(a.moduleId)) // Fallback: try direct ID match (for backwards compatibility)
+                
+                // Find the test that matches this assignment's testId
+                const test = a.testId ? savedTests.find(t => t.id === a.testId) : null
+                
+                // Map assigned users from the users array
+                const assignedUsers = (a.users || []).map((user: any) => {
+                  // Find the full user details from savedUsers
+                  const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
+                  return {
+                    id: Number(fullUser?.id || user.userId || user.id || 0),
+                    name: fullUser?.name || 'Unknown User',
+                    email: fullUser?.email || '',
+                    role: fullUser?.role || 'employee',
+                    department: fullUser?.job || ''
+                  }
+                })
+                
+                return {
+                  id: a.id,
+                  title: a.title || `Assignment ${a.id.slice(0, 8)}`,
+                  name: a.title || `Assignment ${a.id.slice(0, 8)}`,
+                  description: a.description || '',
+                  document: document ? {
+                    id: Number(document.id),
+                    name: document.name,
+                    type: document.type,
+                    uploadedAt: document.uploadedAt
+                  } : { id: 0, name: 'Document Not Found', type: 'UNKNOWN', uploadedAt: a.createdAt },
+                  test: test ? {
+                    id: test.id,
+                    title: test.title,
+                    questionCount: test.questionCount || 0
+                  } : a.testId ? { id: a.testId, title: 'Test Not Found', questionCount: 0 } : { id: '', title: 'No Test', questionCount: 0 },
+                  assignedUsers: assignedUsers,
+                  dueDate: a.dueDate || '',
+                  createdAt: a.createdAt,
+                  createdBy: a.assignedBy,
+                  status: a.status
+                }
+              })}
               onDeleteAssignment={handleDeleteAssignment}
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}

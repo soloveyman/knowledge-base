@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { useNavigateBack } from "@/lib/redirect-utils"
 import { useTranslation } from "@/lib/translation-context"
+import { renderFormattedText } from "@/lib/content-renderer"
 
 interface UserWithRole {
   name?: string | null
@@ -86,25 +87,42 @@ export default function TestPage() {
         
         if (result.success && result.data.test) {
           const test = result.data.test
+          const questionsFromApi = result.data.questions || []
+          
+          // Transform database questions to TestQuestion format
+          const transformedQuestions: TestQuestion[] = questionsFromApi.map((q: {
+            id: string
+            type?: string
+            content?: string
+            title?: string
+            options?: string[] | null
+            correctAnswer?: string | null
+            explanation?: string | null
+          }) => {
+            // Convert database type to frontend type
+            let questionType = 'mcq'
+            if (q.type === 'multiple_choice') questionType = 'mcq'
+            else if (q.type === 'true_false') questionType = 'tf'
+            else if (q.type === 'text') questionType = 'complete'
+            
+            return {
+              id: q.id,
+              type: questionType,
+              prompt: q.content || q.title || 'Question',
+              choices: Array.isArray(q.options) ? q.options : [],
+              correct_answer: q.correctAnswer || undefined,
+              explanation: q.explanation || undefined
+            }
+          })
+          
           setTestData({
             id: test.id,
             title: test.title,
             type: test.type || 'mcq',
             difficulty: test.difficulty || 'medium',
             locale: 'ru', // Default locale
-            questionCount: test.questionIds?.length || 0,
-            questions: test.questionIds?.map((qId: string) => {
-              // For now, we'll need to fetch question details separately
-              // This is a simplified mapping - you may need to enhance the API
-              return {
-                id: qId,
-                type: 'mcq',
-                prompt: `Question ${qId}`,
-                choices: ['A', 'B', 'C', 'D'],
-                correct_answer: 'A',
-                explanation: 'Sample explanation'
-              }
-            }) || [],
+            questionCount: transformedQuestions.length,
+            questions: transformedQuestions,
             sourceDocument: test.moduleId || 'Unknown',
             createdAt: test.createdAt,
             createdBy: test.createdBy || 'Unknown'
@@ -144,12 +162,42 @@ export default function TestPage() {
 
     let correctAnswers = 0
     testData.questions.forEach(question => {
-      if (answers[question.id] === question.correct_answer) {
+      const userAnswer = answers[question.id]
+      if (!userAnswer || !question.correct_answer) return
+      
+      // Normalize correct answer to letter format (A, B, C, D)
+      let correctAnswerLetter: string | null = null
+      
+      // If correct_answer is already a letter (A, B, C, D)
+      if (/^[A-Z]$/.test(question.correct_answer)) {
+        correctAnswerLetter = question.correct_answer.toUpperCase()
+      } 
+      // If correct_answer is a numeric index (0, 1, 2, 3)
+      else if (/^\d+$/.test(question.correct_answer)) {
+        const index = parseInt(question.correct_answer, 10)
+        if (question.choices && index >= 0 && index < question.choices.length) {
+          correctAnswerLetter = String.fromCharCode(65 + index)
+        }
+      }
+      // If correct_answer matches one of the choice texts, find its index
+      else if (question.choices) {
+        const choiceIndex = question.choices.findIndex(
+          choice => choice.trim().toLowerCase() === question.correct_answer.trim().toLowerCase()
+        )
+        if (choiceIndex >= 0) {
+          correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+        }
+      }
+      
+      // Compare normalized answers
+      if (correctAnswerLetter && userAnswer.toUpperCase() === correctAnswerLetter) {
         correctAnswers++
       }
     })
 
-    const percentage = Math.round((correctAnswers / testData.questions.length) * 100)
+    const percentage = testData.questions.length > 0 
+      ? Math.round((correctAnswers / testData.questions.length) * 100)
+      : 0
     setScore(percentage)
     setShowResults(true)
 
@@ -371,9 +419,12 @@ export default function TestPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="text-lg font-medium">
-              {currentQ.prompt}
-            </div>
+            <div 
+              className="text-lg font-medium prose max-w-none"
+              dangerouslySetInnerHTML={{ 
+                __html: renderFormattedText(currentQ.prompt || '') 
+              }}
+            />
 
             {currentQ.choices && (
               <div className="space-y-3">

@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server'
 import { db, tests, questions as questionsTable, users } from '@/lib/db'
-import { eq, desc, sql } from 'drizzle-orm'
+import { eq, desc, sql, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
     const session = await auth()
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Unauthorized' 
+      }, { status: 401 })
+    }
+    
     const userRole = session?.user?.role
     
     // Explicitly select columns that exist (handle case where new columns don't exist yet)
@@ -47,34 +55,59 @@ export async function GET() {
       
       // Manager and other roles filter by businessId (tenant isolation)
       const tenantId = session?.user?.businessId
-      const rows = await db
-        .select({ 
-          test: {
-            id: tests.id,
-            moduleId: tests.moduleId,
-            title: tests.title,
-            description: tests.description,
-            questionIds: tests.questionIds,
-            type: tests.type,
-            difficulty: tests.difficulty,
-            locale: tests.locale,
-            passingScore: tests.passingScore,
-            timeLimit: tests.timeLimit,
-            maxAttempts: tests.maxAttempts,
-            shuffleQuestions: tests.shuffleQuestions,
-            showCorrectAnswers: tests.showCorrectAnswers,
-            status: tests.status,
-            isActive: tests.isActive,
-            createdBy: tests.createdBy,
-            createdAt: tests.createdAt,
-            updatedAt: tests.updatedAt
-          },
-          creatorBusinessId: users.businessId 
+      
+      if (!tenantId) {
+        // If no businessId, return empty array for non-owner users
+        return NextResponse.json({
+          success: true,
+          data: {
+            tests: []
+          }
+        })
+      }
+      
+      // Get user IDs for the tenant first
+      const tenantUsers = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.businessId, tenantId))
+      
+      const tenantUserIds = tenantUsers.map(u => u.id)
+      
+      if (tenantUserIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: {
+            tests: []
+          }
+        })
+      }
+      
+      // Query tests created by users in the tenant
+      const allTests = await db
+        .select({
+          id: tests.id,
+          moduleId: tests.moduleId,
+          title: tests.title,
+          description: tests.description,
+          questionIds: tests.questionIds,
+          type: tests.type,
+          difficulty: tests.difficulty,
+          locale: tests.locale,
+          passingScore: tests.passingScore,
+          timeLimit: tests.timeLimit,
+          maxAttempts: tests.maxAttempts,
+          shuffleQuestions: tests.shuffleQuestions,
+          showCorrectAnswers: tests.showCorrectAnswers,
+          status: tests.status,
+          isActive: tests.isActive,
+          createdBy: tests.createdBy,
+          createdAt: tests.createdAt,
+          updatedAt: tests.updatedAt
         })
         .from(tests)
-        .leftJoin(users, eq(tests.createdBy, users.id))
-        .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
-      const allTests = rows.map(r => r.test)
+        .where(inArray(tests.createdBy, tenantUserIds))
+        .orderBy(desc(tests.createdAt))
 
       return NextResponse.json({
         success: true,
@@ -134,32 +167,60 @@ export async function GET() {
         }
         
         const tenantId = session?.user?.businessId
-        const rows = await db
-          .select({ 
-            test: {
-              id: tests.id,
-              moduleId: tests.moduleId,
-              title: tests.title,
-              description: tests.description,
-              questionIds: tests.questionIds,
-              passingScore: tests.passingScore,
-              timeLimit: tests.timeLimit,
-              maxAttempts: tests.maxAttempts,
-              shuffleQuestions: tests.shuffleQuestions,
-              showCorrectAnswers: tests.showCorrectAnswers,
-              status: tests.status,
-              isActive: tests.isActive,
-              createdBy: tests.createdBy,
-              createdAt: tests.createdAt,
-              updatedAt: tests.updatedAt
-            },
-            creatorBusinessId: users.businessId 
+        
+        if (!tenantId) {
+          // If no businessId, return empty array for non-owner users
+          return NextResponse.json({
+            success: true,
+            data: {
+              tests: []
+            }
+          })
+        }
+        
+        // Get user IDs for the tenant first
+        const tenantUsers = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.businessId, tenantId))
+        
+        const tenantUserIds = tenantUsers.map(u => u.id)
+        
+        if (tenantUserIds.length === 0) {
+          return NextResponse.json({
+            success: true,
+            data: {
+              tests: []
+            }
+          })
+        }
+        
+        // Query tests created by users in the tenant
+        const allTests = await db
+          .select({
+            id: tests.id,
+            moduleId: tests.moduleId,
+            title: tests.title,
+            description: tests.description,
+            questionIds: tests.questionIds,
+            passingScore: tests.passingScore,
+            timeLimit: tests.timeLimit,
+            maxAttempts: tests.maxAttempts,
+            shuffleQuestions: tests.shuffleQuestions,
+            showCorrectAnswers: tests.showCorrectAnswers,
+            status: tests.status,
+            isActive: tests.isActive,
+            createdBy: tests.createdBy,
+            createdAt: tests.createdAt,
+            updatedAt: tests.updatedAt
           })
           .from(tests)
-          .leftJoin(users, eq(tests.createdBy, users.id))
-          .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
-        const allTests = rows.map(r => ({
-          ...r.test,
+          .where(inArray(tests.createdBy, tenantUserIds))
+          .orderBy(desc(tests.createdAt))
+        
+        // Add default values for missing columns
+        const testsWithDefaults = allTests.map(test => ({
+          ...test,
           type: null,
           difficulty: null,
           locale: null
@@ -168,7 +229,7 @@ export async function GET() {
         return NextResponse.json({
           success: true,
           data: {
-            tests: allTests
+            tests: testsWithDefaults
           }
         })
       }

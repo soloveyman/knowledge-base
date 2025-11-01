@@ -387,6 +387,19 @@ function OwnerPageInner() {
     }
   }, [defaultTab, loadData])
 
+  // Reload tests when returning from test-builder (detected via URL change)
+  useEffect(() => {
+    const tab = getTabFromUrl(searchParams)
+    if (tab === 'tests') {
+      // Small delay to ensure router has finished navigation
+      const timer = setTimeout(() => {
+        console.log('Owner: Detected tests tab in URL, reloading tests...')
+        loadData(true)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, loadData])
+
   // Reload data when tab changes to assignments
   useEffect(() => {
     if (defaultTab === 'assignments') {
@@ -475,7 +488,7 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        setSavedTestsWithLog(savedTests.filter(t => t.id !== id))
+        // Reload tests from API to ensure synchronization
         setTimeout(() => loadData(true), 0)
         toast.success('Test deleted successfully')
       } else {
