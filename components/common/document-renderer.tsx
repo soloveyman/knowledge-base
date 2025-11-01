@@ -200,14 +200,64 @@ function DocumentContent({ content }: { content: string }) {
 function TableRenderer({ table }: { 
   table: { title: string; headers: string[]; rows: string[][] }
 }) {
-  // Проверяем, есть ли хотя бы один непустой заголовок
-  const hasHeaders = table.headers && table.headers.length > 0 && table.headers.some(h => h && h.trim().length > 0)
-  const tableEmoji = getEmojiForContext(table.title || 'таблица', 'heading') || '📊'
-  
+  // Вспомогательная функция для проверки, пустая ли ячейка
+  const isCellEmpty = (cell: string | null | undefined): boolean => {
+    if (!cell) return true
+    const trimmed = cell.trim()
+    return trimmed.length === 0 || trimmed === '\u00A0' || trimmed === '&nbsp;'
+  }
+
   // Вспомогательная функция для проверки, пустой ли заголовок
   const isHeaderEmpty = (header: string | null | undefined): boolean => {
-    return !header || header.trim().length === 0
+    return isCellEmpty(header)
   }
+
+  // Функция для проверки, является ли колонка пустой
+  const isColumnEmpty = (columnIndex: number): boolean => {
+    // Проверяем заголовок
+    if (table.headers && table.headers[columnIndex]) {
+      if (!isHeaderEmpty(table.headers[columnIndex])) {
+        return false
+      }
+    }
+    // Проверяем все строки в этой колонке
+    return table.rows.every(row => {
+      const cell = row[columnIndex]
+      return isCellEmpty(cell)
+    })
+  }
+
+  // Функция для проверки, является ли строка пустой
+  const isRowEmpty = (row: string[]): boolean => {
+    return row.every(cell => isCellEmpty(cell))
+  }
+
+  // Определяем максимальное количество колонок
+  const maxColumns = Math.max(
+    table.headers?.length || 0,
+    ...(table.rows.map(row => row.length) || [0])
+  )
+
+  // Находим индексы непустых колонок
+  const nonEmptyColumnIndices = Array.from({ length: maxColumns }, (_, i) => i)
+    .filter(columnIndex => !isColumnEmpty(columnIndex))
+
+  // Фильтруем строки - удаляем пустые
+  const filteredRows = table.rows.filter(row => !isRowEmpty(row))
+
+  // Фильтруем заголовки - оставляем только для непустых колонок
+  const filteredHeaders = table.headers 
+    ? nonEmptyColumnIndices.map(colIdx => table.headers[colIdx] || '')
+    : []
+
+  // Фильтруем строки - оставляем только ячейки из непустых колонок
+  const filteredRowsData = filteredRows.map(row =>
+    nonEmptyColumnIndices.map(colIdx => row[colIdx] || '')
+  )
+
+  // Проверяем, есть ли хотя бы один непустой заголовок после фильтрации
+  const hasHeaders = filteredHeaders.length > 0 && filteredHeaders.some(h => !isHeaderEmpty(h))
+  const tableEmoji = getEmojiForContext(table.title || 'таблица', 'heading') || '📊'
   
   return (
     <div className="space-y-4">
@@ -228,7 +278,7 @@ function TableRenderer({ table }: {
           {hasHeaders && (
             <thead className="bg-muted/50">
               <tr>
-                {table.headers.map((header, idx) => {
+                {filteredHeaders.map((header, idx) => {
                   const isEmpty = isHeaderEmpty(header)
                   return (
                     <th
@@ -247,7 +297,7 @@ function TableRenderer({ table }: {
             </thead>
           )}
           <tbody className="bg-background divide-y divide-border">
-            {table.rows.map((row, rowIdx) => (
+            {filteredRowsData.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
                 className="hover:bg-muted/30 transition-colors"
