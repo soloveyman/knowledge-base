@@ -18,7 +18,7 @@ interface Document {
 interface DocumentsPageProps {
   documents: Document[]
   onDeleteDocument: (id: string) => void
-  onViewDocument: (name: string) => void
+  onViewDocument: (id: string, name?: string) => void
   onImportDocument?: () => void
 }
 
@@ -37,18 +37,11 @@ export function DocumentsPage({
     title: doc.name,
     subtitle: `${t('uploaded')} ${doc.uploadedAt.replace(/^Uploaded\s+/, '')}`,
     metadata: doc.size ? [doc.size] : undefined,
-    badges: [
-      {
-        label: translateBadge(doc.type),
-        variant: (doc.type === 'DOCX'
-          ? 'default' as const
-          : doc.type === 'XLSX'
-            ? 'secondary' as const
-            : 'outline' as const)
-      },
-      ...(doc.status === 'ready' ? [{ label: translateBadge('ready'), variant: 'default' as const }] : [])
-    ],
-    onClick: () => onViewDocument(doc.name),
+    badges: doc.status === 'ready' ? [{ label: translateBadge('ready'), variant: 'default' as const }] : [],
+    onClick: () => {
+      console.log('Document card clicked - ID:', doc.id, 'Name:', doc.name)
+      onViewDocument(String(doc.id), doc.name)
+    },
     onDelete: () => onDeleteDocument(doc.id)
   }))
 

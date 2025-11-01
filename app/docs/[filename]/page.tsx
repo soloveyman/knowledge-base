@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useNavigateBack } from "@/lib/redirect-utils"
-import { renderFormattedText } from '@/lib/content-renderer'
+import { DocumentRenderer } from "@/components/common/document-renderer"
 
 interface UserWithRole {
   name?: string | null
@@ -63,7 +63,7 @@ export default function DocumentViewer() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const params = useParams()
-  const filename = params.filename as string
+  const filenameOrId = params.filename as string
   const navigateBack = useNavigateBack()
 
   const [documentData, setDocumentData] = useState<DocumentData | null>(null)
@@ -80,13 +80,16 @@ export default function DocumentViewer() {
     // Load document data from database
     loadDocumentData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status, router, filename])
+  }, [session, status, router, filenameOrId])
 
   const loadDocumentData = async () => {
     try {
       setLoading(true)
       
-      console.log('Loading document data for filename:', filename)
+      const decodedParam = decodeURIComponent(filenameOrId)
+      console.log('🔍 DocumentViewer: Loading document data')
+      console.log('🔍 Raw param from URL:', filenameOrId)
+      console.log('🔍 Decoded param (ID or filename):', decodedParam)
       
       // Fetch all documents from the database
       const response = await fetch('/api/documents')
@@ -95,12 +98,91 @@ export default function DocumentViewer() {
       console.log('Documents API response:', result)
       
       if (result.success) {
-        // Find the document by filename
-        const document = (result.data.documents as ApiDocument[]).find((doc: ApiDocument) => 
-          doc.originalFileName === decodeURIComponent(filename) || doc.title === decodeURIComponent(filename)
-        )
+        let document: ApiDocument | undefined
+        const documents = result.data.documents as ApiDocument[]
+        
+        // Log all document IDs for debugging
+        console.log('Available document IDs:', documents.map(d => ({
+          id: d.id,
+          idType: typeof d.id,
+          idString: String(d.id),
+          originalFileName: d.originalFileName,
+          title: d.title
+        })))
+        
+        // First try to find by ID (most reliable)
+        // Try both string and direct comparison since ID might be UUID
+        const documentById = documents.find((doc: ApiDocument) => {
+          const docIdStr = String(doc.id)
+          const searchId = decodedParam.trim()
+          
+          // Try exact string match
+          if (docIdStr === searchId) {
+            console.log('Found exact match:', docIdStr, '===', searchId)
+            return true
+          }
+          
+          // Try case-insensitive match
+          if (docIdStr.toLowerCase() === searchId.toLowerCase()) {
+            console.log('Found case-insensitive match:', docIdStr, '===', searchId)
+            return true
+          }
+          
+          return false
+        })
+        
+        if (documentById) {
+          document = documentById
+          console.log('✅ Found document by ID:', document.id)
+        } else {
+          // Fallback: find by filename (for backward compatibility)
+          console.log('⚠️ Document not found by ID, trying filename match')
+          console.log('Search param:', decodedParam)
+          console.log('Available documents:', documents.map(d => ({
+            id: String(d.id),
+            originalFileName: d.originalFileName,
+            title: d.title
+          })))
+          
+          document = documents.find((doc: ApiDocument) => {
+            const originalFileName = doc.originalFileName?.trim() || ''
+            const title = doc.title?.trim() || ''
+            const searchName = decodedParam.trim()
+            
+            // Exact matches
+            if (originalFileName === searchName || title === searchName) {
+              console.log('Found exact filename match')
+              return true
+            }
+            
+            // Case-insensitive matches
+            if (originalFileName.toLowerCase() === searchName.toLowerCase() || 
+                title.toLowerCase() === searchName.toLowerCase()) {
+              console.log('Found case-insensitive filename match')
+              return true
+            }
+            
+            // Also check if either field contains the search name (for partial matches)
+            if (originalFileName && originalFileName.includes(searchName)) {
+              console.log('Found partial filename match in originalFileName')
+              return true
+            }
+            if (title && title.includes(searchName)) {
+              console.log('Found partial filename match in title')
+              return true
+            }
+            
+            return false
+          })
+          
+          if (document) {
+            console.log('✅ Found document by filename:', document.id)
+          } else {
+            console.log('❌ Document not found by ID or filename')
+          }
+        }
 
-        console.log('Found document:', document)
+        console.log('Final document result:', document ? { id: document.id, name: document.originalFileName || document.title } : 'null')
 
         if (document) {
           console.log('Document ID:', document.id)
@@ -117,10 +199,8 @@ export default function DocumentViewer() {
           // Extract tables from parsedContent  
           const tables = document.parsedContent?.tables || []
           
-          // If no sections but we have tables, show a message
-          if (!content && tables.length > 0) {
-            content = 'Document contains tables below.'
-          } else if (!content) {
+          // If no sections but we have tables, leave content empty (tables will be shown)
+          if (!content && tables.length === 0) {
             content = 'Document content will be displayed here...'
           }
           
@@ -153,7 +233,13 @@ export default function DocumentViewer() {
             tables: tables
           })
         } else {
-          console.log('Document not found, redirecting back')
+          console.error('❌ Document not found!')
+          console.error('Search param:', decodedParam)
+          console.error('Available documents:', documents.map(d => ({
+            id: String(d.id),
+            originalFileName: d.originalFileName,
+            title: d.title
+          })))
           // Document doesn't exist, redirect back to previous tab
           const userRole = (session?.user as UserWithRole)?.role || 'manager'
           navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
@@ -183,90 +269,6 @@ export default function DocumentViewer() {
     navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
   }
 
-  // Helper function to escape HTML characters
-  const escapeHTML = (text: string) => {
-    const div = document.createElement('div')
-    div.textContent = text
-    return div.innerHTML
-  }
-
-  // Helper function to render tables as HTML
-  const renderTablesAsHTML = (tables?: Array<{title: string; headers: string[]; rows: string[][]}>): string => {
-    if (!tables || tables.length === 0) {
-      console.log('No tables to render')
-      return ''
-    }
-    
-    console.log('Rendering tables:', tables.length)
-    tables.forEach((table, index) => {
-      console.log(`Table ${index}:`, table.title, 'Headers:', table.headers.length, 'Rows:', table.rows.length)
-    })
-    
-    return tables.map(table => {
-      const escapedTitle = escapeHTML(table.title)
-      
-      // Filter out empty rows (rows where all cells are empty or whitespace)
-      const nonEmptyRows = table.rows.filter(row => {
-        // Check if row has at least one non-empty cell
-        return row && row.length > 0 && row.some(cell => 
-          cell !== null && cell !== undefined && String(cell).trim().length > 0
-        )
-      })
-      
-      // Skip entire table if no rows have content
-      if (nonEmptyRows.length === 0) {
-        console.log(`Skipping empty table: ${table.title}`)
-        return ''
-      }
-      
-      console.log(`Rendering table: ${table.title} with ${nonEmptyRows.length} non-empty rows`)
-      
-      // Only render headers if they exist and are not empty
-      const hasHeaders = table.headers && table.headers.length > 0 && table.headers.some(h => h.trim())
-      const headersHTML = hasHeaders ? table.headers.map((header) => {
-        const escapedHeader = escapeHTML(header)
-        // Use fit-content for natural width, with reasonable constraints
-        return `<th class="px-2 md:px-4 py-2 text-left border-b border-border bg-muted/50 font-semibold text-xs md:text-sm" style="min-width: fit-content; white-space: normal;">${escapedHeader}</th>`
-      }).join('') : ''
-      
-      const rowsHTML = nonEmptyRows.map(row => {
-        const cellsHTML = row.map((cell) => {
-          const escapedCell = escapeHTML(String(cell))
-          return `<td class="px-2 md:px-4 py-2 border-b border-border text-xs md:text-sm" style="white-space: normal;">${escapedCell}</td>`
-        }).join('')
-        return `<tr class="hover:bg-muted/20">${cellsHTML}</tr>`
-      }).join('')
-      
-      // Render table with or without headers based on detection
-      const tableHTML = hasHeaders 
-        ? `
-          <table class="w-full border-collapse" style="table-layout: auto; width: 100%; border: none;">
-            <thead>
-              <tr>${headersHTML}</tr>
-            </thead>
-            <tbody>
-              ${rowsHTML}
-            </tbody>
-          </table>
-        `
-        : `
-          <table class="w-full border-collapse" style="table-layout: auto; width: 100%; border: none;">
-            <tbody>
-              ${rowsHTML}
-            </tbody>
-          </table>
-        `
-      
-      return `
-        <div class="my-8 w-full overflow-x-auto">
-          <h3 class="text-base md:text-xl font-bold mb-4 text-foreground">${escapedTitle}</h3>
-          <div class="w-full">
-            ${tableHTML}
-          </div>
-        </div>
-      `
-    }).join('')
-  }
 
   if (status === "loading" || loading) {
     return (
@@ -307,40 +309,16 @@ export default function DocumentViewer() {
           {documentData?.type === 'PDF' ? (
             <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-screen border border-border rounded-3xl overflow-hidden">
               <iframe 
-                src={`/api/documents/${encodeURIComponent(filename)}`}
+                src={`/api/documents/${encodeURIComponent(filenameOrId)}`}
                 className="w-full h-full"
                 title={documentData?.name}
               />
             </div>
           ) : (
-            <div className="document-content" style={{ maxWidth: '100%', width: '100%' }}>
-              {documentData?.content ? (
-                <>
-                  <div dangerouslySetInnerHTML={{ 
-                      __html: (() => {
-                        const formatted = renderFormattedText(documentData.content)
-                        console.log('Processing content with length:', documentData.content.length)
-                        console.log('Formatted HTML length:', formatted.length)
-                        console.log('First 200 chars of formatted HTML:', formatted.substring(0, 200))
-                        return formatted
-                      })()
-                    }} 
-                  />
-                  {/* Render tables after content */}
-                  {documentData?.tables && documentData.tables.length > 0 && (
-                    <div dangerouslySetInnerHTML={{ 
-                        __html: renderTablesAsHTML(documentData.tables)
-                      }} 
-                    />
-                  )}
-                </>
-              ) : (
-                <div>
-                  <h1>{documentData?.name || 'Document'}</h1>
-                  <p>Document content will be displayed here...</p>
-                </div>
-              )}
-            </div>
+            <DocumentRenderer 
+              content={documentData?.content || ''} 
+              tables={documentData?.tables}
+            />
           )}
         </div>
       </main>

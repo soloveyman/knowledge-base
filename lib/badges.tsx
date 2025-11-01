@@ -15,6 +15,7 @@ export const BADGE_CONFIGS = {
     failed: { variant: "secondary" as const, label: "Failed" },
     pending: { variant: "warning" as const, label: "Pending" },
     completed: { variant: "success" as const, label: "Completed" },
+    ready: { variant: "success" as const, label: "Ready" },
     draft: { variant: "outline" as const, label: "Draft" },
     published: { variant: "success" as const, label: "Published" },
     archived: { variant: "secondary" as const, label: "Archived" },

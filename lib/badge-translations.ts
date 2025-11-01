@@ -9,6 +9,7 @@ const badgeTranslationMap: Record<string, string> = {
   'failed': 'failed',
   'pending': 'pending',
   'completed': 'completed',
+  'ready': 'ready',
   'draft': 'draft',
   'published': 'published',
   'archived': 'archived',

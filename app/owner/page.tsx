@@ -469,10 +469,10 @@ function OwnerPageInner() {
     }
   }
 
-  const handleViewDocument = (name: string) => {
-    console.log('Owner: handleViewDocument called with name:', name)
-    console.log('Owner: Encoded name:', encodeURIComponent(name))
-    router.push(`/docs/${encodeURIComponent(name)}`)
+  const handleViewDocument = (id: string, name?: string) => {
+    console.log('Owner: handleViewDocument called with id:', id, 'name:', name)
+    // Use ID for navigation - more reliable than name
+    router.push(`/docs/${encodeURIComponent(id)}`)
   }
 
   const handleImportDocument = () => {
@@ -769,7 +769,7 @@ function OwnerPageInner() {
                       <div 
                         key={doc.id}
                         className="flex items-center justify-between p-4 border border-border rounded-3xl hover:bg-accent cursor-pointer gap-3"
-                        onClick={() => handleViewDocument(doc.name)}
+                        onClick={() => handleViewDocument(doc.id, doc.name)}
                       >
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>

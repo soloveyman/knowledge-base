@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DocumentTypeBadge } from "@/lib/badges"
 import { useNavigateBack, getRedirectUrl } from "@/lib/redirect-utils"
-import { renderFormattedText } from "@/lib/content-renderer"
+import { DocumentRenderer } from "@/components/common/document-renderer"
 import { useTranslation } from "@/lib/translation-context"
 
 interface UserWithRole {
@@ -82,6 +82,11 @@ interface DocumentData {
   uploadedBy: string
   size: string
   content: string
+  tables?: Array<{
+    title: string
+    headers: string[]
+    rows: string[][]
+  }>
 }
 
 interface AssignmentData {
@@ -168,61 +173,34 @@ export default function DocumentReaderPage() {
           content = document.parsedContent!.sections.map(s => s.content).join('\n')
         }
         
-        // Handle tables (for xlsx files)
-        if (Array.isArray(document.parsedContent?.tables) && document.parsedContent!.tables.length > 0) {
-          const tablesContent = document.parsedContent.tables.map(table => {
-            let tableText = `<div class="mb-6"><h3 class="text-xl font-semibold mb-3">${table.title}</h3><div class="overflow-x-auto"><table class="min-w-full border-collapse"><tbody>`
-            
-            // Add headers if they exist
-            if (table.headers && table.headers.length > 0 && table.headers.some(h => h)) {
-              tableText += '<tr class="bg-muted border-b border-border">'
-              table.headers.forEach(header => {
-                tableText += `<th class="px-4 py-2 text-left text-sm font-semibold">${header || ''}</th>`
-              })
-              tableText += '</tr>'
-            }
-            
-            // Add rows
-            table.rows.forEach((row, rowIndex) => {
-              if (row && row.some(cell => cell)) {
-                tableText += `<tr class="border-b border-border">`
-                row.forEach(cell => {
-                  tableText += `<td class="px-4 py-2">${cell || ''}</td>`
-                })
-                tableText += '</tr>'
-              }
-            })
-            
-            tableText += '</tbody></table></div></div>'
-            return tableText
-          }).join('\n')
-          
-          content += tablesContent
-        }
+        // Extract tables separately (for xlsx files)
+        const tables = document.parsedContent?.tables || []
         
         // Fallback if no content
-        if (!content) {
+        if (!content && tables.length === 0) {
           content = 'Document content will be displayed here...'
         }
           
-          // Clean artifacts immediately after extraction (but preserve legitimate lists)
-          content = content
-            .replace(/;\s*1\./g, '')  // Remove "; 1." (artifact)
-            .replace(/\.\s*1\./g, '.')  // Remove ". 1." -> "." (artifact at end of sentence)
-            .replace(/\s+1\.\s*$/gm, '')  // Remove " 1." at END of lines only
-            // Note: Do NOT remove "1." at START of lines (legitimate lists)
-          
-          console.log('Final content for display:', content.substring(0, 200))
-          
-          documentData = {
-            id: String(document.id),
-            name: document.originalFileName || document.title || 'Untitled',
-            type: document.fileType?.toUpperCase() || 'DOCX',
-            uploadedAt: document.createdAt || new Date().toISOString(),
-            uploadedBy: document.uploadedBy || 'Unknown',
-            size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
-            content: content
-          }
+        // Clean artifacts immediately after extraction (but preserve legitimate lists)
+        content = content
+          .replace(/;\s*1\./g, '')  // Remove "; 1." (artifact)
+          .replace(/\.\s*1\./g, '.')  // Remove ". 1." -> "." (artifact at end of sentence)
+          .replace(/\s+1\.\s*$/gm, '')  // Remove " 1." at END of lines only
+          // Note: Do NOT remove "1." at START of lines (legitimate lists)
+        
+        console.log('Final content for display:', content.substring(0, 200))
+        console.log('Found tables:', tables.length)
+        
+        documentData = {
+          id: String(document.id),
+          name: document.originalFileName || document.title || 'Untitled',
+          type: document.fileType?.toUpperCase() || 'DOCX',
+          uploadedAt: document.createdAt || new Date().toISOString(),
+          uploadedBy: document.uploadedBy || 'Unknown',
+          size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
+          content: content,
+          tables: tables.length > 0 ? tables : undefined
+        }
           
           setDocumentData(documentData)
             
@@ -361,11 +339,15 @@ export default function DocumentReaderPage() {
   if (!documentData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-xl font-semibold text-foreground dark:text-white mb-2">Document Not Found</h2>
-          <p className="text-muted-foreground mb-4">The requested document could not be found.</p>
-          <Button onClick={handleBack}>
+        <div className="text-center px-4">
+          <FileText className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 sm:mb-6 text-muted-foreground" />
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-white mb-3 sm:mb-4 leading-tight">
+            Document Not Found
+          </h2>
+          <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 leading-relaxed max-w-md mx-auto">
+            The requested document could not be found.
+          </p>
+          <Button onClick={handleBack} size="lg">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Assignments
           </Button>
@@ -379,13 +361,13 @@ export default function DocumentReaderPage() {
       {/* Header */}
       <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center min-w-0">
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
+          <div className="flex justify-between items-center h-16 sm:h-18">
+            <div className="flex items-center min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground dark:text-white truncate leading-tight mb-0.5">
                   {assignmentData?.name || documentData.name}
                 </h1>
-                <p className="text-sm text-muted-foreground truncate">
+                <p className="text-sm sm:text-base text-muted-foreground truncate leading-relaxed">
                   {documentData.name}
                 </p>
               </div>
@@ -401,7 +383,7 @@ export default function DocumentReaderPage() {
 
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-6 pb-4 md:py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Document Content */}
           <div className="lg:col-span-3">
@@ -409,34 +391,28 @@ export default function DocumentReaderPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      {documentData.name}
+                    <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold leading-tight">
+                      <FileText className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                      <span className="break-words">{documentData.name}</span>
                     </CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-3 sm:p-6">
-                <div className="prose max-w-none">
-                  {documentData.type === 'PDF' ? (
-                    <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
-                      <iframe 
-                        src={`/api/documents/${encodeURIComponent(documentData.name)}`}
-                        className="w-full h-full"
-                        title={documentData.name}
-                      />
-                    </div>
-                  ) : (
-                    <div 
-                      className="document-content prose max-w-none overflow-x-auto"
-                      dangerouslySetInnerHTML={{ 
-                        __html: documentData.content.includes('<table') 
-                          ? documentData.content // HTML already rendered (xlsx)
-                          : renderFormattedText(documentData.content) // Process text (docx)
-                      }}
+              <CardContent className="p-4 sm:p-6 lg:p-8">
+                {documentData.type === 'PDF' ? (
+                  <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
+                    <iframe 
+                      src={`/api/documents/${encodeURIComponent(documentData.name)}`}
+                      className="w-full h-full"
+                      title={documentData.name}
                     />
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <DocumentRenderer 
+                    content={documentData.content} 
+                    tables={documentData.tables}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
@@ -448,19 +424,28 @@ export default function DocumentReaderPage() {
               {assignmentData?.test ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <TestTube className="h-5 w-5" />
-                      {t('testAvailable')}
+                    <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
+                      <TestTube className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                      <span>{t('testAvailable')}</span>
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
                       {t('completeTheTestAfterReadingTheDocument')}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-sm text-muted-foreground">
-                      <p><strong>{t('testLabel')}:</strong> {assignmentData?.test?.title || t('test')}</p>
-                      <p><strong>{t('questionsLabel')}:</strong> {assignmentData?.test?.questionCount || 0}</p>
-                      <p><strong>{t('estimatedTime')}:</strong> 15 {t('minutes')}</p>
+                    <div className="text-sm sm:text-base text-muted-foreground space-y-2.5 leading-relaxed">
+                      <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                        <strong className="font-semibold text-foreground">{t('testLabel')}:</strong>
+                        <span>{assignmentData?.test?.title || t('test')}</span>
+                      </p>
+                      <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                        <strong className="font-semibold text-foreground">{t('questionsLabel')}:</strong>
+                        <span>{assignmentData?.test?.questionCount || 0}</span>
+                      </p>
+                      <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                        <strong className="font-semibold text-foreground">{t('estimatedTime')}:</strong>
+                        <span>15 {t('minutes')}</span>
+                      </p>
                     </div>
                     
                     <Button 
@@ -478,11 +463,11 @@ export default function DocumentReaderPage() {
                 assignmentData && assignmentData.status !== 'completed' && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <BookOpen className="h-5 w-5" />
-                        {t('readingAssignment')}
+                      <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
+                        <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span>{t('readingAssignment')}</span>
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
                         {t('markAsCompleteAfterReading')}
                       </CardDescription>
                     </CardHeader>

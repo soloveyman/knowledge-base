@@ -43,7 +43,49 @@ export function ListItem({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-1.5">
-          <h3 className="font-medium text-foreground truncate">{title}</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-medium text-foreground truncate">{title}</h3>
+            {badges.length > 0 && (
+              <div className="flex items-center space-x-2 shrink-0">
+                {badges.map((badge, index) => {
+                  // Try to determine badge type and use appropriate config
+                  let config = badge
+                  
+                  // Check if it's a status badge (including ready)
+                  if (badge.label && ['active', 'inactive', 'failed', 'pending', 'completed', 'ready', 'draft', 'published', 'archived'].includes(badge.label.toLowerCase())) {
+                    config = getStatusBadge(badge.label)
+                  }
+                  // Check if it's a role badge
+                  else if (badge.label && ['employee', 'manager', 'owner', 'admin'].includes(badge.label.toLowerCase())) {
+                    config = getRoleBadge(badge.label)
+                  }
+                  // Check if it's a difficulty badge
+                  else if (badge.label && ['easy', 'medium', 'hard'].includes(badge.label.toLowerCase())) {
+                    config = getDifficultyBadge(badge.label)
+                  }
+                  // Check if it's a locale badge
+                  else if (badge.label && ['en', 'es', 'fr', 'de', 'english', 'spanish', 'french', 'german'].includes(badge.label.toLowerCase())) {
+                    config = getLocaleBadge(badge.label)
+                  }
+                  // Check if it's a count badge
+                  else if (badge.label && badge.label.includes('employee')) {
+                    const count = parseInt(badge.label.match(/\d+/)?.[0] || '0')
+                    config = getCountBadge('employees', count)
+                  }
+                  
+                  return (
+                    <Badge 
+                      key={index}
+                      variant={config.variant || "outline"} 
+                      className="text-xs"
+                    >
+                      {translateBadge(config.label)}
+                    </Badge>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         {subtitle && (
           <p className="text-sm text-muted-foreground truncate">{subtitle}</p>
         )}
@@ -52,46 +94,6 @@ export function ListItem({
             {metadata.map((item, index) => (
               <span key={index}>{item}</span>
             ))}
-          </div>
-        )}
-        {badges.length > 0 && (
-          <div className="flex items-center space-x-2 mt-2">
-            {badges.map((badge, index) => {
-              // Try to determine badge type and use appropriate config
-              let config = badge
-              
-              // Check if it's a status badge
-              if (badge.label && ['active', 'inactive', 'failed', 'pending', 'completed', 'draft', 'published', 'archived'].includes(badge.label.toLowerCase())) {
-                config = getStatusBadge(badge.label)
-              }
-              // Check if it's a role badge
-              else if (badge.label && ['employee', 'manager', 'owner', 'admin'].includes(badge.label.toLowerCase())) {
-                config = getRoleBadge(badge.label)
-              }
-              // Check if it's a difficulty badge
-              else if (badge.label && ['easy', 'medium', 'hard'].includes(badge.label.toLowerCase())) {
-                config = getDifficultyBadge(badge.label)
-              }
-              // Check if it's a locale badge
-              else if (badge.label && ['en', 'es', 'fr', 'de', 'english', 'spanish', 'french', 'german'].includes(badge.label.toLowerCase())) {
-                config = getLocaleBadge(badge.label)
-              }
-              // Check if it's a count badge
-              else if (badge.label && badge.label.includes('employee')) {
-                const count = parseInt(badge.label.match(/\d+/)?.[0] || '0')
-                config = getCountBadge('employees', count)
-              }
-              
-              return (
-                <Badge 
-                  key={index}
-                  variant={config.variant || "outline"} 
-                  className="text-xs"
-                >
-                  {translateBadge(config.label)}
-                </Badge>
-              )
-            })}
           </div>
         )}
         </div>

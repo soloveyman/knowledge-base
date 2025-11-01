@@ -367,22 +367,6 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
         // Process rows
         const rows = jsonData as string[][]
         
-        // Check if first row looks like actual headers (short strings, no numbers)
-        const firstRow = rows[0] || []
-        // Look for common header patterns: title case, short descriptions, task-related words
-        const looksLikeHeaders = firstRow.length > 0 && 
-          firstRow.every(cell => {
-            const str = String(cell).trim()
-            const lower = str.toLowerCase()
-            // Common header patterns in multiple languages
-            const headerKeywords = ['задача', 'сотрудник', 'отметка', 'контроль', '№', 'номер', 'task', 'employee', 'name', 'description', 'дата', 'date', 'время', 'time']
-            return str.length > 0 && // Non-empty
-                   str.length < 100 && // Reasonable length for headers
-                   !/^\d+(\.\d+)?\s*(ml|g|шт|гр)$/i.test(str) && // Not quantities
-                   (str.length < 50 || headerKeywords.some(keyword => lower.includes(keyword)))
-          }) &&
-          rows.length > 1 // Must have at least 2 rows (headers + data)
-        
         // Helper function to filter empty rows
         const filterEmptyRows = (rowsArray: string[][]) => {
           return rowsArray.filter(row => 
@@ -390,51 +374,261 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
           )
         }
         
-        if (looksLikeHeaders && rows.length > 1) {
-          // First row is headers, rest is data
-          const headers = firstRow.map(h => String(h))
-          const dataRows = filterEmptyRows(rows.slice(1))
+        // Helper function to check if text looks like a table title
+        const isTableTitle = (text: string): boolean => {
+          if (!text || text.trim().length === 0) return false
           
-          if (dataRows.length > 0) {
-            tables.push({
-              title: sheetName,
-              headers: headers,
-              rows: dataRows.map(row => row.map(cell => String(cell)))
-            })
+          const lower = text.toLowerCase()
+          const trimmed = text.trim()
+          
+          // Long text (likely a title)
+          if (trimmed.length > 80) return true
+          
+          // Common table title keywords (Russian and English)
+          const titleKeywords = [
+            'план', 'график', 'список', 'отчет', 'таблица', 'расписание',
+            'plan', 'schedule', 'list', 'report', 'table', 'chart',
+            'инструкция', 'руководство', 'правила', 'процедура',
+            'instruction', 'guide', 'rules', 'procedure',
+            'выполнение', 'контроль', 'проверка', 'отметка',
+            'execution', 'control', 'check', 'mark'
+          ]
+          
+          // Check for title patterns
+          if (titleKeywords.some(keyword => lower.includes(keyword))) {
+            // If it's long or contains multiple words, likely a title
+            if (trimmed.length > 30 || trimmed.split(/\s+/).length > 3) {
+              return true
+            }
           }
-        } else {
-          // All rows are data rows, treat all as data
-          if (rows.length > 0 && firstRow.length > 0) {
-            // Filter out empty rows
-            const nonEmptyRows = filterEmptyRows(rows)
+          
+          // All caps with multiple words (often titles)
+          if (trimmed === trimmed.toUpperCase() && trimmed.split(/\s+/).length >= 3) {
+            return true
+          }
+          
+          return false
+        }
+        
+        // Helper function to check if row looks like column headers
+        const isColumnHeaders = (row: string[]): boolean => {
+          if (!row || row.length === 0) return false
+          
+          // Check if cells look like headers (short, common header words)
+          const headerKeywords = [
+            'задача', 'сотрудник', 'отметка', 'контроль', '№', 'номер', 
+            'task', 'employee', 'name', 'description', 'дата', 'date', 
+            'время', 'time', 'имя', 'фамилия', 'должность', 'статус',
+            'firstname', 'lastname', 'position', 'status', 'role', 'роль'
+          ]
+          
+          const nonEmptyCells = row.filter(cell => {
+            const str = String(cell).trim()
+            return str.length > 0
+          })
+          
+          if (nonEmptyCells.length === 0) return false
+          
+          // Most cells should be short (headers are typically short)
+          const shortCells = nonEmptyCells.filter(cell => {
+            const str = String(cell).trim()
+            return str.length < 50 && str.length > 0
+          })
+          
+          // Check if cells contain header keywords or are very short
+          const hasHeaderKeywords = nonEmptyCells.some(cell => {
+            const str = String(cell).trim().toLowerCase()
+            return headerKeywords.some(keyword => str.includes(keyword))
+          })
+          
+          // Headers should be:
+          // 1. Mostly short cells (< 50 chars)
+          // 2. Contain header keywords OR all cells are reasonably short
+          // 3. Not contain quantities
+          const isShortEnough = (shortCells.length / nonEmptyCells.length) >= 0.6
+          const noQuantities = nonEmptyCells.every(cell => {
+            const str = String(cell).trim()
+            return !/^\d+(\.\d+)?\s*(ml|g|шт|гр|кг|л)$/i.test(str)
+          })
+          
+          return isShortEnough && noQuantities && (hasHeaderKeywords || nonEmptyCells.every(cell => String(cell).trim().length < 30))
+        }
+        
+        // Helper function to detect day of week headings (same as in parseTextToStructuredContent)
+        const isDayOfWeekRow = (row: string[]): boolean => {
+          if (!row || row.length === 0) return false
+          const firstCell = String(row[0] || '').trim()
+          if (!firstCell || firstCell.length < 3) return false
+          
+          const russianDays = [
+            'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье',
+            'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'
+          ]
+          const englishDays = [
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
+          ]
+          
+          const dayPattern = new RegExp(
+            `^(${[...russianDays, ...englishDays].join('|')})[:!.]?$`,
+            'i'
+          )
+          
+          return dayPattern.test(firstCell)
+        }
+        
+        // Detect multiple tables by days of week (split by day headings)
+        const dayRowIndices: number[] = []
+        rows.forEach((row, idx) => {
+          if (isDayOfWeekRow(row)) {
+            dayRowIndices.push(idx)
+          }
+        })
+        
+        // If we have multiple day sections, process each separately
+        if (dayRowIndices.length > 0) {
+          // Process each day section
+          for (let dayIdx = 0; dayIdx < dayRowIndices.length; dayIdx++) {
+            const dayRowIdx = dayRowIndices[dayIdx]
+            const nextDayRowIdx = dayIdx < dayRowIndices.length - 1 ? dayRowIndices[dayIdx + 1] : rows.length
+            const daySection = rows.slice(dayRowIdx, nextDayRowIdx)
             
-            if (nonEmptyRows.length > 0) {
-              // Use first row as data and create empty headers (will be hidden in render)
-              const headers: string[] = [] // Empty headers to indicate no headers
+            if (daySection.length === 0) continue
+            
+            const dayTitleRow = daySection[0] || []
+            const dayTitle = String(dayTitleRow[0] || '').trim()
+            let columnHeaders: string[] = []
+            let dataRows: string[][] = []
+            
+            // Look for headers in the section (usually row after day title)
+            if (daySection.length > 1) {
+              // Try to find headers in next few rows after day title
+              for (let i = 1; i < Math.min(daySection.length, 4); i++) {
+                const row = daySection[i] || []
+                if (isColumnHeaders(row)) {
+                  columnHeaders = row.map(h => String(h).trim())
+                  // Get all rows after headers as data
+                  dataRows = filterEmptyRows(daySection.slice(i + 1))
+                  break
+                }
+              }
               
+              // If no headers found, check if first row after day title looks like data
+              // In this case, we'll create headers based on first data row length
+              if (columnHeaders.length === 0 && daySection.length > 1) {
+                // Find first non-empty row after day title
+                const firstDataRow = daySection.find((row, idx) => idx > 0 && row.some(cell => String(cell).trim().length > 0))
+                if (firstDataRow) {
+                  // Create empty headers matching the number of columns in data
+                  const numColumns = firstDataRow.length
+                  columnHeaders = Array(numColumns).fill('')
+                  dataRows = filterEmptyRows(daySection.slice(1))
+                }
+              }
+            }
+            
+            // Normalize headers to match data rows length
+            if (dataRows.length > 0) {
+              const maxCols = Math.max(...dataRows.map(row => row.length))
+              if (columnHeaders.length < maxCols) {
+                // Extend headers with empty strings to match data columns
+                columnHeaders = [...columnHeaders, ...Array(maxCols - columnHeaders.length).fill('')]
+              } else if (columnHeaders.length > maxCols) {
+                // Trim headers to match data columns
+                columnHeaders = columnHeaders.slice(0, maxCols)
+              }
+            }
+            
+            // Create table for this day section
+            if (dataRows.length > 0) {
               tables.push({
-                title: sheetName,
-                headers: headers,
-                rows: nonEmptyRows.map(row => row.map(cell => String(cell)))
+                title: dayTitle || `Day ${dayIdx + 1}`,
+                headers: columnHeaders,
+                rows: dataRows.map(row => row.map(cell => String(cell)))
               })
             }
+          }
+        } else {
+          // Original logic for single table per sheet
+          let tableTitle = sheetName // Default to sheet name
+          let columnHeaders: string[] = []
+          let dataRows: string[][] = []
+          
+          if (rows.length > 0) {
+            const firstRow = rows[0] || []
+            const firstRowText = firstRow.join(' ').trim()
+            
+            // Check if first row is a table title (long text, title keywords, spans many columns)
+            if (isTableTitle(firstRowText) || (firstRow.length === 1 && firstRowText.length > 50)) {
+              tableTitle = firstRowText
+              
+              // Check if second row (or next non-empty row) contains headers
+              if (rows.length > 1) {
+                for (let i = 1; i < Math.min(rows.length, 4); i++) {
+                  const row = rows[i] || []
+                  if (isColumnHeaders(row)) {
+                    columnHeaders = row.map(h => String(h).trim())
+                    dataRows = filterEmptyRows(rows.slice(i + 1))
+                    break
+                  }
+                }
+                
+                // If no headers found, create empty headers based on data
+                if (columnHeaders.length === 0 && dataRows.length === 0) {
+                  const firstDataRow = rows.find((row, idx) => idx > 0 && row.some(cell => String(cell).trim().length > 0))
+                  if (firstDataRow) {
+                    const numColumns = firstDataRow.length
+                    columnHeaders = Array(numColumns).fill('')
+                    dataRows = filterEmptyRows(rows.slice(1))
+                  }
+                }
+              }
+            } else if (isColumnHeaders(firstRow)) {
+              // First row is headers, no separate title
+              columnHeaders = firstRow.map(h => String(h).trim())
+              dataRows = filterEmptyRows(rows.slice(1))
+            } else {
+              // No clear title or headers, create empty headers based on data
+              if (rows.length > 0) {
+                const maxCols = Math.max(...rows.map(row => row.length))
+                columnHeaders = Array(maxCols).fill('')
+                dataRows = filterEmptyRows(rows)
+              }
+            }
+          }
+          
+          // Normalize headers to match data rows length
+          if (dataRows.length > 0) {
+            const maxCols = Math.max(...dataRows.map(row => row.length))
+            if (columnHeaders.length < maxCols) {
+              columnHeaders = [...columnHeaders, ...Array(maxCols - columnHeaders.length).fill('')]
+            } else if (columnHeaders.length > maxCols) {
+              columnHeaders = columnHeaders.slice(0, maxCols)
+            }
+          }
+          
+          // Final check: if we have headers and data, create table
+          const hasValidTable = columnHeaders.length > 0 && dataRows.length > 0
+          
+          // Create table if we have valid structure
+          if (hasValidTable) {
+            tables.push({
+              title: tableTitle,
+              headers: columnHeaders,
+              rows: dataRows.map(row => row.map(cell => String(cell)))
+            })
+          } else if (dataRows.length > 0) {
+            // Create table with data but no headers (but ensure headers array matches)
+            tables.push({
+              title: tableTitle,
+              headers: columnHeaders,
+              rows: dataRows.map(row => row.map(cell => String(cell)))
+            })
           }
         }
         
         // Add text content only if no table was created for this sheet
-        const hasTable = rows.length > 0 && (
-          (looksLikeHeaders && rows.length > 1) || 
-          (!looksLikeHeaders && filterEmptyRows(rows).length > 0)
-        )
-        
-        if (!hasTable) {
-          rows.forEach(row => {
-            const rowText = row.filter(cell => cell && String(cell).trim()).join(' | ')
-            if (rowText) {
-              text += rowText + '\n'
-            }
-          })
-        }
+        // (This is handled within the table creation logic above)
       }
     })
 
@@ -651,6 +845,19 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         order: sectionOrder++
       }
     }
+    // Check for days of the week (Monday, Tuesday, etc. or Russian equivalents)
+    else if (isDayOfWeekHeading(trimmedLine)) {
+      if (currentSection) {
+        sections.push(currentSection)
+      }
+      
+      currentSection = {
+        title: trimmedLine,
+        level: 2, // Все дни недели - один уровень
+        content: '',
+        order: sectionOrder++
+      }
+    }
     // Check for all-caps headings (simple heuristic)
     else if (trimmedLine.length > 3 && trimmedLine === trimmedLine.toUpperCase() && !trimmedLine.includes('|')) {
       if (currentSection) {
@@ -748,4 +955,59 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       totalImages: 0
     }
   }
+}
+
+// Helper function to detect days of the week as headings
+function isDayOfWeekHeading(line: string): boolean {
+  if (!line || line.length < 3) return false
+  
+  // Normalize line - remove trailing punctuation but keep for matching
+  const normalized = line.trim()
+  const lineLower = normalized.toLowerCase()
+  
+  // Russian days of the week (case-insensitive)
+  const russianDays = [
+    'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье',
+    'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'
+  ]
+  
+  // English days of the week (case-insensitive)
+  const englishDays = [
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
+  ]
+  
+  // Check if line starts with or is a day name (with optional colon/punctuation)
+  const dayPattern = new RegExp(
+    `^(${[...russianDays, ...englishDays].join('|')})[:!.]?$`,
+    'i'
+  )
+  
+  // Check if it's a day name
+  if (dayPattern.test(normalized)) {
+    return true
+  }
+  
+  // Check if it's a day name followed by colon/exclamation and optional text (like "ВТОРНИК:" or "СРЕДА:")
+  const dayWithTextPattern = new RegExp(
+    `^(${[...russianDays, ...englishDays].join('|')})[:!]\\s*.+`,
+    'i'
+  )
+  
+  if (dayWithTextPattern.test(normalized)) {
+    return true
+  }
+  
+  // Also check for uppercase versions (common in documents like "ВТОРНИК:" or "СРЕДА:")
+  const upperLine = normalized.toUpperCase()
+  const upperDayPattern = new RegExp(
+    `^(${[...russianDays, ...englishDays].map(d => d.toUpperCase()).join('|')})[:!.]?$`,
+    'i'
+  )
+  
+  if (upperDayPattern.test(upperLine)) {
+    return true
+  }
+  
+  return false
 }
