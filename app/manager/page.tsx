@@ -263,7 +263,51 @@ function ManagerPageInner() {
       const testsResponse = await fetch('/api/tests')
       const testsResult = await testsResponse.json()
       if (testsResult.success) {
-        setSavedTestsWithLog(testsResult.data.tests)
+        // Transform tests to match the expected format
+        const transformedTests = await Promise.all(
+          (testsResult.data.tests as Array<{
+            id: string
+            title: string
+            type?: string | null
+            difficulty?: string | null
+            locale?: string | null
+            questionIds?: string[] | null
+            moduleId?: string | null
+            createdAt: string
+            createdBy: string
+          }>).map(async (test) => {
+            // Calculate questionCount from questionIds
+            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+            
+            // Fetch document to get sourceDocument name
+            let sourceDocument = 'Unknown'
+            if (test.moduleId) {
+              try {
+                const docResponse = await fetch(`/api/documents/${test.moduleId}`)
+                const docResult = await docResponse.json()
+                if (docResult.success && docResult.data.document) {
+                  sourceDocument = docResult.data.document.originalFileName || docResult.data.document.title || 'Unknown'
+                }
+              } catch (error) {
+                console.error('Error fetching document for test:', error)
+              }
+            }
+            
+            return {
+              id: test.id,
+              title: test.title,
+              type: test.type || 'mcq',
+              difficulty: test.difficulty || 'medium',
+              locale: test.locale || 'en',
+              questionCount,
+              questions: [], // Not needed for the card display
+              sourceDocument,
+              createdAt: test.createdAt,
+              createdBy: test.createdBy
+            }
+          })
+        )
+        setSavedTestsWithLog(transformedTests)
       }
 
       // Load documents

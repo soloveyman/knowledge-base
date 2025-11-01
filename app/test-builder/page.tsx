@@ -179,15 +179,15 @@ export default function TestBuilderPage() {
         console.log('Test Builder: Test moduleId:', test.moduleId)
         console.log('Test Builder: Questions count:', questions.length)
         
-        // Load test configuration
+        // Load test configuration - use saved test data
         const loadedConfig = {
           count: test.questionIds?.length || 5,
-          type: questions.length > 0 ? questions[0].type || 'mcq' : 'mcq',
-          difficulty: questions.length > 0 ? questions[0].difficulty || 'medium' : 'medium',
-          locale: 'ru' // Default locale
+          type: test.type || (questions.length > 0 ? questions[0].type || 'mcq' : 'mcq'),
+          difficulty: test.difficulty || (questions.length > 0 ? questions[0].difficulty || 'medium' : 'medium'),
+          locale: test.locale || 'en'
         }
         
-        // Update validation values for test config (documentId will be set when document loads)
+        // Update validation values for test config - documentId will be set when document loads
         validation.setValues({
           ...validation.values,
           count: loadedConfig.count,
@@ -237,18 +237,16 @@ export default function TestBuilderPage() {
                 if (!existingDoc) {
                   // Add document to list if not present
                   console.log('Test Builder: Adding document to documents list:', documentToSet.id)
-                  const newList = [...prevDocs, documentToSet]
-                  console.log('Test Builder: New documents list length:', newList.length)
-                  return newList
+                  return [...prevDocs, documentToSet]
                 } else {
                   console.log('Test Builder: Document already in list:', documentToSet.id)
+                  return prevDocs
                 }
-                return prevDocs
               })
               
-              // Use requestAnimationFrame to ensure state updates are processed
-              requestAnimationFrame(() => {
-                console.log('Test Builder: Setting selectedDocument via requestAnimationFrame to:', documentToSet.id)
+              // Set selectedDocument and documentId - use setTimeout to ensure documents list is updated
+              setTimeout(() => {
+                console.log('Test Builder: Setting selectedDocument to:', documentToSet.id)
                 setSelectedDocument(documentToSet)
                 validation.setValues({ 
                   ...validation.values, 
@@ -258,12 +256,7 @@ export default function TestBuilderPage() {
                   difficulty: loadedConfig.difficulty,
                   locale: loadedConfig.locale
                 })
-                
-                // Double-check after a brief delay
-                setTimeout(() => {
-                  console.log('Test Builder: Verifying selectedDocument after delay')
-                }, 200)
-              })
+              }, 100)
               
               // Use actual document content from parsedContent
               let documentContent = ''
@@ -336,6 +329,7 @@ export default function TestBuilderPage() {
                   createdAt: docInList.createdAt,
                   updatedAt: docInList.updatedAt
                 }
+                // Set selectedDocument and documentId synchronously
                 setSelectedDocument(docObj)
                 validation.setValues({ 
                   ...validation.values, 
@@ -708,6 +702,9 @@ export default function TestBuilderPage() {
             title: `${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'} - Test`,
             description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
             questionIds: generatedQuestions.map(q => q.id),
+            type: testConfig.type,
+            difficulty: testConfig.difficulty,
+            locale: testConfig.locale,
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
@@ -734,6 +731,9 @@ export default function TestBuilderPage() {
             description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
             moduleId: selectedDocument.id,
             questions: generatedQuestions, // Send the actual question objects
+            type: testConfig.type,
+            difficulty: testConfig.difficulty,
+            locale: testConfig.locale,
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,

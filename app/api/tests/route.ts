@@ -61,6 +61,9 @@ export async function POST(request: Request) {
       moduleId, 
       questionIds, 
       questions, // The actual question objects
+      type,
+      difficulty,
+      locale,
       passingScore, 
       timeLimit, 
       maxAttempts, 
@@ -151,6 +154,9 @@ export async function POST(request: Request) {
       description: description || '',
       moduleId: null, // Documents are not modules, so set to null
       questionIds: finalQuestionIds, // Array of question IDs
+      type: type || null,
+      difficulty: difficulty || null,
+      locale: locale || null,
       passingScore: passingScore || 70,
       timeLimit: timeLimit || null,
       maxAttempts: maxAttempts || 1,

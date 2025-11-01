@@ -129,6 +129,9 @@ export const tests = pgTable('tests', {
   title: text('title').notNull(),
   description: text('description'),
   questionIds: json('question_ids'), // Array of question IDs
+  type: text('type'), // 'mcq', 'mcq_multi', 'tf', etc.
+  difficulty: text('difficulty'), // 'easy', 'medium', 'hard'
+  locale: text('locale'), // 'en', 'ru', etc.
   passingScore: integer('passing_score').default(70), // Percentage
   timeLimit: integer('time_limit'), // in minutes, null = no limit
   maxAttempts: integer('max_attempts').default(1),

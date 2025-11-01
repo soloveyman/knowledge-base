@@ -106,6 +106,9 @@ export async function PUT(
     const updateData: {
       title?: string
       description?: string | null
+      type?: string | null
+      difficulty?: string | null
+      locale?: string | null
       passingScore?: number | null
       timeLimit?: number | null
       maxAttempts?: number | null
@@ -119,6 +122,9 @@ export async function PUT(
     
     if (body.title !== undefined) updateData.title = body.title
     if (body.description !== undefined) updateData.description = body.description
+    if (body.type !== undefined) updateData.type = body.type
+    if (body.difficulty !== undefined) updateData.difficulty = body.difficulty
+    if (body.locale !== undefined) updateData.locale = body.locale
     if (body.passingScore !== undefined) updateData.passingScore = body.passingScore
     if (body.timeLimit !== undefined) updateData.timeLimit = body.timeLimit
     if (body.maxAttempts !== undefined) updateData.maxAttempts = body.maxAttempts

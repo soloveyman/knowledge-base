@@ -41,7 +41,7 @@ export function TestsPage({
     id: test.id,
     title: test.title,
     subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${new Date(test.createdAt).toLocaleDateString()}`,
-    metadata: [`${t('source')}: ${test.sourceDocument}`],
+    metadata: [],
     badges: [
       { label: translateBadge(test.difficulty || 'medium'), variant: "outline" as const },
       { label: translateBadge(test.locale || 'en'), variant: "secondary" as const }
