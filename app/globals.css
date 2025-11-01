@@ -409,7 +409,7 @@
 
 .prose th,
 .prose td {
-  @apply border border-border px-4 py-2;
+  @apply border-x-0 border-y border-border px-4 py-2;
 }
 
 .prose th {
@@ -465,6 +465,8 @@
   text-align: left;
   padding: 0.75rem;
   border-bottom: 2px solid var(--border);
+  border-left: 0;
+  border-right: 0;
   background-color: var(--muted);
   white-space: normal;
   word-wrap: break-word;
@@ -473,6 +475,8 @@
 .document-content table td {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
+  border-left: 0;
+  border-right: 0;
   font-size: 0.95rem;
   white-space: normal;
   word-wrap: break-word;

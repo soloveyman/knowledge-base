@@ -149,7 +149,7 @@ function DocumentContent({ content }: { content: string }) {
         ),
         table: ({ children }) => (
           <div className="overflow-x-auto my-6 rounded-lg border border-border">
-            <table className="min-w-full divide-y divide-border">
+            <table className="min-w-full divide-y divide-border border-collapse">
               {children}
             </table>
           </div>
@@ -158,12 +158,12 @@ function DocumentContent({ content }: { content: string }) {
           <thead className="bg-muted">{children}</thead>
         ),
         th: ({ children }) => (
-          <th className="px-4 py-3 text-left text-sm font-semibold text-foreground border-b border-border">
+          <th className="px-4 py-3 text-left text-sm font-semibold text-foreground border-b border-x-0 border-border">
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td className="px-4 py-3 text-sm text-foreground border-b border-border">
+          <td className="px-4 py-3 text-sm text-foreground border-b border-x-0 border-border">
             {children}
           </td>
         ),
@@ -224,7 +224,7 @@ function TableRenderer({ table }: {
         </h3>
       )}
       <div className="overflow-x-auto rounded-lg border border-border shadow-sm">
-        <table className="min-w-full divide-y divide-border bg-background text-xs">
+        <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse">
           {hasHeaders && (
             <thead className="bg-muted/50">
               <tr>
@@ -233,7 +233,7 @@ function TableRenderer({ table }: {
                   return (
                     <th
                       key={idx}
-                      className={`px-4 py-2 text-left font-medium uppercase tracking-wider border-b border-border bg-muted/50 text-xs ${
+                      className={`px-4 py-2 text-left font-medium uppercase tracking-wider border-b border-x-0 border-border bg-muted/50 text-xs ${
                         isEmpty 
                           ? 'text-transparent' 
                           : 'text-foreground'
@@ -255,7 +255,7 @@ function TableRenderer({ table }: {
                 {row.map((cell, cellIdx) => (
                   <td
                     key={cellIdx}
-                    className="px-4 py-3 whitespace-nowrap text-xs text-foreground"
+                    className="px-4 py-3 whitespace-nowrap text-xs text-foreground border-x-0"
                   >
                     {cell || '\u00A0'}
                   </td>
