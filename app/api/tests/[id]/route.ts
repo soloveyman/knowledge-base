@@ -13,18 +13,89 @@ export async function GET(
     
     console.log('GET request for test ID:', id, 'checkDependencies:', checkDependencies)
 
-    // Find test by ID
-    const test = await db.select().from(tests).where(eq(tests.id, id)).limit(1)
-    console.log('Test query result:', test.length, 'tests found')
-    
-    if (test.length === 0) {
-      return NextResponse.json({
-        success: false,
-        message: 'Test not found'
-      }, { status: 404 })
-    }
+    // Find test by ID - handle missing columns gracefully
+    let testData
+    try {
+      const test = await db
+        .select({
+          id: tests.id,
+          moduleId: tests.moduleId,
+          title: tests.title,
+          description: tests.description,
+          questionIds: tests.questionIds,
+          type: tests.type,
+          difficulty: tests.difficulty,
+          locale: tests.locale,
+          passingScore: tests.passingScore,
+          timeLimit: tests.timeLimit,
+          maxAttempts: tests.maxAttempts,
+          shuffleQuestions: tests.shuffleQuestions,
+          showCorrectAnswers: tests.showCorrectAnswers,
+          status: tests.status,
+          isActive: tests.isActive,
+          createdBy: tests.createdBy,
+          createdAt: tests.createdAt,
+          updatedAt: tests.updatedAt
+        })
+        .from(tests)
+        .where(eq(tests.id, id))
+        .limit(1)
+      console.log('Test query result:', test.length, 'tests found')
+      
+      if (test.length === 0) {
+        return NextResponse.json({
+          success: false,
+          message: 'Test not found'
+        }, { status: 404 })
+      }
 
-    const testData = test[0]
+      testData = test[0]
+    } catch (selectError: unknown) {
+      // Fallback if new columns don't exist
+      const errorMessage = selectError instanceof Error ? selectError.message : String(selectError)
+      if (errorMessage.includes('column "type" does not exist') || 
+          errorMessage.includes('column "difficulty" does not exist') ||
+          errorMessage.includes('column "locale" does not exist')) {
+        console.log('New columns not found, using fallback query')
+        const test = await db
+          .select({
+            id: tests.id,
+            moduleId: tests.moduleId,
+            title: tests.title,
+            description: tests.description,
+            questionIds: tests.questionIds,
+            passingScore: tests.passingScore,
+            timeLimit: tests.timeLimit,
+            maxAttempts: tests.maxAttempts,
+            shuffleQuestions: tests.shuffleQuestions,
+            showCorrectAnswers: tests.showCorrectAnswers,
+            status: tests.status,
+            isActive: tests.isActive,
+            createdBy: tests.createdBy,
+            createdAt: tests.createdAt,
+            updatedAt: tests.updatedAt
+          })
+          .from(tests)
+          .where(eq(tests.id, id))
+          .limit(1)
+        
+        if (test.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: 'Test not found'
+          }, { status: 404 })
+        }
+        
+        testData = {
+          ...test[0],
+          type: null,
+          difficulty: null,
+          locale: null
+        }
+      } else {
+        throw selectError
+      }
+    }
     
     // If just checking dependencies, return assignments info
     if (checkDependencies) {
@@ -92,8 +163,12 @@ export async function PUT(
     console.log('PUT request for test ID:', id)
     console.log('Update data:', body)
 
-    // Check if test exists
-    const existingTest = await db.select().from(tests).where(eq(tests.id, id)).limit(1)
+    // Check if test exists - select only id to avoid column errors
+    const existingTest = await db
+      .select({ id: tests.id })
+      .from(tests)
+      .where(eq(tests.id, id))
+      .limit(1)
     
     if (existingTest.length === 0) {
       return NextResponse.json({
@@ -122,20 +197,48 @@ export async function PUT(
     
     if (body.title !== undefined) updateData.title = body.title
     if (body.description !== undefined) updateData.description = body.description
-    if (body.type !== undefined) updateData.type = body.type
-    if (body.difficulty !== undefined) updateData.difficulty = body.difficulty
-    if (body.locale !== undefined) updateData.locale = body.locale
     if (body.passingScore !== undefined) updateData.passingScore = body.passingScore
     if (body.timeLimit !== undefined) updateData.timeLimit = body.timeLimit
     if (body.maxAttempts !== undefined) updateData.maxAttempts = body.maxAttempts
     if (body.shuffleQuestions !== undefined) updateData.shuffleQuestions = body.shuffleQuestions
     if (body.showCorrectAnswers !== undefined) updateData.showCorrectAnswers = body.showCorrectAnswers
     if (body.status !== undefined) updateData.status = body.status
+    
+    // Only include new columns if they're provided (they might not exist in DB yet)
+    if (body.type !== undefined) updateData.type = body.type
+    if (body.difficulty !== undefined) updateData.difficulty = body.difficulty
+    if (body.locale !== undefined) updateData.locale = body.locale
 
-    // Update the test
-    await db.update(tests)
-      .set(updateData)
-      .where(eq(tests.id, id))
+    // Update the test - wrap in try/catch to handle missing columns gracefully
+    try {
+      await db.update(tests)
+        .set(updateData)
+        .where(eq(tests.id, id))
+    } catch (updateError: unknown) {
+      // If update fails due to missing columns, try without new columns
+      const errorMessage = updateError instanceof Error ? updateError.message : String(updateError)
+      if (errorMessage.includes('column "type"') || 
+          errorMessage.includes('column "difficulty"') ||
+          errorMessage.includes('column "locale"')) {
+        console.log('New columns not available, updating without type/difficulty/locale')
+        const fallbackUpdateData: typeof updateData = {
+          updatedAt: updateData.updatedAt
+        }
+        if (updateData.title !== undefined) fallbackUpdateData.title = updateData.title
+        if (updateData.description !== undefined) fallbackUpdateData.description = updateData.description
+        if (updateData.passingScore !== undefined) fallbackUpdateData.passingScore = updateData.passingScore
+        if (updateData.timeLimit !== undefined) fallbackUpdateData.timeLimit = updateData.timeLimit
+        if (updateData.maxAttempts !== undefined) fallbackUpdateData.maxAttempts = updateData.maxAttempts
+        if (updateData.shuffleQuestions !== undefined) fallbackUpdateData.shuffleQuestions = updateData.shuffleQuestions
+        if (updateData.showCorrectAnswers !== undefined) fallbackUpdateData.showCorrectAnswers = updateData.showCorrectAnswers
+        if (updateData.status !== undefined) fallbackUpdateData.status = updateData.status
+        await db.update(tests)
+          .set(fallbackUpdateData)
+          .where(eq(tests.id, id))
+      } else {
+        throw updateError
+      }
+    }
 
     console.log('Test updated successfully')
 
@@ -165,21 +268,50 @@ export async function DELETE(
     console.log('ID type:', typeof id)
     console.log('ID length:', id?.length)
 
-    // Check if test exists
-    const existingTest = await db.select().from(tests).where(eq(tests.id, id)).limit(1)
-    console.log('Found test:', existingTest)
-    
-    if (existingTest.length === 0) {
-      console.log('Test not found in database')
-      return NextResponse.json({
-        success: false,
-        message: 'Test not found'
-      }, { status: 404 })
-    }
+    // Check if test exists - select id and questionIds for deletion
+    let questionIds: string[] = []
+    try {
+      const existingTest = await db
+        .select({
+          id: tests.id,
+          questionIds: tests.questionIds
+        })
+        .from(tests)
+        .where(eq(tests.id, id))
+        .limit(1)
+      console.log('Found test:', existingTest)
+      
+      if (existingTest.length === 0) {
+        console.log('Test not found in database')
+        return NextResponse.json({
+          success: false,
+          message: 'Test not found'
+        }, { status: 404 })
+      }
 
-    // Get question IDs from the test
-    const test = existingTest[0]
-    const questionIds = test.questionIds as string[] || []
+      // Get question IDs from the test
+      const test = existingTest[0]
+      questionIds = (test.questionIds as string[]) || []
+    } catch (selectError: unknown) {
+      // Fallback if columns don't exist - just check existence
+      const errorMessage = selectError instanceof Error ? selectError.message : String(selectError)
+      if (errorMessage.includes('column')) {
+        const existingTest = await db
+          .select({ id: tests.id })
+          .from(tests)
+          .where(eq(tests.id, id))
+          .limit(1)
+        if (existingTest.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: 'Test not found'
+          }, { status: 404 })
+        }
+        questionIds = []
+      } else {
+        throw selectError
+      }
+    }
     
     // Check if test is used in assignments - if so, block deletion
     const relatedAssignments = await db.select().from(assignments).where(eq(assignments.testId, id))

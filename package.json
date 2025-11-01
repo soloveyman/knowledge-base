@@ -17,6 +17,8 @@
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:health": "tsx scripts/check-health.ts",
+    "db:check-schema": "tsx scripts/check-db-schema.ts",
+    "db:add-test-columns": "tsx scripts/add-test-columns.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",

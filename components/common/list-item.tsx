@@ -42,13 +42,13 @@ export function ListItem({
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 space-y-1.5">
           <h3 className="font-medium text-foreground truncate">{title}</h3>
         {subtitle && (
           <p className="text-sm text-muted-foreground truncate">{subtitle}</p>
         )}
         {metadata.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 mt-2 text-xs text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 text-xs text-muted-foreground">
             {metadata.map((item, index) => (
               <span key={index}>{item}</span>
             ))}

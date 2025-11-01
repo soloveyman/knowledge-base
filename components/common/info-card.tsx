@@ -46,7 +46,7 @@ export function InfoCard({
             <div className="flex-1">
               <CardTitle>{title}</CardTitle>
               {description && (
-                <CardDescription className="mt-1">{description}</CardDescription>
+                <CardDescription>{description}</CardDescription>
               )}
             </div>
           </div>

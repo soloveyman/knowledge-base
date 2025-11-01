@@ -8,36 +8,168 @@ export async function GET() {
     const session = await auth()
     const userRole = session?.user?.role
     
-    // Owner sees all tests regardless of businessId
-    if (userRole === 'owner') {
-      const allTests = await db
-        .select()
-        .from(tests)
-        .orderBy(desc(tests.createdAt))
+    // Explicitly select columns that exist (handle case where new columns don't exist yet)
+    // Try with all columns first, fallback to excluding new columns if they don't exist
+    try {
+      // Owner sees all tests regardless of businessId
+      if (userRole === 'owner') {
+        const allTests = await db
+          .select({
+            id: tests.id,
+            moduleId: tests.moduleId,
+            title: tests.title,
+            description: tests.description,
+            questionIds: tests.questionIds,
+            type: tests.type,
+            difficulty: tests.difficulty,
+            locale: tests.locale,
+            passingScore: tests.passingScore,
+            timeLimit: tests.timeLimit,
+            maxAttempts: tests.maxAttempts,
+            shuffleQuestions: tests.shuffleQuestions,
+            showCorrectAnswers: tests.showCorrectAnswers,
+            status: tests.status,
+            isActive: tests.isActive,
+            createdBy: tests.createdBy,
+            createdAt: tests.createdAt,
+            updatedAt: tests.updatedAt
+          })
+          .from(tests)
+          .orderBy(desc(tests.createdAt))
+        
+        return NextResponse.json({
+          success: true,
+          data: {
+            tests: allTests
+          }
+        })
+      }
       
+      // Manager and other roles filter by businessId (tenant isolation)
+      const tenantId = session?.user?.businessId
+      const rows = await db
+        .select({ 
+          test: {
+            id: tests.id,
+            moduleId: tests.moduleId,
+            title: tests.title,
+            description: tests.description,
+            questionIds: tests.questionIds,
+            type: tests.type,
+            difficulty: tests.difficulty,
+            locale: tests.locale,
+            passingScore: tests.passingScore,
+            timeLimit: tests.timeLimit,
+            maxAttempts: tests.maxAttempts,
+            shuffleQuestions: tests.shuffleQuestions,
+            showCorrectAnswers: tests.showCorrectAnswers,
+            status: tests.status,
+            isActive: tests.isActive,
+            createdBy: tests.createdBy,
+            createdAt: tests.createdAt,
+            updatedAt: tests.updatedAt
+          },
+          creatorBusinessId: users.businessId 
+        })
+        .from(tests)
+        .leftJoin(users, eq(tests.createdBy, users.id))
+        .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+      const allTests = rows.map(r => r.test)
+
       return NextResponse.json({
         success: true,
         data: {
           tests: allTests
         }
       })
-    }
-    
-    // Manager and other roles filter by businessId (tenant isolation)
-    const tenantId = session?.user?.businessId
-    const rows = await db
-      .select({ test: tests, creatorBusinessId: users.businessId })
-      .from(tests)
-      .leftJoin(users, eq(tests.createdBy, users.id))
-      .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
-    const allTests = rows.map(r => r.test)
+    } catch (selectError: unknown) {
+      // If columns don't exist, fallback to selecting without new columns
+      const errorMessage = selectError instanceof Error ? selectError.message : String(selectError)
+      if (errorMessage.includes('column "type" does not exist') || 
+          errorMessage.includes('column "difficulty" does not exist') ||
+          errorMessage.includes('column "locale" does not exist')) {
+        console.log('New columns not found, using fallback query without type/difficulty/locale')
+        
+        // Fallback: select without new columns
+        if (userRole === 'owner') {
+          const allTests = await db
+            .select({
+              id: tests.id,
+              moduleId: tests.moduleId,
+              title: tests.title,
+              description: tests.description,
+              questionIds: tests.questionIds,
+              passingScore: tests.passingScore,
+              timeLimit: tests.timeLimit,
+              maxAttempts: tests.maxAttempts,
+              shuffleQuestions: tests.shuffleQuestions,
+              showCorrectAnswers: tests.showCorrectAnswers,
+              status: tests.status,
+              isActive: tests.isActive,
+              createdBy: tests.createdBy,
+              createdAt: tests.createdAt,
+              updatedAt: tests.updatedAt
+            })
+            .from(tests)
+            .orderBy(desc(tests.createdAt))
+          
+          // Add default values for missing columns
+          const testsWithDefaults = allTests.map(test => ({
+            ...test,
+            type: null,
+            difficulty: null,
+            locale: null
+          }))
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              tests: testsWithDefaults
+            }
+          })
+        }
+        
+        const tenantId = session?.user?.businessId
+        const rows = await db
+          .select({ 
+            test: {
+              id: tests.id,
+              moduleId: tests.moduleId,
+              title: tests.title,
+              description: tests.description,
+              questionIds: tests.questionIds,
+              passingScore: tests.passingScore,
+              timeLimit: tests.timeLimit,
+              maxAttempts: tests.maxAttempts,
+              shuffleQuestions: tests.shuffleQuestions,
+              showCorrectAnswers: tests.showCorrectAnswers,
+              status: tests.status,
+              isActive: tests.isActive,
+              createdBy: tests.createdBy,
+              createdAt: tests.createdAt,
+              updatedAt: tests.updatedAt
+            },
+            creatorBusinessId: users.businessId 
+          })
+          .from(tests)
+          .leftJoin(users, eq(tests.createdBy, users.id))
+          .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+        const allTests = rows.map(r => ({
+          ...r.test,
+          type: null,
+          difficulty: null,
+          locale: null
+        }))
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        tests: allTests
+        return NextResponse.json({
+          success: true,
+          data: {
+            tests: allTests
+          }
+        })
       }
-    })
+      throw selectError
+    }
   } catch (error) {
     console.error('Tests API error:', error)
     return NextResponse.json({
@@ -148,15 +280,27 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create the test
-    const newTest = await db.insert(tests).values({
+    // Create the test - handle missing columns gracefully
+    const testValues: {
+      title: string
+      description: string
+      moduleId: null
+      questionIds: string[]
+      type?: string | null
+      difficulty?: string | null
+      locale?: string | null
+      passingScore: number
+      timeLimit: number | null
+      maxAttempts: number
+      shuffleQuestions: boolean
+      showCorrectAnswers: boolean
+      status: string
+      createdBy: string
+    } = {
       title,
       description: description || '',
       moduleId: null, // Documents are not modules, so set to null
       questionIds: finalQuestionIds, // Array of question IDs
-      type: type || null,
-      difficulty: difficulty || null,
-      locale: locale || null,
       passingScore: passingScore || 70,
       timeLimit: timeLimit || null,
       maxAttempts: maxAttempts || 1,
@@ -164,7 +308,38 @@ export async function POST(request: Request) {
       showCorrectAnswers: showCorrectAnswers !== false, // Default to true
       status: status || 'draft',
       createdBy: session.user.id
-    }).returning()
+    }
+    
+    // Only add new columns if they're provided (they might not exist in DB yet)
+    if (type !== undefined) testValues.type = type || null
+    if (difficulty !== undefined) testValues.difficulty = difficulty || null
+    if (locale !== undefined) testValues.locale = locale || null
+    
+    let newTest
+    try {
+      newTest = await db.insert(tests).values(testValues).returning()
+    } catch (insertError: unknown) {
+      // If insert fails due to missing columns, try without new columns
+      const errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
+      if (errorMessage.includes('column "type"') || 
+          errorMessage.includes('column "difficulty"') ||
+          errorMessage.includes('column "locale"')) {
+        console.log('New columns not available, creating test without type/difficulty/locale')
+        delete testValues.type
+        delete testValues.difficulty
+        delete testValues.locale
+        newTest = await db.insert(tests).values(testValues).returning()
+        // Add default values to returned test
+        newTest = newTest.map(test => ({
+          ...test,
+          type: null,
+          difficulty: null,
+          locale: null
+        }))
+      } else {
+        throw insertError
+      }
+    }
 
     console.log('Test created successfully:', newTest[0])
 

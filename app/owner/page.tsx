@@ -858,8 +858,10 @@ function OwnerPageInner() {
           <TabsContent value="settings" className="space-y-3 md:space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>System settings</CardTitle>
-                <CardDescription>Configure system-wide settings</CardDescription>
+                <div>
+                  <CardTitle>System settings</CardTitle>
+                  <CardDescription>Configure system-wide settings</CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
