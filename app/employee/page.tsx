@@ -565,7 +565,7 @@ function EmployeePageInner() {
                         const score = assignment.score ?? 0
                         const colorClass = score >= 70 ? 'text-green-600' : 'text-red-600'
                         return (
-                          <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                          <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-3xl hover:bg-accent transition-colors">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium">{assignment.title}</h4>
@@ -593,7 +593,7 @@ function EmployeePageInner() {
                         const score = attempt.score ?? 0
                         const colorClass = score >= 70 ? 'text-green-600' : 'text-red-600'
                         return (
-                          <div key={attempt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors">
+                          <div key={attempt.id} className="flex items-center justify-between p-3 border rounded-3xl hover:bg-accent transition-colors">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium">{t('testAttempt')}</h4>

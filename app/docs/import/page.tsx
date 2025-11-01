@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ErrorMessage } from "@/components/common/error-message"
 import { Progress } from "@/components/ui/progress"
 import { 
-  Upload, 
   FileText, 
   X, 
   CheckCircle, 
@@ -322,7 +321,7 @@ function DocImportPageInner() {
           </CardHeader>
           <CardContent>
             <div
-              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              className={`relative border-2 border-dashed rounded-3xl p-8 text-center transition-colors ${
                 dragActive 
                   ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300' 
                   : 'border-border hover:border-accent'
@@ -332,7 +331,7 @@ function DocImportPageInner() {
               onDragOver={handleDrag}
               onDrop={handleDrop}
             >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <span className="text-5xl block mb-4">📤</span>
               <div className="space-y-2">
                 <p className="text-lg font-medium text-foreground">
                   {t('dropFilesHere')}
@@ -367,7 +366,7 @@ function DocImportPageInner() {
             <CardContent>
               <div className="space-y-4">
                 {files.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={file.id} className="flex items-center justify-between p-4 border rounded-3xl">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground truncate">{file.name}</p>
                       <p className="text-sm text-muted-foreground">

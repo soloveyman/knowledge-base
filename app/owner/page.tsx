@@ -710,7 +710,7 @@ function OwnerPageInner() {
                     {documents.map((doc) => (
                       <div 
                         key={doc.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent cursor-pointer gap-3"
+                        className="flex items-center justify-between p-4 border border-border rounded-3xl hover:bg-accent cursor-pointer gap-3"
                         onClick={() => handleViewDocument(doc.name)}
                       >
                         <div className="flex-1 min-w-0">

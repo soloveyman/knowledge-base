@@ -288,7 +288,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                       const actualDescription = assignment.description || assignment.title || assignment.name || `Complete assignment ${assignment.id.slice(0, 8)}`
                       
                       return (
-                      <div key={assignment.id} className="p-4 border rounded-lg bg-card">
+                      <div key={assignment.id} className="p-4 border rounded-3xl bg-card">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">

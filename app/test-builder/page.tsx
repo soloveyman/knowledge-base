@@ -1046,7 +1046,7 @@ export default function TestBuilderPage() {
                 <CardContent className="overflow-hidden">
                   <div className="space-y-4">
                     {generatedQuestions.map((question, index) => (
-                      <div key={question.id || index} className="p-4 border rounded-lg overflow-hidden">
+                      <div key={question.id || index} className="p-4 border rounded-3xl overflow-hidden">
                         <div className="flex items-start justify-between mb-2 gap-2">
                           <div className="flex items-center space-x-2 min-w-0">
                             <h4 className="font-medium truncate">{t('question')} {index + 1}</h4>

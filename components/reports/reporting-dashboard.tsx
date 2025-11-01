@@ -326,7 +326,7 @@ export default function ReportingDashboard() {
         <CardContent>
           <div className="space-y-4">
             {reportData.map((module) => (
-              <div key={module.moduleId} className="p-4 border rounded-lg">
+              <div key={module.moduleId} className="p-4 border rounded-3xl">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h4 className="font-medium">{module.moduleTitle}</h4>
@@ -395,7 +395,7 @@ export default function ReportingDashboard() {
         <CardContent>
           <div className="space-y-3">
             {employeeProgress.map((employee) => (
-              <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div key={employee.id} className="flex items-center justify-between p-3 border rounded-3xl">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
                     <Users className="h-5 w-5 text-muted-foreground" />

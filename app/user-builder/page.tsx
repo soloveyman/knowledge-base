@@ -364,7 +364,7 @@ export default function UserBuilderPage() {
                   </FormField>
                 </div>
 
-                <div className="bg-primary/10 p-4 rounded-lg">
+                <div className="bg-primary/10 p-4 rounded-3xl">
                   <h4 className="font-medium text-primary-700 dark:text-primary-300 mb-2">{t('rolePermissions')}</h4>
                   <div className="text-sm text-primary-700 dark:text-primary-300 space-y-1">
                     {userConfig.role === 'manager' && (

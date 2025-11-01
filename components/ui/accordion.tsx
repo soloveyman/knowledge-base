@@ -70,7 +70,7 @@ Accordion.displayName = "Accordion"
 const AccordionItem = React.forwardRef<HTMLDivElement, AccordionItemProps>(
   ({ value, children, className, ...props }, ref) => {
     return (
-      <div ref={ref} className={cn("border rounded-lg", className)} {...props}>
+      <div ref={ref} className={cn("border rounded-3xl", className)} {...props}>
         {children}
       </div>
     )

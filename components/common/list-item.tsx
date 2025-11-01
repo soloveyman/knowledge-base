@@ -38,7 +38,7 @@ export function ListItem({
   const translateBadge = useBadgeTranslation()
   return (
     <div 
-      className="p-4 border border-border rounded-lg hover:bg-accent"
+      className="p-4 border border-border rounded-3xl hover:bg-accent"
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-3">

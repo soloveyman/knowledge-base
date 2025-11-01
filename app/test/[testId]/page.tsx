@@ -292,13 +292,13 @@ export default function TestPage() {
                 {score >= 70 ? t('youPassedTheTest') : t('youNeedToScore70PercentOrHigherToPass')}
               </div>
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-                <div className="bg-muted p-4 rounded-lg">
+                <div className="bg-muted p-4 rounded-3xl">
                   <div className="text-2xl font-bold text-foreground">
                     {Object.keys(answers).length}
                   </div>
                   <div className="text-sm text-muted-foreground">{t('questionsAnswered')}</div>
                 </div>
-                <div className="bg-muted p-4 rounded-lg">
+                <div className="bg-muted p-4 rounded-3xl">
                   <div className="text-2xl font-bold text-foreground">
                     {testData.questions.length}
                   </div>
@@ -385,7 +385,7 @@ export default function TestPage() {
                     <button
                       key={index}
                       onClick={() => handleAnswerSelect(currentQ.id, letter)}
-                      className={`w-full p-4 text-left border rounded-lg transition-colors ${
+                      className={`w-full p-4 text-left border rounded-3xl transition-colors ${
                         isSelected
                           ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300'
                           : 'border-border hover:border-accent hover:bg-accent'

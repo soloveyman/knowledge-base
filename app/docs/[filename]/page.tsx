@@ -305,7 +305,7 @@ export default function DocumentViewer() {
         {/* Document Content */}
         <div className="min-h-screen w-full">
           {documentData?.type === 'PDF' ? (
-            <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-screen border border-border rounded-lg overflow-hidden">
+            <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-screen border border-border rounded-3xl overflow-hidden">
               <iframe 
                 src={`/api/documents/${encodeURIComponent(filename)}`}
                 className="w-full h-full"

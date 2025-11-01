@@ -5,7 +5,7 @@ import { X } from "lucide-react"
 
 interface PageHeaderProps {
   title: string
-  icon: React.ReactNode
+  icon?: React.ReactNode
   onClose?: () => void
   showCloseButton?: boolean
 }
@@ -15,10 +15,7 @@ export function PageHeader({ title, icon, onClose, showCloseButton = true }: Pag
     <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center min-w-0 gap-3">
-            <div className="text-primary shrink-0">
-              {icon}
-            </div>
+          <div className="flex items-center min-w-0">
             <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
               {title}
             </h1>
