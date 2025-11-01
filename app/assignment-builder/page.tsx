@@ -516,8 +516,10 @@ function AssignmentBuilderPageContent() {
             {/* Assignment Configuration */}
             <Card>
               <CardHeader>
-                <CardTitle>{t('assignmentConfiguration')}</CardTitle>
-                <CardDescription>{t('configureAssignmentParameters')}</CardDescription>
+                <div>
+                  <CardTitle>{t('assignmentConfiguration')}</CardTitle>
+                  <CardDescription>{t('configureAssignmentParameters')}</CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField

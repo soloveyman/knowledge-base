@@ -314,10 +314,12 @@ function DocImportPageInner() {
         {/* Upload Area */}
         <Card>
           <CardHeader>
-            <CardTitle>{t('uploadDocuments')}</CardTitle>
-            <CardDescription>
-              {t('uploadWordExcelFiles')}
-            </CardDescription>
+            <div>
+              <CardTitle>{t('uploadDocuments')}</CardTitle>
+              <CardDescription>
+                {t('uploadWordExcelFiles')}
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <div

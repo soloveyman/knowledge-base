@@ -325,9 +325,13 @@ export async function POST(request: Request) {
     } catch (insertError: unknown) {
       // If insert fails due to missing columns, try without new columns
       const errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
-      if (errorMessage.includes('column "type"') || 
-          errorMessage.includes('column "difficulty"') ||
-          errorMessage.includes('column "locale"')) {
+      const errorCause = (insertError as any)?.cause
+      const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+      const fullErrorText = `${errorMessage} ${nestedMessage}`
+      
+      if (fullErrorText.includes('column "type"') || 
+          fullErrorText.includes('column "difficulty"') ||
+          fullErrorText.includes('column "locale"')) {
         console.log('New columns not available, creating test without type/difficulty/locale')
         delete testValues.type
         delete testValues.difficulty

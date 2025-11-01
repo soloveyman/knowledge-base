@@ -811,8 +811,10 @@ export default function TestBuilderPage() {
             {/* Test Configuration */}
             <Card className="overflow-hidden">
               <CardHeader>
-                <CardTitle>{t('testConfiguration')}</CardTitle>
-                <CardDescription>{t('configureTestParameters')}</CardDescription>
+                <div>
+                  <CardTitle>{t('testConfiguration')}</CardTitle>
+                  <CardDescription>{t('configureTestParameters')}</CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4 overflow-hidden">
                 <FormField
