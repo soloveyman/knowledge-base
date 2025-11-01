@@ -53,9 +53,13 @@ export async function GET(
     } catch (selectError: unknown) {
       // Fallback if new columns don't exist
       const errorMessage = selectError instanceof Error ? selectError.message : String(selectError)
-      if (errorMessage.includes('column "type" does not exist') || 
-          errorMessage.includes('column "difficulty" does not exist') ||
-          errorMessage.includes('column "locale" does not exist')) {
+      const errorCause = (selectError as any)?.cause
+      const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+      const fullErrorText = `${errorMessage} ${nestedMessage}`
+      
+      if (fullErrorText.includes('column "type" does not exist') || 
+          fullErrorText.includes('column "difficulty" does not exist') ||
+          fullErrorText.includes('column "locale" does not exist')) {
         console.log('New columns not found, using fallback query')
         const test = await db
           .select({
