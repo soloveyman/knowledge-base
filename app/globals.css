@@ -409,7 +409,7 @@
 
 .prose th,
 .prose td {
-  @apply border-x-0 border-y border-border px-4 py-2;
+  @apply border-x-0 border-y border-border px-4 py-2 text-left;
 }
 
 .prose th {
@@ -469,7 +469,8 @@
   border-right: 0;
   background-color: var(--muted);
   white-space: normal;
-  word-wrap: break-word;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .document-content table td {
@@ -478,9 +479,11 @@
   border-left: 0;
   border-right: 0;
   font-size: 0.95rem;
+  text-align: left;
   white-space: normal;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  word-break: normal;
+  overflow-wrap: normal;
+  vertical-align: top;
 }
 
 .document-content table tbody tr:last-child td {
@@ -489,29 +492,78 @@
 
 /* Mobile table improvements - allow horizontal scroll */
 @media (max-width: 640px) {
+  /* Стили для контейнеров таблиц на мобильных */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) transparent;
+  }
+
+  /* Стили для таблиц внутри .document-content */
   .document-content table {
     font-size: 0.875rem;
     margin: 1rem 0;
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    display: table;
+    overflow: visible;
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: auto;
   }
   
   .document-content table thead,
   .document-content table tbody,
   .document-content table tr {
-    display: table;
-    width: 100%;
+    display: table-row;
   }
   
   .document-content table th {
     font-size: 0.875rem;
     padding: 0.5rem 0.5rem;
+    text-align: left !important;
+    word-break: normal;
+    overflow-wrap: normal;
+    white-space: normal;
+    vertical-align: top !important;
   }
   
   .document-content table td {
     padding: 0.5rem 0.5rem;
     font-size: 0.8125rem;
+    text-align: left !important;
+    word-break: normal;
+    overflow-wrap: normal;
+    white-space: normal;
+    vertical-align: top !important;
+  }
+
+  /* Стили для всех таблиц на мобильных (включая TableRenderer) */
+  table {
+    font-size: 0.75rem !important;
+    border-collapse: collapse !important;
+    width: auto !important;
+    min-width: 100%;
+    table-layout: auto !important;
+    display: table !important;
+  }
+
+  table th {
+    padding: 0.5rem 0.5rem !important;
+    font-size: 0.75rem !important;
+    text-align: left !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    white-space: normal !important;
+    vertical-align: top !important;
+  }
+
+  table td {
+    padding: 0.5rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+    text-align: left !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    white-space: normal !important;
+    vertical-align: top !important;
   }
 }
 

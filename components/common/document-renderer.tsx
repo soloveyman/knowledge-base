@@ -148,22 +148,22 @@ function DocumentContent({ content }: { content: string }) {
           </pre>
         ),
         table: ({ children }) => (
-          <div className="overflow-x-auto my-6 rounded-lg border border-border">
-            <table className="min-w-full divide-y divide-border border-collapse">
+          <div className="overflow-x-auto my-6 rounded-lg border border-border shadow-sm -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+            <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
               {children}
             </table>
           </div>
         ),
         thead: ({ children }) => (
-          <thead className="bg-muted">{children}</thead>
+          <thead className="bg-muted/50">{children}</thead>
         ),
         th: ({ children }) => (
-          <th className="px-4 py-3 text-left text-sm font-semibold text-foreground border-b border-x-0 border-border">
+          <th className="px-2 sm:px-4 py-2 text-left font-medium uppercase tracking-wider border-b border-x-0 border-border bg-muted/50 text-xs text-foreground whitespace-normal">
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td className="px-4 py-3 text-sm text-foreground border-b border-x-0 border-border">
+          <td className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs text-foreground border-x-0 align-top whitespace-normal">
             {children}
           </td>
         ),
@@ -202,9 +202,17 @@ function TableRenderer({ table }: {
 }) {
   // Вспомогательная функция для проверки, пустая ли ячейка
   const isCellEmpty = (cell: string | null | undefined): boolean => {
-    if (!cell) return true
-    const trimmed = cell.trim()
-    return trimmed.length === 0 || trimmed === '\u00A0' || trimmed === '&nbsp;'
+    if (cell === null || cell === undefined) return true
+    if (typeof cell !== 'string') return true
+    // Удаляем все виды пробелов и невидимых символов
+    const normalized = cell
+      .replace(/\u00A0/g, ' ') // неразрывный пробел
+      .replace(/&nbsp;/g, ' ') // HTML entity
+      .replace(/\u200B/g, '') // zero-width space
+      .replace(/\uFEFF/g, '') // zero-width no-break space
+      .replace(/\s+/g, ' ') // заменяем все пробельные символы на обычный пробел
+      .trim()
+    return normalized.length === 0
   }
 
   // Вспомогательная функция для проверки, пустой ли заголовок
@@ -213,18 +221,33 @@ function TableRenderer({ table }: {
   }
 
   // Функция для проверки, является ли колонка пустой
+  // Колонка считается пустой, если все ячейки данных в ней пустые
+  // Заголовок не учитывается - колонка удаляется даже если заголовок заполнен, но все ячейки пустые
   const isColumnEmpty = (columnIndex: number): boolean => {
-    // Проверяем заголовок
-    if (table.headers && table.headers[columnIndex]) {
-      if (!isHeaderEmpty(table.headers[columnIndex])) {
-        return false
+    // Если нет строк данных, проверяем только заголовок
+    if (table.rows.length === 0) {
+      const header = table.headers?.[columnIndex]
+      return isHeaderEmpty(header)
+    }
+    
+    // Проверяем ВСЕ строки данных в этой колонке
+    // Колонка считается пустой, если ВСЕ ячейки данных пустые (игнорируем заголовок)
+    let hasAnyNonEmptyCell = false
+    
+    for (const row of table.rows) {
+      // Если строка короче, чем индекс колонки - ячейка пустая
+      if (columnIndex >= row.length) continue
+      
+      const cell = row[columnIndex]
+      // Если ячейка не пустая - колонка не пустая
+      if (!isCellEmpty(cell)) {
+        hasAnyNonEmptyCell = true
+        break
       }
     }
-    // Проверяем все строки в этой колонке
-    return table.rows.every(row => {
-      const cell = row[columnIndex]
-      return isCellEmpty(cell)
-    })
+    
+    // Колонка пустая, если не найдено ни одной непустой ячейки данных
+    return !hasAnyNonEmptyCell
   }
 
   // Функция для проверки, является ли строка пустой
@@ -252,7 +275,10 @@ function TableRenderer({ table }: {
 
   // Фильтруем строки - оставляем только ячейки из непустых колонок
   const filteredRowsData = filteredRows.map(row =>
-    nonEmptyColumnIndices.map(colIdx => row[colIdx] || '')
+    nonEmptyColumnIndices.map(colIdx => {
+      const cell = row[colIdx]
+      return cell !== undefined && cell !== null ? String(cell) : ''
+    })
   )
 
   // Проверяем, есть ли хотя бы один непустой заголовок после фильтрации
@@ -273,8 +299,8 @@ function TableRenderer({ table }: {
           <span>Таблица</span>
         </h3>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border shadow-sm">
-        <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse">
+      <div className="overflow-x-auto rounded-lg border border-border shadow-sm -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+        <table className="w-full divide-y divide-border bg-background border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
           {hasHeaders && (
             <thead className="bg-muted/50">
               <tr>
@@ -283,7 +309,7 @@ function TableRenderer({ table }: {
                   return (
                     <th
                       key={idx}
-                      className={`px-4 py-2 text-left font-medium uppercase tracking-wider border-b border-x-0 border-border bg-muted/50 text-xs ${
+                      className={`px-2 sm:px-4 py-2 text-left font-medium uppercase tracking-wider border-b border-x-0 border-border bg-muted/50 text-xs whitespace-normal ${
                         isEmpty 
                           ? 'text-transparent' 
                           : 'text-foreground'
@@ -302,14 +328,17 @@ function TableRenderer({ table }: {
                 key={rowIdx}
                 className="hover:bg-muted/30 transition-colors"
               >
-                {row.map((cell, cellIdx) => (
-                  <td
-                    key={cellIdx}
-                    className="px-4 py-3 whitespace-nowrap text-xs text-foreground border-x-0"
-                  >
-                    {cell || '\u00A0'}
-                  </td>
-                ))}
+                {row.map((cell, cellIdx) => {
+                  const isEmpty = isCellEmpty(cell)
+                  return (
+                    <td
+                      key={cellIdx}
+                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs text-foreground border-x-0 align-top whitespace-normal"
+                    >
+                      {isEmpty ? '\u00A0' : cell}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
