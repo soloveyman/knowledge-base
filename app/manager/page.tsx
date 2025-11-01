@@ -664,7 +664,7 @@ function ManagerPageInner() {
                   </div>
                 ) : documents.length === 0 ? (
                   <EmptyState
-                    icon={<FileText className="h-12 w-12" />}
+                    icon={<span className="text-5xl">📄</span>}
                     title={t('noDocumentsUploaded')}
                     description={t('getStartedImportDocument')}
                     actionLabel={t('importDocument')}

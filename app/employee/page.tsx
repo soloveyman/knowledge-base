@@ -439,7 +439,7 @@ function EmployeePageInner() {
           <TabsContent value="assignments" className="space-y-6">
             {transformedAssignments.length === 0 ? (
               <EmptyState
-                icon={<ClipboardList className="h-12 w-12" />}
+                icon={<span className="text-5xl">📋</span>}
                 title={t('noAssignmentsYet')}
                 description={t('youDontHaveAnyAssignmentsAtTheMoment')}
               />

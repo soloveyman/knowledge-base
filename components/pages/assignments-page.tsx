@@ -86,7 +86,7 @@ export function AssignmentsPage({
       showEditButton={true}
       isLoading={isLoading}
       emptyState={{
-        icon: <ClipboardList className="h-12 w-12" />,
+        icon: <span className="text-5xl">📋</span>,
         title: t('noAssignmentsCreated'),
         description: t('getStartedCreateAssignment'),
         actionLabel: t('createAssignment'),

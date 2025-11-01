@@ -71,7 +71,7 @@ export function UsersPage({
       items={userItems}
       showEditButton={true}
       emptyState={{
-        icon: <Users className="h-12 w-12" />,
+        icon: <span className="text-5xl">👥</span>,
         title: t('noUsersCreatedYet'),
         description: t('createYourFirstUserAccount'),
         actionLabel: t('addUser'),

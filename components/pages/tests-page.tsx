@@ -65,7 +65,7 @@ export function TestsPage({
       showEditButton={true}
       isLoading={isLoading}
       emptyState={{
-        icon: <TestTube className="h-12 w-12" />,
+        icon: <span className="text-5xl">🧪</span>,
         title: t('noTestsCreated'),
         description: t('getStartedCreateTest'),
         actionLabel: t('createTest'),
