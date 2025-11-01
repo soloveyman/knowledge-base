@@ -376,6 +376,7 @@ export const translations = {
     read: "Read",
     test: "Test",
     completeAssignment: "Complete assignment",
+    assignmentDescriptionDefault: "No description provided",
     
     // Document Reader Test Card
     testAvailable: "Test Available",
@@ -385,6 +386,9 @@ export const translations = {
     estimatedTime: "Estimated time",
     takeTest: "Take Test",
     mcq: "MCQ",
+    readingAssignment: "Reading Assignment",
+    markAsCompleteAfterReading: "Mark this assignment as complete after reading",
+    markAsComplete: "Mark as Complete",
     
     // Test Results
     congratulations: "Congratulations!",
@@ -392,6 +396,15 @@ export const translations = {
     youNeedToScore70PercentOrHigherToPass: "You need to score 70% or higher to pass.",
     questionsAnswered: "Questions Answered",
     backToAssignments: "Back to Assignments",
+    
+    // Test Attempt Statistics
+    testAttemptStatistics: "Test Attempt Statistics",
+    totalAttempts: "Total Attempts",
+    attempt: "attempt",
+    attempts: "attempts",
+    bestScore: "Best Score",
+    averageScore: "Average Score",
+    passed: "Passed",
   },
   ru: {
     // User Menu
@@ -769,6 +782,7 @@ export const translations = {
     read: "Читать",
     test: "Тест",
     completeAssignment: "Выполнить задание",
+    assignmentDescriptionDefault: "Описание не указано",
     
     // Document Reader Test Card
     testAvailable: "Доступен тест",
@@ -778,6 +792,9 @@ export const translations = {
     estimatedTime: "Примерное время",
     takeTest: "Пройти тест",
     mcq: "МВВ",
+    readingAssignment: "Чтение задания",
+    markAsCompleteAfterReading: "Отметьте это задание как выполненное после прочтения",
+    markAsComplete: "Отметить как выполненное",
     
     // Test Results
     congratulations: "Поздравляем!",
@@ -785,6 +802,15 @@ export const translations = {
     youNeedToScore70PercentOrHigherToPass: "Для прохождения необходимо набрать 70% или больше.",
     questionsAnswered: "Вопросов отвечено",
     backToAssignments: "Назад к заданиям",
+    
+    // Test Attempt Statistics
+    testAttemptStatistics: "Статистика попыток тестов",
+    totalAttempts: "Всего попыток",
+    attempt: "попытка",
+    attempts: "попытки",
+    bestScore: "Лучший результат",
+    averageScore: "Средний результат",
+    passed: "Пройдено",
   }
 } as const
 

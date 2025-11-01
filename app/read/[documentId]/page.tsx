@@ -49,7 +49,8 @@ import {
   X,
   BookOpen,
   TestTube,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle
 } from "lucide-react"
 import { useParams } from "next/navigation"
 
@@ -302,13 +303,47 @@ export default function DocumentReaderPage() {
     }
   }
 
+  const handleCompleteAssignment = async () => {
+    if (!assignmentData?.id) return
+    
+    // Only complete if there's no test (assignments with tests are completed via test attempts)
+    if (!assignmentData.test) {
+      try {
+        const response = await fetch(`/api/assignments/${assignmentData.id}/complete`, {
+          method: 'POST'
+        })
+        const result = await response.json()
+        
+        if (result.success) {
+          setAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null)
+        }
+      } catch (error) {
+        console.error('Error completing assignment:', error)
+      }
+    }
+  }
+
   const handleBack = () => {
+    // Complete assignment if there's no test (automatic completion on navigation)
+    handleCompleteAssignment()
+    
     // Determine user role from session or default to employee
     const userRole = (session?.user as UserWithRole)?.role || 'employee'
     // Ensure userRole is a string and valid
     const validRole = typeof userRole === 'string' ? userRole : 'employee'
     navigateBack(validRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
+
+  // Auto-complete assignment when user leaves the page if there's no test
+  useEffect(() => {
+    return () => {
+      // Cleanup: mark assignment as complete when component unmounts (user leaves page)
+      if (assignmentData && !assignmentData.test && assignmentData.status !== 'completed') {
+        // Use a flag to prevent duplicate calls
+        handleCompleteAssignment()
+      }
+    }
+  }, [assignmentData])
 
 
   if (status === "loading" || loading) {
@@ -410,7 +445,7 @@ export default function DocumentReaderPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-6">
               {/* Test Section */}
-              {assignmentData?.test && (
+              {assignmentData?.test ? (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -438,6 +473,30 @@ export default function DocumentReaderPage() {
                     </Button>
                   </CardContent>
                 </Card>
+              ) : (
+                /* No test - show completion button */
+                assignmentData && assignmentData.status !== 'completed' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <BookOpen className="h-5 w-5" />
+                        {t('readingAssignment')}
+                      </CardTitle>
+                      <CardDescription>
+                        {t('markAsCompleteAfterReading')}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button 
+                        onClick={handleCompleteAssignment}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {t('markAsComplete')}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )
               )}
             </div>
           </div>

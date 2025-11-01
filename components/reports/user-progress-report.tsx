@@ -77,10 +77,125 @@ interface UserProgressReportProps {
   tests?: Test[]
 }
 
+interface AttemptStats {
+  totalAttempts: number
+  passedAttempts: number
+  failedAttempts: number
+  bestScore: number | null
+  averageScore: number | null
+}
+
 export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
+  const [attemptStats, setAttemptStats] = useState<Record<string, Record<string, AttemptStats>>>({})
+  const [userAttemptScores, setUserAttemptScores] = useState<Record<string, number[]>>({})
   const { t } = useTranslation()
   const translateBadge = useBadgeTranslation()
+
+  // Load all test attempts for each user across all their assignments
+  useEffect(() => {
+    const loadAllAttemptScores = async () => {
+      const scoresByUser: Record<string, number[]> = {}
+      
+      for (const user of users) {
+        if (user.role !== 'employee') continue
+        
+        // Get all assignments for this user that have a testId
+        const userAssignments = assignments.filter(assignment => {
+          if (!assignment.testId) return false
+          if (assignment.users && Array.isArray(assignment.users)) {
+            return assignment.users.some((au: AssignedUser) => au.userId === user.id)
+          }
+          return false
+        })
+        
+        if (userAssignments.length === 0) {
+          scoresByUser[user.id] = []
+          continue
+        }
+        
+        // Get all unique testIds from user's assignments
+        const testIds = [...new Set(userAssignments.map(a => a.testId).filter(Boolean))]
+        
+        // Fetch all attempts for all testIds
+        const allScores: number[] = []
+        for (const testId of testIds) {
+          try {
+            const response = await fetch(`/api/test-attempts?userId=${user.id}&testId=${testId}`)
+            const result = await response.json()
+            
+            if (result.success && result.data.attempts) {
+              const attempts = result.data.attempts
+              const completedAttempts = attempts.filter((a: any) => 
+                a.status === 'completed' && a.score !== null && a.score !== undefined
+              )
+              completedAttempts.forEach((a: any) => {
+                allScores.push(a.score ?? 0)
+              })
+            }
+          } catch (error) {
+            console.error(`Error loading attempts for user ${user.id}, test ${testId}:`, error)
+          }
+        }
+        
+        scoresByUser[user.id] = allScores
+      }
+      
+      setUserAttemptScores(scoresByUser)
+    }
+    
+    loadAllAttemptScores()
+  }, [assignments, users])
+
+  // Load test attempt statistics for each assignment
+  useEffect(() => {
+    const loadAttemptStats = async () => {
+      const stats: Record<string, Record<string, AttemptStats>> = {}
+      
+      for (const assignment of assignments) {
+        if (!assignment.testId) continue
+        
+        stats[assignment.id] = {}
+        
+        for (const user of users) {
+          if (user.role !== 'employee') continue
+          
+          try {
+            const response = await fetch(`/api/test-attempts?userId=${user.id}&testId=${assignment.testId}`)
+            const result = await response.json()
+            
+            if (result.success && result.data.attempts) {
+              const attempts = result.data.attempts
+              const completedAttempts = attempts.filter((a: any) => a.status === 'completed' && a.score !== null && a.score !== undefined)
+              const totalAttempts = attempts.length
+              const passedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) >= 70).length
+              const failedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) < 70).length
+              const bestScore = completedAttempts.length > 0 
+                ? Math.max(...completedAttempts.map((a: any) => a.score ?? 0))
+                : null
+              const averageScore = completedAttempts.length > 0
+                ? Math.round(completedAttempts.reduce((acc: number, a: any) => acc + (a.score ?? 0), 0) / completedAttempts.length)
+                : null
+              
+              stats[assignment.id][user.id] = {
+                totalAttempts,
+                passedAttempts,
+                failedAttempts,
+                bestScore,
+                averageScore
+              }
+            }
+          } catch (error) {
+            console.error(`Error loading attempts for assignment ${assignment.id}, user ${user.id}:`, error)
+          }
+        }
+      }
+      
+      setAttemptStats(stats)
+    }
+    
+    loadAttemptStats()
+  }, [assignments, users])
 
   useEffect(() => {
     console.log('UserProgressReport: useEffect triggered')
@@ -116,23 +231,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
         return dueDate < now && userAssignment?.status !== 'completed' && userAssignment?.status !== 'passed'
       }).length
 
-      const completedWithScores = userAssignments.filter(assignment => {
-        const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === user.id)
-        return userAssignment?.status === 'completed'
-      })
-
-      // Get the actual scores from test attempts
-      const scores: number[] = []
-      for (const assignment of completedWithScores) {
-        // Find the user's test score from the assignment's users array
-        const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === user.id)
-        if (userAssignment?.testScore !== undefined && userAssignment.testScore !== null) {
-          scores.push(userAssignment.testScore)
-        }
-      }
+      // Get all test attempts scores for this user across all their assignments
+      // Use the pre-loaded attempt scores from all assignments
+      const allAttemptScores = userAttemptScores[user.id] || []
       
-      const averageScore = scores.length > 0
-        ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      const averageScore = allAttemptScores.length > 0
+        ? Math.round(allAttemptScores.reduce((sum, score) => sum + score, 0) / allAttemptScores.length)
         : 0
 
       return {
@@ -146,7 +250,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     })
 
     setUserProgress(progressData)
-  }, [users, assignments])
+  }, [users, assignments, userAttemptScores])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -287,7 +391,9 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                       const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === progress.user.id)
                       const actualStatus = userAssignment?.status || assignment.status || 'pending'
                       const actualTitle = assignment.title || assignment.name || `Assignment ${assignment.id.slice(0, 8)}`
-                      const actualDescription = assignment.description || assignment.title || assignment.name || `Complete assignment ${assignment.id.slice(0, 8)}`
+                      const actualDescription = assignment.description || assignment.title || assignment.name || t('assignmentDescriptionDefault')
+                      
+                      const stats = attemptStats[assignment.id]?.[progress.user.id]
                       
                       return (
                       <div key={assignment.id} className="p-4 border rounded-3xl bg-card">
@@ -298,7 +404,14 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                               {getStatusIcon(actualStatus)}
                               {getStatusBadge(actualStatus)}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">{actualDescription}</p>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {actualDescription}
+                              {stats && stats.totalAttempts > 0 && (
+                                <span className="ml-2 text-blue-600 font-medium">
+                                  ({stats.totalAttempts} {stats.totalAttempts === 1 ? t('attempt') : t('attempts')})
+                                </span>
+                              )}
+                            </p>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
                               {assignment.testId && (
                                 <div className="flex items-center gap-1">

@@ -281,7 +281,7 @@ function EmployeePageInner() {
       status: userStatus,
       progress: userStatus === 'completed' ? 100 : 0,
       dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : t('noDueDate'),
-      description: assignment.description || `${t('completeAssignment')} ${assignment.id.slice(0, 8)}`, // Use actual description or generate
+      description: assignment.description || t('assignmentDescriptionDefault'), // Use actual description or default message
       estimatedTime: assignment.testId ? `15 ${t('minutes')}` : `30 ${t('minutes')}`,
       score: testScore, // Use actual test score from database
       moduleId: assignment.moduleId,
