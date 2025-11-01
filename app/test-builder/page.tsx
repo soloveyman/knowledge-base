@@ -163,6 +163,27 @@ export default function TestBuilderPage() {
     }
   }, [isEditMode, selectedDocument, documents])
 
+  // Ensure documentId is synced with selectedDocument
+  useEffect(() => {
+    if (selectedDocument && values.documentId !== String(selectedDocument.id)) {
+      console.log('Syncing documentId with selectedDocument:', selectedDocument.id, 'current:', values.documentId)
+      setValue('documentId', String(selectedDocument.id))
+    }
+  }, [selectedDocument])
+
+  // Ensure document is selected when documentId is set and document exists in list
+  useEffect(() => {
+    if (values.documentId && documents.length > 0 && !selectedDocument) {
+      const doc = documents.find(d => String(d.id) === String(values.documentId))
+      if (doc) {
+        console.log('Found document for documentId:', values.documentId, doc.title)
+        setSelectedDocument(doc)
+      } else {
+        console.log('Document not found in list for documentId:', values.documentId, 'Available IDs:', documents.map(d => d.id))
+      }
+    }
+  }, [values.documentId, documents, selectedDocument])
+
   const loadTestForEditing = useCallback(async (testId: string) => {
     try {
       console.log('Test Builder: Loading test for editing, testId:', testId)
@@ -231,32 +252,35 @@ export default function TestBuilderPage() {
               console.log('Test Builder: Document ID as string:', String(documentToSet.id))
               
               // Ensure the document is in the documents list for the Select dropdown FIRST
+              let documentExists = false
               setDocuments(prevDocs => {
                 console.log('Test Builder: Current documents list length:', prevDocs.length)
                 const existingDoc = prevDocs.find(d => String(d.id) === String(documentToSet.id))
-                if (!existingDoc) {
+                if (existingDoc) {
+                  documentExists = true
+                  console.log('Test Builder: Document already in list:', documentToSet.id)
+                  return prevDocs
+                } else {
                   // Add document to list if not present
                   console.log('Test Builder: Adding document to documents list:', documentToSet.id)
                   return [...prevDocs, documentToSet]
-                } else {
-                  console.log('Test Builder: Document already in list:', documentToSet.id)
-                  return prevDocs
                 }
               })
               
-              // Set selectedDocument and documentId - use setTimeout to ensure documents list is updated
+              // Set form values first
+              setValue('count', loadedConfig.count)
+              setValue('type', loadedConfig.type)
+              setValue('difficulty', loadedConfig.difficulty)
+              setValue('locale', loadedConfig.locale)
+              setValue('documentId', String(documentToSet.id))
+              
+              // Set selected document - use setTimeout to ensure document is in list
               setTimeout(() => {
                 console.log('Test Builder: Setting selectedDocument to:', documentToSet.id)
+                console.log('Test Builder: Document ID as string:', String(documentToSet.id))
+                console.log('Test Builder: Current documents count:', documents.length)
                 setSelectedDocument(documentToSet)
-                validation.setValues({ 
-                  ...validation.values, 
-                  documentId: String(documentToSet.id),
-                  count: loadedConfig.count,
-                  type: loadedConfig.type,
-                  difficulty: loadedConfig.difficulty,
-                  locale: loadedConfig.locale
-                })
-              }, 100)
+              }, documentExists ? 0 : 150)
               
               // Use actual document content from parsedContent
               let documentContent = ''
@@ -825,7 +849,7 @@ export default function TestBuilderPage() {
                   error={touched.documentId ? errors.documentId : undefined}
                 >
                   <Select 
-                    value={values.documentId} 
+                    value={values.documentId || undefined} 
                     onValueChange={(value) => {
                       const doc = documents.find(d => String(d.id) === String(value))
                       if (doc) {

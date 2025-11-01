@@ -43,8 +43,7 @@ export function TestsPage({
     subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${new Date(test.createdAt).toLocaleDateString()}`,
     metadata: [],
     badges: [
-      { label: translateBadge(test.difficulty || 'medium'), variant: "outline" as const },
-      { label: translateBadge(test.locale || 'en'), variant: "secondary" as const }
+      { label: translateBadge(test.difficulty || 'medium'), variant: "outline" as const }
     ],
     onClick: () => onViewTest(test.id),
     onDelete: () => onDeleteTest(test.id),
