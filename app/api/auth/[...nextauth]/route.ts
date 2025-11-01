@@ -18,9 +18,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Log request URL for debugging
-    const url = req.url
-    const headers = Object.fromEntries(req.headers.entries())
+    // Debug logging for localhost
+    if (process.env.NODE_ENV === 'development') {
+      const url = req.url
+      const host = req.headers.get('host')
+      console.log('[NextAuth] POST request:', {
+        url,
+        host,
+        hasNEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+        NEXTAUTH_URL: process.env.NEXTAUTH_URL
+      })
+    }
     
     // Apply rate limiting for login attempts
     const rateLimitResult = await checkAuthRateLimit(req)
@@ -42,22 +50,14 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // Ensure request has proper URL and headers for NextAuth
-    // NextAuth needs the full URL to construct callback URLs properly
-    const host = headers['x-forwarded-host'] || headers.host || req.headers.get('host')
-    const protocol = headers['x-forwarded-proto'] || 'https'
-    
-    if (!host && process.env.NODE_ENV === 'production') {
-      console.error('Missing host header - this may cause URL parsing errors')
-    }
-    
-    // Call the original NextAuth POST handler
+    // Call the original NextAuth POST handler - pass request as-is
     return await originalPOST(req)
   } catch (error) {
     console.error("NextAuth POST error:", error)
     console.error("Error details:", {
       message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      cause: error instanceof Error && error.cause ? error.cause : undefined
     })
     
     // Check if it's a URL parsing error
@@ -69,12 +69,18 @@ export async function POST(req: NextRequest) {
       const invalidUrl = error.message.match(/\/[^\s]+/)?.[0] || 
         (error.cause && error.cause instanceof Error ? error.cause.message.match(/\/[^\s]+/)?.[0] : null) || 
         'unknown'
-      console.error(`URL parsing error - tried to parse: ${invalidUrl}`)
-      console.error('Check NEXTAUTH_URL environment variable or ensure trustHost: true is working')
+      
+      console.error(`❌ URL parsing error - tried to parse: ${invalidUrl}`)
+      console.error(`📍 Current NEXTAUTH_URL: ${process.env.NEXTAUTH_URL || 'NOT SET'}`)
+      console.error(`📍 Current NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`)
+      console.error('💡 CRITICAL: Restart your dev server after setting NEXTAUTH_URL in .env.local')
+      
       return NextResponse.json(
         { 
           error: "Authentication configuration error. Please check server settings.",
-          details: process.env.NODE_ENV === 'development' ? `Failed to parse URL: ${invalidUrl}` : undefined
+          details: process.env.NODE_ENV === 'development' ? 
+            `Failed to parse URL: ${invalidUrl}. Make sure NEXTAUTH_URL=http://localhost:3000 is set in .env.local and restart dev server (Ctrl+C then npm run dev)` : 
+            undefined
         },
         { status: 500 }
       )

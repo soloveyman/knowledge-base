@@ -23,18 +23,27 @@ const oauthProviders = (
     : []
 )
 
-// Ensure NEXTAUTH_URL is set in production
+// Ensure NEXTAUTH_URL is set
+// For localhost, trustHost should handle it, but having NEXTAUTH_URL set is safer
 const nextAuthUrl = process.env.NEXTAUTH_URL || 
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : undefined)
 
-if (process.env.NODE_ENV === 'production' && !nextAuthUrl) {
-  console.warn('NEXTAUTH_URL is not set in production. This may cause authentication errors.')
-  console.warn('Using trustHost: true as fallback - ensure Vercel URL is properly configured')
+// Log warning if NEXTAUTH_URL is not set
+if (typeof process !== 'undefined' && !process.env.NEXTAUTH_URL) {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('⚠️  NEXTAUTH_URL is not set in production. This may cause authentication errors.')
+    console.warn('⚠️  Set NEXTAUTH_URL in Vercel environment variables (e.g., https://uppstaff.vercel.app)')
+  } else {
+    console.warn('⚠️  NEXTAUTH_URL is not set. For localhost, trustHost: true should work, but consider setting NEXTAUTH_URL=http://localhost:3000 in .env.local')
+  }
+  console.warn('⚠️  Using trustHost: true as fallback')
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   trustHost: true, // Allow NextAuth to trust the host from request headers (important for Vercel)
+  debug: process.env.NODE_ENV === 'development', // Enable debug logging in development
   providers: [
     ...oauthProviders,
     CredentialsProvider({
@@ -45,14 +54,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
+          console.log("[Auth] Authorize called with credentials:", { email: credentials?.email ? "provided" : "missing" })
+          
           const { email, password } = loginSchema.parse(credentials)
           const normalizedEmail = email.toLowerCase().trim()
+          
+          console.log("[Auth] Looking up user:", normalizedEmail)
           
           // Find user in database
           const dbUsers = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
           
           if (dbUsers.length === 0) {
-            console.log("User not found:", email)
+            console.log("[Auth] User not found:", normalizedEmail)
             return null
           }
 
@@ -60,18 +73,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           
           // Check if user has a password (some users might not have one if created via OAuth)
           if (!dbUser.password) {
-            console.log("User has no password set:", email)
+            console.log("[Auth] User has no password set:", normalizedEmail)
             return null
           }
 
           // Verify password
+          console.log("[Auth] Verifying password for user:", normalizedEmail)
           const isValidPassword = await bcrypt.compare(password, dbUser.password)
           
           if (!isValidPassword) {
-            console.log("Invalid password for user:", email)
+            console.log("[Auth] Invalid password for user:", normalizedEmail)
             return null
           }
 
+          console.log("[Auth] Authentication successful for user:", normalizedEmail)
+          
           // Return user object for NextAuth
           const resolvedRole = ((dbUser.role ?? 'owner') as string).toLowerCase() as UserRole
           const resolvedBusinessId: string = dbUser.businessId ?? dbUser.id
@@ -84,7 +100,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             businessName: 'Knowledge Base',
           }
         } catch (error) {
-          console.error("Auth error:", error)
+          console.error("[Auth] Authorize error:", error)
+          console.error("[Auth] Error details:", {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          })
           return null
         }
       }
@@ -92,64 +112,80 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === 'google' && user?.email) {
-        const existing = await db.select().from(users).where(eq(users.email, user.email)).limit(1)
-        if (existing.length === 0) {
-          const [created] = await db.insert(users).values({
-            email: user.email,
-            name: user.name ?? null,
-            role: 'owner',
-            country: 'US',
-          }).returning()
-          await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
-          const u = user as { id?: string; role?: UserRole; businessId?: string }
-          u.id = created.id
-          u.role = 'owner'
-          u.businessId = created.id
-        } else {
-          const dbUser = existing[0] as unknown as { id: string; role: string; businessId?: string | null }
-          const u = user as { id?: string; role?: UserRole; businessId?: string }
-          u.id = dbUser.id
-          u.role = (dbUser.role as string).toLowerCase() as UserRole
-          u.businessId = (dbUser.businessId ?? dbUser.id)
-        }
-      }
-      return true
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        // Ensure token.sub is always the DB user id (important for OAuth providers)
-        // so session.user.id matches our users.id UUID everywhere
-        const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string }
-        token.sub = u.id ?? token.sub
-        token.role = ((u.role as string | undefined)?.toLowerCase() as UserRole) ?? (token.role as UserRole)
-        token.businessId = u.businessId ?? token.businessId
-        token.businessName = u.businessName ?? token.businessName
-      } else {
-        // Fallback: if role/businessId missing, hydrate from DB
-        if ((!token.role || !token.businessId) && token.sub) {
-          try {
-            const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
-            if (dbUsers.length > 0) {
-              const dbUser = dbUsers[0] as { role: string | null; businessId?: string | null }
-              if (!token.role) token.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
-              if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
-            }
-          } catch {
-            // non-fatal; leave token as-is
+      try {
+        if (account?.provider === 'google' && user?.email) {
+          const existing = await db.select().from(users).where(eq(users.email, user.email)).limit(1)
+          if (existing.length === 0) {
+            const [created] = await db.insert(users).values({
+              email: user.email,
+              name: user.name ?? null,
+              role: 'owner',
+              country: 'US',
+            }).returning()
+            await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
+            const u = user as { id?: string; role?: UserRole; businessId?: string }
+            u.id = created.id
+            u.role = 'owner'
+            u.businessId = created.id
+          } else {
+            const dbUser = existing[0] as unknown as { id: string; role: string; businessId?: string | null }
+            const u = user as { id?: string; role?: UserRole; businessId?: string }
+            u.id = dbUser.id
+            u.role = (dbUser.role as string).toLowerCase() as UserRole
+            u.businessId = (dbUser.businessId ?? dbUser.id)
           }
         }
+        return true
+      } catch (error) {
+        console.error("[Auth] signIn callback error:", error)
+        return false
       }
-      return token
+    },
+    async jwt({ token, user }) {
+      try {
+        if (user) {
+          // Ensure token.sub is always the DB user id (important for OAuth providers)
+          // so session.user.id matches our users.id UUID everywhere
+          const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string }
+          token.sub = u.id ?? token.sub
+          token.role = ((u.role as string | undefined)?.toLowerCase() as UserRole) ?? (token.role as UserRole)
+          token.businessId = u.businessId ?? token.businessId
+          token.businessName = u.businessName ?? token.businessName
+        } else {
+          // Fallback: if role/businessId missing, hydrate from DB
+          if ((!token.role || !token.businessId) && token.sub) {
+            try {
+              const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
+              if (dbUsers.length > 0) {
+                const dbUser = dbUsers[0] as { role: string | null; businessId?: string | null }
+                if (!token.role) token.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
+                if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
+              }
+            } catch (error) {
+              console.error("[Auth] jwt callback DB fallback error:", error)
+              // non-fatal; leave token as-is
+            }
+          }
+        }
+        return token
+      } catch (error) {
+        console.error("[Auth] jwt callback error:", error)
+        return token // Return token even on error to avoid breaking auth
+      }
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.sub!
-        session.user.role = token.role as UserRole
-        session.user.businessId = token.businessId
-        session.user.businessName = token.businessName
+      try {
+        if (token) {
+          session.user.id = token.sub!
+          session.user.role = token.role as UserRole
+          session.user.businessId = token.businessId
+          session.user.businessName = token.businessName
+        }
+        return session
+      } catch (error) {
+        console.error("[Auth] session callback error:", error)
+        return session // Return session even on error
       }
-      return session
     },
   },
   pages: {

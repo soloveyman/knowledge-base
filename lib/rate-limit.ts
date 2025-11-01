@@ -4,10 +4,18 @@ import { Redis } from "@upstash/redis"
 // Initialize Redis client (works with Upstash or any Redis instance)
 // If Upstash env vars are not set, fallback to in-memory rate limiting
 let redis: Redis | null = null
-try {
-  redis = Redis.fromEnv()
-} catch {
-  // If Redis is not configured, we'll use in-memory fallback
+
+// Check if Upstash environment variables are set
+const hasUpstashConfig = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+
+if (hasUpstashConfig) {
+  try {
+    redis = Redis.fromEnv()
+  } catch {
+    // If Redis initialization fails, use in-memory fallback
+    console.warn("Upstash Redis initialization failed. Rate limiting will use in-memory fallback.")
+  }
+} else {
   console.warn("Upstash Redis not configured. Rate limiting will use in-memory fallback.")
 }
 
@@ -120,12 +128,18 @@ export async function checkRateLimit(
   fallbackWindowMs: number
 ): Promise<{ success: boolean; limit: number; remaining: number; reset: number }> {
   if (limiter) {
-    const result = await limiter.limit(identifier)
-    return {
-      success: result.success,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset
+    try {
+      const result = await limiter.limit(identifier)
+      return {
+        success: result.success,
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: result.reset
+      }
+    } catch (error) {
+      // If Redis fails (e.g., no credentials), fall back to in-memory
+      console.warn("Rate limiter Redis call failed, using in-memory fallback:", error instanceof Error ? error.message : String(error))
+      return getMemoryRateLimit(identifier, fallbackMax, fallbackWindowMs)
     }
   }
   // Fallback to in-memory

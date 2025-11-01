@@ -105,6 +105,19 @@ export async function POST(req: Request) {
     }
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Register error:', message)
+    
+    // Check if it's a URL parsing error (may occur if NextAuth is called)
+    if (err instanceof Error && (
+      message.includes("Failed to parse URL") || 
+      message.includes("Invalid URL")
+    )) {
+      console.error('URL parsing error in registration - this may indicate NEXTAUTH_URL is not set')
+      return NextResponse.json({ 
+        error: 'Registration service error. Please try again later.',
+        details: process.env.NODE_ENV === 'development' ? message : undefined
+      }, { status: 500 })
+    }
+    
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
