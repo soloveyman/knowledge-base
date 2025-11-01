@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ClipboardList, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
@@ -76,7 +76,7 @@ export function AssignmentsPage({
     <ManagementPage
       title={t('assignmentManagement')}
       description={t('assignTrainingModules')}
-      icon={<ClipboardList className="h-8 w-8" />}
+      icon={<span className="text-4xl">📋</span>}
       actionButton={{
         label: t('createAssignment'),
         icon: <Plus className="h-4 w-4" />,

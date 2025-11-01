@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { TestTube, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
@@ -55,7 +55,7 @@ export function TestsPage({
     <ManagementPage
       title={t('testManagement')}
       description={t('createAndManageTests')}
-      icon={<TestTube className="h-8 w-8" />}
+      icon={<span className="text-4xl">🧪</span>}
       actionButton={{
         label: t('createTest'),
         icon: <Plus className="h-4 w-4" />,

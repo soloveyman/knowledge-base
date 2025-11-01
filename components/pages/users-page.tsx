@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { ManagementPage } from "@/components/common/management-page"
-import { Users, Plus, UserCheck, UserX } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 
@@ -62,7 +62,7 @@ export function UsersPage({
     <ManagementPage
       title={t('userManagement')}
       description={t('createAndManageUserAccounts')}
-      icon={<Users className="h-6 w-6" />}
+      icon={<span className="text-4xl">👥</span>}
       actionButton={{
         label: t('addUser'),
         icon: <Plus className="h-4 w-4" />,

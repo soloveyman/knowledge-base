@@ -2,7 +2,7 @@
 
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
-import { FileText, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
 import { useRouter } from "next/navigation"
 
@@ -56,7 +56,7 @@ export function DocumentsPage({
     <ManagementPage
       title={t('uploadedDocuments')}
       description={t('viewAndManageDocuments')}
-      icon={<FileText className="h-8 w-8" />}
+      icon={<span className="text-4xl">📄</span>}
       actionButton={{
         label: t('importDocument'),
         icon: <Plus className="h-4 w-4" />,

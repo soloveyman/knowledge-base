@@ -8,7 +8,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { 
-  Users, 
   CheckCircle, 
   Clock, 
   AlertCircle, 
@@ -208,7 +207,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <span className="text-5xl block mb-4">👥</span>
             <p>No employees or assignments found</p>
           </div>
         </CardContent>

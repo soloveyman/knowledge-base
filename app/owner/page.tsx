@@ -17,11 +17,6 @@ import UserProgressReport from "@/components/reports/user-progress-report"
 import { useTranslation } from "@/lib/translation-context"
 import { toast } from "sonner"
 import { 
-  Users, 
-  FileText, 
-  ClipboardList, 
-  BarChart3, 
-  Settings,
   X
 } from "lucide-react"
 import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
@@ -561,7 +556,7 @@ function OwnerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('totalUsers')}</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">👥</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedUsers.length}</div>
@@ -574,7 +569,7 @@ function OwnerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('activeTraining')}</CardTitle>
-                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">📋</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedAssignments.length}</div>
@@ -585,7 +580,7 @@ function OwnerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('documents')}</CardTitle>
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">📄</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{documents.length}</div>
@@ -596,7 +591,7 @@ function OwnerPageInner() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{t('completionRate')}</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">📊</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
@@ -691,7 +686,7 @@ function OwnerPageInner() {
                     className="w-full sm:w-auto"
                     onClick={handleImportDocument}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <span className="text-xl mr-2">📄</span>
                     {t('importDocument')}
                   </Button>
                 </div>
@@ -823,7 +818,7 @@ function OwnerPageInner() {
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
-                  <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <span className="text-5xl block mb-4">⚙️</span>
                   <p>System settings will be implemented here</p>
                 </div>
               </CardContent>
