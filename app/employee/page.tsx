@@ -360,7 +360,6 @@ function EmployeePageInner() {
             <Card>
               <CardHeader>
                 <CardTitle>{t('overallProgress')}</CardTitle>
-                <CardDescription>{t('yourLearningJourneyProgress')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
