@@ -243,7 +243,7 @@ async function testRegistrationValidation(): Promise<boolean> {
     authLog(`Testing registration validation`, 'info')
     
     // Test with invalid email
-    const invalidEmailResponse = await fetch(`${BASE_URL}/api/auth/register`, {
+    const invalidEmailResponse = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -261,7 +261,7 @@ async function testRegistrationValidation(): Promise<boolean> {
     }
     
     // Test with short password
-    const shortPasswordResponse = await fetch(`${BASE_URL}/api/auth/register`, {
+    const shortPasswordResponse = await fetch(`${AUTH_TEST_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
