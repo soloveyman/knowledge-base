@@ -1028,7 +1028,6 @@ export const translations = {
     emailAddress: "Адрес электронной почты",
     enterEmailAddress: "Введите адрес электронной почты",
     enterPassword: "Введите пароль",
-    forgotPassword: "Забыли пароль?",
     resetPassword: "Сбросить пароль",
     forgotPasswordTitle: "Забыли пароль",
     forgotPasswordDescription: "Введите ваш email адрес, и мы отправим вам ссылку для сброса пароля.",
