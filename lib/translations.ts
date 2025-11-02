@@ -18,6 +18,96 @@ export const translations = {
     fullSystemControl: "Full system control and business management",
     learningJourney: "Your learning journey and assignment management",
     
+    // Employee Greetings - Unfinished
+    employeeGreetingUnfinished1: "Keep going, [Name]! 🚀 You're almost there.",
+    employeeGreetingUnfinished2: "Don't stop now, [Name]! 🚀 Just a few steps left.",
+    employeeGreetingUnfinished3: "Let's finish strong, [Name]! 🚀",
+    employeeGreetingUnfinished4: "Keep learning, [Name]! 🚀 You're making great progress.",
+    employeeGreetingUnfinished5: "Almost done, [Name]! 🚀 One more training to go.",
+    employeeGreetingUnfinished6: "You're on the right track, [Name]! 🚀",
+    employeeGreetingUnfinished7: "Step by step, [Name]! 🚀 Keep it up.",
+    employeeGreetingUnfinished8: "Stay focused, [Name]! 🚀 Success is close.",
+    
+    // Employee Greetings - Successful
+    employeeGreetingSuccessful1: "Great job, [Name]! 🎉 You nailed it.",
+    employeeGreetingSuccessful2: "Well done, [Name]! 🎉 Another goal achieved.",
+    employeeGreetingSuccessful3: "Awesome work, [Name]! 🎉",
+    employeeGreetingSuccessful4: "You did it, [Name]! 🎉 Keep growing.",
+    employeeGreetingSuccessful5: "Fantastic progress, [Name]! 🎉",
+    employeeGreetingSuccessful6: "You've mastered this, [Name]! 🎉",
+    employeeGreetingSuccessful7: "That's the spirit, [Name]! 🎉",
+    employeeGreetingSuccessful8: "Great energy, [Name]! 🎉 You're doing amazing.",
+    
+    // Employee Greetings - Default
+    employeeGreetingDefault1: "Welcome back, [Name]! 👋 Ready to learn?",
+    employeeGreetingDefault2: "Hey there, [Name]! 👋 Let's get started.",
+    employeeGreetingDefault3: "Good to see you again, [Name]! 👋",
+    employeeGreetingDefault4: "Hi, [Name]! 👋 Let's dive into learning.",
+    employeeGreetingDefault5: "Welcome, [Name]! 👋 New day, new progress.",
+    employeeGreetingDefault6: "Glad to have you here, [Name]! 👋",
+    employeeGreetingDefault7: "Nice to see you, [Name]! 👋",
+    employeeGreetingDefault8: "Welcome aboard, [Name]! 👋 Let's go.",
+    
+    // Manager Greetings - Unfinished
+    managerGreetingUnfinished1: "Keep going, [Name]! 🚀 Some team members need your help.",
+    managerGreetingUnfinished2: "Almost there, [Name]! 🚀 A few trainings still open.",
+    managerGreetingUnfinished3: "You've got this, [Name]! 🚀 Let's wrap up the pending ones.",
+    managerGreetingUnfinished4: "Keep supporting your team, [Name]! 🚀",
+    managerGreetingUnfinished5: "Not done yet, [Name]! 🚀 Check ongoing trainings.",
+    managerGreetingUnfinished6: "Keep pushing, [Name]! 🚀 Your team counts on you.",
+    managerGreetingUnfinished7: "You're leading the way, [Name]! 🚀 Just a bit more to go.",
+    managerGreetingUnfinished8: "Let's finish strong, [Name]! 🚀",
+    
+    // Manager Greetings - Successful
+    managerGreetingSuccessful1: "Great job, [Name]! 🎉 Your team's on track.",
+    managerGreetingSuccessful2: "Well done, [Name]! 🎉 The results speak for themselves.",
+    managerGreetingSuccessful3: "Awesome leadership, [Name]! 🎉",
+    managerGreetingSuccessful4: "Great work, [Name]! 🎉 Everyone's learning fast.",
+    managerGreetingSuccessful5: "Impressive progress, [Name]! 🎉",
+    managerGreetingSuccessful6: "Your team did great, [Name]! 🎉",
+    managerGreetingSuccessful7: "Fantastic, [Name]! 🎉 You're making an impact.",
+    managerGreetingSuccessful8: "Strong results, [Name]! 🎉 Keep it up.",
+    
+    // Manager Greetings - Default
+    managerGreetingDefault1: "Welcome back, [Name]! 👋 Let's review team progress.",
+    managerGreetingDefault2: "Hi, [Name]! 👋 Time to see what's new.",
+    managerGreetingDefault3: "Good to see you, [Name]! 👋",
+    managerGreetingDefault4: "Welcome, [Name]! 👋 Your dashboard is ready.",
+    managerGreetingDefault5: "Hey, [Name]! 👋 Let's check today's updates.",
+    managerGreetingDefault6: "Hello again, [Name]! 👋",
+    managerGreetingDefault7: "Nice to see you back, [Name]! 👋",
+    managerGreetingDefault8: "Welcome back, [Name]! 👋 Let's see how your team's doing.",
+    
+    // Owner Greetings - Unfinished
+    ownerGreetingUnfinished1: "Keep going, [Name]! 🚀 A few trainings are still open.",
+    ownerGreetingUnfinished2: "Some teams need attention, [Name]! 🚀",
+    ownerGreetingUnfinished3: "Almost complete, [Name]! 🚀 Keep the momentum.",
+    ownerGreetingUnfinished4: "Keep driving progress, [Name]! 🚀",
+    ownerGreetingUnfinished5: "A little more to go, [Name]! 🚀",
+    ownerGreetingUnfinished6: "Keep the energy up, [Name]! 🚀",
+    ownerGreetingUnfinished7: "You're doing great, [Name]! 🚀 Just a few gaps left.",
+    ownerGreetingUnfinished8: "Stay focused, [Name]! 🚀 Success is close.",
+    
+    // Owner Greetings - Successful
+    ownerGreetingSuccessful1: "Great job, [Name]! 🎉 The company's learning fast.",
+    ownerGreetingSuccessful2: "Fantastic, [Name]! 🎉 New trainings and users added.",
+    ownerGreetingSuccessful3: "Well done, [Name]! 🎉 Growth looks strong.",
+    ownerGreetingSuccessful4: "Amazing progress, [Name]! 🎉",
+    ownerGreetingSuccessful5: "Great leadership, [Name]! 🎉",
+    ownerGreetingSuccessful6: "Results are looking good, [Name]! 🎉",
+    ownerGreetingSuccessful7: "Outstanding work, [Name]! 🎉",
+    ownerGreetingSuccessful8: "Success all around, [Name]! 🎉 Keep building on it.",
+    
+    // Owner Greetings - Default
+    ownerGreetingDefault1: "Welcome back, [Name]! 👋 Here's your latest overview.",
+    ownerGreetingDefault2: "Hi, [Name]! 👋 Time to check company progress.",
+    ownerGreetingDefault3: "Welcome, [Name]! 👋 Your team's results are ready.",
+    ownerGreetingDefault4: "Hello again, [Name]! 👋",
+    ownerGreetingDefault5: "Great to see you, [Name]! 👋 Let's see what's new.",
+    ownerGreetingDefault6: "Welcome back, [Name]! 👋 Everything's running smoothly.",
+    ownerGreetingDefault7: "Good to have you here, [Name]! 👋",
+    ownerGreetingDefault8: "Welcome back, [Name]! 👋 Let's review this week's progress.",
+    
     // Navigation
     overview: "Overview",
     users: "Users",
@@ -491,6 +581,96 @@ export const translations = {
     // Common
     welcome: "Добро пожаловать",
     manageTeam: "Управляйте обучением и базой знаний вашей команды",
+    
+    // Employee Greetings - Unfinished
+    employeeGreetingUnfinished1: "Продолжайте, [Name]! 🚀 Почти готово.",
+    employeeGreetingUnfinished2: "Не останавливайтесь, [Name]! 🚀 Осталось совсем немного.",
+    employeeGreetingUnfinished3: "Завершим обучение вместе, [Name]! 🚀",
+    employeeGreetingUnfinished4: "Отличный темп, [Name]! 🚀 Продолжайте в том же духе.",
+    employeeGreetingUnfinished5: "Почти всё готово, [Name]! 🚀 Остался один шаг.",
+    employeeGreetingUnfinished6: "Всё получается, [Name]! 🚀",
+    employeeGreetingUnfinished7: "Шаг за шагом, [Name]! 🚀 Так держать.",
+    employeeGreetingUnfinished8: "Ещё немного, [Name]! 🚀 Успех рядом.",
+    
+    // Employee Greetings - Successful
+    employeeGreetingSuccessful1: "Отличная работа, [Name]! 🎉 Всё получилось.",
+    employeeGreetingSuccessful2: "Молодцы, [Name]! 🎉 Ещё один результат в копилку.",
+    employeeGreetingSuccessful3: "Отлично справились, [Name]! 🎉",
+    employeeGreetingSuccessful4: "Готово, [Name]! 🎉 Продолжайте в том же духе.",
+    employeeGreetingSuccessful5: "Прекрасный прогресс, [Name]! 🎉",
+    employeeGreetingSuccessful6: "Освоили материал, [Name]! 🎉",
+    employeeGreetingSuccessful7: "Вот это настрой, [Name]! 🎉",
+    employeeGreetingSuccessful8: "Отличный результат, [Name]! 🎉 Так держать.",
+    
+    // Employee Greetings - Default
+    employeeGreetingDefault1: "С возвращением, [Name]! 👋 Готовы учиться?",
+    employeeGreetingDefault2: "Привет, [Name]! 👋 Начнём обучение.",
+    employeeGreetingDefault3: "Рад видеть снова, [Name]! 👋",
+    employeeGreetingDefault4: "Здравствуйте, [Name]! 👋 Приступим к новому материалу.",
+    employeeGreetingDefault5: "Добро пожаловать, [Name]! 👋 Новый день — новые знания.",
+    employeeGreetingDefault6: "Рады вас видеть, [Name]! 👋",
+    employeeGreetingDefault7: "Отлично, что вы здесь, [Name]! 👋",
+    employeeGreetingDefault8: "С возвращением, [Name]! 👋 Начнём.",
+    
+    // Manager Greetings - Unfinished
+    managerGreetingUnfinished1: "Продолжайте, [Name]! 🚀 Некоторым сотрудникам нужна поддержка.",
+    managerGreetingUnfinished2: "Почти всё готово, [Name]! 🚀 Остались незавершённые обучения.",
+    managerGreetingUnfinished3: "Отличный темп, [Name]! 🚀 Завершим начатое.",
+    managerGreetingUnfinished4: "Поддерживайте команду, [Name]! 🚀",
+    managerGreetingUnfinished5: "Ещё не всё завершено, [Name]! 🚀 Проверьте обучение сотрудников.",
+    managerGreetingUnfinished6: "Не сдавайтесь, [Name]! 🚀 Команда рассчитывает на вас.",
+    managerGreetingUnfinished7: "Вы задаёте темп, [Name]! 🚀 Ещё немного.",
+    managerGreetingUnfinished8: "Завершим всё вместе, [Name]! 🚀",
+    
+    // Manager Greetings - Successful
+    managerGreetingSuccessful1: "Отличная работа, [Name]! 🎉 Команда справляется отлично.",
+    managerGreetingSuccessful2: "Молодцы, [Name]! 🎉 Результаты говорят сами за себя.",
+    managerGreetingSuccessful3: "Отличное руководство, [Name]! 🎉",
+    managerGreetingSuccessful4: "Прекрасная работа, [Name]! 🎉 Команда учится быстро.",
+    managerGreetingSuccessful5: "Замечательный прогресс, [Name]! 🎉",
+    managerGreetingSuccessful6: "Команда отлично справилась, [Name]! 🎉",
+    managerGreetingSuccessful7: "Отличный результат, [Name]! 🎉 Вы вдохновляете.",
+    managerGreetingSuccessful8: "Всё под контролем, [Name]! 🎉 Так держать.",
+    
+    // Manager Greetings - Default
+    managerGreetingDefault1: "С возвращением, [Name]! 👋 Проверим прогресс команды.",
+    managerGreetingDefault2: "Привет, [Name]! 👋 Посмотрим, что нового.",
+    managerGreetingDefault3: "Рад вас видеть, [Name]! 👋",
+    managerGreetingDefault4: "Добро пожаловать, [Name]! 👋 Панель готова к работе.",
+    managerGreetingDefault5: "Здравствуйте, [Name]! 👋 Проверим сегодняшние результаты.",
+    managerGreetingDefault6: "Снова рады видеть, [Name]! 👋",
+    managerGreetingDefault7: "Отлично, что вы вернулись, [Name]! 👋",
+    managerGreetingDefault8: "С возвращением, [Name]! 👋 Посмотрим на итоги команды.",
+    
+    // Owner Greetings - Unfinished
+    ownerGreetingUnfinished1: "Продолжайте, [Name]! 🚀 Несколько обучений ещё не завершено.",
+    ownerGreetingUnfinished2: "Некоторым командам нужна поддержка, [Name]! 🚀",
+    ownerGreetingUnfinished3: "Почти всё готово, [Name]! 🚀 Сохраняйте темп.",
+    ownerGreetingUnfinished4: "Продолжайте развивать команду, [Name]! 🚀",
+    ownerGreetingUnfinished5: "Осталось немного, [Name]! 🚀",
+    ownerGreetingUnfinished6: "Сохраняйте энергию, [Name]! 🚀",
+    ownerGreetingUnfinished7: "Всё идёт отлично, [Name]! 🚀 Осталось несколько шагов.",
+    ownerGreetingUnfinished8: "Внимание к деталям, [Name]! 🚀 Успех близко.",
+    
+    // Owner Greetings - Successful
+    ownerGreetingSuccessful1: "Отличная работа, [Name]! 🎉 Компания развивается быстро.",
+    ownerGreetingSuccessful2: "Прекрасно, [Name]! 🎉 Созданы новые обучения и пользователи.",
+    ownerGreetingSuccessful3: "Отличный результат, [Name]! 🎉 Рост заметен.",
+    ownerGreetingSuccessful4: "Замечательный прогресс, [Name]! 🎉",
+    ownerGreetingSuccessful5: "Прекрасное руководство, [Name]! 🎉",
+    ownerGreetingSuccessful6: "Отличные показатели, [Name]! 🎉",
+    ownerGreetingSuccessful7: "Вы проделали отличную работу, [Name]! 🎉",
+    ownerGreetingSuccessful8: "Успех на всех уровнях, [Name]! 🎉 Так держать.",
+    
+    // Owner Greetings - Default
+    ownerGreetingDefault1: "С возвращением, [Name]! 👋 Последние результаты готовы.",
+    ownerGreetingDefault2: "Привет, [Name]! 👋 Проверим прогресс компании.",
+    ownerGreetingDefault3: "Добро пожаловать, [Name]! 👋 Данные по командам обновлены.",
+    ownerGreetingDefault4: "Рад вас видеть, [Name]! 👋",
+    ownerGreetingDefault5: "Отлично, что вы вернулись, [Name]! 👋 Посмотрим, что нового.",
+    ownerGreetingDefault6: "С возвращением, [Name]! 👋 Всё работает стабильно.",
+    ownerGreetingDefault7: "Рады вас видеть, [Name]! 👋",
+    ownerGreetingDefault8: "Добро пожаловать, [Name]! 👋 Проверим итоги недели.",
     fullSystemControl: "Полный контроль системы и управление бизнесом",
     learningJourney: "Ваш путь обучения и управление заданиями",
     

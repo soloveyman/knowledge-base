@@ -566,10 +566,55 @@ function ManagerPageInner() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
-        <GreetingCard
-          name={`${t('welcome')}, ${session.user?.name || t('manager')}!`}
-          description={t('manageTeam')}
-        />
+        {(() => {
+          // Determine greeting type based on actions
+          // Check for unfinished assignments (users with pending/in_progress status)
+          let hasUnfinished = false
+          savedAssignments.forEach(assignment => {
+            if (assignment.users && Array.isArray(assignment.users)) {
+              const hasPending = assignment.users.some((au: AssignedUser) => au.status === 'pending' || au.status === 'in_progress')
+              if (hasPending) {
+                hasUnfinished = true
+              }
+            }
+          })
+          
+          const hasActivity = savedTests.length > 0 || savedAssignments.length > 0 || documents.length > 0
+          const greetingType: 'default' | 'unfinished' | 'successful' = hasUnfinished ? 'unfinished' : (hasActivity ? 'successful' : 'default')
+          
+          const userName = session.user?.name || t('manager')
+          
+          const getGreetingMessage = () => {
+            const greetingKeys: string[] = []
+            
+            switch (greetingType) {
+              case 'unfinished':
+                greetingKeys = ['managerGreetingUnfinished1', 'managerGreetingUnfinished2', 'managerGreetingUnfinished3', 'managerGreetingUnfinished4', 'managerGreetingUnfinished5', 'managerGreetingUnfinished6', 'managerGreetingUnfinished7', 'managerGreetingUnfinished8']
+                break
+              case 'successful':
+                greetingKeys = ['managerGreetingSuccessful1', 'managerGreetingSuccessful2', 'managerGreetingSuccessful3', 'managerGreetingSuccessful4', 'managerGreetingSuccessful5', 'managerGreetingSuccessful6', 'managerGreetingSuccessful7', 'managerGreetingSuccessful8']
+                break
+              default:
+                greetingKeys = ['managerGreetingDefault1', 'managerGreetingDefault2', 'managerGreetingDefault3', 'managerGreetingDefault4', 'managerGreetingDefault5', 'managerGreetingDefault6', 'managerGreetingDefault7', 'managerGreetingDefault8']
+            }
+            
+            // Pick a random greeting based on current date (for consistency across sessions)
+            const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24))
+            const index = dayOfYear % greetingKeys.length
+            const selectedKey = greetingKeys[index]
+            
+            const message = t(selectedKey as any)
+            // Replace [Name] with actual user name
+            return message.replace('[Name]', userName)
+          }
+
+          return (
+            <GreetingCard
+              message={getGreetingMessage()}
+              greetingType={greetingType}
+            />
+          )
+        })()}
 
 
         {/* Main Tabs */}

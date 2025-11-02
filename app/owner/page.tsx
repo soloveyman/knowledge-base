@@ -620,10 +620,55 @@ function OwnerPageInner() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
-        <GreetingCard
-          name={`${t('welcome')}, ${session.user?.name || t('owner')}!`}
-          description={t('fullSystemControl')}
-        />
+        {(() => {
+          // Determine greeting type based on actions
+          // Check for unfinished assignments (users with pending/in_progress status)
+          let hasUnfinished = false
+          savedAssignments.forEach(assignment => {
+            if (assignment.users && Array.isArray(assignment.users)) {
+              const hasPending = assignment.users.some((au: any) => au.status === 'pending' || au.status === 'in_progress')
+              if (hasPending) {
+                hasUnfinished = true
+              }
+            }
+          })
+          
+          const hasActivity = savedTests.length > 0 || savedAssignments.length > 0 || documents.length > 0 || savedUsers.length > 0
+          const greetingType: 'default' | 'unfinished' | 'successful' = hasUnfinished ? 'unfinished' : (hasActivity ? 'successful' : 'default')
+          
+          const userName = session.user?.name || t('owner')
+          
+          const getGreetingMessage = () => {
+            const greetingKeys: string[] = []
+            
+            switch (greetingType) {
+              case 'unfinished':
+                greetingKeys = ['ownerGreetingUnfinished1', 'ownerGreetingUnfinished2', 'ownerGreetingUnfinished3', 'ownerGreetingUnfinished4', 'ownerGreetingUnfinished5', 'ownerGreetingUnfinished6', 'ownerGreetingUnfinished7', 'ownerGreetingUnfinished8']
+                break
+              case 'successful':
+                greetingKeys = ['ownerGreetingSuccessful1', 'ownerGreetingSuccessful2', 'ownerGreetingSuccessful3', 'ownerGreetingSuccessful4', 'ownerGreetingSuccessful5', 'ownerGreetingSuccessful6', 'ownerGreetingSuccessful7', 'ownerGreetingSuccessful8']
+                break
+              default:
+                greetingKeys = ['ownerGreetingDefault1', 'ownerGreetingDefault2', 'ownerGreetingDefault3', 'ownerGreetingDefault4', 'ownerGreetingDefault5', 'ownerGreetingDefault6', 'ownerGreetingDefault7', 'ownerGreetingDefault8']
+            }
+            
+            // Pick a random greeting based on current date (for consistency across sessions)
+            const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24))
+            const index = dayOfYear % greetingKeys.length
+            const selectedKey = greetingKeys[index]
+            
+            const message = t(selectedKey as any)
+            // Replace [Name] with actual user name
+            return message.replace('[Name]', userName)
+          }
+
+          return (
+            <GreetingCard
+              message={getGreetingMessage()}
+              greetingType={greetingType}
+            />
+          )
+        })()}
 
         {/* Main Tabs */}
         <Tabs value={defaultTab} onValueChange={(value) => {
@@ -645,48 +690,48 @@ function OwnerPageInner() {
 
           <TabsContent value="overview" className="space-y-3 md:space-y-6">
             {/* Overview Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{t('totalUsers')}</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6 items-stretch">
+              <Card className="flex flex-col h-full min-h-[140px] md:min-h-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 px-4 md:px-6">
+                  <CardTitle className="text-base md:text-sm font-medium">{t('totalUsers')}</CardTitle>
                   <span className="text-2xl">👥</span>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-2 pb-2 px-4 md:px-6 flex-1 flex flex-col justify-between">
                   <div className="text-2xl font-bold">{savedUsers.length}</div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {savedUsers.filter(u => u.role === 'manager').length} {t('managers')}, {savedUsers.filter(u => u.role === 'employee').length} {t('employees')}
                   </p>
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{t('activeTraining')}</CardTitle>
+              <Card className="flex flex-col h-full min-h-[140px] md:min-h-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 px-4 md:px-6">
+                  <CardTitle className="text-base md:text-sm font-medium">{t('activeTraining')}</CardTitle>
                   <span className="text-2xl">📋</span>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-4 px-4 md:px-6 pb-2 flex-1 flex flex-col justify-between">
                   <div className="text-2xl font-bold">{savedAssignments.length}</div>
                   <p className="text-xs text-muted-foreground">{t('totalAssignments')}</p>
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{t('documents')}</CardTitle>
+              <Card className="flex flex-col h-full min-h-[140px] md:min-h-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 px-4 md:px-6">
+                  <CardTitle className="text-base md:text-sm font-medium">{t('documents')}</CardTitle>
                   <span className="text-2xl">📄</span>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-4 px-4 md:px-6 pb-2 flex-1 flex flex-col justify-between">
                   <div className="text-2xl font-bold">{documents.length}</div>
                   <p className="text-xs text-muted-foreground">{t('totalDocuments')}</p>
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{t('completionRate')}</CardTitle>
+              <Card className="flex flex-col h-full min-h-[140px] md:min-h-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0 px-4 md:px-6">
+                  <CardTitle className="text-base md:text-sm font-medium">{t('completionRate')}</CardTitle>
                   <span className="text-2xl">📊</span>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-4 px-4 md:px-6 pb-2 flex-1 flex flex-col justify-between">
                   <div className="text-2xl font-bold">
                     {(() => {
                       let totalUserAssignments = 0
@@ -708,7 +753,7 @@ function OwnerPageInner() {
                         : 0
                     })()}%
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-2">
                     {(() => {
                       let totalUserAssignments = 0
                       let completedUserAssignments = 0
