@@ -199,7 +199,17 @@ export default function SignInPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password">{t('password')} *</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">{t('password')} *</Label>
+                {!isRegister && (
+                  <a
+                    href="/auth/forgot-password"
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    {t('forgotPassword')}
+                  </a>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -278,7 +288,7 @@ export default function SignInPage() {
             <button
               type="button"
               onClick={() => { setIsRegister(!isRegister); setError("") }}
-              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium"
+              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
             >
               {isRegister ? 'Have an account? Sign in' : 'No account? Sign up'}
             </button>

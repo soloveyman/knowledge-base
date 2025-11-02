@@ -45,6 +45,15 @@ export const verificationTokens = pgTable('verification_tokens', {
   expires: timestamp('expires').notNull(),
 });
 
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expires: timestamp('expires').notNull(),
+  used: boolean('used').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // ===== KNOWLEDGE BASE MANAGEMENT =====
 export const modules = pgTable('modules', {
   id: uuid('id').primaryKey().defaultRandom(),
