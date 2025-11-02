@@ -256,7 +256,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                     <span>Uploading...</span>
                     <span>{Math.round(uploadProgress)}%</span>
                   </div>
-                  <Progress value={uploadProgress} className="w-full" />
+                  <Progress value={uploadProgress} className="w-full h-2" />
                 </div>
               )}
 

@@ -369,7 +369,7 @@ function EmployeePageInner() {
                     <span>{t('overallCompletion')}</span>
                     <span>{Math.round(totalProgress)}%</span>
                   </div>
-                  <Progress value={totalProgress} className="h-3" />
+                  <Progress value={totalProgress} className="h-2" />
                   <div className="text-xs text-muted-foreground">
                     {completedCount} of {assignments.length} {t('assignmentsCompleted')}
                   </div>

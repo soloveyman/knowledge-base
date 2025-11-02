@@ -343,7 +343,7 @@ export default function SubscriptionManager({
               {t('currentSubscriptionDesc')}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-6 md:pb-8">
             {currentSubscription ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -375,7 +375,7 @@ function DocImportPageInner() {
                         {formatFileSize(file.size)}
                       </p>
                       {file.status === 'uploading' && (
-                        <Progress value={file.progress} className="mt-2" />
+                        <Progress value={file.progress} className="mt-2 h-2" />
                       )}
                       {file.error && (
                         <p className="text-sm text-destructive mt-1">{file.error}</p>

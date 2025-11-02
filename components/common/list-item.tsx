@@ -41,7 +41,7 @@ export function ListItem({
       className="p-4 border border-border rounded-3xl hover:bg-accent"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start md:items-center justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-medium text-foreground truncate">

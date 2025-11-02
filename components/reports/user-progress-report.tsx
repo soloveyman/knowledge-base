@@ -338,7 +338,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
             <AccordionItem key={progress.user.id} value={progress.user.id}>
               <AccordionTrigger 
                 value={progress.user.id}
-                className="hover:no-underline relative [&>svg]:absolute [&>svg]:top-4 [&>svg]:right-4 md:[&>svg]:static md:[&>svg]:top-auto md:[&>svg]:right-auto"
+                className="hover:no-underline relative md:items-center [&>svg]:absolute [&>svg]:top-4 [&>svg]:right-4 md:[&>svg]:static md:[&>svg]:top-auto md:[&>svg]:right-auto md:[&>svg]:mt-0"
               >
                 <div className="flex flex-col md:flex-row md:items-center w-full gap-3">
                   <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1">

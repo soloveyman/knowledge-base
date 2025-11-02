@@ -444,7 +444,7 @@ export default function TestGenerator({
                 <span>Generating questions...</span>
                 <span>{Math.round(generationProgress)}%</span>
               </div>
-              <Progress value={generationProgress} className="w-full" />
+              <Progress value={generationProgress} className="w-full h-2" />
             </div>
           )}
 

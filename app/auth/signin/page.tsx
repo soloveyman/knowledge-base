@@ -144,9 +144,9 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] px-4 py-8 md:py-12 pb-16 md:pb-20">
       <Card className="w-full max-w-md bg-card/95 border-border">
         <CardHeader className="text-center space-y-4">
-          <div className="space-y-2">
-            <CardTitle className="text-2xl font-bold">{t('knowledgeBasePlatform')}</CardTitle>
-            <CardDescription>
+          <div className="space-y-2 text-center">
+            <CardTitle className="text-2xl font-bold justify-center">{t('knowledgeBasePlatform')}</CardTitle>
+            <CardDescription className="text-center">
               {t('signInToAccess')}
             </CardDescription>
           </div>
@@ -236,18 +236,18 @@ export default function SignInPage() {
               )}
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full min-w-[96px]" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isRegister ? 'Sign Up' : t('signIn')}
             </Button>
           </form>
           
           {/* Google OAuth Sign In */}
-          <div className="mt-4">
+          <div className="mt-6">
           <Button
             type="button"
             variant="outline"
-            className="w-full bg-white hover:bg-gray-50 text-gray-700 border-gray-300 hover:border-gray-400 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-700 dark:border-gray-300"
+            className="w-full min-w-[96px] bg-white hover:bg-gray-50 text-gray-700 border-gray-300 hover:border-gray-400 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-700 dark:border-gray-300"
             onClick={handleGoogleSignIn}
             disabled={isLoading || isGoogleLoading}
           >
@@ -274,7 +274,7 @@ export default function SignInPage() {
           </Button>
           </div>
           
-          <div className="text-center text-sm mt-3">
+          <div className="text-center text-sm mt-6">
             <button
               type="button"
               onClick={() => { setIsRegister(!isRegister); setError("") }}
