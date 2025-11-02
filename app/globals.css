@@ -756,6 +756,120 @@
     [class*="min-h-screen"] {
       min-height: 100dvh !important;
     }
+    
+    /* Force dropdown menus and select to fit within viewport on mobile */
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="select-content"] {
+      max-width: 100vw !important;
+      width: auto !important;
+    }
+    
+    /* Truncate text in dropdown menu items on mobile - all children that contain text */
+    [data-slot="dropdown-menu-item"] {
+      min-width: 0;
+      width: 100%;
+    }
+    
+    /* Make all direct children allow truncation */
+    [data-slot="dropdown-menu-item"] > * {
+      min-width: 0;
+    }
+    
+    /* Truncate div children */
+    [data-slot="dropdown-menu-item"] > div {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    /* Truncate all span elements that contain text */
+    [data-slot="dropdown-menu-item"] span:not([class*='flex'][class*='items-center'][class*='justify-center']) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+      display: inline-block;
+    }
+    
+    /* Truncate any child element that isn't an icon or special element */
+    [data-slot="dropdown-menu-item"] > *:not(svg):not([class*='flex'][class*='items-center'][class*='justify-center']) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+    
+    /* Truncate nested text elements */
+    [data-slot="dropdown-menu-item"] > div > *:not(svg):not([class*='flex']):not([class*='items-center']):not([class*='justify-center']) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      max-width: 100%;
+    }
+    
+    /* Truncate text in select items on mobile - all children that contain text */
+    [data-slot="select-item"] {
+      min-width: 0;
+      width: 100%;
+    }
+    
+    /* Make all direct children allow truncation */
+    [data-slot="select-item"] > * {
+      min-width: 0;
+    }
+    
+    /* Truncate div children */
+    [data-slot="select-item"] > div {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    /* Truncate all span elements that contain text */
+    [data-slot="select-item"] span:not([class*='text-blue']):not([class*='flex'][class*='items-center'][class*='justify-center']) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+      display: inline-block;
+    }
+    
+    /* Truncate any child element that isn't an icon or special element */
+    [data-slot="select-item"] > *:not(svg):not([class*='text-blue']):not([class*='flex'][class*='items-center'][class*='justify-center']) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+    
+    /* Truncate nested text elements */
+    [data-slot="select-item"] > div > *:not(svg):not([class*='text-blue']):not([class*='justify-center']):not([class*='flex'][class*='items-center'][class*='justify-center']) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      max-width: 100%;
+    }
+    
+    [data-slot="select-item-text"] {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
   }
 }
 

@@ -1015,7 +1015,7 @@ export default function TestBuilderPage() {
             {generatedQuestions.length > 0 && (
               <Card className="overflow-hidden">
                 <CardHeader>
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                  <div className="flex flex-col gap-4">
                     <div className="min-w-0 flex-1">
                       <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">❓</span> <span className="leading-none self-center">{t('generatedQuestions')}</span></CardTitle>
                       <CardDescription className="wrap-break-word">
