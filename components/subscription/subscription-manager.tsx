@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useTranslation } from "@/lib/translation-context"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PlanBadge, StatusBadge, InvoiceStatusBadge } from "@/lib/badges"
@@ -78,6 +79,7 @@ export default function SubscriptionManager({
   onCancel, 
   onBilling 
 }: SubscriptionManagerProps) {
+  const { t } = useTranslation()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
@@ -111,11 +113,61 @@ export default function SubscriptionManager({
   }, [loadSubscriptionData])
 
   const formatPrice = (price: number, currency: string) => {
-    if (price === 0) return 'Free'
+    if (price === 0) return t('free')
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency
     }).format(price / 100)
+  }
+
+  const translateFeature = (feature: string): string => {
+    // Map feature strings to translation keys
+    const featureMap: Record<string, string> = {
+      'Access to all features': t('accessToAllFeatures'),
+      '10 team members': `10 ${t('teamMembers')}`,
+      '50 document imports per month': `50 ${t('documentImportsPerMonth')}`,
+      '100 AI test generations per month': `100 ${t('aiTestGenerationsPerMonth')}`,
+      'Full support during trial': t('fullSupportDuringTrial'),
+    }
+    
+    // Check if we have a direct translation
+    if (featureMap[feature]) {
+      return featureMap[feature]
+    }
+    
+    // Try to parse dynamic features like "X team members", "X document imports per month", etc.
+    const teamMembersMatch = feature.match(/^(\d+)\s+team\s+members$/i)
+    if (teamMembersMatch) {
+      return `${teamMembersMatch[1]} ${t('teamMembers')}`
+    }
+    
+    const importsMatch = feature.match(/^(\d+)\s+document\s+imports\s+per\s+month$/i)
+    if (importsMatch) {
+      return `${importsMatch[1]} ${t('documentImportsPerMonth')}`
+    }
+    
+    const generationsMatch = feature.match(/^(\d+)\s+AI\s+test\s+generations\s+per\s+month$/i)
+    if (generationsMatch) {
+      return `${generationsMatch[1]} ${t('aiTestGenerationsPerMonth')}`
+    }
+    
+    // Return original if no translation found
+    return feature
+  }
+
+  const translatePlanDescription = (description: string): string => {
+    // Map plan descriptions to translation keys
+    const descriptionMap: Record<string, string> = {
+      '14-day free trial to explore all features': t('freeTrialDescription'),
+    }
+    
+    // Check if we have a direct translation
+    if (descriptionMap[description]) {
+      return descriptionMap[description]
+    }
+    
+    // Return original if no translation found
+    return description
   }
 
   const getPlanIcon = (planName: string) => {
@@ -141,9 +193,9 @@ export default function SubscriptionManager({
   }
 
   const getUsageColor = (percentage: number) => {
-    if (percentage >= 90) return 'text-red-600'
-    if (percentage >= 75) return 'text-yellow-600'
-    return 'text-green-600'
+    if (percentage >= 90) return 'text-red-600 dark:text-red-400'
+    if (percentage >= 75) return 'text-yellow-600 dark:text-yellow-400'
+    return 'text-green-600 dark:text-green-400'
   }
 
   const handlePlanSelect = (planId: string) => {
@@ -225,10 +277,10 @@ export default function SubscriptionManager({
       <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">💰</span> <span className="leading-none self-center">Current Subscription</span>
+              <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">💰</span> <span className="leading-none self-center">{t('currentSubscription')}</span>
             </CardTitle>
             <CardDescription>
-              Your current plan and usage details
+              {t('currentSubscriptionDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -236,18 +288,18 @@ export default function SubscriptionManager({
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h4 className="font-medium mb-2">Plan Details</h4>
+                    <h4 className="font-medium mb-2">{t('planDetails')}</h4>
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Plan:</span>
+                        <span className="text-sm text-muted-foreground">{t('plan')}:</span>
                         <PlanBadge plan={currentSubscription.plan?.name || 'unknown'} />
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Status:</span>
+                        <span className="text-sm text-muted-foreground">{t('status')}:</span>
                         <StatusBadge status={currentSubscription.status} />
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Next billing:</span>
+                        <span className="text-sm text-muted-foreground">{t('nextBilling')}:</span>
                         <span className="text-sm">
                           {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
                         </span>
@@ -256,7 +308,7 @@ export default function SubscriptionManager({
                         <Alert>
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Your subscription will be cancelled at the end of the current period.
+                            {t('subscriptionCancelledAtPeriodEnd')}
                           </AlertDescription>
                         </Alert>
                       )}
@@ -265,11 +317,11 @@ export default function SubscriptionManager({
 
                   {usage && (
                     <div>
-                      <h4 className="font-medium mb-2">Current Usage</h4>
+                      <h4 className="font-medium mb-2">{t('currentUsage')}</h4>
                       <div className="space-y-3">
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>Users</span>
+                            <span>{t('users')}</span>
                             <span className={getUsageColor(getUsagePercentage(usage.usersCount, 25))}>
                               {usage.usersCount}/25
                             </span>
@@ -282,7 +334,7 @@ export default function SubscriptionManager({
 
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>Imports this month</span>
+                            <span>{t('importsThisMonth')}</span>
                             <span className={getUsageColor(getUsagePercentage(usage.importsCount, 100))}>
                               {usage.importsCount}/100
                             </span>
@@ -295,7 +347,7 @@ export default function SubscriptionManager({
 
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>AI Generations</span>
+                            <span>{t('aiGenerations')}</span>
                             <span className={getUsageColor(getUsagePercentage(usage.generationsCount, 200))}>
                               {usage.generationsCount}/200
                             </span>
@@ -313,18 +365,18 @@ export default function SubscriptionManager({
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
                   <Button variant="outline" onClick={handleBilling}>
                     <CreditCard className="h-4 w-4 mr-2" />
-                    Billing Settings
+                    {t('billingSettings')}
                   </Button>
                   <Button variant="outline" onClick={handleCancel}>
                     <Settings className="h-4 w-4 mr-2" />
-                    Manage Subscription
+                    {t('manageSubscription')}
                   </Button>
                 </div>
               </>
             ) : (
               <div className="text-center py-6">
-                <p className="text-gray-600 mb-4">No active subscription</p>
-                <p className="text-sm text-gray-500">Select a plan below to get started</p>
+                <p className="text-muted-foreground mb-4">{t('noActiveSubscription')}</p>
+                <p className="text-sm text-muted-foreground">{t('selectPlanToGetStarted')}</p>
               </div>
             )}
           </CardContent>
@@ -337,7 +389,7 @@ export default function SubscriptionManager({
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
-                You&apos;ve reached your user limit. Upgrade your plan to add more users.
+                {t('reachedUserLimit')}
               </AlertDescription>
             </Alert>
           )}
@@ -346,7 +398,7 @@ export default function SubscriptionManager({
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
-                You&apos;ve reached your monthly import limit. Upgrade your plan for more imports.
+                {t('reachedImportLimit')}
               </AlertDescription>
             </Alert>
           )}
@@ -355,7 +407,7 @@ export default function SubscriptionManager({
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
-                You&apos;ve reached your monthly AI generation limit. Upgrade your plan for more generations.
+                {t('reachedGenerationLimit')}
               </AlertDescription>
             </Alert>
           )}
@@ -364,7 +416,7 @@ export default function SubscriptionManager({
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                You&apos;re approaching your user limit. Consider upgrading your plan.
+                {t('approachingUserLimit')}
               </AlertDescription>
             </Alert>
           )}
@@ -375,10 +427,10 @@ export default function SubscriptionManager({
       <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">⭐</span> <span className="leading-none self-center">Available Plans</span>
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">⭐</span> <span className="leading-none self-center">{t('availablePlans')}</span>
           </CardTitle>
           <CardDescription>
-            Choose the plan that best fits your needs
+            {t('availablePlansDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -388,27 +440,24 @@ export default function SubscriptionManager({
                 key={plan.id}
                 className={`p-6 border rounded-3xl cursor-pointer transition-all shadow-none ${
                   selectedPlan === plan.id
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/50 dark:border-blue-400'
                     : plan.isPopular
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 dark:border-purple-400'
+                    : 'border-border hover:border-blue-300 dark:hover:border-blue-700'
                 }`}
                 onClick={() => handlePlanSelect(plan.id)}
               >
                 {plan.isPopular && (
                   <div className="text-center mb-4">
-                    <Badge className="bg-purple-100 text-purple-800">
-                      Most Popular
+                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {t('mostPopular')}
                     </Badge>
                   </div>
                 )}
 
                 <div className="text-center mb-4">
-                  <div className="flex justify-center mb-2">
-                    {getPlanIcon(plan.displayName)}
-                  </div>
-                  <h3 className="text-xl font-bold">{plan.displayName}</h3>
-                  <p className="text-gray-600 text-sm">{plan.description}</p>
+                  <h3 className="text-xl font-bold mb-2">{plan.displayName}</h3>
+                  <p className="text-muted-foreground text-sm">{translatePlanDescription(plan.description)}</p>
                 </div>
 
                 <div className="text-center mb-6">
@@ -416,8 +465,8 @@ export default function SubscriptionManager({
                     {formatPrice(plan.price, plan.currency)}
                   </div>
                   {plan.price > 0 && (
-                    <div className="text-sm text-gray-600">
-                      per {plan.interval}
+                    <div className="text-sm text-muted-foreground">
+                      {t('per')} {t(plan.interval === 'month' ? 'month' : 'year')}
                     </div>
                   )}
                 </div>
@@ -426,7 +475,7 @@ export default function SubscriptionManager({
                   {plan.features.map((feature, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
+                      <span className="text-sm">{translateFeature(feature)}</span>
                     </div>
                   ))}
                 </div>
@@ -437,7 +486,7 @@ export default function SubscriptionManager({
                     variant={selectedPlan === plan.id ? 'default' : 'outline'}
                     disabled={plan.id === currentSubscription?.plan?.id}
                   >
-                    {plan.id === currentSubscription?.plan?.id ? 'Current Plan' : 'Select Plan'}
+                    {plan.id === currentSubscription?.plan?.id ? t('currentPlan') : t('selectPlan')}
                   </Button>
                 </div>
               </div>
@@ -445,17 +494,17 @@ export default function SubscriptionManager({
           </div>
 
           {selectedPlan && selectedPlan !== currentSubscription?.plan?.id && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-3xl">
+            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-3xl border border-blue-200 dark:border-blue-800">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-medium">Ready to upgrade?</h4>
-                  <p className="text-sm text-gray-600">
-                    You&apos;ll be charged immediately and your new plan will be active right away.
+                  <h4 className="font-medium">{t('readyToUpgrade')}</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {t('upgradeDescription')}
                   </p>
                 </div>
                 <Button onClick={handleUpgrade}>
                   <Crown className="h-4 w-4 mr-2" />
-                  Upgrade Now
+                  {t('upgradeNow')}
                 </Button>
               </div>
             </div>
@@ -467,42 +516,44 @@ export default function SubscriptionManager({
       <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📜</span> <span className="leading-none self-center">Billing History</span>
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📜</span> <span className="leading-none self-center">{t('billingHistory')}</span>
           </CardTitle>
           <CardDescription>
-            Your recent billing and payment history
+            {t('billingHistoryDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {[
               {
-                date: '2024-01-01',
-                description: 'Pro Plan - Monthly',
+                startDate: '2024-01-01',
+                endDate: '2024-01-31',
+                description: 'Pro Plan',
                 amount: '$29.00',
                 status: 'paid'
               },
               {
-                date: '2023-12-01',
-                description: 'Pro Plan - Monthly',
+                startDate: '2023-12-01',
+                endDate: '2023-12-31',
+                description: 'Pro Plan',
                 amount: '$29.00',
                 status: 'paid'
               },
               {
-                date: '2023-11-01',
-                description: 'Pro Plan - Monthly',
+                startDate: '2023-11-01',
+                endDate: '2023-11-30',
+                description: 'Pro Plan',
                 amount: '$29.00',
                 status: 'paid'
               }
             ].map((invoice, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-3xl">
+              <div key={index} className="flex items-center justify-between p-3 border border-border rounded-3xl">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <CreditCard className="h-5 w-5 text-gray-500" />
-                  </div>
                   <div>
                     <div className="font-medium">{invoice.description}</div>
-                    <div className="text-sm text-gray-600">{invoice.date}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {invoice.startDate} - {invoice.endDate}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

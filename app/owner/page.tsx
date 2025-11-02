@@ -613,7 +613,7 @@ function OwnerPageInner() {
               <TabsTrigger value="docs">{t('documents')}</TabsTrigger>
               <TabsTrigger value="tests">{t('tests')}</TabsTrigger>
               <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
-              <TabsTrigger value="settings">{t('settings')}</TabsTrigger>
+              <TabsTrigger value="settings">{t('subscriptions')}</TabsTrigger>
             </TabsList>
           </TabsContainer>
 
