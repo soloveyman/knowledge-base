@@ -921,7 +921,6 @@ export const translations = {
     createAccount: "Создать аккаунт",
     repeatPassword: "Повторите пароль",
     resetPassword: "Сбросить пароль",
-    sendResetLink: "Отправить ссылку",
     backToLogin: "Назад ко входу",
     loginError: "Ошибка входа. Проверьте данные и попробуйте снова.",
     registrationSuccess: "Аккаунт создан 🎉",
