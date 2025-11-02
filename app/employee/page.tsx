@@ -361,7 +361,7 @@ function EmployeePageInner() {
             {/* Overall Progress Card - Top */}
             <Card>
               <CardHeader>
-                <CardTitle>{t('overallProgress')}</CardTitle>
+                <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📈</span> <span className="leading-none self-center">{t('overallProgress')}</span></CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -525,7 +525,7 @@ function EmployeePageInner() {
             <div className="grid gap-3 md:gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>{t('learningStatistics')}</CardTitle>
+                  <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📈</span> <span className="leading-none self-center">{t('learningStatistics')}</span></CardTitle>
                   <CardDescription>{t('yourPerformanceAndCompletionRates')}</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -552,7 +552,7 @@ function EmployeePageInner() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>{t('recentActivity')}</CardTitle>
+                  <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">🔔</span> <span className="leading-none self-center">{t('recentActivity')}</span></CardTitle>
                   <CardDescription>{t('yourRecentAssignmentActivityAndTestScores')}</CardDescription>
                 </CardHeader>
                 <CardContent>

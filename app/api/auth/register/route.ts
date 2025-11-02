@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'
 import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
+import { assignFreeTrialToOwner } from '@/lib/subscription/trial'
 
 const schema = z.object({
   email: z.string().email(),
@@ -79,6 +80,14 @@ export async function POST(req: Request) {
     } catch {
       console.warn('Register: failed to set businessId, proceeding anyway')
     }
+
+    // Assign free trial subscription to new owner (non-blocking)
+    try {
+      await assignFreeTrialToOwner(created.id)
+    } catch (error) {
+      console.error('Register: failed to assign free trial, proceeding anyway:', error)
+    }
+
     return NextResponse.json({ success: true, id: created.id, businessId: created.id })
   } catch (err) {
     // Handle Zod validation errors

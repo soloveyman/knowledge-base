@@ -60,7 +60,7 @@ export function UsersPage({
 
   return (
     <ManagementPage
-      title={t('userManagement')}
+      title={<><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">👥</span> <span className="leading-none self-center">{t('userManagement')}</span></>}
       description={t('createAndManageUserAccounts')}
       icon={<span className="text-4xl">👥</span>}
       actionButton={{

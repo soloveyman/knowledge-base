@@ -52,7 +52,7 @@ export function TestsPage({
 
   return (
     <ManagementPage
-      title={t('testManagement')}
+      title={<><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">🧪</span> <span className="leading-none self-center">{t('testManagement')}</span></>}
       description={t('createAndManageTests')}
       icon={<span className="text-4xl">🧪</span>}
       actionButton={{

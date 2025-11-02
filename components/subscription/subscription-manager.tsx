@@ -42,13 +42,22 @@ interface SubscriptionPlan {
 }
 
 interface CurrentSubscription {
+  id: string
   planId: string
-  planName: string
   status: 'active' | 'cancelled' | 'expired'
   currentPeriodStart: string
   currentPeriodEnd: string
   cancelAtPeriodEnd: boolean
-  nextBillingDate: string
+  plan: {
+    id: string
+    name: string
+    displayName: string
+    description: string | null
+    price: number | null
+    currency: string | null
+    interval: string | null
+    features: string[] | null
+  } | null
 }
 
 interface Usage {
@@ -141,16 +150,65 @@ export default function SubscriptionManager({
     setSelectedPlan(planId)
   }
 
-  const handleUpgrade = () => {
-    if (selectedPlan && onUpgrade) {
-      onUpgrade(selectedPlan)
+  const handleUpgrade = async () => {
+    if (!selectedPlan) return;
+    
+    try {
+      const response = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planId: selectedPlan,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = result.data.url;
+      } else {
+        console.error('Failed to create checkout session:', result.message);
+        alert(result.message || 'Failed to create checkout session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      alert('An error occurred. Please try again.');
     }
   }
 
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel()
+  const handleCancel = async () => {
+    try {
+      const baseUrl = window.location.origin;
+      const response = await fetch('/api/stripe/create-portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          returnUrl: `${baseUrl}/subscription`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data.url) {
+        // Redirect to Stripe Customer Portal
+        window.location.href = result.data.url;
+      } else {
+        console.error('Failed to create portal session:', result.message);
+        alert(result.message || 'Failed to open billing portal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating portal session:', error);
+      alert('An error occurred. Please try again.');
     }
+  }
+
+  const handleBilling = async () => {
+    await handleCancel(); // Same as cancel - opens Stripe portal
   }
 
   const isLimitReached = (current: number, max: number) => {
@@ -164,107 +222,113 @@ export default function SubscriptionManager({
   return (
     <div className="space-y-6">
       {/* Current Subscription */}
-      {currentSubscription && (
-        <Card>
+      <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Crown className="h-5 w-5" />
-              Current Subscription
+              <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">💰</span> <span className="leading-none self-center">Current Subscription</span>
             </CardTitle>
             <CardDescription>
               Your current plan and usage details
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-medium mb-2">Plan Details</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Plan:</span>
-                    <PlanBadge plan={currentSubscription.planName} />
+            {currentSubscription ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-2">Plan Details</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Plan:</span>
+                        <PlanBadge plan={currentSubscription.plan?.name || 'unknown'} />
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Status:</span>
+                        <StatusBadge status={currentSubscription.status} />
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Next billing:</span>
+                        <span className="text-sm">
+                          {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {currentSubscription.cancelAtPeriodEnd && (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Your subscription will be cancelled at the end of the current period.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Status:</span>
-                    <StatusBadge status={currentSubscription.status} />
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Next billing:</span>
-                    <span className="text-sm">
-                      {new Date(currentSubscription.nextBillingDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {currentSubscription.cancelAtPeriodEnd && (
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Your subscription will be cancelled at the end of the current period.
-                      </AlertDescription>
-                    </Alert>
+
+                  {usage && (
+                    <div>
+                      <h4 className="font-medium mb-2">Current Usage</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Users</span>
+                            <span className={getUsageColor(getUsagePercentage(usage.usersCount, 25))}>
+                              {usage.usersCount}/25
+                            </span>
+                          </div>
+                          <Progress 
+                            value={getUsagePercentage(usage.usersCount, 25)} 
+                            className="h-2"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Imports this month</span>
+                            <span className={getUsageColor(getUsagePercentage(usage.importsCount, 100))}>
+                              {usage.importsCount}/100
+                            </span>
+                          </div>
+                          <Progress 
+                            value={getUsagePercentage(usage.importsCount, 100)} 
+                            className="h-2"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>AI Generations</span>
+                            <span className={getUsageColor(getUsagePercentage(usage.generationsCount, 200))}>
+                              {usage.generationsCount}/200
+                            </span>
+                          </div>
+                          <Progress 
+                            value={getUsagePercentage(usage.generationsCount, 200)} 
+                            className="h-2"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {usage && (
-                <div>
-                  <h4 className="font-medium mb-2">Current Usage</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Users</span>
-                        <span className={getUsageColor(getUsagePercentage(usage.usersCount, 25))}>
-                          {usage.usersCount}/25
-                        </span>
-                      </div>
-                      <Progress 
-                        value={getUsagePercentage(usage.usersCount, 25)} 
-                        className="h-2"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Imports this month</span>
-                        <span className={getUsageColor(getUsagePercentage(usage.importsCount, 100))}>
-                          {usage.importsCount}/100
-                        </span>
-                      </div>
-                      <Progress 
-                        value={getUsagePercentage(usage.importsCount, 100)} 
-                        className="h-2"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>AI Generations</span>
-                        <span className={getUsageColor(getUsagePercentage(usage.generationsCount, 200))}>
-                          {usage.generationsCount}/200
-                        </span>
-                      </div>
-                      <Progress 
-                        value={getUsagePercentage(usage.generationsCount, 200)} 
-                        className="h-2"
-                      />
-                    </div>
-                  </div>
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+                  <Button variant="outline" onClick={handleBilling}>
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Billing Settings
+                  </Button>
+                  <Button variant="outline" onClick={handleCancel}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Manage Subscription
+                  </Button>
                 </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-              <Button variant="outline" onClick={onBilling}>
-                <CreditCard className="h-4 w-4 mr-2" />
-                Billing Settings
-              </Button>
-              <Button variant="outline" onClick={handleCancel}>
-                <Settings className="h-4 w-4 mr-2" />
-                Manage Subscription
-              </Button>
-            </div>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-gray-600 mb-4">No active subscription</p>
+                <p className="text-sm text-gray-500">Select a plan below to get started</p>
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
 
       {/* Usage Alerts */}
       {usage && (
@@ -308,11 +372,10 @@ export default function SubscriptionManager({
       )}
 
       {/* Available Plans */}
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Available Plans
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">⭐</span> <span className="leading-none self-center">Available Plans</span>
           </CardTitle>
           <CardDescription>
             Choose the plan that best fits your needs
@@ -323,7 +386,7 @@ export default function SubscriptionManager({
             {plans.map((plan) => (
               <div
                 key={plan.id}
-                className={`p-6 border rounded-lg cursor-pointer transition-all ${
+                className={`p-6 border rounded-3xl cursor-pointer transition-all shadow-none ${
                   selectedPlan === plan.id
                     ? 'border-blue-500 bg-blue-50'
                     : plan.isPopular
@@ -372,17 +435,17 @@ export default function SubscriptionManager({
                   <Button
                     className="w-full"
                     variant={selectedPlan === plan.id ? 'default' : 'outline'}
-                    disabled={plan.id === currentSubscription?.planId}
+                    disabled={plan.id === currentSubscription?.plan?.id}
                   >
-                    {plan.id === currentSubscription?.planId ? 'Current Plan' : 'Select Plan'}
+                    {plan.id === currentSubscription?.plan?.id ? 'Current Plan' : 'Select Plan'}
                   </Button>
                 </div>
               </div>
             ))}
           </div>
 
-          {selectedPlan && selectedPlan !== currentSubscription?.planId && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+          {selectedPlan && selectedPlan !== currentSubscription?.plan?.id && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-3xl">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium">Ready to upgrade?</h4>
@@ -401,11 +464,10 @@ export default function SubscriptionManager({
       </Card>
 
       {/* Billing History */}
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Billing History
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📜</span> <span className="leading-none self-center">Billing History</span>
           </CardTitle>
           <CardDescription>
             Your recent billing and payment history
@@ -433,7 +495,7 @@ export default function SubscriptionManager({
                 status: 'paid'
               }
             ].map((invoice, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded">
+              <div key={index} className="flex items-center justify-between p-3 border rounded-3xl">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                     <CreditCard className="h-5 w-5 text-gray-500" />

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, X } from "lucide-react"
 
 interface ManagementCardProps {
-  title: string
+  title: string | React.ReactNode
   description: string
   icon: React.ReactNode
   actionButton: {

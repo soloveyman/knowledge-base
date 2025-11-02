@@ -832,7 +832,7 @@ export default function TestBuilderPage() {
             <Card className="overflow-hidden">
               <CardHeader>
                 <div>
-                  <CardTitle>{t('testConfiguration')}</CardTitle>
+                  <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">🧪</span> <span className="leading-none self-center">{t('testConfiguration')}</span></CardTitle>
                   <CardDescription>{t('configureTestParameters')}</CardDescription>
                 </div>
               </CardHeader>
@@ -1017,7 +1017,7 @@ export default function TestBuilderPage() {
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <div className="min-w-0 flex-1">
-                      <CardTitle>{t('generatedQuestions')}</CardTitle>
+                      <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">❓</span> <span className="leading-none self-center">{t('generatedQuestions')}</span></CardTitle>
                       <CardDescription className="wrap-break-word">
                         {isEditMode ? (
                           <>

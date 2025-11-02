@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/common/empty-state"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 import { GreetingCard } from "@/components/common/greeting-card"
 import UserProgressReport from "@/components/reports/user-progress-report"
+import SubscriptionManager from "@/components/subscription/subscription-manager"
 import { useTranslation } from "@/lib/translation-context"
 import { toast } from "sonner"
 import { 
@@ -416,6 +417,14 @@ function OwnerPageInner() {
     }
   }, [defaultTab, loadData])
 
+  // Reload data when tab changes to settings
+  useEffect(() => {
+    if (defaultTab === 'settings') {
+      console.log('Owner: Settings tab activated')
+      // Settings tab will handle its own data loading via SubscriptionManager
+    }
+  }, [defaultTab])
+
   // Reload data when page becomes visible (e.g., when returning from document viewer)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -737,7 +746,7 @@ function OwnerPageInner() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
-                    <CardTitle>{t('uploadedDocuments')}</CardTitle>
+                    <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📄</span> <span className="leading-none self-center">{t('uploadedDocuments')}</span></CardTitle>
                     <CardDescription>{t('viewAndManageDocuments')}</CardDescription>
                   </div>
                   <Button 
@@ -869,20 +878,7 @@ function OwnerPageInner() {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-3 md:space-y-6">
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle>System settings</CardTitle>
-                  <CardDescription>Configure system-wide settings</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <span className="text-5xl block mb-4">⚙️</span>
-                  <p>System settings will be implemented here</p>
-                </div>
-              </CardContent>
-            </Card>
+            <SubscriptionManager />
           </TabsContent>
 
         </Tabs>

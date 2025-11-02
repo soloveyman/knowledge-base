@@ -238,7 +238,7 @@ export default function UserBuilderPage() {
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
-                  <CardTitle>{t('userInformation')}</CardTitle>
+                  <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">👤</span> <span className="leading-none self-center">{t('userInformation')}</span></CardTitle>
                   <CardDescription>
                     {isEditMode ? t('updateUserDetailsAndRole') : t('createNewUserAccount')}
                   </CardDescription>

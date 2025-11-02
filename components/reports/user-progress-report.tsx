@@ -327,7 +327,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
       <CardHeader>
         <div>
           <CardTitle>
-            {t('employeeProgressReport')}
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📈</span> <span className="leading-none self-center">{t('employeeProgressReport')}</span>
           </CardTitle>
           <CardDescription>{t('trackEmployeeProgress')}</CardDescription>
         </div>

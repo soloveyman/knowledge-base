@@ -517,7 +517,7 @@ function AssignmentBuilderPageContent() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>{t('assignmentConfiguration')}</CardTitle>
+                  <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📝</span> <span className="leading-none self-center">{t('assignmentConfiguration')}</span></CardTitle>
                   <CardDescription>{t('configureAssignmentParameters')}</CardDescription>
                 </div>
               </CardHeader>

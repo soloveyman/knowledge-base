@@ -6,7 +6,7 @@ import { EmptyState } from "./empty-state"
 import { ListItem } from "./list-item"
 
 interface ManagementPageProps {
-  title: string
+  title: string | ReactNode
   description: string
   icon: ReactNode
   actionButton: {

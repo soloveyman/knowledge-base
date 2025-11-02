@@ -704,7 +704,7 @@ function ManagerPageInner() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
-                    <CardTitle>{t('uploadedDocuments')}</CardTitle>
+                    <CardTitle><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📄</span> <span className="leading-none self-center">{t('uploadedDocuments')}</span></CardTitle>
                     <CardDescription>{t('viewAndManageDocuments')}</CardDescription>
                   </div>
                   <Button 

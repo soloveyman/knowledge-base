@@ -74,7 +74,7 @@ export function AssignmentsPage({
 
   return (
     <ManagementPage
-      title={t('assignmentManagement')}
+      title={<><span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📋</span> <span className="leading-none self-center">{t('assignmentManagement')}</span></>}
       description={t('assignTrainingModules')}
       icon={<span className="text-4xl">📋</span>}
       actionButton={{

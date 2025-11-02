@@ -123,6 +123,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               country: 'US',
             }).returning()
             await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
+            
+            // Assign free trial to new owner (non-blocking)
+            const { assignFreeTrialToOwner } = await import('@/lib/subscription/trial')
+            try {
+              await assignFreeTrialToOwner(created.id)
+            } catch (error) {
+              console.error('[Auth] Failed to assign free trial:', error)
+            }
+            
             const u = user as { id?: string; role?: UserRole; businessId?: string }
             u.id = created.id
             u.role = 'owner'
