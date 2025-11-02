@@ -47,9 +47,8 @@ interface Assignment {
 import { 
   FileText, 
   X,
-  BookOpen,
-  TestTube,
   ArrowLeft,
+  TestTube,
   CheckCircle
 } from "lucide-react"
 import { useParams } from "next/navigation"
@@ -302,26 +301,12 @@ export default function DocumentReaderPage() {
   }
 
   const handleBack = () => {
-    // Complete assignment if there's no test (automatic completion on navigation)
-    handleCompleteAssignment()
-    
     // Determine user role from session or default to employee
     const userRole = (session?.user as UserWithRole)?.role || 'employee'
     // Ensure userRole is a string and valid
     const validRole = typeof userRole === 'string' ? userRole : 'employee'
     navigateBack(validRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
-
-  // Auto-complete assignment when user leaves the page if there's no test
-  useEffect(() => {
-    return () => {
-      // Cleanup: mark assignment as complete when component unmounts (user leaves page)
-      if (assignmentData && !assignmentData.test && assignmentData.status !== 'completed') {
-        // Use a flag to prevent duplicate calls
-        handleCompleteAssignment()
-      }
-    }
-  }, [assignmentData])
 
 
   if (status === "loading" || loading) {
@@ -384,107 +369,112 @@ export default function DocumentReaderPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
           {/* Document Content */}
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold leading-tight">
-                      <FileText className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-                      <span className="break-words">{documentData.name}</span>
-                    </CardTitle>
-                  </div>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold leading-tight">
+                    <FileText className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                    <span className="break-words">{documentData.name}</span>
+                  </CardTitle>
                 </div>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 lg:p-8">
-                {documentData.type === 'PDF' ? (
-                  <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
-                    <iframe 
-                      src={`/api/documents/${encodeURIComponent(documentData.name)}`}
-                      className="w-full h-full"
-                      title={documentData.name}
-                    />
-                  </div>
-                ) : (
-                  <DocumentRenderer 
-                    content={documentData.content} 
-                    tables={documentData.tables}
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 lg:p-8">
+              {documentData.type === 'PDF' ? (
+                <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
+                  <iframe 
+                    src={`/api/documents/${encodeURIComponent(documentData.name)}`}
+                    className="w-full h-full"
+                    title={documentData.name}
                   />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-24 space-y-6">
-              {/* Test Section */}
-              {assignmentData?.test ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
-                      <TestTube className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-                      <span>{t('testAvailable')}</span>
-                    </CardTitle>
-                    <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
-                      {t('completeTheTestAfterReadingTheDocument')}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-sm sm:text-base text-muted-foreground space-y-2.5 leading-relaxed">
-                      <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                        <strong className="font-semibold text-foreground">{t('testLabel')}:</strong>
-                        <span>{assignmentData?.test?.title || t('test')}</span>
-                      </p>
-                      <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                        <strong className="font-semibold text-foreground">{t('questionsLabel')}:</strong>
-                        <span>{assignmentData?.test?.questionCount || 0}</span>
-                      </p>
-                      <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                        <strong className="font-semibold text-foreground">{t('estimatedTime')}:</strong>
-                        <span>15 {t('minutes')}</span>
-                      </p>
-                    </div>
-                    
-                    <Button 
-                      onClick={handleTakeTest}
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                      disabled={assignmentData?.status === 'completed'}
-                    >
-                      <TestTube className="h-4 w-4 mr-2" />
-                      {assignmentData?.status === 'completed' ? t('testCompleted') : t('takeTest')}
-                    </Button>
-                  </CardContent>
-                </Card>
+                </div>
               ) : (
-                /* No test - show completion button */
-                assignmentData && assignmentData.status !== 'completed' && (
+                <DocumentRenderer 
+                  content={documentData.content} 
+                  tables={documentData.tables}
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card Section */}
+          {(assignmentData?.test || assignmentData) && (
+            <div>
+              <div className="w-full">
+                {/* Test Section */}
+                {assignmentData?.test ? (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
-                        <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-                        <span>{t('readingAssignment')}</span>
+                        <span className="text-2xl">📝</span>
+                        <span>{t('testAvailable')}</span>
                       </CardTitle>
                       <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
-                        {t('markAsCompleteAfterReading')}
+                        {t('completeTheTestAfterReadingTheDocument')}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
+                      <div className="text-sm sm:text-base text-muted-foreground space-y-2.5 leading-relaxed">
+                        <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                          <strong className="font-semibold text-foreground">{t('testLabel')}:</strong>
+                          <span>{assignmentData?.test?.title || t('test')}</span>
+                        </p>
+                        <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                          <strong className="font-semibold text-foreground">{t('questionsLabel')}:</strong>
+                          <span>{assignmentData?.test?.questionCount || 0}</span>
+                        </p>
+                        <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                          <strong className="font-semibold text-foreground">{t('estimatedTime')}:</strong>
+                          <span>15 {t('minutes')}</span>
+                        </p>
+                      </div>
+                      
                       <Button 
-                        onClick={handleCompleteAssignment}
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={handleTakeTest}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        disabled={assignmentData?.status === 'completed'}
                       >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        {t('markAsComplete')}
+                        <TestTube className="h-4 w-4 mr-2" />
+                        {assignmentData?.status === 'completed' ? t('testCompleted') : t('takeTest')}
                       </Button>
                     </CardContent>
                   </Card>
-                )
-              )}
+                ) : (
+                  /* No test - show completion button */
+                  assignmentData && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
+                          <span className="text-2xl">📖</span>
+                          <span>{t('readingAssignment')}</span>
+                        </CardTitle>
+                        <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
+                          {assignmentData.status === 'completed' 
+                            ? t('assignmentCompleted') 
+                            : t('markAsCompleteAfterReading')}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          onClick={handleCompleteAssignment}
+                          className="w-full bg-green-600 hover:bg-green-700"
+                          disabled={assignmentData.status === 'completed'}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {assignmentData.status === 'completed' 
+                            ? t('completed') 
+                            : t('markAsComplete')}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>

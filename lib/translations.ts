@@ -513,6 +513,7 @@ export const translations = {
     readingAssignment: "Reading Assignment",
     markAsCompleteAfterReading: "Mark this assignment as complete after reading",
     markAsComplete: "Mark as Complete",
+    assignmentCompleted: "Assignment completed",
     
     // Test Results
     congratulations: "Congratulations!",
@@ -1096,6 +1097,7 @@ export const translations = {
     readingAssignment: "Чтение задания",
     markAsCompleteAfterReading: "Отметьте это задание как выполненное после прочтения",
     markAsComplete: "Отметить как выполненное",
+    assignmentCompleted: "Задание выполнено",
     
     // Subscription Management
     currentSubscription: "Текущая подписка",
