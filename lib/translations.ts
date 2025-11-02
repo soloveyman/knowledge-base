@@ -340,7 +340,6 @@ export const translations = {
     createAccount: "Create account",
     repeatPassword: "Repeat password",
     resetPassword: "Reset password",
-    sendResetLink: "Send reset link",
     backToLogin: "Back to login",
     loginError: "Login failed. Check your details and try again.",
     registrationSuccess: "Account created 🎉",
