@@ -248,7 +248,7 @@ export default function SignInPage() {
             
             <Button type="submit" className="w-full min-w-[96px]" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isRegister ? 'Sign Up' : t('signIn')}
+              {isRegister ? t('signUp') : t('signIn')}
             </Button>
           </form>
           
@@ -290,7 +290,7 @@ export default function SignInPage() {
               onClick={() => { setIsRegister(!isRegister); setError("") }}
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
             >
-              {isRegister ? 'Have an account? Sign in' : 'No account? Sign up'}
+              {isRegister ? t('haveAccountSignIn') : t('noAccountSignUp')}
             </button>
           </div>
         </CardContent>
