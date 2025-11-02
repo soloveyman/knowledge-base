@@ -667,10 +667,10 @@ function AssignmentBuilderPageContent() {
 
             <Card>
               <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div className="space-y-4">
                   <div>
                     <CardTitle>
-                      {t('selectEmployees')} <span className="text-red-500">*</span>
+                      <span className="text-red-500 mr-1">👥</span> {t('selectEmployees')}
                     </CardTitle>
                     <CardDescription>
                       {t('chooseEmployeesToAssign')}

@@ -99,9 +99,22 @@ export const badgeVariantStyles = {
   failed: "border-transparent bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
 }
 
+// Utility function to format plan names
+function formatPlanName(plan: string): string {
+  // Split by hyphen or underscore, capitalize first letter of each word, join with space
+  return plan
+    .split(/[-_]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 // Utility functions for creating badges
 export function getBadgeConfig(type: keyof typeof BADGE_CONFIGS, key: string) {
   const config = BADGE_CONFIGS[type]
+  // For plan badges, format the label if not found in config
+  if (type === 'plan' && !config[key as keyof typeof config]) {
+    return { variant: "outline" as const, label: formatPlanName(key) }
+  }
   return config[key as keyof typeof config] || { variant: "outline" as const, label: key }
 }
 

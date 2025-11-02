@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions as questionsTable, users } from '@/lib/db'
-import { eq, desc, sql, inArray } from 'drizzle-orm'
+import { db, tests, questions as questionsTable, users, usage } from '@/lib/db'
+import { eq, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 export async function GET() {
@@ -293,6 +293,7 @@ export async function POST(request: Request) {
     }
 
     let finalQuestionIds: string[] = questionIds || []
+    let savedQuestions: any[] = []
 
     // If questions are provided, save them to database first
     if (questions && questions.length > 0) {
@@ -339,7 +340,7 @@ export async function POST(request: Request) {
         
         console.log('Processed question data:', JSON.stringify(questionData, null, 2))
         
-        const savedQuestions = await db.insert(questionsTable).values(
+        savedQuestions = await db.insert(questionsTable).values(
           questionData.map((q: typeof questionData[number]) => ({ ...q, createdBy: session.user.id }))
         ).returning()
 
@@ -482,10 +483,48 @@ export async function POST(request: Request) {
 
     console.log('Test created successfully:', newTest[0])
 
+    // Update usage counter for AI generations (only for owners)
+    if (session.user.role === 'owner') {
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      
+      // Check if usage record exists for current month
+      const existingUsage = await db
+        .select()
+        .from(usage)
+        .where(
+          and(
+            eq(usage.userId, session.user.id),
+            eq(usage.month, currentMonth)
+          )
+        )
+        .limit(1)
+
+      if (existingUsage.length > 0) {
+        // Update existing usage record
+        await db
+          .update(usage)
+          .set({
+            generationsCount: (existingUsage[0].generationsCount || 0) + 1,
+            updatedAt: new Date()
+          })
+          .where(eq(usage.id, existingUsage[0].id))
+      } else {
+        // Create new usage record
+        await db.insert(usage).values({
+          userId: session.user.id,
+          month: currentMonth,
+          importsCount: 0,
+          generationsCount: 1
+        })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
-        test: newTest[0]
+        test: newTest[0],
+        questions: savedQuestions || []
       },
       message: 'Test saved successfully'
     })

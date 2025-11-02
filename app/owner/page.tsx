@@ -21,7 +21,7 @@ import {
   FileText,
   X
 } from "lucide-react"
-import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
+import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
 import { cleanupDocumentFromLocalStorage, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
 
 // Component to handle tabs overflow detection
@@ -197,11 +197,32 @@ function OwnerPageInner() {
     }
   }, [])
 
-  // Get initial tab from URL parameter using useMemo to prevent re-renders
+  // Get initial tab from URL parameter or sessionStorage using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
-    const tab = getTabFromUrl(searchParams)
-    return tab && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(tab) ? tab : "overview"
+    const tabFromUrl = getTabFromUrl(searchParams)
+    if (tabFromUrl && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(tabFromUrl)) {
+      return tabFromUrl
+    }
+    // If no tab in URL, try to get from sessionStorage
+    const previousTab = getPreviousTab('owner')
+    if (previousTab && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(previousTab)) {
+      return previousTab
+    }
+    // Default to overview
+    return "overview"
   }, [searchParams])
+
+  // Restore tab from sessionStorage on mount if not in URL
+  useEffect(() => {
+    const tabFromUrl = getTabFromUrl(searchParams)
+    if (!tabFromUrl) {
+      const previousTab = getPreviousTab('owner')
+      if (previousTab && previousTab !== 'overview' && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(previousTab)) {
+        // Update URL to include the restored tab
+        router.replace(`/owner?tab=${previousTab}`, { scroll: false })
+      }
+    }
+  }, [searchParams, router]) // Run when searchParams change
 
   // Save current tab when it changes
   useEffect(() => {
@@ -605,7 +626,12 @@ function OwnerPageInner() {
         />
 
         {/* Main Tabs */}
-        <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
+        <Tabs value={defaultTab} onValueChange={(value) => {
+          if (value && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(value)) {
+            router.replace(`/owner?tab=${value}`, { scroll: false })
+            saveCurrentTab('owner', value)
+          }
+        }} className="space-y-3 md:space-y-6">
           <TabsContainer>
             <TabsList className="w-full min-w-max grid grid-cols-3 sm:grid-cols-6">
               <TabsTrigger value="overview">{t('overview')}</TabsTrigger>

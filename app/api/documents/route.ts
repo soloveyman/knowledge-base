@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, documents, users } from '@/lib/db'
-import { desc, eq } from 'drizzle-orm'
+import { db, documents, users, usage } from '@/lib/db'
+import { desc, eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 export async function GET() {
@@ -78,6 +78,43 @@ export async function POST(request: Request) {
       uploadedBy: session.user.id,
       status: 'ready' // Set status to 'ready' since parsing is complete
     }).returning()
+
+    // Update usage counter for imports (only for owners)
+    if (session.user.role === 'owner') {
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      
+      // Check if usage record exists for current month
+      const existingUsage = await db
+        .select()
+        .from(usage)
+        .where(
+          and(
+            eq(usage.userId, session.user.id),
+            eq(usage.month, currentMonth)
+          )
+        )
+        .limit(1)
+
+      if (existingUsage.length > 0) {
+        // Update existing usage record
+        await db
+          .update(usage)
+          .set({
+            importsCount: (existingUsage[0].importsCount || 0) + 1,
+            updatedAt: new Date()
+          })
+          .where(eq(usage.id, existingUsage[0].id))
+      } else {
+        // Create new usage record
+        await db.insert(usage).values({
+          userId: session.user.id,
+          month: currentMonth,
+          importsCount: 1,
+          generationsCount: 0
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,

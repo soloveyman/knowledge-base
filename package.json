@@ -31,6 +31,8 @@
     "check:env": "tsx scripts/check-env.ts",
     "setup:env": "tsx scripts/setup-env.ts",
     "setup:trial": "tsx scripts/setup-trial-plan.ts",
+    "setup:starter": "tsx scripts/setup-starter-plan.ts",
+    "setup:pro": "tsx scripts/setup-pro-plan.ts",
     "assign:trial": "tsx scripts/assign-trial-to-existing-users.ts",
     "typecheck": "tsc --noEmit",
     "lint:ci": "next lint --max-warnings=0",

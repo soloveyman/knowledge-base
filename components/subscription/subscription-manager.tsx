@@ -23,7 +23,8 @@ import {
   Calendar,
   TrendingUp,
   Lock,
-  Unlock
+  Unlock,
+  Wallet
 } from "lucide-react"
 
 interface SubscriptionPlan {
@@ -58,6 +59,9 @@ interface CurrentSubscription {
     currency: string | null
     interval: string | null
     features: string[] | null
+    maxUsers: number | null
+    maxImportsPerMonth: number | null
+    maxGenerationsPerMonth: number | null
   } | null
 }
 
@@ -66,6 +70,17 @@ interface Usage {
   importsCount: number
   generationsCount: number
   usersCount: number
+}
+
+interface PaymentHistory {
+  id: string
+  planName: string
+  startDate: string
+  endDate: string
+  amount: number // in cents/kopecks - will be formatted
+  currency: string
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'completed'
+  createdAt?: string
 }
 
 interface SubscriptionManagerProps {
@@ -84,6 +99,8 @@ export default function SubscriptionManager({
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[] | null>(null)
+  const [isStripeEnabled, setIsStripeEnabled] = useState<boolean>(false)
 
   const loadSubscriptionData = useCallback(async () => {
     try {
@@ -94,18 +111,26 @@ export default function SubscriptionManager({
         setPlans(result.data.plans)
         setCurrentSubscription(result.data.currentSubscription)
         setUsage(result.data.usage)
+        setIsStripeEnabled(result.data.isStripeConfigured ?? false)
+        // Payment history will be loaded from API when available
+        // For now, set to null to indicate it should use fallback data
+        setPaymentHistory(result.data.paymentHistory || null)
       } else {
         console.error('Failed to load subscription data:', result.message)
         setPlans([])
         setCurrentSubscription(null)
         setUsage(null)
+        setIsStripeEnabled(false)
+        setPaymentHistory(null)
       }
     } catch (error) {
       console.error('Error loading subscription data:', error)
-      setPlans([])
-      setCurrentSubscription(null)
-      setUsage(null)
-    }
+        setPlans([])
+        setCurrentSubscription(null)
+        setUsage(null)
+        setIsStripeEnabled(false)
+        setPaymentHistory(null)
+      }
   }, [])
 
   useEffect(() => {
@@ -128,6 +153,11 @@ export default function SubscriptionManager({
       '50 document imports per month': `50 ${t('documentImportsPerMonth')}`,
       '100 AI test generations per month': `100 ${t('aiTestGenerationsPerMonth')}`,
       'Full support during trial': t('fullSupportDuringTrial'),
+      'Full support': t('fullSupport'),
+      '20 document imports per month': `20 ${t('documentImportsPerMonth')}`,
+      '25 team members': `25 ${t('teamMembers')}`,
+      '100 document imports per month': `100 ${t('documentImportsPerMonth')}`,
+      '500 AI test generations per month': `500 ${t('aiTestGenerationsPerMonth')}`,
     }
     
     // Check if we have a direct translation
@@ -155,10 +185,22 @@ export default function SubscriptionManager({
     return feature
   }
 
+  const translatePlanName = (displayName: string): string => {
+    // Map plan names for consistency
+    const nameMap: Record<string, string> = {
+      'Starter': 'Optimal',
+    }
+    
+    // Return mapped name if exists, otherwise return original
+    return nameMap[displayName] || displayName
+  }
+
   const translatePlanDescription = (description: string): string => {
     // Map plan descriptions to translation keys
     const descriptionMap: Record<string, string> = {
       '14-day free trial to explore all features': t('freeTrialDescription'),
+      'Small teams, startups': t('starterDescription'),
+      'Growing companies, medium-sized teams': t('proDescription'),
     }
     
     // Check if we have a direct translation
@@ -172,7 +214,9 @@ export default function SubscriptionManager({
 
   const getPlanIcon = (planName: string) => {
     switch (planName.toLowerCase()) {
-      case 'free': return <Shield className="h-6 w-6" />
+      case 'free':
+      case 'free-trial': return <Shield className="h-6 w-6" />
+      case 'starter': return <Users className="h-6 w-6" />
       case 'pro': return <Zap className="h-6 w-6" />
       case 'business': return <Crown className="h-6 w-6" />
       default: return <Shield className="h-6 w-6" />
@@ -181,10 +225,12 @@ export default function SubscriptionManager({
 
   const getPlanColor = (planName: string) => {
     switch (planName.toLowerCase()) {
-      case 'free': return 'bg-gray-100 text-gray-800'
-      case 'pro': return 'bg-blue-100 text-blue-800'
-      case 'business': return 'bg-purple-100 text-purple-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'free':
+      case 'free-trial': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+      case 'starter': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'pro': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      case 'business': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
     }
   }
 
@@ -203,7 +249,12 @@ export default function SubscriptionManager({
   }
 
   const handleUpgrade = async () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan || !isStripeEnabled) {
+      if (!isStripeEnabled) {
+        alert('Payment processing is not available at this time. Please contact support.');
+      }
+      return;
+    }
     
     try {
       const response = await fetch('/api/stripe/create-checkout', {
@@ -232,6 +283,11 @@ export default function SubscriptionManager({
   }
 
   const handleCancel = async () => {
+    if (!isStripeEnabled) {
+      alert('Payment management is not available at this time. Please contact support.');
+      return;
+    }
+    
     try {
       const baseUrl = window.location.origin;
       const response = await fetch('/api/stripe/create-portal', {
@@ -260,6 +316,10 @@ export default function SubscriptionManager({
   }
 
   const handleBilling = async () => {
+    if (!isStripeEnabled) {
+      alert('Payment management is not available at this time. Please contact support.');
+      return;
+    }
     await handleCancel(); // Same as cancel - opens Stripe portal
   }
 
@@ -315,62 +375,57 @@ export default function SubscriptionManager({
                     </div>
                   </div>
 
-                  {usage && (
+                  {usage && currentSubscription?.plan && (
                     <div>
                       <h4 className="font-medium mb-2">{t('currentUsage')}</h4>
                       <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>{t('users')}</span>
-                            <span className={getUsageColor(getUsagePercentage(usage.usersCount, 25))}>
-                              {usage.usersCount}/25
-                            </span>
+                        {currentSubscription.plan.maxUsers !== null && (
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span>{t('users')}</span>
+                              <span className={getUsageColor(getUsagePercentage(usage.usersCount, currentSubscription.plan.maxUsers))}>
+                                {usage.usersCount}/{currentSubscription.plan.maxUsers}
+                              </span>
+                            </div>
+                            <Progress 
+                              value={getUsagePercentage(usage.usersCount, currentSubscription.plan.maxUsers)} 
+                              className="h-2"
+                            />
                           </div>
-                          <Progress 
-                            value={getUsagePercentage(usage.usersCount, 25)} 
-                            className="h-2"
-                          />
-                        </div>
+                        )}
 
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>{t('importsThisMonth')}</span>
-                            <span className={getUsageColor(getUsagePercentage(usage.importsCount, 100))}>
-                              {usage.importsCount}/100
-                            </span>
+                        {currentSubscription.plan.maxImportsPerMonth !== null && (
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span>{t('importsThisMonth')}</span>
+                              <span className={getUsageColor(getUsagePercentage(usage.importsCount, currentSubscription.plan.maxImportsPerMonth))}>
+                                {usage.importsCount}/{currentSubscription.plan.maxImportsPerMonth}
+                              </span>
+                            </div>
+                            <Progress 
+                              value={getUsagePercentage(usage.importsCount, currentSubscription.plan.maxImportsPerMonth)} 
+                              className="h-2"
+                            />
                           </div>
-                          <Progress 
-                            value={getUsagePercentage(usage.importsCount, 100)} 
-                            className="h-2"
-                          />
-                        </div>
+                        )}
 
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>{t('aiGenerations')}</span>
-                            <span className={getUsageColor(getUsagePercentage(usage.generationsCount, 200))}>
-                              {usage.generationsCount}/200
-                            </span>
+                        {currentSubscription.plan.maxGenerationsPerMonth !== null && (
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span>{t('aiGenerations')}</span>
+                              <span className={getUsageColor(getUsagePercentage(usage.generationsCount, currentSubscription.plan.maxGenerationsPerMonth))}>
+                                {usage.generationsCount}/{currentSubscription.plan.maxGenerationsPerMonth}
+                              </span>
+                            </div>
+                            <Progress 
+                              value={getUsagePercentage(usage.generationsCount, currentSubscription.plan.maxGenerationsPerMonth)} 
+                              className="h-2"
+                            />
                           </div>
-                          <Progress 
-                            value={getUsagePercentage(usage.generationsCount, 200)} 
-                            className="h-2"
-                          />
-                        </div>
+                        )}
                       </div>
                     </div>
                   )}
-                </div>
-
-                <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-                  <Button variant="outline" onClick={handleBilling}>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    {t('billingSettings')}
-                  </Button>
-                  <Button variant="outline" onClick={handleCancel}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    {t('manageSubscription')}
-                  </Button>
                 </div>
               </>
             ) : (
@@ -383,9 +438,9 @@ export default function SubscriptionManager({
         </Card>
 
       {/* Usage Alerts */}
-      {usage && (
+      {usage && currentSubscription?.plan && (
         <>
-          {isLimitReached(usage.usersCount, 25) && (
+          {currentSubscription.plan.maxUsers !== null && isLimitReached(usage.usersCount, currentSubscription.plan.maxUsers) && (
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
@@ -394,7 +449,7 @@ export default function SubscriptionManager({
             </Alert>
           )}
 
-          {isLimitReached(usage.importsCount, 100) && (
+          {currentSubscription.plan.maxImportsPerMonth !== null && isLimitReached(usage.importsCount, currentSubscription.plan.maxImportsPerMonth) && (
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
@@ -403,7 +458,7 @@ export default function SubscriptionManager({
             </Alert>
           )}
 
-          {isLimitReached(usage.generationsCount, 200) && (
+          {currentSubscription.plan.maxGenerationsPerMonth !== null && isLimitReached(usage.generationsCount, currentSubscription.plan.maxGenerationsPerMonth) && (
             <Alert variant="destructive">
               <Lock className="h-4 w-4" />
               <AlertDescription>
@@ -412,7 +467,7 @@ export default function SubscriptionManager({
             </Alert>
           )}
 
-          {isNearLimit(usage.usersCount, 25) && !isLimitReached(usage.usersCount, 25) && (
+          {currentSubscription.plan.maxUsers !== null && isNearLimit(usage.usersCount, currentSubscription.plan.maxUsers) && !isLimitReached(usage.usersCount, currentSubscription.plan.maxUsers) && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
@@ -434,63 +489,93 @@ export default function SubscriptionManager({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {!isStripeEnabled && (
+            <Alert className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Payment processing is currently unavailable. You can view subscription plans, but payment features are disabled. Please contact support for assistance.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((plan) => (
+            {plans.map((plan) => {
+              const isOptimal = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Optimal'
+              return (
               <div
                 key={plan.id}
-                className={`p-6 border rounded-3xl cursor-pointer transition-all shadow-none ${
+                className={`p-6 border rounded-3xl flex flex-col ${
+                  !isStripeEnabled 
+                    ? 'opacity-60 cursor-not-allowed' 
+                    : 'cursor-pointer transition-all shadow-none'
+                } ${
                   selectedPlan === plan.id
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/50 dark:border-blue-400'
                     : plan.isPopular
                     ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 dark:border-purple-400'
+                    : isOptimal
+                    ? 'border-primary hover:border-primary/80'
                     : 'border-border hover:border-blue-300 dark:hover:border-blue-700'
                 }`}
-                onClick={() => handlePlanSelect(plan.id)}
+                onClick={() => isStripeEnabled && handlePlanSelect(plan.id)}
               >
-                {plan.isPopular && (
-                  <div className="text-center mb-4">
-                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                      {t('mostPopular')}
-                    </Badge>
-                  </div>
-                )}
-
-                <div className="text-center mb-4">
-                  <h3 className="text-xl font-bold mb-2">{plan.displayName}</h3>
-                  <p className="text-muted-foreground text-sm">{translatePlanDescription(plan.description)}</p>
-                </div>
-
-                <div className="text-center mb-6">
-                  <div className="text-3xl font-bold">
-                    {formatPrice(plan.price, plan.currency)}
-                  </div>
-                  {plan.price > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      {t('per')} {t(plan.interval === 'month' ? 'month' : 'year')}
+                {/* Header */}
+                <div>
+                  {plan.isPopular && (
+                    <div className="text-center mb-4">
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                        {t('mostPopular')}
+                      </Badge>
                     </div>
                   )}
-                </div>
 
-                <div className="space-y-3 mb-6">
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      <span className="text-sm">{translateFeature(feature)}</span>
+                  <div className="text-center mb-4">
+                    <h3 className="text-xl font-bold mb-2">{translatePlanName(plan.displayName)}</h3>
+                    <p className="text-muted-foreground text-sm">{translatePlanDescription(plan.description)}</p>
+                  </div>
+
+                  <div className="text-center mb-6">
+                    <div className="text-3xl font-bold">
+                      {formatPrice(plan.price, plan.currency)}
                     </div>
-                  ))}
+                    {plan.price > 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        {t('per')} {t(plan.interval === 'month' ? 'month' : 'year')}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground invisible">
+                        {t('per')} {t('month')}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="text-center">
-                  <Button
-                    className="w-full"
-                    variant={selectedPlan === plan.id ? 'default' : 'outline'}
-                    disabled={plan.id === currentSubscription?.plan?.id}
-                  >
-                    {plan.id === currentSubscription?.plan?.id ? t('currentPlan') : t('selectPlan')}
-                  </Button>
+                {/* Included limits */}
+                <div>
+                  <div className="space-y-3 mb-6">
+                    {plan.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="text-sm">{translateFeature(feature)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Button */}
+                <div className="mt-auto">
+                  <div className="text-center">
+                    <Button
+                      className={isOptimal ? "w-full" : "w-full text-primary border-primary hover:bg-primary hover:text-primary-foreground"}
+                      variant={selectedPlan === plan.id || isOptimal ? 'default' : 'outline'}
+                      disabled={plan.id === currentSubscription?.plan?.id || !isStripeEnabled}
+                    >
+                      {plan.id === currentSubscription?.plan?.id ? t('currentPlan') : t('selectPlan')}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {selectedPlan && selectedPlan !== currentSubscription?.plan?.id && (
@@ -502,7 +587,7 @@ export default function SubscriptionManager({
                     {t('upgradeDescription')}
                   </p>
                 </div>
-                <Button onClick={handleUpgrade}>
+                <Button onClick={handleUpgrade} disabled={!isStripeEnabled}>
                   <Crown className="h-4 w-4 mr-2" />
                   {t('upgradeNow')}
                 </Button>
@@ -516,57 +601,113 @@ export default function SubscriptionManager({
       <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">📜</span> <span className="leading-none self-center">{t('billingHistory')}</span>
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">⚙️</span> <span className="leading-none self-center">{t('billingHistory')}</span>
           </CardTitle>
           <CardDescription>
             {t('billingHistoryDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[
-              {
-                startDate: '2024-01-01',
-                endDate: '2024-01-31',
-                description: 'Pro Plan',
-                amount: '$29.00',
-                status: 'paid'
-              },
-              {
-                startDate: '2023-12-01',
-                endDate: '2023-12-31',
-                description: 'Pro Plan',
-                amount: '$29.00',
-                status: 'paid'
-              },
-              {
-                startDate: '2023-11-01',
-                endDate: '2023-11-30',
-                description: 'Pro Plan',
-                amount: '$29.00',
-                status: 'paid'
-              }
-            ].map((invoice, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border border-border rounded-3xl">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <div className="font-medium">{invoice.description}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {invoice.startDate} - {invoice.endDate}
+          <div className="space-y-6">
+            {/* Manage Subscription */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Wallet className="h-4 w-4" />
+                <div className="font-medium">{t('subscriptionsAndPayments')}</div>
+              </div>
+              <div className="space-y-3">
+                {currentSubscription && (
+                  <div className="space-y-3">
+                    {currentSubscription.cancelAtPeriodEnd ? (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {t('subscriptionCancelledAtPeriodEnd')}
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button variant="outline" onClick={handleCancel} className="flex-1" disabled={!isStripeEnabled}>
+                        <Crown className="h-4 w-4 mr-2" />
+                        {t('manageSubscription')}
+                      </Button>
+                      <Button variant="outline" onClick={handleBilling} className="flex-1" disabled={!isStripeEnabled}>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        {t('billingSettings')}
+                      </Button>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="font-medium">{invoice.amount}</div>
-                    <InvoiceStatusBadge status={invoice.status} />
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
+                )}
+                {!currentSubscription && (
+                  <p className="text-sm text-muted-foreground">{t('noActiveSubscription')}</p>
+                )}
               </div>
-            ))}
+            </div>
+
+            {/* Payment History */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <CreditCard className="h-4 w-4" />
+                <div className="font-medium">{t('paymentHistory')}</div>
+              </div>
+              <div className="space-y-3">
+                {(paymentHistory && paymentHistory.length > 0 ? paymentHistory : [
+                  // Fallback data - will be replaced with real API data when available
+                  {
+                    id: '1',
+                    startDate: '2024-01-01',
+                    endDate: '2024-01-31',
+                    planName: 'pro',
+                    amount: 9900, // in cents
+                    currency: 'usd',
+                    status: 'completed' as const
+                  },
+                  {
+                    id: '2',
+                    startDate: '2023-12-01',
+                    endDate: '2023-12-31',
+                    planName: 'starter',
+                    amount: 3900, // in cents
+                    currency: 'usd',
+                    status: 'completed' as const
+                  },
+                  {
+                    id: '3',
+                    startDate: '2023-11-01',
+                    endDate: '2023-11-30',
+                    planName: 'pro',
+                    amount: 9900, // in cents
+                    currency: 'usd',
+                    status: 'completed' as const
+                  }
+                ]).map((invoice) => {
+                  const plan = plans.find(p => p.name === invoice.planName)
+                  const planDisplayName = plan ? translatePlanName(plan.displayName) : invoice.planName
+                  // Format amount from cents to currency string
+                  const invoiceAmount = typeof invoice.amount === 'number' 
+                    ? formatPrice(invoice.amount, invoice.currency)
+                    : invoice.amount
+                  return (
+                    <div key={invoice.id} className="flex items-center justify-between px-6 py-3 border border-border rounded-3xl">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="font-medium">{planDisplayName}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {invoice.startDate} - {invoice.endDate}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="font-medium">{invoiceAmount}</div>
+                          <InvoiceStatusBadge status={invoice.status === 'completed' ? 'paid' : invoice.status} />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

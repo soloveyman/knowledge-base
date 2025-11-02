@@ -44,7 +44,9 @@ export function ListItem({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-medium text-foreground truncate">{title}</h3>
+            <h3 className="font-medium text-foreground truncate">
+              {title.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()}
+            </h3>
             {badges.length > 0 && (
               <div className="flex items-center space-x-2 shrink-0">
                 {badges.map((badge, index) => {
@@ -73,13 +75,17 @@ export function ListItem({
                     config = getCountBadge('employees', count)
                   }
                   
+                  const badgeLabel = translateBadge(config.label)
+                  // Remove emojis from badge label
+                  const cleanedLabel = badgeLabel.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()
+                  
                   return (
                     <Badge 
                       key={index}
                       variant={config.variant || "outline"} 
                       className="text-xs"
                     >
-                      {translateBadge(config.label)}
+                      {cleanedLabel}
                     </Badge>
                   )
                 })}

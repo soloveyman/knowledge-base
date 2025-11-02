@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, subscriptionPlans, subscriptions, usage } from '@/lib/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { isStripeConfigured } from '@/lib/stripe/client';
+import { db, subscriptionPlans, subscriptions, usage, payments, users } from '@/lib/db';
+import { eq, and, desc, sql } from 'drizzle-orm';
 
 export async function GET() {
   try {
@@ -56,9 +57,23 @@ export async function GET() {
             currency: sub.plan.currency,
             interval: sub.plan.interval,
             features: sub.plan.features,
+            maxUsers: sub.plan.maxUsers,
+            maxImportsPerMonth: sub.plan.maxImportsPerMonth,
+            maxGenerationsPerMonth: sub.plan.maxGenerationsPerMonth,
           } : null,
         };
       }
+    }
+
+    // Get users count for owner (count users with same businessId)
+    let usersCount = 0;
+    if (session.user.role === 'owner' && session.user.businessId) {
+      const usersWithSameBusiness = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(eq(users.businessId, session.user.businessId));
+      
+      usersCount = Number(usersWithSameBusiness[0]?.count || 0);
     }
 
     // Get usage data for current month
@@ -80,11 +95,60 @@ export async function GET() {
       month: userUsage[0].month,
       importsCount: userUsage[0].importsCount || 0,
       generationsCount: userUsage[0].generationsCount || 0,
+      usersCount: usersCount,
     } : {
       month: currentMonth,
       importsCount: 0,
       generationsCount: 0,
+      usersCount: usersCount,
     };
+
+    // Get payment history (only for owners)
+    let paymentHistory: any[] = [];
+    if (session.user.role === 'owner') {
+      const userPayments = await db
+        .select({
+          payment: payments,
+          subscription: subscriptions,
+          plan: subscriptionPlans,
+        })
+        .from(payments)
+        .leftJoin(subscriptions, eq(payments.subscriptionId, subscriptions.id))
+        .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+        .where(eq(payments.ownerId, session.user.id))
+        .orderBy(desc(payments.createdAt))
+        .limit(50); // Limit to last 50 payments
+
+      paymentHistory = userPayments.map((row) => {
+        const payment = row.payment;
+        const subscription = row.subscription;
+        const plan = row.plan;
+
+        // Determine dates from subscription period or payment date
+        const startDate = subscription?.currentPeriodStart 
+          ? new Date(subscription.currentPeriodStart).toISOString().split('T')[0]
+          : payment.createdAt 
+            ? new Date(payment.createdAt).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0];
+        
+        const endDate = subscription?.currentPeriodEnd
+          ? new Date(subscription.currentPeriodEnd).toISOString().split('T')[0]
+          : payment.createdAt
+            ? new Date(payment.createdAt).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0];
+
+        return {
+          id: payment.id,
+          planName: plan?.name || 'unknown',
+          startDate,
+          endDate,
+          amount: payment.amount,
+          currency: payment.currency,
+          status: payment.status as 'paid' | 'pending' | 'failed' | 'refunded',
+          createdAt: payment.createdAt?.toISOString(),
+        };
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -104,6 +168,8 @@ export async function GET() {
         })),
         currentSubscription,
         usage: usageData,
+        paymentHistory,
+        isStripeConfigured: isStripeConfigured(),
       }
     });
   } catch (error) {
