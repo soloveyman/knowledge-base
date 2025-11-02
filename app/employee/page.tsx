@@ -346,7 +346,7 @@ function EmployeePageInner() {
   const userName = session.user?.name || t('employee')
   
   const getGreetingMessage = () => {
-    const greetingKeys: string[] = []
+    let greetingKeys: string[] = []
     
     switch (greetingType) {
       case 'unfinished':
