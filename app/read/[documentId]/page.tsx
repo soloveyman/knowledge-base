@@ -177,7 +177,7 @@ export default function DocumentReaderPage() {
         
         // Handle sections (for docx files)
         if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
-          content = document.parsedContent!.sections.map(s => s.content).join('\n')
+          content = document.parsedContent!.sections.map((s: { content: string }) => s.content).join('\n')
         }
         
         // Extract tables separately (for xlsx files)

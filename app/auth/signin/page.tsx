@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { signIn, getSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -144,11 +145,24 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#1A1D29] dark:bg-[#1A1D29] px-4 py-8 md:py-12 pb-16 md:pb-20">
       <Card className="w-full max-w-md bg-card/95 border-border">
         <CardHeader className="text-center space-y-4">
-          <div className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-bold justify-center">{t('knowledgeBasePlatform')}</CardTitle>
-            <CardDescription className="text-center">
-              {t('signInToAccess')}
-            </CardDescription>
+          <div className="space-y-1 text-center">
+            {/* Logo */}
+            <div className="flex justify-center">
+              <Image
+                src="/Uppstaff_logo.svg"
+                alt="Logo"
+                width={64}
+                height={64}
+                className="object-contain"
+                priority
+              />
+            </div>
+            <div className="space-y-4">
+              <CardTitle className="text-4xl font-bold justify-center">{t('knowledgeBasePlatform')}</CardTitle>
+              <CardDescription className="text-center">
+                {t('signInToAccess')}
+              </CardDescription>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pb-6">
