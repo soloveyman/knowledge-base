@@ -234,7 +234,7 @@ function ManagerPageInner() {
     // Role-based redirects are now handled by middleware
   }, [session, status, router])
 
-  // Load data from APIs
+  // Load data from APIs - parallel fetching for faster loading
   const loadData = useCallback(async (preserveDocuments = false) => {
     try {
       // Set loading states if we're refreshing
@@ -244,23 +244,28 @@ function ManagerPageInner() {
         setIsLoadingAssignments(true)
       }
 
-      // Load users
-      const usersResponse = await fetch('/api/users')
+      // Fetch all data in parallel for instant loading
+      const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
+        fetch('/api/users'),
+        fetch('/api/assignments'),
+        fetch('/api/tests'),
+        fetch('/api/documents')
+      ])
+
+      // Process users
       const usersResult = await usersResponse.json()
       if (usersResult.success) {
         setSavedUsers(usersResult.data.users)
       }
 
-      // Load assignments
-      const assignmentsResponse = await fetch('/api/assignments')
+      // Process assignments
       const assignmentsResult = await assignmentsResponse.json()
       if (assignmentsResult.success) {
         console.log('Manager: Loaded assignments from API:', assignmentsResult.data.assignments)
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
-      // Load tests
-      const testsResponse = await fetch('/api/tests')
+      // Process tests
       const testsResult = await testsResponse.json()
       if (testsResult.success) {
         // Transform tests to match the expected format
@@ -310,8 +315,7 @@ function ManagerPageInner() {
         setSavedTestsWithLog(transformedTests)
       }
 
-      // Load documents
-      const documentsResponse = await fetch('/api/documents')
+      // Process documents (already fetched in parallel above)
       const documentsResult = await documentsResponse.json()
       if (documentsResult.success) {
         console.log('Manager: Raw documents from API:', documentsResult.data.documents)
@@ -476,8 +480,11 @@ function ManagerPageInner() {
     console.log('📄 ID:', id, 'ID type:', typeof id, 'Name:', name)
     // Use ID for navigation - more reliable than name
     const encodedId = encodeURIComponent(String(id))
-    console.log('📄 Navigating to:', `/docs/${encodedId}`)
-    router.push(`/docs/${encodedId}`)
+    const url = `/docs/${encodedId}`
+    console.log('📄 Navigating to:', url)
+    // Prefetch for instant navigation
+    router.prefetch(url)
+    router.push(url)
   }
 
   const handleImportDocument = () => {
@@ -512,7 +519,9 @@ function ManagerPageInner() {
 
   const handleEditTest = (id: string) => {
     // Redirect to test builder with edit parameter and returnTo
-    router.push(`/test-builder?edit=${id}&returnTo=/manager?tab=tests`)
+    const url = `/test-builder?edit=${id}&returnTo=/manager?tab=tests`
+    router.prefetch(url)
+    router.push(url)
   }
 
   // Assignment handlers

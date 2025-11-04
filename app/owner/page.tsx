@@ -243,7 +243,7 @@ function OwnerPageInner() {
     // Role-based redirects are now handled by middleware
   }, [session, status, router])
 
-  // Load data from APIs
+  // Load data from APIs - parallel fetching for faster loading
   const loadData = useCallback(async (preserveDocuments = false) => {
     try {
       // Set loading states if we're refreshing
@@ -253,24 +253,29 @@ function OwnerPageInner() {
         setIsLoadingAssignments(true)
       }
 
-      // Load users
-      const usersResponse = await fetch('/api/users')
+      // Fetch all data in parallel for instant loading
+      const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
+        fetch('/api/users'),
+        fetch('/api/assignments'),
+        fetch('/api/tests'),
+        fetch('/api/documents')
+      ])
+
+      // Process users
       const usersResult = await usersResponse.json()
       if (usersResult.success) {
         // Exclude the signed-in owner from the Users tab to reflect team members only
         setSavedUsers((usersResult.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
       }
 
-      // Load assignments
-      const assignmentsResponse = await fetch('/api/assignments')
+      // Process assignments
       const assignmentsResult = await assignmentsResponse.json()
       if (assignmentsResult.success) {
         console.log('Owner: Loaded assignments from API:', assignmentsResult.data.assignments)
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
-      // Load tests
-      const testsResponse = await fetch('/api/tests')
+      // Process tests
       const testsResult = await testsResponse.json()
       if (testsResult.success) {
         // Transform tests to match the expected format
@@ -320,10 +325,9 @@ function OwnerPageInner() {
         setSavedTestsWithLog(transformedTests)
       }
 
-      // Load documents
+      // Process documents (already fetched in parallel above)
       console.log('Owner: Loading documents, session user:', session?.user)
       console.log('Owner: Session businessId:', session?.user?.businessId)
-      const documentsResponse = await fetch('/api/documents')
       const documentsResult = await documentsResponse.json()
       console.log('Owner: Documents API response:', documentsResult)
       if (documentsResult.success) {
@@ -503,7 +507,10 @@ function OwnerPageInner() {
   const handleViewDocument = (id: string, name?: string) => {
     console.log('Owner: handleViewDocument called with id:', id, 'name:', name)
     // Use ID for navigation - more reliable than name
-    router.push(`/docs/${encodeURIComponent(id)}`)
+    const url = `/docs/${encodeURIComponent(id)}`
+    // Prefetch for instant navigation
+    router.prefetch(url)
+    router.push(url)
   }
 
   const handleImportDocument = () => {
@@ -537,7 +544,9 @@ function OwnerPageInner() {
   }
 
   const handleEditTest = (id: string) => {
-    router.push(`/test-builder?edit=${id}&returnTo=/owner?tab=tests`)
+    const url = `/test-builder?edit=${id}&returnTo=/owner?tab=tests`
+    router.prefetch(url)
+    router.push(url)
   }
 
   // Assignment handlers
@@ -567,7 +576,9 @@ function OwnerPageInner() {
   }
 
   const handleEditAssignment = (id: string) => {
-    router.push(`/assignment-builder?edit=${id}&returnTo=/owner?tab=assignments`)
+    const url = `/assignment-builder?edit=${id}&returnTo=/owner?tab=assignments`
+    router.prefetch(url)
+    router.push(url)
   }
 
   // User handlers
