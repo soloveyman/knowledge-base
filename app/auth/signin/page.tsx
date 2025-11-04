@@ -22,6 +22,7 @@ export default function SignInPage() {
   const [isRegister, setIsRegister] = useState(false)
   const [name, setName] = useState("")
   const [honeypot, setHoneypot] = useState("") // Honeypot field for bot detection
+  const [hasFailedAttempt, setHasFailedAttempt] = useState(false) // Track if login failed
   const router = useRouter()
   const { t } = useTranslation()
 
@@ -124,6 +125,8 @@ export default function SignInPage() {
       const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
       if (result?.error) {
         setError('Invalid email or password')
+        setHasFailedAttempt(true) // Show forgot password link after failed attempt
+        setIsLoading(false)
         return
       }
       // route by role
@@ -215,7 +218,7 @@ export default function SignInPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">{t('password')} *</Label>
-                {!isRegister && (
+                {!isRegister && hasFailedAttempt && (
                   <a
                     href="/auth/forgot-password"
                     className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"

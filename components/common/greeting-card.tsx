@@ -26,12 +26,17 @@ export function GreetingCard({ name, description, message, className, greetingTy
       const titlePart = message.substring(0, emojiIndex).trim()
       const descriptionPart = message.substring(emojiIndex + emoji.length).trim()
       
+      const hasDescription = !!descriptionPart
+      
       return (
         <Card className={cn(
-          "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 border-border pt-4 pb-3 md:py-6",
+          "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 border-border h-24 flex",
           className
         )}>
-          <CardContent>
+          <CardContent className={cn(
+            "flex flex-col justify-center",
+            hasDescription ? "" : "items-center text-center"
+          )}>
             <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
               {emoji} {titlePart}
             </h2>
@@ -48,10 +53,10 @@ export function GreetingCard({ name, description, message, className, greetingTy
     // Fallback if no emoji found
     return (
       <Card className={cn(
-        "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 border-border pt-4 pb-3 md:py-6",
+        "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 border-border h-24 flex",
         className
       )}>
-        <CardContent>
+        <CardContent className="flex flex-col justify-center items-center text-center">
           <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
             👋 {message}
           </h2>
@@ -72,12 +77,17 @@ export function GreetingCard({ name, description, message, className, greetingTy
     }
   }
 
+  const hasDescription = !!description
+  
   return (
     <Card className={cn(
-      "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 border-border pt-4 pb-3 md:py-6",
+      "mb-4 md:mb-6 bg-gradient-to-br from-card to-blue-400/50 dark:to-blue-800/30 border-border h-24 flex",
       className
     )}>
-      <CardContent>
+      <CardContent className={cn(
+        "flex flex-col justify-center",
+        hasDescription ? "" : "items-center text-center"
+      )}>
         <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
           {getGreetingEmoji()} {name}
         </h2>
