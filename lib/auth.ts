@@ -161,14 +161,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.businessId = u.businessId ?? token.businessId
           token.businessName = u.businessName ?? token.businessName
         } else {
-          // Fallback: if role/businessId missing, hydrate from DB
-          if ((!token.role || !token.businessId) && token.sub) {
+          // Fallback: if role/businessId/businessName missing, hydrate from DB
+          if ((!token.role || !token.businessId || !token.businessName) && token.sub) {
             try {
               const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
               if (dbUsers.length > 0) {
                 const dbUser = dbUsers[0] as { role: string | null; businessId?: string | null }
                 if (!token.role) token.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
                 if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
+                if (!token.businessName) token.businessName = 'Knowledge Base'
               }
             } catch (error) {
               console.error("[Auth] jwt callback DB fallback error:", error)
@@ -184,11 +185,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       try {
-        if (token) {
-          session.user.id = token.sub!
-          session.user.role = token.role as UserRole
-          session.user.businessId = token.businessId
-          session.user.businessName = token.businessName
+        if (token && token.sub) {
+          session.user.id = token.sub
+          session.user.role = (token.role as UserRole) ?? 'employee'
+          session.user.businessId = token.businessId ?? token.sub
+          session.user.businessName = token.businessName ?? 'Knowledge Base'
         }
         return session
       } catch (error) {
