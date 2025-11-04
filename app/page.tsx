@@ -1,6 +1,16 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
-  // Always redirect to signin - let middleware handle authenticated routing
-  redirect("/auth/signin")
+  // Static redirect for unauthenticated users
+  // Middleware handles authenticated user redirects
+  const router = useRouter()
+  
+  useEffect(() => {
+    router.replace("/auth/signin")
+  }, [router])
+
+  return null
 }
