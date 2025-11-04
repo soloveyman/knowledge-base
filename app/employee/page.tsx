@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, Suspense, useCallback, useLayoutEffect, useMemo } from "react"
+import { useEffect, useState, Suspense, useCallback, useLayoutEffect, useMemo, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -71,8 +71,29 @@ function EmployeePageInner() {
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [userAssignments, setUserAssignments] = useState<Assignment[]>([])
+  // Initialize assignments from localStorage to prevent empty state on re-mount
+  const [assignments, setAssignments] = useState<Assignment[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('employee-assignments')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  const [userAssignments, setUserAssignments] = useState<Assignment[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('employee-user-assignments')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   const [currentTab, setCurrentTab] = useState('overview')
   interface TestAttempt {
     id: string
@@ -101,40 +122,67 @@ function EmployeePageInner() {
   }, [session?.user?.id])
 
   // Load assignments from API
-  const loadAssignments = useCallback(async () => {
+  const loadAssignments = useCallback(async (preserveData = false) => {
     try {
-      const response = await fetch('/api/assignments')
+      const response = await fetch('/api/assignments', { cache: 'no-store' })
       const result = await response.json()
       
       if (result.success) {
         const allAssignments: Assignment[] = (result.data.assignments || []) as Assignment[]
         setAssignments(allAssignments)
         
+        // Save to localStorage for instant display on refresh
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('employee-assignments', JSON.stringify(allAssignments))
+          } catch {
+            // Ignore localStorage errors
+          }
+        }
+        
         // Filter assignments for current user using the new assignment_users table
         const currentUserId = session?.user?.id
-        const userAssignments = allAssignments.filter((assignment: Assignment) => {
+        const filteredUserAssignments = allAssignments.filter((assignment: Assignment) => {
           // Check if this assignment has users array and contains the current user
           if (assignment.users && Array.isArray(assignment.users)) {
             return assignment.users.some((au: AssignedUser) => au.userId === currentUserId)
           }
           return false
         })
-        setUserAssignments(userAssignments)
+        setUserAssignments(filteredUserAssignments)
+        
+        // Save filtered assignments to localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('employee-user-assignments', JSON.stringify(filteredUserAssignments))
+          } catch {
+            // Ignore localStorage errors
+          }
+        }
       } else {
         console.error('Failed to load assignments:', result.message)
-        setAssignments([])
-        setUserAssignments([])
+        if (!preserveData) {
+          setAssignments([])
+          setUserAssignments([])
+        }
       }
     } catch (error) {
       console.error('Error loading assignments:', error)
-      setAssignments([])
-      setUserAssignments([])
+      if (!preserveData) {
+        setAssignments([])
+        setUserAssignments([])
+      }
     }
   }, [session?.user?.id])
+
+  // Track if we've already loaded data to prevent multiple loads
+  const hasLoadedDataRef = useRef(false)
+  const hasCachedDataOnMountRef = useRef(userAssignments.length > 0)
 
   // Initial data load - only once on mount
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return
+    if (hasLoadedDataRef.current) return
     
     if (status === "loading") return
     
@@ -143,13 +191,28 @@ function EmployeePageInner() {
       return
     }
 
-    // Load assignments and test attempts in parallel for faster loading
-    Promise.all([
-      loadAssignments(),
-      loadTestAttempts()
-    ]).catch(error => {
-      console.error('Error loading employee data:', error)
-    })
+    hasLoadedDataRef.current = true
+    
+    // Check if we have cached data - if yes, load in background; if no, await load
+    const hasCachedData = hasCachedDataOnMountRef.current
+    
+    if (hasCachedData) {
+      // We have cached data, show it immediately and refresh in background
+      Promise.all([
+        loadAssignments(true),
+        loadTestAttempts()
+      ]).catch(error => {
+        console.error('Error loading employee data:', error)
+      })
+    } else {
+      // No cached data, await the load
+      Promise.all([
+        loadAssignments(false),
+        loadTestAttempts()
+      ]).catch(error => {
+        console.error('Error loading employee data:', error)
+      })
+    }
   }, [session, status, router, loadAssignments, loadTestAttempts])
 
   // Handle tab from URL - only update tab, don't reload data
@@ -174,79 +237,10 @@ function EmployeePageInner() {
     }
   }, [currentTab])
 
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return null
-  }
-
-
-  const handleCompleteAssignment = async (assignmentId: string) => {
-    try {
-      const response = await fetch(`/api/assignments/${assignmentId}/complete`, {
-        method: 'POST'
-      })
-      const result = await response.json()
-      
-      if (result.success) {
-        // Reload assignments to get updated data
-        await loadAssignments()
-      } else {
-        console.error('Failed to complete assignment:', result.message)
-      }
-    } catch (error) {
-      console.error('Error completing assignment:', error)
-    }
-  }
-
-  const handleReadDocument = async (assignmentId: string) => {
-    // Find the assignment and get the document info
-    const assignment = userAssignments.find(a => a.id === assignmentId)
-    if (assignment && assignment.moduleId) {
-      // Navigate immediately using moduleId (which is the document ID)
-      // Start assignment update in background (non-blocking)
-      const documentId = String(assignment.moduleId)
-      router.push(`/read/${documentId}`)
-      
-      // Update assignment status in background (don't wait for it)
-      fetch(`/api/assignments/${assignmentId}/start`, {
-        method: 'POST'
-      })
-        .then(response => response.json())
-        .then(result => {
-          if (result.success) {
-            // Reload assignments in background to get updated data
-            loadAssignments().catch(console.error)
-          }
-        })
-        .catch(error => {
-          console.error('Error starting assignment:', error)
-        })
-    }
-  }
-
-  const handleTakeTest = (assignmentId: string) => {
-    // Find the assignment and get the test ID
-    const assignment = userAssignments.find(a => a.id === assignmentId)
-    if (assignment && assignment.testId) {
-      // Navigate to test page using testId
-      router.push(`/test/${assignment.testId}`)
-    } else if (assignment && assignment.test?.id) {
-      // Fallback to test.id if testId not available
-      router.push(`/test/${assignment.test.id}`)
-    }
-  }
-
-  // Transform assignment data for display
-  const transformedAssignments = userAssignments.map(assignment => {
+  // Transform assignment data for display - MUST be before early returns
+  const currentUserId = session?.user?.id
+  const transformedAssignments = useMemo(() => userAssignments.map(assignment => {
     // Get the user's specific status from assignment_users
-    const currentUserId = session?.user?.id
     const userAssignment = assignment.users?.find((au: AssignedUser) => au.userId === currentUserId)
     
     // Get the actual test score from the user assignment data
@@ -285,7 +279,84 @@ function EmployeePageInner() {
       moduleId: assignment.moduleId,
       testId: assignment.testId
     }
-  }), [userAssignments, session?.user?.id, t])
+  }), [userAssignments, currentUserId, t])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  const handleCompleteAssignment = async (assignmentId: string) => {
+    try {
+      const response = await fetch(`/api/assignments/${assignmentId}/complete`, {
+        method: 'POST'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        // Optimistically update UI - reload assignments in background
+        loadAssignments(true).catch(console.error)
+      } else {
+        console.error('Failed to complete assignment:', result.message)
+      }
+    } catch (error) {
+      console.error('Error completing assignment:', error)
+    }
+  }
+
+  const handleReadDocument = async (assignmentId: string) => {
+    // Find the assignment and get the document info
+    const assignment = userAssignments.find(a => a.id === assignmentId)
+    if (assignment && assignment.moduleId) {
+      // Prefetch route for instant navigation
+      const documentId = String(assignment.moduleId)
+      const url = `/read/${documentId}`
+      router.prefetch(url)
+      
+      // Navigate immediately
+      router.push(url)
+      
+      // Update assignment status in background (don't wait for it)
+      fetch(`/api/assignments/${assignmentId}/start`, {
+        method: 'POST'
+      })
+        .then(response => response.json())
+        .then(result => {
+          if (result.success) {
+            // Reload assignments in background to get updated data (preserve existing data during load)
+            loadAssignments(true).catch(console.error)
+          }
+        })
+        .catch(error => {
+          console.error('Error starting assignment:', error)
+        })
+    }
+  }
+
+  const handleTakeTest = (assignmentId: string) => {
+    // Find the assignment and get the test ID
+    const assignment = userAssignments.find(a => a.id === assignmentId)
+    if (assignment && assignment.testId) {
+      // Prefetch route for instant navigation
+      const url = `/test/${assignment.testId}`
+      router.prefetch(url)
+      // Navigate to test page using testId
+      router.push(url)
+    } else if (assignment && assignment.test?.id) {
+      // Prefetch route for instant navigation (fallback)
+      const url = `/test/${assignment.test.id}`
+      router.prefetch(url)
+      // Navigate to test page (fallback)
+      router.push(url)
+    }
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {

@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useParams } from "next/navigation"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -71,7 +71,8 @@ export default function TestPage() {
   const [timeLeft, setTimeLeft] = useState(15 * 60) // 15 minutes in seconds
   const [showExitConfirm, setShowExitConfirm] = useState(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
     if (status === "loading") return
     
     if (!session) {
@@ -82,7 +83,7 @@ export default function TestPage() {
     // Load test data from API
     const loadTestData = async () => {
       try {
-        const response = await fetch(`/api/tests/${testId}`)
+        const response = await fetch(`/api/tests/${testId}`, { cache: 'no-store' })
         const result = await response.json()
         
         if (result.success && result.data.test) {
@@ -273,16 +274,21 @@ export default function TestPage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
-  if (status === "loading" || loading) {
+  // Don't block UI while session loads - show page immediately
+  if (status === "loading") {
+    // Show page but with disabled state - don't block with spinner
+  }
+
+  if (!session) {
+    return null
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
       </div>
     )
-  }
-
-  if (!session) {
-    return null
   }
 
   if (!testData) {

@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -114,9 +114,9 @@ export default function DocumentReaderPage() {
   const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
     if (status === "loading") return
-    
     if (!session) {
       router.push("/auth/signin")
       return
@@ -127,7 +127,7 @@ export default function DocumentReaderPage() {
       try {
         // Fetch document directly by ID (more efficient than fetching all documents)
         // Try both documentId and moduleId formats since documentId might be either
-        const docResponse = await fetch(`/api/documents/${documentId}`)
+        const docResponse = await fetch(`/api/documents/${documentId}`, { cache: 'no-store' })
         const docResult = await docResponse.json()
         
         let document = null
@@ -135,7 +135,7 @@ export default function DocumentReaderPage() {
           document = docResult.data.document
         } else {
           // Fallback: try fetching all documents if direct fetch fails
-          const allDocsResponse = await fetch('/api/documents')
+          const allDocsResponse = await fetch('/api/documents', { cache: 'no-store' })
           const allDocsResult = await allDocsResponse.json()
           
           if (allDocsResult.success && allDocsResult.data.documents) {
@@ -198,7 +198,7 @@ export default function DocumentReaderPage() {
         console.log('Final content for display:', content.substring(0, 200))
         console.log('Found tables:', tables.length)
         
-        documentData = {
+        const newDocumentData = {
           id: String(document.id),
           name: document.originalFileName || document.title || 'Untitled',
           type: document.fileType?.toUpperCase() || 'DOCX',
@@ -209,10 +209,10 @@ export default function DocumentReaderPage() {
           tables: tables.length > 0 ? tables : undefined
         }
           
-          setDocumentData(documentData)
+          setDocumentData(newDocumentData)
             
           // Find the assignment that has this document
-          const response = await fetch(`/api/assignments`)
+          const response = await fetch(`/api/assignments`, { cache: 'no-store' })
           const result = await response.json()
           
           if (result.success) {
@@ -234,7 +234,7 @@ export default function DocumentReaderPage() {
               let testData = null
               if (assignment.testId) {
                 // Fetch test in background (non-blocking)
-                fetch(`/api/tests/${assignment.testId}`)
+                fetch(`/api/tests/${assignment.testId}`, { cache: 'no-store' })
                   .then(testResponse => testResponse.json())
                   .then(testResult => {
                     if (testResult.success && testResult.data.test) {
@@ -258,7 +258,7 @@ export default function DocumentReaderPage() {
                 id: assignment.id,
                 name: assignment.title || 'Assignment',
                 description: assignment.description || '',
-                document: documentData,
+                document: newDocumentData,
                 test: testData,
                 dueDate: assignment.dueDate || '',
                 status: assignment.status || 'in_progress'
@@ -268,7 +268,7 @@ export default function DocumentReaderPage() {
                 id: String(document.id),
                 name: document.title || 'Document',
                 description: '',
-                document: documentData,
+                document: newDocumentData,
                 test: null,
                 dueDate: '',
                 status: 'completed'
@@ -323,16 +323,21 @@ export default function DocumentReaderPage() {
   }
 
 
-  if (status === "loading" || loading) {
+  // Don't block UI while session loads - show page immediately
+  if (status === "loading") {
+    // Show page but with disabled state - don't block with spinner
+  }
+
+  if (!session) {
+    return null
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
       </div>
     )
-  }
-
-  if (!session) {
-    return null
   }
 
   if (!documentData) {
