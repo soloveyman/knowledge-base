@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
+import Image from 'next/image'
 
 interface DocumentRendererProps {
   content: string
@@ -167,16 +168,34 @@ function DocumentContent({ content }: { content: string }) {
             {children}
           </td>
         ),
-        img: ({ src, alt }) => (
-          <div className="my-6">
-            <img 
-              src={src} 
-              alt={alt}
-              className="rounded-lg border border-border max-w-full h-auto"
-              loading="lazy"
-            />
-          </div>
-        ),
+        img: ({ src, alt }) => {
+          if (!src) return null
+          
+          // Convert src to string if it's a Blob
+          const srcString = typeof src === 'string' ? src : ''
+          if (!srcString) return null
+          
+          // Check if it's a data URL or external URL
+          const isDataUrl = srcString.startsWith('data:')
+          const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
+          
+          // For data URLs or if we need to use external images, use unoptimized
+          // Otherwise Next.js Image will handle optimization
+          return (
+            <div className="my-6 relative w-full">
+              <Image
+                src={srcString}
+                alt={alt || ''}
+                width={800}
+                height={600}
+                className="rounded-lg border border-border max-w-full h-auto"
+                style={{ width: 'auto', height: 'auto' }}
+                unoptimized={isDataUrl || isExternal}
+                loading="lazy"
+              />
+            </div>
+          )
+        },
         a: ({ href, children }) => (
           <a 
             href={href}
