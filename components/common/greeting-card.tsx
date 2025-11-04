@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { useEffect, useRef, useState } from "react"
 
 interface GreetingCardProps {
   name?: string
@@ -9,6 +10,58 @@ interface GreetingCardProps {
   message?: string
   className?: string
   greetingType?: 'default' | 'unfinished' | 'successful'
+}
+
+// Component that checks if title text overflows and applies smaller font on mobile if needed
+function ResponsiveTitle({ children, className }: { children: React.ReactNode; className?: string }) {
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const [isOverflowing, setIsOverflowing] = useState(false)
+
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (titleRef.current && window.innerWidth < 640) {
+        // Temporarily apply text-2xl to measure overflow with original size
+        const originalClasses = titleRef.current.className
+        titleRef.current.className = cn(
+          "font-bold text-foreground dark:text-white mb-2 text-2xl"
+        )
+        
+        // Force a reflow to get accurate measurements
+        void titleRef.current.offsetWidth
+        
+        const isOverflow = titleRef.current.scrollWidth > titleRef.current.clientWidth
+        
+        // Restore original classes
+        titleRef.current.className = originalClasses
+        
+        setIsOverflowing(isOverflow)
+      } else {
+        setIsOverflowing(false)
+      }
+    }
+
+    // Check after render and resize
+    const timeoutId = setTimeout(checkOverflow, 50)
+    window.addEventListener('resize', checkOverflow)
+
+    return () => {
+      window.removeEventListener('resize', checkOverflow)
+      clearTimeout(timeoutId)
+    }
+  }, [children])
+
+  return (
+    <h2
+      ref={titleRef}
+      className={cn(
+        "font-bold text-foreground dark:text-white mb-2",
+        isOverflowing ? "text-lg sm:text-2xl" : "text-2xl",
+        className
+      )}
+    >
+      {children}
+    </h2>
+  )
 }
 
 export function GreetingCard({ name, description, message, className, greetingType = 'default' }: GreetingCardProps) {
@@ -34,9 +87,9 @@ export function GreetingCard({ name, description, message, className, greetingTy
           className
         )}>
           <CardContent className="flex flex-col justify-center">
-            <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
+            <ResponsiveTitle>
               {emoji} {titlePart}
-            </h2>
+            </ResponsiveTitle>
             {descriptionPart && (
               <p className="text-muted-foreground">
                 {descriptionPart}
@@ -54,9 +107,9 @@ export function GreetingCard({ name, description, message, className, greetingTy
         className
       )}>
         <CardContent className="flex flex-col justify-center">
-          <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
+          <ResponsiveTitle>
             👋 {message}
-          </h2>
+          </ResponsiveTitle>
         </CardContent>
       </Card>
     )
@@ -82,9 +135,9 @@ export function GreetingCard({ name, description, message, className, greetingTy
       className
     )}>
       <CardContent className="flex flex-col justify-center">
-        <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2">
+        <ResponsiveTitle>
           {getGreetingEmoji()} {name}
-        </h2>
+        </ResponsiveTitle>
         {description && (
           <p className="text-muted-foreground">
             {description}
