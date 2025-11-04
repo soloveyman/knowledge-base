@@ -670,55 +670,9 @@ function OwnerPageInner() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
-        {(() => {
-          // Determine greeting type based on actions
-          // Check for unfinished assignments (users with pending/in_progress status)
-          let hasUnfinished = false
-          savedAssignments.forEach(assignment => {
-            if (assignment.users && Array.isArray(assignment.users)) {
-              const hasPending = assignment.users.some((au: any) => au.status === 'pending' || au.status === 'in_progress')
-              if (hasPending) {
-                hasUnfinished = true
-              }
-            }
-          })
-          
-          const hasActivity = savedTests.length > 0 || savedAssignments.length > 0 || documents.length > 0 || savedUsers.length > 0
-          const greetingType: 'default' | 'unfinished' | 'successful' = hasUnfinished ? 'unfinished' : (hasActivity ? 'successful' : 'default')
-          
-          const userName = session.user?.name || t('owner')
-          
-          const getGreetingMessage = () => {
-            let greetingKeys: string[] = []
-            
-            switch (greetingType) {
-              case 'unfinished':
-                greetingKeys = ['ownerGreetingUnfinished1', 'ownerGreetingUnfinished2', 'ownerGreetingUnfinished3', 'ownerGreetingUnfinished4', 'ownerGreetingUnfinished5', 'ownerGreetingUnfinished6', 'ownerGreetingUnfinished7', 'ownerGreetingUnfinished8']
-                break
-              case 'successful':
-                greetingKeys = ['ownerGreetingSuccessful1', 'ownerGreetingSuccessful2', 'ownerGreetingSuccessful3', 'ownerGreetingSuccessful4', 'ownerGreetingSuccessful5', 'ownerGreetingSuccessful6', 'ownerGreetingSuccessful7', 'ownerGreetingSuccessful8']
-                break
-              default:
-                greetingKeys = ['ownerGreetingDefault1', 'ownerGreetingDefault2', 'ownerGreetingDefault3', 'ownerGreetingDefault4', 'ownerGreetingDefault5', 'ownerGreetingDefault6', 'ownerGreetingDefault7', 'ownerGreetingDefault8']
-            }
-            
-            // Pick a random greeting based on current date (for consistency across sessions)
-            const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24))
-            const index = dayOfYear % greetingKeys.length
-            const selectedKey = greetingKeys[index]
-            
-            const message = t(selectedKey as any)
-            // Replace [Name] with actual user name
-            return message.replace('[Name]', userName)
-          }
-
-          return (
-            <GreetingCard
-              message={getGreetingMessage()}
-              greetingType={greetingType}
-            />
-          )
-        })()}
+        <GreetingCard
+          name={session.user?.name || t('owner')}
+        />
 
         {/* Main Tabs */}
         <Tabs value={defaultTab} onValueChange={(value) => {

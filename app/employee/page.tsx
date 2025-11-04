@@ -396,47 +396,7 @@ function EmployeePageInner() {
     ? transformedAssignments.reduce((acc, a) => acc + a.progress, 0) / transformedAssignments.length 
     : 0
 
-  // Determine greeting type based on actions
-  const getGreetingType = (): 'default' | 'unfinished' | 'successful' => {
-    const hasUnfinished = pendingCount > 0 || inProgressCount > 0
-    const hasRecentSuccess = completedCount > 0 && completedCount > failedCount
-    
-    if (hasRecentSuccess && !hasUnfinished) {
-      return 'successful'
-    } else if (hasUnfinished) {
-      return 'unfinished'
-    }
-    return 'default'
-  }
-
-  const greetingType = getGreetingType()
   const userName = session.user?.name || t('employee')
-  
-  const getGreetingMessage = () => {
-    let greetingKeys: string[] = []
-    
-    switch (greetingType) {
-      case 'unfinished':
-        greetingKeys = ['employeeGreetingUnfinished1', 'employeeGreetingUnfinished2', 'employeeGreetingUnfinished3', 'employeeGreetingUnfinished4', 'employeeGreetingUnfinished5', 'employeeGreetingUnfinished6', 'employeeGreetingUnfinished7', 'employeeGreetingUnfinished8']
-        break
-      case 'successful':
-        greetingKeys = ['employeeGreetingSuccessful1', 'employeeGreetingSuccessful2', 'employeeGreetingSuccessful3', 'employeeGreetingSuccessful4', 'employeeGreetingSuccessful5', 'employeeGreetingSuccessful6', 'employeeGreetingSuccessful7', 'employeeGreetingSuccessful8']
-        break
-      default:
-        greetingKeys = ['employeeGreetingDefault1', 'employeeGreetingDefault2', 'employeeGreetingDefault3', 'employeeGreetingDefault4', 'employeeGreetingDefault5', 'employeeGreetingDefault6', 'employeeGreetingDefault7', 'employeeGreetingDefault8']
-    }
-    
-    // Pick a random greeting based on current date (for consistency across sessions)
-    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24))
-    const index = dayOfYear % greetingKeys.length
-    const selectedKey = greetingKeys[index]
-    
-    const message = t(selectedKey as any)
-    // Replace [Name] with actual user name
-    return message.replace('[Name]', userName)
-  }
-
-  const greetingMessage = getGreetingMessage()
 
   return (
     <div className="min-h-screen bg-background">
@@ -452,8 +412,7 @@ function EmployeePageInner() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
         <GreetingCard
-          message={greetingMessage}
-          greetingType={greetingType}
+          name={userName}
         />
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-3 md:space-y-6">
