@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslation } from "@/lib/translation-context"
 import { formatDateShort } from "@/lib/date-format"
@@ -90,6 +90,15 @@ interface SubscriptionManagerProps {
   onBilling?: () => void
 }
 
+// Module-level cache that persists across component remounts (tab switches)
+let subscriptionDataCache: {
+  plans: SubscriptionPlan[]
+  currentSubscription: CurrentSubscription | null
+  usage: Usage | null
+  paymentHistory: PaymentHistory[] | null
+  isStripeEnabled: boolean
+} | null = null
+
 export default function SubscriptionManager({ 
   onUpgrade, 
   onCancel, 
@@ -103,19 +112,30 @@ export default function SubscriptionManager({
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[] | null>(null)
   const [isStripeEnabled, setIsStripeEnabled] = useState<boolean>(false)
 
+  // Use module-level cache (persists across component remounts)
+  const dataCache = useRef(subscriptionDataCache)
+
   const loadSubscriptionData = useCallback(async () => {
     try {
-      const response = await fetch('/api/subscription')
+      const response = await fetch('/api/subscription', { cache: 'no-store' })
       const result = await response.json()
       
       if (result.success) {
-        setPlans(result.data.plans)
-        setCurrentSubscription(result.data.currentSubscription)
-        setUsage(result.data.usage)
-        setIsStripeEnabled(result.data.isStripeConfigured ?? false)
-        // Payment history will be loaded from API when available
-        // For now, set to null to indicate it should use fallback data
-        setPaymentHistory(result.data.paymentHistory || null)
+        const data = {
+          plans: result.data.plans,
+          currentSubscription: result.data.currentSubscription,
+          usage: result.data.usage,
+          paymentHistory: result.data.paymentHistory || null,
+          isStripeEnabled: result.data.isStripeConfigured ?? false
+        }
+        // Cache data for future remounts (module-level)
+        subscriptionDataCache = data
+        dataCache.current = data
+        setPlans(data.plans)
+        setCurrentSubscription(data.currentSubscription)
+        setUsage(data.usage)
+        setIsStripeEnabled(data.isStripeEnabled)
+        setPaymentHistory(data.paymentHistory)
       } else {
         console.error('Failed to load subscription data:', result.message)
         setPlans([])
@@ -135,8 +155,27 @@ export default function SubscriptionManager({
   }, [])
 
   useEffect(() => {
-    loadSubscriptionData()
-  }, [loadSubscriptionData])
+    // Sync ref with module-level cache (persists across remounts)
+    dataCache.current = subscriptionDataCache
+    
+    // Restore from cache if available (instant render on tab switch)
+    if (subscriptionDataCache) {
+      const cached = subscriptionDataCache
+      setPlans(cached.plans)
+      setCurrentSubscription(cached.currentSubscription)
+      setUsage(cached.usage)
+      setIsStripeEnabled(cached.isStripeEnabled)
+      setPaymentHistory(cached.paymentHistory)
+      // Refresh in background after a delay to avoid blocking render
+      setTimeout(() => {
+        loadSubscriptionData()
+      }, 200)
+    } else if (plans.length === 0 && !currentSubscription && !usage) {
+      // Only load if no cached data and state is empty
+      loadSubscriptionData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const formatPrice = (price: number, currency: string) => {
     if (price === 0) return t('free')

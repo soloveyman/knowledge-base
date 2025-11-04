@@ -125,37 +125,45 @@ export default function DocumentReaderPage() {
     // Load assignment data from API
     const loadAssignmentData = async () => {
       try {
-        // Load actual document data directly using documentId from URL
-        const docResponse = await fetch('/api/documents')
+        // Fetch document directly by ID (more efficient than fetching all documents)
+        // Try both documentId and moduleId formats since documentId might be either
+        const docResponse = await fetch(`/api/documents/${documentId}`)
         const docResult = await docResponse.json()
         
-        let documentData = null
-        if (!docResult.success) {
-          setLoading(false)
-          return
-        }
-        
-        interface ApiDocument {
-          id: string | number
-          originalFileName?: string
-          title?: string
-          fileType?: string
-          createdAt?: string
-          uploadedBy?: string
-          fileSize?: number
-          moduleId?: string | null
-          parsedContent?: {
-            sections?: Array<{ content: string }>
-            tables?: Array<{
-              title: string
-              headers: string[]
-              rows: string[][]
-            }>
+        let document = null
+        if (docResult.success && docResult.data.document) {
+          document = docResult.data.document
+        } else {
+          // Fallback: try fetching all documents if direct fetch fails
+          const allDocsResponse = await fetch('/api/documents')
+          const allDocsResult = await allDocsResponse.json()
+          
+          if (allDocsResult.success && allDocsResult.data.documents) {
+            interface ApiDocument {
+              id: string | number
+              originalFileName?: string
+              title?: string
+              fileType?: string
+              createdAt?: string
+              uploadedBy?: string
+              fileSize?: number
+              moduleId?: string | null
+              parsedContent?: {
+                sections?: Array<{ content: string }>
+                tables?: Array<{
+                  title: string
+                  headers: string[]
+                  rows: string[][]
+                }>
+              }
+            }
+            
+            document = (allDocsResult.data.documents as ApiDocument[]).find((doc: ApiDocument) => 
+              String(doc.id) === String(documentId) || String(doc.moduleId) === String(documentId)
+            )
           }
         }
         
-        // Find document by the documentId in the URL
-        const document = (docResult.data.documents as ApiDocument[]).find((doc: ApiDocument) => String(doc.id) === String(documentId))
         if (!document) {
           setLoading(false)
           return
@@ -222,22 +230,28 @@ export default function DocumentReaderPage() {
             const assignment = (result.data.assignments as AssignmentWithModule[]).find((a: AssignmentWithModule) => a.moduleId === document.moduleId)
             
             if (assignment) {
-              // Fetch test data if testId exists
+              // Fetch test data if testId exists (non-blocking, will update when ready)
               let testData = null
               if (assignment.testId) {
-                try {
-                  const testResponse = await fetch(`/api/tests/${assignment.testId}`)
-                  const testResult = await testResponse.json()
-                  if (testResult.success && testResult.data.test) {
-                    testData = {
-                      id: assignment.testId,
-                      title: testResult.data.test.title,
-                      questionCount: testResult.data.test.questionIds?.length || 0
+                // Fetch test in background (non-blocking)
+                fetch(`/api/tests/${assignment.testId}`)
+                  .then(testResponse => testResponse.json())
+                  .then(testResult => {
+                    if (testResult.success && testResult.data.test) {
+                      const loadedTestData = {
+                        id: assignment.testId!,
+                        title: testResult.data.test.title,
+                        questionCount: testResult.data.test.questionIds?.length || 0
+                      }
+                      setAssignmentData(prev => prev ? {
+                        ...prev,
+                        test: loadedTestData
+                      } : null)
                     }
-                  }
-                } catch (error) {
-                  console.error('Error loading test:', error)
-                }
+                  })
+                  .catch(error => {
+                    console.error('Error loading test:', error)
+                  })
               }
               
               setAssignmentData({

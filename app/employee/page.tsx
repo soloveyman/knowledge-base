@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, Suspense, useCallback } from "react"
+import { useEffect, useState, Suspense, useCallback, useLayoutEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -132,7 +132,10 @@ function EmployeePageInner() {
     }
   }, [session?.user?.id])
 
-  useEffect(() => {
+  // Initial data load - only once on mount
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    
     if (status === "loading") return
     
     if (!session) {
@@ -140,22 +143,29 @@ function EmployeePageInner() {
       return
     }
 
-    // Handle tab from URL - use setTimeout to avoid synchronous setState
-    const tabFromUrl = getTabFromUrl(searchParams)
-    if (tabFromUrl) {
-      setTimeout(() => {
-        setCurrentTab(tabFromUrl)
-      }, 0)
+    // Load assignments and test attempts in parallel for faster loading
+    Promise.all([
+      loadAssignments(),
+      loadTestAttempts()
+    ]).catch(error => {
+      console.error('Error loading employee data:', error)
+    })
+  }, [session, status, router, loadAssignments, loadTestAttempts])
+
+  // Handle tab from URL - only update tab, don't reload data
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      return
     }
 
-    // Load assignments and test attempts - use setTimeout to avoid synchronous setState
-    setTimeout(() => {
-      loadAssignments()
-      loadTestAttempts()
-    }, 0)
-
-    // Role-based redirects are now handled by middleware
-  }, [session, status, router, searchParams, loadAssignments, loadTestAttempts])
+    // Handle tab from URL
+    const tabFromUrl = getTabFromUrl(searchParams)
+    if (tabFromUrl) {
+      setCurrentTab(tabFromUrl)
+    }
+  }, [session, status, searchParams])
 
   // Save current tab when it changes
   useEffect(() => {
@@ -199,40 +209,25 @@ function EmployeePageInner() {
     // Find the assignment and get the document info
     const assignment = userAssignments.find(a => a.id === assignmentId)
     if (assignment && assignment.moduleId) {
-      try {
-        // Update assignment status to in_progress when user starts reading
-        const response = await fetch(`/api/assignments/${assignmentId}/start`, {
-          method: 'POST'
-        })
-        const result = await response.json()
-        
-        if (result.success) {
-          // Reload assignments to get updated data
-          await loadAssignments()
-        }
-      } catch (error) {
-        console.error('Error starting assignment:', error)
-      }
+      // Navigate immediately using moduleId (which is the document ID)
+      // Start assignment update in background (non-blocking)
+      const documentId = String(assignment.moduleId)
+      router.push(`/read/${documentId}`)
       
-      // Find the document that has this moduleId
-      try {
-        const docsResponse = await fetch('/api/documents')
-        const docsResult = await docsResponse.json()
-        if (docsResult.success && docsResult.data.documents) {
-          interface ApiDoc {
-            id: string | number
-            moduleId?: string | null
+      // Update assignment status in background (don't wait for it)
+      fetch(`/api/assignments/${assignmentId}/start`, {
+        method: 'POST'
+      })
+        .then(response => response.json())
+        .then(result => {
+          if (result.success) {
+            // Reload assignments in background to get updated data
+            loadAssignments().catch(console.error)
           }
-          const document = (docsResult.data.documents as ApiDoc[]).find((d: ApiDoc) => d.moduleId === assignment.moduleId)
-          if (document) {
-            // Navigate to document reader - ensure id is a string
-            const documentId = String(document.id)
-            router.push(`/read/${documentId}`)
-          }
-        }
-      } catch (error) {
-        console.error('Error finding document:', error)
-      }
+        })
+        .catch(error => {
+          console.error('Error starting assignment:', error)
+        })
     }
   }
 
@@ -290,7 +285,7 @@ function EmployeePageInner() {
       moduleId: assignment.moduleId,
       testId: assignment.testId
     }
-  })
+  }), [userAssignments, session?.user?.id, t])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

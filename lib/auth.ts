@@ -1,4 +1,5 @@
 import NextAuth from "next-auth"
+import type { Session } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { z } from "zod"
@@ -277,12 +278,12 @@ export function hasPermission(role: UserRole, resource: keyof typeof PERMISSIONS
  *   // Now TypeScript knows session.user exists
  */
 export async function requireUser(): Promise<
-  | { session: Awaited<ReturnType<typeof auth>> & { user: NonNullable<Awaited<ReturnType<typeof auth>>['user']> } }
+  | { session: Session & { user: NonNullable<Session['user']> } }
   | NextResponse<{ success: false; message: string }>
 > {
   const session = await auth()
   
-  if (!session?.user) {
+  if (!session || !('user' in session) || !session.user) {
     return NextResponse.json(
       {
         success: false,
@@ -292,7 +293,7 @@ export async function requireUser(): Promise<
     )
   }
 
-  return { session } as { session: typeof session & { user: NonNullable<typeof session['user']> } }
+  return { session: session as Session & { user: NonNullable<Session['user']> } }
 }
 
 /**
@@ -308,7 +309,7 @@ export async function requireUser(): Promise<
 export async function requireRole(
   role: UserRole | UserRole[]
 ): Promise<
-  | { session: Awaited<ReturnType<typeof auth>> & { user: NonNullable<Awaited<ReturnType<typeof auth>>['user']> } }
+  | { session: Session & { user: NonNullable<Session['user']> } }
   | NextResponse<{ success: false; message: string }>
 > {
   const result = await requireUser()

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
+import { useMemo } from "react"
 import { ManagementPage } from "../common/management-page"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
@@ -38,7 +39,8 @@ export function TestsPage({
   const { t } = useTranslation()
   const translateBadge = useBadgeTranslation()
 
-  const testItems = tests.map((test) => ({
+  // Memoize testItems to avoid recalculating on every render
+  const testItems = useMemo(() => tests.map((test) => ({
     id: test.id,
     title: test.title,
     subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${formatDateShort(test.createdAt)}`,
@@ -49,7 +51,7 @@ export function TestsPage({
     onClick: () => onViewTest(test.id),
     onDelete: () => onDeleteTest(test.id),
     onEdit: () => onEditTest(test.id)
-  }))
+  })), [tests, t, translateBadge, onViewTest, onDeleteTest, onEditTest])
 
   return (
     <ManagementPage

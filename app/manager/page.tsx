@@ -245,11 +245,13 @@ function ManagerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
+      // Use cache: 'no-store' to force fresh data when switching tabs
+      const fetchOptions: RequestInit = preserveDocuments ? { cache: 'no-store' } : {}
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/assignments'),
-        fetch('/api/tests'),
-        fetch('/api/documents')
+        fetch('/api/users', fetchOptions),
+        fetch('/api/assignments', fetchOptions),
+        fetch('/api/tests', fetchOptions),
+        fetch('/api/documents', fetchOptions)
       ])
 
       // Process users
@@ -265,61 +267,22 @@ function ManagerPageInner() {
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
-      // Process tests
-      const testsResult = await testsResponse.json()
-      if (testsResult.success) {
-        // Transform tests to match the expected format
-        const transformedTests = await Promise.all(
-          (testsResult.data.tests as Array<{
-            id: string
-            title: string
-            type?: string | null
-            difficulty?: string | null
-            locale?: string | null
-            questionIds?: string[] | null
-            moduleId?: string | null
-            createdAt: string
-            createdBy: string
-          }>).map(async (test) => {
-            // Calculate questionCount from questionIds
-            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
-            
-            // Fetch document to get sourceDocument name
-            let sourceDocument = 'Unknown'
-            if (test.moduleId) {
-              try {
-                const docResponse = await fetch(`/api/documents/${test.moduleId}`)
-                const docResult = await docResponse.json()
-                if (docResult.success && docResult.data.document) {
-                  sourceDocument = docResult.data.document.originalFileName || docResult.data.document.title || 'Unknown'
-                }
-              } catch (error) {
-                console.error('Error fetching document for test:', error)
-              }
-            }
-            
-            return {
-              id: test.id,
-              title: test.title,
-              type: test.type || 'mcq',
-              difficulty: test.difficulty || 'medium',
-              locale: test.locale || 'en',
-              questionCount,
-              questions: [], // Not needed for the card display
-              sourceDocument,
-              createdAt: test.createdAt,
-              createdBy: test.createdBy
-            }
-          })
-        )
-        setSavedTestsWithLog(transformedTests)
-      }
-
-      // Process documents (already fetched in parallel above)
+      // Process documents first (needed for test sourceDocument lookup)
       const documentsResult = await documentsResponse.json()
-      if (documentsResult.success) {
-        console.log('Manager: Raw documents from API:', documentsResult.data.documents)
+      
+      // Create document lookup map for fast access (avoids individual fetches per test)
+      const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+      if (documentsResult.success && documentsResult.data.documents) {
+        documentsResult.data.documents.forEach((doc: {
+          id: string
+          originalFileName?: string
+          title: string
+        }) => {
+          documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+        })
+        
         // Transform database documents to match the expected format
+        console.log('Manager: Raw documents from API:', documentsResult.data.documents)
         const transformedDocs = documentsResult.data.documents.map((doc: {
           id: string
           originalFileName?: string
@@ -345,6 +308,49 @@ function ManagerPageInner() {
         // Only clear documents if we're not preserving them and the API call failed
         setDocumentsWithLog([])
       }
+
+      // Process tests (use document map instead of individual fetches)
+      const testsResult = await testsResponse.json()
+      if (testsResult.success) {
+        // Transform tests to match the expected format (no async needed now)
+        const transformedTests = (testsResult.data.tests as Array<{
+          id: string
+          title: string
+          type?: string | null
+          difficulty?: string | null
+          locale?: string | null
+          questionIds?: string[] | null
+          moduleId?: string | null
+          createdAt: string
+          createdBy: string
+        }>).map((test) => {
+          // Calculate questionCount from questionIds
+          const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+          
+          // Get sourceDocument from map (much faster than individual fetch)
+          let sourceDocument = 'Unknown'
+          if (test.moduleId) {
+            const doc = documentMap.get(test.moduleId)
+            if (doc) {
+              sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+            }
+          }
+          
+          return {
+            id: test.id,
+            title: test.title,
+            type: test.type || 'mcq',
+            difficulty: test.difficulty || 'medium',
+            locale: test.locale || 'en',
+            questionCount,
+            questions: [], // Not needed for the card display
+            sourceDocument,
+            createdAt: test.createdAt,
+            createdBy: test.createdBy
+          }
+        })
+        setSavedTestsWithLog(transformedTests)
+      }
     } catch (error) {
       console.error('Error loading data:', error)
       if (!preserveDocuments) {
@@ -368,72 +374,66 @@ function ManagerPageInner() {
     fetchData()
   }, [loadData])
 
-  // Reload data when tab changes to docs
+  // Only reload data when tab changes if data is missing
+  // This prevents unnecessary delays when switching tabs
   useEffect(() => {
-    if (defaultTab === 'docs') {
-      console.log('Manager: Docs tab activated, reloading documents...')
-      // Use setTimeout to avoid synchronous setState in effect
-      // Preserve documents during refresh to avoid empty state
-      setTimeout(() => loadData(true), 0)
+    // Skip reload if data already exists (instant render like overview tab)
+    if (defaultTab === 'docs' && documents.length === 0) {
+      console.log('Manager: Docs tab activated, loading documents...')
+      loadData(false)
+    } else if (defaultTab === 'tests' && savedTests.length === 0) {
+      console.log('Manager: Tests tab activated, loading tests...')
+      loadData(false)
+    } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+      console.log('Manager: Assignments tab activated, loading assignments...')
+      loadData(false)
+    } else if (defaultTab === 'overview' && (documents.length === 0 || savedTests.length === 0 || savedAssignments.length === 0)) {
+      console.log('Manager: Overview tab activated, loading missing data...')
+      loadData(false)
     }
-  }, [defaultTab, loadData])
-
-  // Reload data when tab changes to tests
-  useEffect(() => {
-    if (defaultTab === 'tests') {
-      console.log('Manager: Tests tab activated, reloading tests...')
-      // Use setTimeout to avoid synchronous setState in effect
-      // Preserve tests during refresh to avoid empty state
-      setTimeout(() => loadData(true), 0)
-    }
-  }, [defaultTab, loadData])
+  }, [defaultTab, loadData, documents.length, savedTests.length, savedAssignments.length])
 
   // Reload tests when returning from test-builder (detected via URL change)
+  // Only reload if data is missing to avoid unnecessary delays
   useEffect(() => {
     const tab = getTabFromUrl(searchParams)
-    if (tab === 'tests') {
-      // Small delay to ensure router has finished navigation
-      const timer = setTimeout(() => {
-        console.log('Manager: Detected tests tab in URL, reloading tests...')
-        loadData(true)
-      }, 100)
-      return () => clearTimeout(timer)
+    if (tab === 'tests' && savedTests.length === 0) {
+      // Load immediately without delay (router navigation is already complete)
+      console.log('Manager: Detected tests tab in URL, loading tests...')
+      loadData(false)
     }
-  }, [searchParams, loadData])
-
-  // Reload data when tab changes to assignments
-  useEffect(() => {
-    if (defaultTab === 'assignments') {
-      console.log('Manager: Assignments tab activated, reloading assignments...')
-      // Use setTimeout to avoid synchronous setState in effect
-      // Preserve assignments during refresh to avoid empty state
-      setTimeout(() => loadData(true), 0)
-    }
-  }, [defaultTab, loadData])
-
-  // Reload data when tab changes to overview
-  useEffect(() => {
-    if (defaultTab === 'overview') {
-      console.log('Manager: Overview tab activated, reloading data...')
-      // Use setTimeout to avoid synchronous setState in effect
-      // Preserve data during refresh to avoid empty state
-      setTimeout(() => loadData(true), 0)
-    }
-  }, [defaultTab, loadData])
+  }, [searchParams, loadData, savedTests.length])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer)
+  // Only reload if data is missing to avoid unnecessary delays
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments' || defaultTab === 'overview')) {
-        console.log('Manager: Page became visible, reloading data...')
-        setTimeout(() => loadData(true), 0)
+      if (!document.hidden) {
+        // Only reload if data is missing for the current tab
+        if (defaultTab === 'docs' && documents.length === 0) {
+          console.log('Manager: Page became visible, loading documents...')
+          loadData(false)
+        } else if (defaultTab === 'tests' && savedTests.length === 0) {
+          console.log('Manager: Page became visible, loading tests...')
+          loadData(false)
+        } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+          console.log('Manager: Page became visible, loading assignments...')
+          loadData(false)
+        }
       }
     }
 
     const handleFocus = () => {
-      if (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments' || defaultTab === 'overview') {
-        console.log('Manager: Window focused, reloading data...')
-        setTimeout(() => loadData(true), 0)
+      // Only reload if data is missing for the current tab
+      if (defaultTab === 'docs' && documents.length === 0) {
+        console.log('Manager: Window focused, loading documents...')
+        loadData(false)
+      } else if (defaultTab === 'tests' && savedTests.length === 0) {
+        console.log('Manager: Window focused, loading tests...')
+        loadData(false)
+      } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+        console.log('Manager: Window focused, loading assignments...')
+        loadData(false)
       }
     }
 

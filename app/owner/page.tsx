@@ -154,14 +154,44 @@ function OwnerPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Initialize with empty arrays - data will come from API
-  const [savedTests, setSavedTests] = useState<SavedTest[]>([])
+  // Initialize tests from localStorage to prevent empty state on refresh
+  const [savedTests, setSavedTests] = useState<SavedTest[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('owner-tests')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   
-  // Initialize with empty arrays - data will come from API
-  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
+  // Initialize assignments from localStorage to prevent empty state on refresh
+  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('owner-assignments')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   
-  // Initialize with empty arrays - data will come from API
-  const [documents, setDocuments] = useState<SavedDocument[]>([])
+  // Initialize documents from localStorage to prevent empty state on refresh
+  const [documents, setDocuments] = useState<SavedDocument[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('owner-documents')
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
   
@@ -169,34 +199,41 @@ function OwnerPageInner() {
   const [isLoadingTests, setIsLoadingTests] = useState(false)
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
 
-  // Set documents - no localStorage persistence for clean state
+  // Set documents with localStorage persistence for smoother reloads
   const setDocumentsWithLog = (newDocuments: SavedDocument[]) => {
     setDocuments(newDocuments)
-  }
-
-  // Set tests - no localStorage persistence for clean state
-  const setSavedTestsWithLog = (newTests: SavedTest[]) => {
-    setSavedTests(newTests)
-  }
-
-  // Set assignments - no localStorage persistence for clean state
-  const setSavedAssignmentsWithLog = (newAssignments: SavedAssignment[]) => {
-    setSavedAssignments(newAssignments)
-  }
-
-  // Clear localStorage on mount to ensure clean state for new owners
-  useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('owner-tests')
-        localStorage.removeItem('owner-assignments')
-        localStorage.removeItem('owner-documents')
-        fixCorruptedLocalStorage()
+        localStorage.setItem('owner-documents', JSON.stringify(newDocuments))
       } catch (error) {
-        console.error('Error clearing localStorage:', error)
+        console.error('Error saving documents to localStorage:', error)
       }
     }
-  }, [])
+  }
+
+  // Set tests with localStorage persistence for smoother reloads
+  const setSavedTestsWithLog = (newTests: SavedTest[]) => {
+    setSavedTests(newTests)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('owner-tests', JSON.stringify(newTests))
+      } catch (error) {
+        console.error('Error saving tests to localStorage:', error)
+      }
+    }
+  }
+
+  // Set assignments with localStorage persistence for smoother reloads
+  const setSavedAssignmentsWithLog = (newAssignments: SavedAssignment[]) => {
+    setSavedAssignments(newAssignments)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('owner-assignments', JSON.stringify(newAssignments))
+      } catch (error) {
+        console.error('Error saving assignments to localStorage:', error)
+      }
+    }
+  }
 
   // Get initial tab from URL parameter or sessionStorage using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
@@ -254,11 +291,13 @@ function OwnerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
+      // Use cache: 'no-store' to force fresh data when switching tabs
+      const fetchOptions: RequestInit = preserveDocuments ? { cache: 'no-store' } : {}
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/assignments'),
-        fetch('/api/tests'),
-        fetch('/api/documents')
+        fetch('/api/users', fetchOptions),
+        fetch('/api/assignments', fetchOptions),
+        fetch('/api/tests', fetchOptions),
+        fetch('/api/documents', fetchOptions)
       ])
 
       // Process users
@@ -298,7 +337,7 @@ function OwnerPageInner() {
             let sourceDocument = 'Unknown'
             if (test.moduleId) {
               try {
-                const docResponse = await fetch(`/api/documents/${test.moduleId}`)
+                const docResponse = await fetch(`/api/documents/${test.moduleId}`, { cache: 'no-store' })
                 const docResult = await docResponse.json()
                 if (docResult.success && docResult.data.document) {
                   sourceDocument = docResult.data.document.originalFileName || docResult.data.document.title || 'Unknown'
@@ -394,54 +433,43 @@ function OwnerPageInner() {
     
     const fetchData = async () => {
       await loadData()
+      // Preload subscription data in parallel (non-blocking) for instant tab switch
+      fetch('/api/subscription', { cache: 'no-store' }).catch(() => {
+        // Silently fail - SubscriptionManager will load it if needed
+      })
     }
     fetchData()
   }, [loadData])
 
-  // Reload data when tab changes to docs
+  // Only reload data when tab changes if data is missing or stale
+  // This prevents unnecessary delays when switching tabs
   useEffect(() => {
-    if (defaultTab === 'docs') {
-      console.log('Owner: Docs tab activated, reloading documents...')
-      setTimeout(() => loadData(true), 0)
+    // Skip reload if data already exists (instant render like overview/users tabs)
+    if (defaultTab === 'docs' && documents.length === 0) {
+      console.log('Owner: Docs tab activated, loading documents...')
+      loadData(false)
+    } else if (defaultTab === 'tests' && savedTests.length === 0) {
+      console.log('Owner: Tests tab activated, loading tests...')
+      loadData(false)
+    } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+      console.log('Owner: Assignments tab activated, loading assignments...')
+      loadData(false)
+    } else if (defaultTab === 'overview' && (savedUsers.length === 0 || savedAssignments.length === 0)) {
+      console.log('Owner: Overview tab activated, loading missing data...')
+      loadData(false)
     }
-  }, [defaultTab, loadData])
-
-  // Reload data when tab changes to tests
-  useEffect(() => {
-    if (defaultTab === 'tests') {
-      console.log('Owner: Tests tab activated, reloading tests...')
-      setTimeout(() => loadData(true), 0)
-    }
-  }, [defaultTab, loadData])
+  }, [defaultTab, loadData, documents.length, savedTests.length, savedAssignments.length, savedUsers.length])
 
   // Reload tests when returning from test-builder (detected via URL change)
+  // Only reload if data is missing to avoid unnecessary delays
   useEffect(() => {
     const tab = getTabFromUrl(searchParams)
-    if (tab === 'tests') {
-      // Small delay to ensure router has finished navigation
-      const timer = setTimeout(() => {
-        console.log('Owner: Detected tests tab in URL, reloading tests...')
-        loadData(true)
-      }, 100)
-      return () => clearTimeout(timer)
+    if (tab === 'tests' && savedTests.length === 0) {
+      // Load immediately without delay (router navigation is already complete)
+      console.log('Owner: Detected tests tab in URL, loading tests...')
+      loadData(false)
     }
-  }, [searchParams, loadData])
-
-  // Reload data when tab changes to assignments
-  useEffect(() => {
-    if (defaultTab === 'assignments') {
-      console.log('Owner: Assignments tab activated, reloading assignments...')
-      setTimeout(() => loadData(true), 0)
-    }
-  }, [defaultTab, loadData])
-
-  // Reload data when tab changes to overview
-  useEffect(() => {
-    if (defaultTab === 'overview') {
-      console.log('Owner: Overview tab activated, reloading data...')
-      setTimeout(() => loadData(true), 0)
-    }
-  }, [defaultTab, loadData])
+  }, [searchParams, loadData, savedTests.length])
 
   // Reload data when tab changes to settings
   useEffect(() => {

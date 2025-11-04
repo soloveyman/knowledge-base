@@ -267,40 +267,32 @@ function AssignmentBuilderPageContent() {
   }, [session, status, pathname, editingId]) // Use memoized editingId
 
   useEffect(() => {
-    // Load tests from API
-    const loadTests = async () => {
+    // Load all data in parallel for faster loading
+    const loadData = async () => {
       try {
-        const response = await fetch('/api/tests')
-        const result = await response.json()
-        if (result.success) {
-          setSavedTests(result.data.tests)
-        }
-      } catch (error) {
-        console.error('Error loading tests:', error)
-      }
-    }
+        const [testsResponse, usersResponse, documentsResponse] = await Promise.all([
+          fetch('/api/tests'),
+          fetch('/api/users'),
+          fetch('/api/documents')
+        ])
 
-    // Load users from API
-    const loadUsers = async () => {
-      try {
-        const response = await fetch('/api/users')
-        const result = await response.json()
-        if (result.success) {
-          setSavedUsers(result.data.users)
+        // Process tests
+        const testsResult = await testsResponse.json()
+        if (testsResult.success) {
+          setSavedTests(testsResult.data.tests)
         }
-      } catch (error) {
-        console.error('Error loading users:', error)
-      }
-    }
 
-    // Load documents from API
-    const loadDocuments = async () => {
-      try {
-        const response = await fetch('/api/documents')
-        const result = await response.json()
-        if (result.success) {
+        // Process users
+        const usersResult = await usersResponse.json()
+        if (usersResult.success) {
+          setSavedUsers(usersResult.data.users)
+        }
+
+        // Process documents
+        const documentsResult = await documentsResponse.json()
+        if (documentsResult.success) {
           // Transform database documents to match the expected format
-          const transformedDocs = result.data.documents.map((doc: {
+          const transformedDocs = documentsResult.data.documents.map((doc: {
             id: string
             originalFileName?: string
             title: string
@@ -319,13 +311,11 @@ function AssignmentBuilderPageContent() {
           setSavedDocuments(transformedDocs)
         }
       } catch (error) {
-        console.error('Error loading documents:', error)
+        console.error('Error loading data:', error)
       }
     }
 
-    loadTests()
-    loadUsers()
-    loadDocuments()
+    loadData()
   }, [])
 
   const handleUserToggle = (userId: string) => {
