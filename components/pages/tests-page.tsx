@@ -5,6 +5,7 @@ import { Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
+import { formatDateShort } from "@/lib/date-format"
 
 interface Test {
   id: string
@@ -40,7 +41,7 @@ export function TestsPage({
   const testItems = tests.map((test) => ({
     id: test.id,
     title: test.title,
-    subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${new Date(test.createdAt).toLocaleDateString()}`,
+    subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${formatDateShort(test.createdAt)}`,
     metadata: [],
     badges: [
       { label: translateBadge(test.difficulty || 'medium'), variant: "outline" as const }

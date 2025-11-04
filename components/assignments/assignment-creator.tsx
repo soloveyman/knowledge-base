@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatDateTime } from "@/lib/date-format"
 import { 
   Users, 
   User, 
@@ -500,7 +501,7 @@ export default function AssignmentCreator({ onSave, onCancel }: AssignmentCreato
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Due Date:</span>
                 <span className="text-sm">
-                  {assignmentData.dueDate ? new Date(assignmentData.dueDate).toLocaleString() : 'Not set'}
+                  {assignmentData.dueDate ? formatDateTime(assignmentData.dueDate) : 'Not set'}
                 </span>
               </div>
               <div className="flex items-center justify-between">

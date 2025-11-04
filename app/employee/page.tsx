@@ -14,6 +14,7 @@ import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
 import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
+import { formatDateShort } from "@/lib/date-format"
 import { 
   BookOpen, 
   ClipboardList, 
@@ -643,7 +644,7 @@ function EmployeePageInner() {
                                 <StatusBadge status={attempt.status === 'completed' ? 'completed' : 'failed'} />
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                {attempt.completedAt && `${t('completed')}: ${new Date(attempt.completedAt).toLocaleDateString()}`}
+                                {attempt.completedAt && `${t('completed')}: ${formatDateShort(attempt.completedAt)}`}
                               </p>
                             </div>
                             <div className="text-right">

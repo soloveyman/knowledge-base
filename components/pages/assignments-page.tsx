@@ -5,6 +5,7 @@ import { Plus } from "lucide-react"
 import { ManagementPage } from "../common/management-page"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
+import { formatDateShort } from "@/lib/date-format"
 
 interface Assignment {
   id: string
@@ -57,7 +58,7 @@ export function AssignmentsPage({
   const assignmentItems = assignments.map((assignment) => ({
     id: assignment.id,
     title: assignment.title || assignment.name || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
-    subtitle: `${t('due')}: ${assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : t('noDueDate')} | ${t('created')}: ${new Date(assignment.createdAt).toLocaleDateString()}`,
+    subtitle: `${t('due')}: ${assignment.dueDate ? formatDateShort(assignment.dueDate) : t('noDueDate')} | ${t('created')}: ${formatDateShort(assignment.createdAt)}`,
     metadata: [],
     badges: [
       { 

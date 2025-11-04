@@ -5,6 +5,7 @@ import { ManagementPage } from "@/components/common/management-page"
 import { Plus } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
+import { formatDateShort } from "@/lib/date-format"
 
 interface User {
   id: string
@@ -40,7 +41,7 @@ export function UsersPage({
     subtitle: `${user.job} • ${user.email}`,
     metadata: [
       `${t('role')}: ${user.role.charAt(0).toUpperCase() + user.role.slice(1)}`,
-      `${t('created')}: ${new Date(user.createdAt).toLocaleDateString()}`
+      `${t('created')}: ${formatDateShort(user.createdAt)}`
     ],
     badges: [
       { 

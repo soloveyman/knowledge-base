@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
 import { cleanupDocumentFromLocalStorage, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
+import { formatDateShort } from "@/lib/date-format"
 
 // Component to handle tabs overflow detection
 function TabsContainer({ children }: { children: React.ReactNode }) {
@@ -345,7 +346,7 @@ function OwnerPageInner() {
             id: doc.id,
             name: doc.originalFileName || doc.title,
             type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-            uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+            uploadedAt: formatDateShort(doc.createdAt),
             size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
             status: doc.status || 'ready',
             moduleId: doc.moduleId || null

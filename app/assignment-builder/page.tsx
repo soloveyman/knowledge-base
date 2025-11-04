@@ -28,7 +28,7 @@ import {
   Save,
   Check
 } from "lucide-react"
-import { format } from "date-fns"
+import { formatDatePretty, formatDateShort } from "@/lib/date-format"
 import { cn } from "@/lib/utils"
 
 const formatFileSize = (bytes: number): string => {
@@ -100,7 +100,8 @@ interface Assignment {
 }
 
 function AssignmentBuilderPageContent() {
-  const { data: session, status } = useSession()
+  const sessionResult = useSession()
+  const { data: session, status } = sessionResult || { data: null, status: 'loading' }
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()
@@ -311,7 +312,7 @@ function AssignmentBuilderPageContent() {
             id: doc.id,
             name: doc.originalFileName || doc.title,
             type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-            uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+            uploadedAt: formatDateShort(doc.createdAt),
             size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
             status: doc.status || 'ready'
           }))
@@ -610,7 +611,7 @@ function AssignmentBuilderPageContent() {
                       >
                         <div className="flex items-center">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {assignmentConfig.dueDate ? format(assignmentConfig.dueDate, "PPP") : t('pickDate')}
+                          {assignmentConfig.dueDate ? formatDatePretty(assignmentConfig.dueDate) : t('pickDate')}
                         </div>
                         {assignmentConfig.dueDate && (
                           <X 

@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import AuthSessionProvider from "@/components/providers/session-provider";
-import { ThemeProvider } from "@/components/providers/theme-provider";
-import { TranslationProvider } from "@/lib/translation-context";
-import { Toaster } from "@/components/ui/sonner";
+import { ClientProviders } from "@/components/providers/client-providers";
 
 const graphik = localFont({
   src: [
@@ -83,19 +80,9 @@ export default function RootLayout({
         className={`${graphik.variable} ${graphikMono.variable} antialiased overflow-x-hidden`}
         suppressHydrationWarning={true}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <TranslationProvider>
-            <AuthSessionProvider>
-              {children}
-              <Toaster />
-            </AuthSessionProvider>
-          </TranslationProvider>
-        </ThemeProvider>
+        <ClientProviders>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );

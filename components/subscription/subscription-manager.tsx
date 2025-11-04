@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslation } from "@/lib/translation-context"
+import { formatDateShort } from "@/lib/date-format"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PlanBadge, StatusBadge, InvoiceStatusBadge } from "@/lib/badges"
@@ -361,7 +362,7 @@ export default function SubscriptionManager({
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">{t('nextBilling')}:</span>
                         <span className="text-sm">
-                          {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString()}
+                          {formatDateShort(currentSubscription.currentPeriodEnd)}
                         </span>
                       </div>
                       {currentSubscription.cancelAtPeriodEnd && (

@@ -29,6 +29,7 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
+import { formatDateShort } from "@/lib/date-format"
 
 interface SavedTest {
   id: string
@@ -327,7 +328,7 @@ function ManagerPageInner() {
           id: doc.id,
           name: doc.originalFileName || doc.title,
           type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-          uploadedAt: new Date(doc.createdAt).toLocaleDateString(),
+          uploadedAt: formatDateShort(doc.createdAt),
           size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
           status: doc.status || 'ready'
         }))

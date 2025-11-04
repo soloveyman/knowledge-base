@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatDateTime } from "@/lib/date-format"
 import { 
   GitBranch, 
   Save, 
@@ -155,13 +156,7 @@ export default function VersionManager({
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    return formatDateTime(dateString)
   }
 
   const renderDiff = (version1: Version, version2: Version) => {

@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
+import { formatDateShort } from "@/lib/date-format"
 import { 
   CheckCircle, 
   Clock, 
@@ -289,11 +290,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
+    return formatDateShort(dateString)
   }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {

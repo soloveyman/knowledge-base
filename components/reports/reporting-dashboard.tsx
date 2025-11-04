@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
+import { formatDateCompact } from "@/lib/date-format"
 import { 
   BarChart3, 
   Download, 
@@ -141,12 +142,7 @@ export default function ReportingDashboard() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    return formatDateCompact(dateString)
   }
 
   const totalStats = reportData.reduce((acc, module) => ({

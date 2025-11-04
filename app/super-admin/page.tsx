@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AppBar } from "@/components/common/app-bar";
+import { formatDateShort } from "@/lib/date-format";
 import { 
   Crown, 
   Users, 
@@ -278,7 +279,7 @@ export default function SuperAdminPage() {
                           )}
                           {owner.subscription && (
                             <div className="text-xs text-gray-500">
-                              Ends: {new Date(owner.subscription.currentPeriodEnd).toLocaleDateString()}
+                              Ends: {formatDateShort(owner.subscription.currentPeriodEnd)}
                             </div>
                           )}
                         </div>

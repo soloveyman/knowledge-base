@@ -44,7 +44,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
 export function useTranslation() {
   const context = useContext(TranslationContext)
   if (context === undefined) {
-    throw new Error('useTranslation must be used within a TranslationProvider')
+    // Fallback during SSR/prerender when provider isn't mounted yet
+    return {
+      language: 'en' as Language,
+      setLanguage: () => {},
+      t: (key: TranslationKey) => translations.en[key] || key
+    }
   }
   return context
 }
