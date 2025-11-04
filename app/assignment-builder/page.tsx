@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import Image from "next/image"
 import { useEffect, useState, useCallback, useRef, useMemo, Suspense, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -484,7 +485,15 @@ function AssignmentBuilderPageContent() {
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <Image
+                src="/Uppstaff_logo.svg"
+                alt="Logo"
+                width={38}
+                height={38}
+                className="object-contain flex-shrink-0"
+                priority
+              />
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
                 {isEditMode ? t('edit') + ' ' + t('assignmentManagement') : t('assignmentBuilder')}
               </h1>
