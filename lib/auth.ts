@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { z } from "zod"
+import { NextResponse } from "next/server"
 import { db, users } from "./db"
 import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
@@ -262,4 +263,72 @@ export function hasPermission(role: UserRole, resource: keyof typeof PERMISSIONS
   const rolePermissions = PERMISSIONS[resource][role as keyof typeof PERMISSIONS[typeof resource]]
   if (!rolePermissions) return false
   return (rolePermissions as readonly string[]).includes(action)
+}
+
+/**
+ * Require authenticated user in API routes
+ * Returns session with guaranteed user or NextResponse error
+ * Provides type narrowing so TypeScript knows user exists
+ * 
+ * Usage:
+ *   const authResult = await requireUser()
+ *   if (authResult instanceof NextResponse) return authResult
+ *   const { session } = authResult
+ *   // Now TypeScript knows session.user exists
+ */
+export async function requireUser(): Promise<
+  | { session: Awaited<ReturnType<typeof auth>> & { user: NonNullable<Awaited<ReturnType<typeof auth>>['user']> } }
+  | NextResponse<{ success: false; message: string }>
+> {
+  const session = await auth()
+  
+  if (!session?.user) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Unauthorized. Please sign in.',
+      },
+      { status: 401 }
+    )
+  }
+
+  return { session } as { session: typeof session & { user: NonNullable<typeof session['user']> } }
+}
+
+/**
+ * Require authenticated user with specific role
+ * Returns session with guaranteed user and role or NextResponse error
+ * 
+ * Usage:
+ *   const authResult = await requireRole('owner')
+ *   if (authResult instanceof NextResponse) return authResult
+ *   const { session } = authResult
+ *   // Now TypeScript knows session.user exists and has correct role
+ */
+export async function requireRole(
+  role: UserRole | UserRole[]
+): Promise<
+  | { session: Awaited<ReturnType<typeof auth>> & { user: NonNullable<Awaited<ReturnType<typeof auth>>['user']> } }
+  | NextResponse<{ success: false; message: string }>
+> {
+  const result = await requireUser()
+  
+  if (result instanceof NextResponse) {
+    return result
+  }
+
+  const roles = Array.isArray(role) ? role : [role]
+  const userRole = result.session.user.role
+
+  if (!roles.includes(userRole)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Access denied. Required role: ${roles.join(' or ')}.`,
+      },
+      { status: 403 }
+    )
+  }
+
+  return result
 }
