@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -113,11 +113,13 @@ export default function TestBuilderPage() {
   const [editingTestId, setEditingTestId] = useState<string | null>(null)
   const [originalQuestionCount, setOriginalQuestionCount] = useState(0)
 
-  // Load documents from API
-  useEffect(() => {
+  // Load documents from API - use useLayoutEffect for faster initial load
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    
     const loadDocuments = async () => {
       try {
-        const response = await fetch('/api/documents')
+        const response = await fetch('/api/documents', { cache: 'no-store' })
         const result = await response.json()
         
         if (result.success) {
@@ -415,23 +417,11 @@ export default function TestBuilderPage() {
       setIsEditMode(true)
       setEditingTestId(editingId)
       
-      // Wait for documents to load before loading test (ensures document can be selected)
-      if (documents.length === 0) {
-        console.log('Test Builder: Waiting for documents to load...')
-        // Wait a bit for documents to load, then load test
-        const timer = setTimeout(() => {
-          console.log('Test Builder: Documents should be loaded now, loading test...')
-          loadTestForEditing(editingId).then(() => {
-            setTestLoaded(true)
-          })
-        }, 1000) // Increased timeout to ensure documents are loaded
-        return () => clearTimeout(timer)
-      } else {
-        console.log('Test Builder: Documents already loaded, loading test immediately...')
-        loadTestForEditing(editingId).then(() => {
-          setTestLoaded(true)
-        })
-      }
+      // Load test immediately - loadTestForEditing will handle document loading if needed
+      console.log('Test Builder: Loading test for editing...')
+      loadTestForEditing(editingId).then(() => {
+        setTestLoaded(true)
+      })
     }
   }, [session, status, router, loadTestForEditing, documents.length, testLoaded])
 
@@ -791,12 +781,9 @@ export default function TestBuilderPage() {
     }
   }
 
+  // Don't block UI while session loads - show page immediately
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    // Show page but with disabled state - don't block with spinner
   }
 
   if (!session) {

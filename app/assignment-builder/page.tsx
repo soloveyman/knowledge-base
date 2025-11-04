@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -266,14 +266,16 @@ function AssignmentBuilderPageContent() {
     }
   }, [session, status, pathname, editingId]) // Use memoized editingId
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    
     // Load all data in parallel for faster loading
     const loadData = async () => {
       try {
         const [testsResponse, usersResponse, documentsResponse] = await Promise.all([
-          fetch('/api/tests'),
-          fetch('/api/users'),
-          fetch('/api/documents')
+          fetch('/api/tests', { cache: 'no-store' }),
+          fetch('/api/users', { cache: 'no-store' }),
+          fetch('/api/documents', { cache: 'no-store' })
         ])
 
         // Process tests
@@ -467,12 +469,9 @@ function AssignmentBuilderPageContent() {
     }
   }
 
+  // Don't block UI while session loads - show page immediately
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    // Show page but with disabled state - don't block with spinner
   }
 
   if (!session) {

@@ -507,26 +507,26 @@ function OwnerPageInner() {
   // Document handlers
   const handleDeleteDocument = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setDocumentsWithLog(documents.filter(doc => doc.id !== id))
+      cleanupDocumentFromLocalStorage(id)
+      
       const response = await fetch(`/api/documents/${id}`, {
         method: 'DELETE'
       })
       const result = await response.json()
       
       if (result.success) {
-        setDocumentsWithLog(documents.filter(doc => doc.id !== id))
-        
-        // Clean up localStorage when document is deleted
-        cleanupDocumentFromLocalStorage(id)
-        
         toast.success('Document deleted successfully')
-        
-        // Ensure we stay on the docs tab after deletion
-        router.push('/owner?tab=docs')
       } else {
+        // Revert on error - reload data
+        loadData(false)
         console.error('Failed to delete document:', result.message)
         toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
+      // Revert on error - reload data
+      loadData(false)
       console.error('Error deleting document:', error)
       toast.error('Error deleting document')
     }
@@ -548,20 +548,25 @@ function OwnerPageInner() {
   // Test handlers
   const handleDeleteTest = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
+      
       const response = await fetch(`/api/tests/${id}`, {
         method: 'DELETE'
       })
       const result = await response.json()
       
       if (result.success) {
-        // Reload tests from API to ensure synchronization
-        setTimeout(() => loadData(true), 0)
         toast.success('Test deleted successfully')
       } else {
+        // Revert on error - reload data
+        loadData(false)
         console.error('Failed to delete test:', result.message)
         toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
+      // Revert on error - reload data
+      loadData(false)
       console.error('Error deleting test:', error)
       toast.error('Error deleting test')
     }
@@ -580,20 +585,25 @@ function OwnerPageInner() {
   // Assignment handlers
   const handleDeleteAssignment = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
+      
       const response = await fetch(`/api/assignments/${id}`, {
         method: 'DELETE'
       })
       const result = await response.json()
       
       if (result.success) {
-        setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
-        setTimeout(() => loadData(true), 0)
         toast.success('Assignment deleted successfully')
       } else {
+        // Revert on error - reload data
+        loadData(false)
         console.error('Failed to delete assignment:', result.message)
         toast.error(result.message || 'Failed to delete assignment')
       }
     } catch (error) {
+      // Revert on error - reload data
+      loadData(false)
       console.error('Error deleting assignment:', error)
       toast.error('Error deleting assignment')
     }

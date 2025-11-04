@@ -245,8 +245,8 @@ function ManagerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
-      // Use cache: 'no-store' to force fresh data when switching tabs
-      const fetchOptions: RequestInit = preserveDocuments ? { cache: 'no-store' } : {}
+      // Always use cache: 'no-store' to ensure fresh data on reload
+      const fetchOptions: RequestInit = { cache: 'no-store' }
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
         fetch('/api/users', fetchOptions),
         fetch('/api/assignments', fetchOptions),
@@ -450,26 +450,26 @@ function ManagerPageInner() {
   // Document handlers
   const handleDeleteDocument = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setDocumentsWithLog(documents.filter(doc => doc.id !== id))
+      cleanupDocumentFromLocalStorage(id)
+      
       const response = await fetch(`/api/documents/${id}`, {
         method: 'DELETE'
       })
       const result = await response.json()
       
       if (result.success) {
-        setDocumentsWithLog(documents.filter(doc => doc.id !== id))
-        
-        // Clean up localStorage when document is deleted
-        cleanupDocumentFromLocalStorage(id)
-        
         toast.success('Document deleted successfully')
-        
-        // Ensure we stay on the docs tab after deletion
-        router.push('/manager?tab=docs')
       } else {
+        // Revert on error - reload data
+        loadData(false)
         console.error('Failed to delete document:', result.message)
         toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
+      // Revert on error - reload data
+      loadData(false)
       console.error('Error deleting document:', error)
       toast.error('Error deleting document')
     }
@@ -494,20 +494,25 @@ function ManagerPageInner() {
   // Test handlers
   const handleDeleteTest = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
+      
       const response = await fetch(`/api/tests/${id}`, {
         method: 'DELETE'
       })
       const result = await response.json()
       
       if (result.success) {
-        // Reload tests from API to ensure synchronization
-        setTimeout(() => loadData(true), 0)
         toast.success('Test deleted successfully')
       } else {
+        // Revert on error - reload data
+        loadData(false)
         console.error('Failed to delete test:', result.message)
         toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
+      // Revert on error - reload data
+      loadData(false)
       console.error('Error deleting test:', error)
       toast.error('Error deleting test')
     }
@@ -527,18 +532,27 @@ function ManagerPageInner() {
   // Assignment handlers
   const handleDeleteAssignment = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
+      
       const response = await fetch(`/api/assignments/${id}`, {
         method: 'DELETE'
       })
       const result = await response.json()
       
       if (result.success) {
-        setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
+        toast.success('Assignment deleted successfully')
       } else {
+        // Revert on error - reload data
+        loadData(false)
         console.error('Failed to delete assignment:', result.message)
+        toast.error(result.message || 'Failed to delete assignment')
       }
     } catch (error) {
+      // Revert on error - reload data
+      loadData(false)
       console.error('Error deleting assignment:', error)
+      toast.error('Error deleting assignment')
     }
   }
 
@@ -551,12 +565,9 @@ function ManagerPageInner() {
     router.push(`/assignment-builder?edit=${id}`)
   }
 
+  // Don't block UI while session loads - show page immediately
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    // Show page but with disabled state - don't block with spinner
   }
 
   if (!session) {

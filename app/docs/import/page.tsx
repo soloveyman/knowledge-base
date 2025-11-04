@@ -292,12 +292,9 @@ function DocImportPageInner() {
     }
   }
 
+  // Don't block UI while session loads - show page immediately
   if (status === "loading") {
-    return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-foreground"></div>
-        </div>
-    )
+    // Show page but with disabled state - don't block with spinner
   }
 
   if (!session) {
