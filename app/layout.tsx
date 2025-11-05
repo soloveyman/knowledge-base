@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { ClientProviders } from "@/components/providers/client-providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const graphik = localFont({
   src: [
@@ -83,6 +84,7 @@ export default function RootLayout({
         <ClientProviders>
           {children}
         </ClientProviders>
+        <Analytics />
       </body>
     </html>
   );
