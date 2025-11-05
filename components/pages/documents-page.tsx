@@ -13,6 +13,8 @@ interface Document {
   uploadedAt: string
   size?: string
   status?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 interface DocumentsPageProps {
@@ -32,18 +34,29 @@ export function DocumentsPage({
   const { t } = useTranslation()
   const translateBadge = useBadgeTranslation()
 
-  const documentItems = documents.map((doc) => ({
-    id: doc.id,
-    title: doc.name,
-    subtitle: `${t('uploaded')} ${doc.uploadedAt.replace(/^Uploaded\s+/, '')}`,
-    metadata: doc.size ? [doc.size] : undefined,
-    badges: doc.status === 'ready' ? [{ label: translateBadge('ready'), variant: 'default' as const }] : [],
-    onClick: () => {
-      console.log('Document card clicked - ID:', doc.id, 'Name:', doc.name)
-      onViewDocument(String(doc.id), doc.name)
-    },
-    onDelete: () => onDeleteDocument(doc.id)
-  }))
+  const documentItems = documents.map((doc) => {
+    const badges = []
+    if (doc.status === 'ready') {
+      badges.push({ label: translateBadge('ready'), variant: 'default' as const })
+    }
+    // Check if document was updated (updatedAt exists and is different from createdAt)
+    if (doc.updatedAt && doc.createdAt && new Date(doc.updatedAt) > new Date(doc.createdAt)) {
+      badges.push({ label: translateBadge('updated'), variant: 'secondary' as const })
+    }
+    
+    return {
+      id: doc.id,
+      title: doc.name,
+      subtitle: `${t('uploaded')} ${doc.uploadedAt.replace(/^Uploaded\s+/, '')}`,
+      metadata: doc.size ? [doc.size] : undefined,
+      badges,
+      onClick: () => {
+        console.log('Document card clicked - ID:', doc.id, 'Name:', doc.name)
+        onViewDocument(String(doc.id), doc.name)
+      },
+      onDelete: () => onDeleteDocument(doc.id)
+    }
+  })
 
   return (
     <ManagementPage

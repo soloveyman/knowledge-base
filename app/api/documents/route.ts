@@ -66,21 +66,52 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Create new document
-    const newDocument = await db.insert(documents).values({
-      title,
-      originalFileName,
-      fileType,
-      fileUrl,
-      fileSize,
-      parsedContent,
-      parsingLog,
-      uploadedBy: session.user.id,
-      status: 'ready' // Set status to 'ready' since parsing is complete
-    }).returning()
+    // Check if document with same title already exists
+    const existingDocument = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.title, title))
+      .limit(1)
 
-    // Update usage counter for imports (only for owners)
-    if (session.user.role === 'owner') {
+    let savedDocument
+
+    if (existingDocument.length > 0) {
+      // Update existing document instead of creating a new one
+      const updated = await db
+        .update(documents)
+        .set({
+          originalFileName,
+          fileType,
+          fileUrl,
+          fileSize,
+          parsedContent,
+          parsingLog,
+          status: 'ready',
+          updatedAt: new Date()
+        })
+        .where(eq(documents.id, existingDocument[0].id))
+        .returning()
+      
+      savedDocument = updated[0]
+    } else {
+      // Create new document
+      const newDocument = await db.insert(documents).values({
+        title,
+        originalFileName,
+        fileType,
+        fileUrl,
+        fileSize,
+        parsedContent,
+        parsingLog,
+        uploadedBy: session.user.id,
+        status: 'ready' // Set status to 'ready' since parsing is complete
+      }).returning()
+      
+      savedDocument = newDocument[0]
+    }
+
+    // Update usage counter for imports (only for owners and only when creating new document)
+    if (session.user.role === 'owner' && existingDocument.length === 0) {
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       
@@ -119,9 +150,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        document: newDocument[0]
+        document: savedDocument
       },
-      message: 'Document created successfully'
+      message: existingDocument.length > 0 ? 'Document updated successfully' : 'Document created successfully'
     })
   } catch (error) {
     console.error('Create document API error:', error)

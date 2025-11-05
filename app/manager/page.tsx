@@ -10,6 +10,8 @@ import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
 import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { 
   FileText,
@@ -78,6 +80,7 @@ interface SavedAssignment {
 function ManagerPageInner() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Initialize tests from localStorage to prevent empty state on re-mount
@@ -123,6 +126,8 @@ function ManagerPageInner() {
     uploadedAt: string
     size?: string
     status?: string
+    createdAt?: string
+    updatedAt?: string
   }>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -147,6 +152,8 @@ function ManagerPageInner() {
     uploadedAt: string
     size?: string
     status?: string
+    createdAt?: string
+    updatedAt?: string
   }>) => {
     console.log('Manager: setDocuments called with:', newDocuments.length, 'documents')
     if (newDocuments.length === 0) {
@@ -289,6 +296,7 @@ function ManagerPageInner() {
           title: string
           fileType?: string
           createdAt: string
+          updatedAt?: string
           fileSize?: number
           status?: string
         }) => ({
@@ -297,7 +305,9 @@ function ManagerPageInner() {
           type: doc.fileType?.toUpperCase() || 'UNKNOWN',
           uploadedAt: formatDateShort(doc.createdAt),
           size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-          status: doc.status || 'ready'
+          status: doc.status || 'ready',
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt
         }))
         console.log('Manager: Transformed documents:', transformedDocs)
         setDocumentsWithLog(transformedDocs)
@@ -759,7 +769,14 @@ function ManagerPageInner() {
                         onClick={() => handleViewDocument(doc.id, doc.name)}
                       >
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
+                            {doc.updatedAt && doc.createdAt && new Date(doc.updatedAt) > new Date(doc.createdAt) && (
+                              <Badge variant="secondary" className="text-xs">
+                                {translateBadge('updated')}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                         </div>
                         <div className="shrink-0">

@@ -16,6 +16,8 @@ import { GreetingCard } from "@/components/common/greeting-card"
 import UserProgressReport from "@/components/reports/user-progress-report"
 import SubscriptionManager from "@/components/subscription/subscription-manager"
 import { useTranslation } from "@/lib/translation-context"
+import { useBadgeTranslation } from "@/lib/badge-translations"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { 
   FileText,
@@ -146,11 +148,14 @@ interface SavedDocument {
   size?: string
   status?: string
   moduleId?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 function OwnerPageInner() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
+  const translateBadge = useBadgeTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -382,6 +387,7 @@ function OwnerPageInner() {
             title: string
             fileType?: string
             createdAt: string
+            updatedAt?: string
             fileSize?: number
             status?: string
             moduleId?: string | null
@@ -392,7 +398,9 @@ function OwnerPageInner() {
             uploadedAt: formatDateShort(doc.createdAt),
             size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
             status: doc.status || 'ready',
-            moduleId: doc.moduleId || null
+            moduleId: doc.moduleId || null,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt
           }))
           console.log('Owner: Transformed documents:', transformedDocs)
           setDocumentsWithLog(transformedDocs)
@@ -856,7 +864,14 @@ function OwnerPageInner() {
                         onClick={() => handleViewDocument(doc.id, doc.name)}
                       >
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
+                            {doc.updatedAt && doc.createdAt && new Date(doc.updatedAt) > new Date(doc.createdAt) && (
+                              <Badge variant="secondary" className="text-xs">
+                                {translateBadge('updated')}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                         </div>
                         <div className="shrink-0">
