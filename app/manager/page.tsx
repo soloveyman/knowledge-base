@@ -15,7 +15,9 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { 
   FileText,
-  X
+  X,
+  Sparkles,
+  Loader2
 } from "lucide-react"
 import { TestsPage } from "@/components/pages/tests-page"
 import { AssignmentsPage } from "@/components/pages/assignments-page"
@@ -458,6 +460,34 @@ function ManagerPageInner() {
 
 
   // Document handlers
+  const [enhancingDocId, setEnhancingDocId] = useState<string | null>(null)
+
+  const handleEnhanceDocument = async (id: string) => {
+    try {
+      setEnhancingDocId(id)
+      toast.loading('Enhancing document with Grok API...', { id: 'enhance' })
+      
+      const response = await fetch(`/api/documents/${id}/enhance`, {
+        method: 'POST'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        toast.success('Document enhanced successfully!', { id: 'enhance' })
+        // Reload documents to show updated content
+        loadData(false)
+      } else {
+        console.error('Failed to enhance document:', result.message)
+        toast.error(result.message || 'Failed to enhance document', { id: 'enhance' })
+      }
+    } catch (error) {
+      console.error('Error enhancing document:', error)
+      toast.error('Error enhancing document', { id: 'enhance' })
+    } finally {
+      setEnhancingDocId(null)
+    }
+  }
+
   const handleDeleteDocument = async (id: string) => {
     try {
       // Optimistically update UI immediately
@@ -779,7 +809,24 @@ function ManagerPageInner() {
                           </div>
                           <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                         </div>
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEnhanceDocument(doc.id)
+                            }}
+                            disabled={enhancingDocId === doc.id}
+                            title="Enhance with Grok API"
+                          >
+                            {enhancingDocId === doc.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-4 w-4" />
+                            )}
+                          </Button>
                           <DeleteConfirmation
                             onConfirm={() => handleDeleteDocument(doc.id)}
                             itemName={doc.name}
@@ -787,7 +834,7 @@ function ManagerPageInner() {
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                className="text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-destructive"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <X className="h-4 w-4" />
