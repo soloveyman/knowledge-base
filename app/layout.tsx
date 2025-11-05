@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ClientProviders } from "@/components/providers/client-providers";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const graphik = localFont({
   src: [
@@ -85,6 +86,7 @@ export default function RootLayout({
           {children}
         </ClientProviders>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
