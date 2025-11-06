@@ -51,9 +51,9 @@ export function DocumentViewerClient({ document, userRole }: DocumentViewerClien
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 pb-4 md:py-8" suppressHydrationWarning>
+      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 pb-4 md:py-8 w-full overflow-x-hidden" suppressHydrationWarning>
         {/* Document Content */}
-        <div className="min-h-screen w-full px-4 sm:px-0 overflow-x-hidden" suppressHydrationWarning>
+        <div className="min-h-screen w-full max-w-full overflow-x-hidden" suppressHydrationWarning>
           {document.type === 'PDF' ? (
             <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-screen border border-border rounded-3xl overflow-hidden">
               <iframe 

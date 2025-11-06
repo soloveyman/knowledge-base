@@ -123,8 +123,8 @@ export function DocumentReaderClient({ document, assignment, userRole }: Documen
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10" suppressHydrationWarning>
-        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8" suppressHydrationWarning>
+      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10 w-full overflow-x-hidden" suppressHydrationWarning>
+        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8 w-full max-w-full overflow-x-hidden" suppressHydrationWarning>
           {/* Document Content */}
           <Card>
             <CardHeader>
@@ -137,7 +137,7 @@ export function DocumentReaderClient({ document, assignment, userRole }: Documen
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden" suppressHydrationWarning>
+            <CardContent className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden w-full max-w-full" suppressHydrationWarning>
               {document.type === 'PDF' ? (
                 <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
                   <iframe 

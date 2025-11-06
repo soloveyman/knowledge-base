@@ -112,7 +112,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
   
   if (hasError || !imageSrc) {
     return (
-      <span className="my-6 -mx-2 sm:mx-0 block">
+      <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
         <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
           <p>Image failed to load</p>
         </div>
@@ -123,7 +123,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
   // For data URLs, use regular img tag with React state management
   if (isDataUrl || !isValidForNextImage) {
     return (
-      <span className="my-6 -mx-2 sm:mx-0 block">
+      <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
         {isLoading && (
           <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
             <p>Loading image...</p>
@@ -133,7 +133,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
         <img
           src={imageSrc}
           alt={alt || ''}
-          className={`${imageRadius} border border-border max-w-full h-auto transition-opacity w-full ${
+          className={`${imageRadius} border border-border max-w-full h-auto transition-opacity mx-auto ${
             isLoading ? 'opacity-0' : 'opacity-100'
           }`}
           style={{ width: 'auto', height: 'auto' }}
@@ -150,7 +150,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
 
   // For valid external URLs or relative paths, use Next.js Image
   return (
-    <span className="my-6 -mx-2 sm:mx-0 block">
+    <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
       {isLoading && (
         <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
           <p>Loading image...</p>
@@ -161,7 +161,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
         alt={alt || ''}
         width={800}
         height={600}
-        className={`${imageRadius} border border-border max-w-full h-auto transition-opacity w-full ${
+        className={`${imageRadius} border border-border max-w-full h-auto transition-opacity mx-auto ${
           isLoading ? 'opacity-0' : 'opacity-100'
         }`}
         style={{ width: 'auto', height: 'auto' }}
@@ -225,7 +225,7 @@ function DocumentContent({ content }: { content: string }) {
         h1: ({ children }) => {
           // Главный заголовок - самый крупный и выразительный
           return (
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border pb-4 leading-tight tracking-tight">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border pb-4 leading-tight tracking-tight wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h1>
           )
@@ -233,7 +233,7 @@ function DocumentContent({ content }: { content: string }) {
         h2: ({ children }) => {
           // Подзаголовок первого уровня - крупный и четкий
           return (
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border pb-3 leading-tight tracking-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border pb-3 leading-tight tracking-tight wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h2>
           )
@@ -241,7 +241,7 @@ function DocumentContent({ content }: { content: string }) {
         h3: ({ children }) => {
           // Подзаголовок второго уровня - средний размер с акцентом
           return (
-            <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold mt-8 mb-5 text-foreground leading-tight tracking-tight">
+            <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold mt-8 mb-5 text-foreground leading-tight tracking-tight wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h3>
           )
@@ -249,7 +249,7 @@ function DocumentContent({ content }: { content: string }) {
         h4: ({ children }) => {
           // Подзаголовок третьего уровня - заметный, но не перегруженный
           return (
-            <h4 className="text-2xl sm:text-3xl lg:text-4xl font-semibold mt-7 mb-4 text-foreground leading-tight tracking-normal">
+            <h4 className="text-2xl sm:text-3xl lg:text-4xl font-semibold mt-7 mb-4 text-foreground leading-tight tracking-normal wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h4>
           )
@@ -257,7 +257,7 @@ function DocumentContent({ content }: { content: string }) {
         h5: ({ children }) => {
           // Подзаголовок четвертого уровня - четкий акцент
           return (
-            <h5 className="text-xl sm:text-2xl lg:text-3xl font-semibold mt-6 mb-3 text-foreground/90 leading-tight tracking-normal">
+            <h5 className="text-xl sm:text-2xl lg:text-3xl font-semibold mt-6 mb-3 text-foreground/90 leading-tight tracking-normal wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h5>
           )
@@ -265,7 +265,7 @@ function DocumentContent({ content }: { content: string }) {
         h6: ({ children }) => {
           // Подзаголовок пятого уровня - аккуратный выделенный текст
           return (
-            <h6 className="text-lg sm:text-xl lg:text-2xl font-semibold mt-5 mb-3 text-foreground/80 leading-tight tracking-normal">
+            <h6 className="text-lg sm:text-xl lg:text-2xl font-semibold mt-5 mb-3 text-foreground/80 leading-tight tracking-normal wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h6>
           )
@@ -309,7 +309,7 @@ function DocumentContent({ content }: { content: string }) {
           }
           
           return (
-            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground wrap-break-word">
+            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </p>
           )
@@ -320,7 +320,7 @@ function DocumentContent({ content }: { content: string }) {
           const hasEmojis = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓✅🔴🍽️🍸👨‍🍳🏢🧼🚪📦🚚🔧📝💭]/u.test(childrenStr)
           
           return (
-            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground wrap-break-word ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`}>
+            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground wrap-break-word ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </ul>
           )
@@ -328,7 +328,7 @@ function DocumentContent({ content }: { content: string }) {
         ol: ({ children }) => {
           console.log('DocumentContent: Rendering ordered list with', React.Children.count(children), 'items')
           return (
-            <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground wrap-break-word">
+            <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </ol>
           )
@@ -336,7 +336,7 @@ function DocumentContent({ content }: { content: string }) {
         li: ({ children }) => {
           // Эмодзи уже добавлены в markdown, просто отображаем
           return (
-            <li className="leading-relaxed mb-1 wrap-break-word">{children}</li>
+            <li className="leading-relaxed mb-1 wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>{children}</li>
           )
         },
         strong: ({ children }) => (

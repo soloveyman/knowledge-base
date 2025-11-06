@@ -211,7 +211,7 @@ async function fetchManagerData() {
   }))
   
   // Create document lookup map for tests
-  const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+      const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
   const documentsList = documentsData.map(r => r.document)
   documentsList.forEach(doc => {
     documentMap.set(doc.id, { originalFileName: doc.originalFileName || undefined, title: doc.title })
@@ -219,19 +219,19 @@ async function fetchManagerData() {
   
   // Transform tests
   const savedTests: SavedTest[] = testsData.map((test) => {
-    const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+          const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
     const doc = documentMap.get(test.moduleId || '')
     const sourceDocument = doc?.originalFileName || doc?.title || 'Unknown'
-    
-    return {
-      id: test.id,
-      title: test.title,
-      type: test.type || 'mcq',
-      difficulty: test.difficulty || 'medium',
-      locale: test.locale || 'en',
-      questionCount,
+          
+          return {
+            id: test.id,
+            title: test.title,
+            type: test.type || 'mcq',
+            difficulty: test.difficulty || 'medium',
+            locale: test.locale || 'en',
+            questionCount,
       questions: [],
-      sourceDocument,
+            sourceDocument,
       createdAt: test.createdAt?.toISOString() || '',
       createdBy: test.createdBy || ''
     }
@@ -291,8 +291,8 @@ function ManagerPageSkeleton() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6" suppressHydrationWarning>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" suppressHydrationWarning />
-          ))}
-        </div>
+                    ))}
+                  </div>
       </main>
     </div>
   )
