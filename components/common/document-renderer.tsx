@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -39,8 +40,21 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
 }
 
 function DocumentContent({ content }: { content: string }) {
-  // Преобразуем форматирование в markdown
-  const markdown = convertToMarkdown(content)
+  // Content is already markdown from Mammoth - just clean up any remaining [BOLD]/[ITALIC] tags
+  // These might still exist from old parsing, so convert them to markdown
+  let markdown = content
+    .replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '**$1**')
+    .replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '*$1*')
+  
+  // Debug: log numbered lists in markdown
+  const numberedListMatches = markdown.match(/^\s*\d+\.\s+.+$/gm)
+  if (numberedListMatches && numberedListMatches.length > 0) {
+    console.log('DocumentContent: Found numbered list items in markdown:', numberedListMatches.length)
+    console.log('DocumentContent: First few numbered list items:', numberedListMatches.slice(0, 3))
+  }
+  
+  // Ensure numbered lists are properly grouped (no blank lines between consecutive items)
+  markdown = markdown.replace(/(^\s*\d+\.\s+.+)\n\n+(^\s*\d+\.\s+.+)/gm, '$1\n$2')
   
   return (
     <ReactMarkdown
@@ -95,11 +109,40 @@ function DocumentContent({ content }: { content: string }) {
             </h6>
           )
         },
-        p: ({ children }) => (
-          <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground">
-            {children}
-          </p>
-        ),
+        p: ({ children }) => {
+          // Check if paragraph only contains an image - if so, don't wrap in <p> tag
+          // This prevents hydration errors where <div> (image wrapper) is inside <p>
+          const childrenArray = React.Children.toArray(children)
+          
+          // Check if any child is an image (could be wrapped in a div by our img component)
+          const hasImage = childrenArray.some(child => {
+            if (React.isValidElement(child)) {
+              // Check if it's an img element or a div containing an img
+              if (child.type === 'img') return true
+              if (child.type === 'div') {
+                const props = child.props as { children?: React.ReactNode }
+                if (props.children) {
+                  const divChildren = React.Children.toArray(props.children)
+                  return divChildren.some(c => 
+                    React.isValidElement(c) && c.type === 'img'
+                  )
+                }
+              }
+            }
+            return false
+          })
+          
+          // If paragraph only contains an image (or image wrapper), don't wrap in <p>
+          if (hasImage && childrenArray.length === 1) {
+            return <>{children}</>
+          }
+          
+          return (
+            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground">
+              {children}
+            </p>
+          )
+        },
         ul: ({ children }) => {
           // Проверяем наличие эмодзи в элементах списка через строковое представление
           const childrenStr = String(children)
@@ -111,11 +154,14 @@ function DocumentContent({ content }: { content: string }) {
             </ul>
           )
         },
-        ol: ({ children }) => (
-          <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground">
-            {children}
-          </ol>
-        ),
+        ol: ({ children }) => {
+          console.log('DocumentContent: Rendering ordered list with', React.Children.count(children), 'items')
+          return (
+            <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground">
+              {children}
+            </ol>
+          )
+        },
         li: ({ children }) => {
           // Эмодзи уже добавлены в markdown, просто отображаем
           return (
@@ -172,17 +218,78 @@ function DocumentContent({ content }: { content: string }) {
           if (!src) return null
           
           // Convert src to string if it's a Blob
-          const srcString = typeof src === 'string' ? src : ''
-          if (!srcString) return null
+          let srcString = typeof src === 'string' ? src : ''
+          if (!srcString || srcString.trim() === '') return null
           
-          // Check if it's a data URL or external URL
+          // Fix malformed base64 URLs (e.g., "base64,..." should be "data:image/png;base64,...")
+          // This can happen if the parser doesn't properly format the data URL
+          if (srcString.startsWith('base64,')) {
+            // Try to detect image type from the base64 data
+            const base64Data = srcString.substring(7) // Remove "base64," prefix
+            // PNG signature: iVBORw0KGgo
+            // JPEG signature: /9j/4AAQ
+            // GIF signature: R0lGODlh
+            let mimeType = 'image/png' // Default to PNG
+            if (base64Data.startsWith('iVBORw0KGgo')) {
+              mimeType = 'image/png'
+            } else if (base64Data.startsWith('/9j/4AAQ') || base64Data.startsWith('/9j/')) {
+              mimeType = 'image/jpeg'
+            } else if (base64Data.startsWith('R0lGODlh')) {
+              mimeType = 'image/gif'
+            }
+            srcString = `data:${mimeType};base64,${base64Data}`
+          }
+          
+          // Check if it's a data URL
           const isDataUrl = srcString.startsWith('data:')
+          
+          // Check if it's a valid external URL
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
-          // For data URLs or if we need to use external images, use unoptimized
-          // Otherwise Next.js Image will handle optimization
+          // Check if it's a valid relative path (starts with /)
+          const isRelativePath = srcString.startsWith('/')
+          
+          // Validate URL format for Next.js Image
+          // Next.js Image requires valid URLs or relative paths
+          let isValidForNextImage = false
+          if (isExternal || isRelativePath) {
+            try {
+              // Try to construct a URL to validate it
+              if (isExternal) {
+                new URL(srcString)
+                isValidForNextImage = true
+              } else if (isRelativePath) {
+                // Relative paths starting with / are valid for Next.js Image
+                isValidForNextImage = true
+              }
+            } catch {
+              // Invalid URL, will use regular img tag
+              isValidForNextImage = false
+            }
+          }
+          
+          // For data URLs or invalid URLs, use regular img tag
+          // Next.js Image doesn't handle data URLs or malformed URLs
+          // Use span with block display to avoid hydration errors (div inside p is invalid)
+          if (isDataUrl || !isValidForNextImage) {
+            return (
+              <span className="my-6 relative w-full block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={srcString}
+                  alt={alt || ''}
+                  className="rounded-lg border border-border max-w-full h-auto"
+                  style={{ width: 'auto', height: 'auto' }}
+                  loading="lazy"
+                />
+              </span>
+            )
+          }
+          
+          // For valid external URLs or relative paths, use Next.js Image
+          // Use span with block display to avoid hydration errors (div inside p is invalid)
           return (
-            <div className="my-6 relative w-full">
+            <span className="my-6 relative w-full block">
               <Image
                 src={srcString}
                 alt={alt || ''}
@@ -190,10 +297,10 @@ function DocumentContent({ content }: { content: string }) {
                 height={600}
                 className="rounded-lg border border-border max-w-full h-auto"
                 style={{ width: 'auto', height: 'auto' }}
-                unoptimized={isDataUrl || isExternal}
+                unoptimized={isExternal}
                 loading="lazy"
               />
-            </div>
+            </span>
           )
         },
         a: ({ href, children }) => (
@@ -484,67 +591,23 @@ function getEmojiForContext(text: string, context?: 'heading' | 'list' | 'paragr
   return ''
 }
 
-// Преобразует ваш формат в markdown с добавлением эмодзи
+// Legacy function - content should already be markdown from Mammoth
+// Just handles any remaining [BOLD]/[ITALIC] tags and ensures proper list formatting
 function convertToMarkdown(content: string): string {
   if (!content) return ''
   
   let md = content
   
-  // Преобразуем [BOLD] и [ITALIC] теги
+  // Convert any remaining [BOLD]/[ITALIC] tags to markdown (backward compatibility)
   md = md.replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '**$1**')
   md = md.replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '*$1*')
   
-  // Преобразуем alignment теги в div с align атрибутом
-  md = md.replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '<div align="center">$1</div>')
-  md = md.replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '<div align="right">$1</div>')
-  md = md.replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '<div align="justify">$1</div>')
+  // Ensure numbered lists are properly grouped (no blank lines between consecutive items)
+  // This is required for ReactMarkdown to recognize them as ordered lists
+  md = md.replace(/(^\s*\d+\.\s+.+)\n\n+(^\s*\d+\.\s+.+)/gm, '$1\n$2')
   
-  // Убираем артефакты
-  md = md.replace(/;\s*\d+\./g, '')
-  md = md.replace(/\.\s*\d+\./g, '.')
-  md = md.replace(/\s+\d+\.\s*$/gm, '')
-  
-  // Добавляем эмодзи к заголовкам markdown (если их еще нет)
-  md = md.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, text) => {
-    // Проверяем, есть ли уже эмодзи в начале
-    if (!/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(text.trim())) {
-      const emoji = getEmojiForContext(text, 'heading')
-      return `${hashes} ${emoji ? emoji + ' ' : ''}${text}`
-    }
-    return match
-  })
-  
-  // Добавляем эмодзи к спискам и убираем оригинальные буллеты
-  md = md.replace(/^(\s*[-•*·–—]|\s*\d+\.)\s+(.+)$/gm, (match, marker, text) => {
-    const trimmedText = text.trim()
-    const indent = match.match(/^(\s*)/)?.[1] || ''
-    
-    // Проверяем, есть ли уже эмодзи в начале текста
-    const hasEmoji = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓]/u.test(trimmedText)
-    
-    if (!hasEmoji) {
-      const emoji = getEmojiForContext(trimmedText, 'list')
-      if (emoji) {
-        // Если нашли эмодзи, заменяем оригинальный буллет на стандартный маркер с эмодзи
-        return `${indent}- ${emoji} ${trimmedText}`
-      }
-      // Если эмодзи нет, нормализуем маркер но оставляем стандартный формат
-      // Определяем тип маркера
-      const isNumbered = /^\d+\./.test(marker.trim())
-      if (isNumbered) {
-        // Нумерованный список - оставляем как есть (будут нормализованы позже)
-        return match
-      }
-      // Маркированный список - нормализуем на стандартный
-      return `${indent}- ${trimmedText}`
-    }
-    // Если эмодзи уже есть, убираем оригинальный буллет и используем стандартный маркер
-    return `${indent}- ${trimmedText}`
-  })
-  
-  // Нормализуем нумерованные списки - просто преобразуем все в стандартный формат
-  // Не пытаемся проверять эмодзи в lookahead, так как это может вызвать проблемы
-  md = md.replace(/^(\s*)\d+\.\s+/gm, '$11. ')
+  // Add blank line before numbered lists if they don't have one
+  md = md.replace(/([^\n])\n(^\s*\d+\.\s+.+)/gm, '$1\n\n$2')
   
   return md
 }

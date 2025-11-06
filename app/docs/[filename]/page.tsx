@@ -205,7 +205,54 @@ export default function DocumentViewer() {
           // Extract content from sections
           let content = ''
           if (document.parsedContent?.sections && document.parsedContent.sections.length > 0) {
-            content = document.parsedContent.sections.map((s: { content: string }) => s.content).join('\n')
+            // Debug: Check section content before joining - show full content for first few sections
+            console.log('Sections before joining:', document.parsedContent.sections.map((s: { title?: string; content: string }, idx: number) => {
+              const numberedListsInSection = (s.content || '').match(/^\s*\d+\.\s+.+$/gm)
+              return {
+                index: idx,
+                title: s.title?.substring(0, 50),
+                contentLength: s.content?.length || 0,
+                contentPreview: s.content?.substring(0, 200),
+                fullContent: idx < 3 ? s.content : undefined, // Show full content for first 3 sections
+                hasNumberedList: /^\s*\d+\.\s/.test(s.content || ''),
+                numberedListCount: numberedListsInSection?.length || 0,
+                numberedListItems: numberedListsInSection?.slice(0, 3),
+                startsWithHeading: /^#+\s/.test(s.content?.trim() || '')
+              }
+            }))
+            
+            // Join sections with proper spacing, preserving list structure
+            content = document.parsedContent.sections
+              .map((s: { title?: string; content: string }) => {
+                const sectionParts: string[] = []
+                const contentTrimmed = s.content?.trim() || ''
+                
+                // Only add title if content doesn't already start with a heading
+                // This prevents duplication when content already has markdown headings
+                if (s.title && !contentTrimmed.startsWith('#')) {
+                  // Convert section title to markdown heading based on level
+                  const level = (s as { level?: number }).level || 2
+                  const headingPrefix = '#'.repeat(Math.min(level, 6))
+                  sectionParts.push(`${headingPrefix} ${s.title}`)
+                }
+                
+                if (s.content) {
+                  sectionParts.push(s.content)
+                }
+                
+                return sectionParts.join('\n')
+              })
+              .filter(Boolean)
+              .join('\n\n')
+            
+            // Debug: Check content immediately after joining
+            const numberedListsAfterJoin = content.match(/^\s*\d+\.\s+.+$/gm)
+            console.log('After joining sections:', {
+              contentLength: content.length,
+              numberedListCount: numberedListsAfterJoin?.length || 0,
+              firstFewNumberedLists: numberedListsAfterJoin?.slice(0, 5),
+              contentPreview: content.substring(0, 500)
+            })
           }
           
           // Extract tables from parsedContent  
@@ -216,20 +263,36 @@ export default function DocumentViewer() {
             content = 'Document content will be displayed here...'
           }
           
-          // Debug: Check for newlines in content
+          // Debug: Check for newlines and numbered lists in content
           console.log('Content has newlines:', content.includes('\n'))
           console.log('Content has double newlines:', content.includes('\n\n'))
+          const numberedListMatches = content.match(/^\s*\d+\.\s+.+$/gm)
+          console.log('Numbered lists found in content:', numberedListMatches?.length || 0)
+          if (numberedListMatches && numberedListMatches.length > 0) {
+            console.log('First few numbered lists:', numberedListMatches.slice(0, 3))
+          }
           console.log('First 500 chars of raw content:', content.substring(0, 500))
           console.log('Parser version:', document.parsedContent?.metadata?.parserVersion)
           console.log('Total newline count:', (content.match(/\n/g) || []).length)
           console.log('Content sample with \\n visible:', content.substring(0, 200).replace(/\n/g, '\\n'))
           
           // Clean artifacts immediately after extraction (but preserve legitimate lists)
+          // IMPORTANT: Only remove artifacts, never numbered lists at start of lines
+          const beforeClean = content
           content = content
             .replace(/;\s*1\./g, '')  // Remove "; 1." (artifact)
             .replace(/\.\s*1\./g, '.')  // Remove ". 1." -> "." (artifact at end of sentence)
             .replace(/\s+1\.\s*$/gm, '')  // Remove " 1." at END of lines only
             // Note: Do NOT remove "1." at START of lines (legitimate lists)
+          
+          // Verify numbered lists weren't removed
+          const afterClean = content.match(/^\s*\d+\.\s+.+$/gm)
+          if (numberedListMatches && afterClean && numberedListMatches.length !== afterClean.length) {
+            console.warn('⚠️ Warning: Some numbered lists may have been removed by cleaning!', {
+              before: numberedListMatches.length,
+              after: afterClean.length
+            })
+          }
           
           console.log('Final content for display:', content.substring(0, 200))
           console.log('Found tables:', tables.length)

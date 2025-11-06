@@ -177,7 +177,29 @@ export default function DocumentReaderPage() {
         
         // Handle sections (for docx files)
         if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
-          content = document.parsedContent!.sections.map((s: { content: string }) => s.content).join('\n')
+          // Join sections with proper spacing, preserving list structure
+          content = document.parsedContent!.sections
+            .map((s: { title?: string; content: string; level?: number }) => {
+              const sectionParts: string[] = []
+              const contentTrimmed = s.content?.trim() || ''
+              
+              // Only add title if content doesn't already start with a heading
+              // This prevents duplication when content already has markdown headings
+              if (s.title && !contentTrimmed.startsWith('#')) {
+                // Convert section title to markdown heading based on level
+                const level = s.level || 2
+                const headingPrefix = '#'.repeat(Math.min(level, 6))
+                sectionParts.push(`${headingPrefix} ${s.title}`)
+              }
+              
+              if (s.content) {
+                sectionParts.push(s.content)
+              }
+              
+              return sectionParts.join('\n')
+            })
+            .filter(Boolean)
+            .join('\n\n')
         }
         
         // Extract tables separately (for xlsx files)
