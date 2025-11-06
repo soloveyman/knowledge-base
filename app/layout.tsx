@@ -52,11 +52,12 @@ const graphikMono = localFont({
 export const metadata: Metadata = {
   title: "Knowledge Base Platform",
   description: "Employee training and knowledge management system",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },

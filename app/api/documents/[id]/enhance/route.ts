@@ -70,18 +70,23 @@ export async function POST(
         const startTime = Date.now()
         console.log(`Attempting Grok API enhancement with model: ${model}`)
 
-        grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: 'system',
-                content: `You are an expert document structure enhancer. Improve the structure and organization of parsed document content.
+        // Create AbortController for timeout
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 second timeout for enhancement
+        
+        try {
+          grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are an expert document structure enhancer. Improve the structure and organization of parsed document content.
 
 Your task:
 1. Analyze the provided document sections and tables
@@ -121,17 +126,27 @@ Return ONLY a valid JSON object with this exact structure:
 }
 
 Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language. Do NOT include images in your JSON response - they will be preserved from the original document automatically.`
-              },
-              {
-                role: 'user',
-                content: `Enhance this parsed document content:\n\n${fullText}`
-              }
-            ],
-            temperature: 0.3,
-            max_tokens: 4000
+                },
+                {
+                  role: 'user',
+                  content: `Enhance this parsed document content:\n\n${fullText}`
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 4000
+            }),
+            signal: controller.signal
           })
-        })
-
+          
+          clearTimeout(timeoutId)
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            throw new Error('Request timeout - Grok API took too long to respond')
+          }
+          throw fetchError
+        }
+        
         const duration = Date.now() - startTime
         console.log(`Grok API enhancement request to ${model} took ${duration}ms, status: ${grokResponse.status}`)
 

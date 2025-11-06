@@ -63,18 +63,23 @@ export async function POST(request: Request) {
         const startTime = Date.now()
         console.log(`Attempting Grok API call with model: ${model}`)
         
-        grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert test generator. Generate ${params?.count || 5} high-quality questions based on the provided content. 
+        // Create AbortController for timeout
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+        
+        try {
+          grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are an expert test generator. Generate ${params?.count || 5} high-quality questions based on the provided content. 
             
             Requirements:
             - Questions should test understanding of the content
@@ -94,16 +99,26 @@ export async function POST(request: Request) {
                 "explanation": "Why this answer is correct"
               }
             ]`
-          },
-          {
-            role: 'user',
-            content: `Generate questions based on this content:\n\n${context?.text || 'No content provided'}`
+                },
+                {
+                  role: 'user',
+                  content: `Generate questions based on this content:\n\n${context?.text || 'No content provided'}`
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 2000
+            }),
+            signal: controller.signal
+          })
+          
+          clearTimeout(timeoutId)
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            throw new Error('Request timeout - Grok API took too long to respond')
           }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      })
-    })
+          throw fetchError
+        }
         
         const duration = Date.now() - startTime
         lastStatus = grokResponse.status

@@ -80,10 +80,10 @@ const nextConfig: NextConfig = {
       '@radix-ui/react-select',
       '@radix-ui/react-tabs',
     ],
-    // Optimize output for better FCP
-    outputFileTracingIncludes: {
-      '/': ['./public/fonts/**/*'],
-    },
+  },
+  // Optimize output for better FCP
+  outputFileTracingIncludes: {
+    '/': ['./public/fonts/**/*'],
   },
   // Performance optimizations
   compress: true,
