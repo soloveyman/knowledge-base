@@ -169,31 +169,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       }
       
       // Use Mammoth to convert DOCX to HTML with default settings
-      // Mammoth's default output preserves structure better (h1-h6, p, ol, ul, li, img)
-      const result = await mammoth.convertToHtml({ arrayBuffer: buffer }, {
-        ignoreEmptyParagraphs: true,
-        // Use default styleMap - Mammoth handles lists better by default
-        convertImage: mammoth.images.imgElement(function(image) {
-          // Extract image data and return img element
-          return image.read('base64').then((imageBuffer: string) => {
-            const extension = image.contentType?.split('/')[1] || 'png'
-            const filename = `image_${images.length + 1}.${extension}`
-            const base64Data = `data:${image.contentType};base64,${imageBuffer}`
-            
-            images.push({
-              filename: filename,
-              data: base64Data,
-              type: image.contentType || 'image/png'
-            })
-            console.log(`Extracted image: ${filename}`)
-            
-            return {
-              src: base64Data,
-              alt: filename
-            }
-          })
-        })
-      })
+      const result = await mammoth.convertToHtml({ arrayBuffer: buffer })
       
       console.log('Mammoth conversion completed')
       console.log('Messages:', result.messages.length)

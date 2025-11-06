@@ -201,9 +201,12 @@ export function ManagerPageClient({
       }
 
       const testsResult = await testsResponse.json()
+      
+      // Read documents response once and reuse it
+      const documentsResult = await documentsResponse.json()
+      
       if (testsResult.success) {
         const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-        const documentsResult = await documentsResponse.json()
         if (documentsResult.success && documentsResult.data.documents) {
           documentsResult.data.documents.forEach((doc: {
             id: string
@@ -244,8 +247,6 @@ export function ManagerPageClient({
         })
         setSavedTests(transformedTests)
       }
-
-      const documentsResult = await documentsResponse.json()
       if (documentsResult.success && documentsResult.data.documents) {
         const transformedDocs = documentsResult.data.documents.map((doc: {
           id: string
