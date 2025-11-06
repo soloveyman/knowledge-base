@@ -35,6 +35,7 @@
     "setup:pro": "tsx scripts/setup-pro-plan.ts",
     "assign:trial": "tsx scripts/assign-trial-to-existing-users.ts",
     "db:add-enhancement-columns": "tsx scripts/add-enhancement-columns.ts",
+    "db:add-manual-plan-change-column": "tsx scripts/add-manual-plan-change-column.ts",
     "typecheck": "tsc --noEmit",
     "lint:ci": "next lint --max-warnings=0",
     "db:reset:test": "node scripts/reset-for-testing.js"

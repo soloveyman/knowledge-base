@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, users } from '@/lib/db';
+import { db, users, subscriptions, subscriptionPlans } from '@/lib/db';
 import { eq, sql } from 'drizzle-orm';
 
 export async function GET() {
@@ -27,8 +27,9 @@ export async function GET() {
       allOwners.map(async (owner) => {
         // Get owner's subscription - using user_id (current DB schema)
         const ownerSubscriptions = await db.execute(sql`
-          SELECT s.*, sp.name as plan_name, sp.display_name as plan_display_name, 
-                 sp.price as plan_price, sp.currency as plan_currency
+          SELECT s.id as subscription_id, s.*, sp.id as plan_id, sp.name as plan_name, 
+                 sp.display_name as plan_display_name, sp.price as plan_price, 
+                 sp.currency as plan_currency, s.changed_manually_at as changed_manually_at
           FROM subscriptions s
           LEFT JOIN subscription_plans sp ON s.plan_id = sp.id
           WHERE s.user_id = ${owner.id}
@@ -37,11 +38,14 @@ export async function GET() {
         `);
 
         let subscriptionData: {
+          id: string | null;
           status: string;
           currentPeriodEnd: Date | string;
           createdAt: Date | string;
+          changedManuallyAt: Date | string | null;
         } | null = null;
         let planData: {
+          id: string | null;
           name: string | null;
           displayName: string | null;
           price: number | string | null;
@@ -50,20 +54,26 @@ export async function GET() {
         
         if (ownerSubscriptions.rows && ownerSubscriptions.rows.length > 0) {
           const sub = ownerSubscriptions.rows[0] as {
+            subscription_id?: string;
             status?: string;
             current_period_end?: Date | string;
             created_at?: Date | string;
+            changed_manually_at?: Date | string | null;
+            plan_id?: string;
             plan_name?: string | null;
             plan_display_name?: string | null;
             plan_price?: number | string | null;
             plan_currency?: string | null;
           };
           subscriptionData = {
+            id: sub.subscription_id || null,
             status: sub.status || '',
             currentPeriodEnd: sub.current_period_end || new Date(),
             createdAt: sub.created_at || new Date(),
+            changedManuallyAt: sub.changed_manually_at || null,
           };
           planData = {
+            id: sub.plan_id || null,
             name: sub.plan_name ?? null,
             displayName: sub.plan_display_name ?? null,
             price: sub.plan_price ?? null,
@@ -107,15 +117,20 @@ export async function GET() {
           email: owner.email,
           country: owner.country,
           plan: planData ? {
+            id: planData.id,
             name: planData.name,
             displayName: planData.displayName,
             price: planData.price || 0,
             currency: planData.currency || 'USD',
           } : null,
           subscription: subscriptionData ? {
+            id: subscriptionData.id,
             status: subscriptionData.status as 'active' | 'cancelled' | 'expired',
             currentPeriodEnd: new Date(subscriptionData.currentPeriodEnd).toISOString(),
             provider,
+            changedManuallyAt: subscriptionData.changedManuallyAt 
+              ? new Date(subscriptionData.changedManuallyAt).toISOString() 
+              : null,
           } : null,
           revenue,
         };
@@ -203,6 +218,115 @@ export async function GET() {
     return NextResponse.json({
       success: false,
       message: 'Failed to fetch subscriptions data',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await auth();
+    
+    // Check if user is super-admin
+    if (!session?.user || session.user.role !== 'super-admin') {
+      return NextResponse.json({
+        success: false,
+        message: 'Unauthorized. Super-admin access required.'
+      }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { ownerId, planId } = body;
+
+    if (!ownerId || !planId) {
+      return NextResponse.json({
+        success: false,
+        message: 'Missing required fields: ownerId and planId'
+      }, { status: 400 });
+    }
+
+    // Verify the owner exists
+    const owner = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, ownerId))
+      .limit(1);
+
+    if (owner.length === 0 || owner[0].role !== 'owner') {
+      return NextResponse.json({
+        success: false,
+        message: 'Owner not found'
+      }, { status: 404 });
+    }
+
+    // Verify the plan exists
+    const plan = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, planId))
+      .limit(1);
+
+    if (plan.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'Plan not found'
+      }, { status: 404 });
+    }
+
+    // Check if owner has a subscription
+    const existingSubscription = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, ownerId))
+      .limit(1);
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1); // Extend by 1 month
+
+    if (existingSubscription.length > 0) {
+      // Update existing subscription
+      await db
+        .update(subscriptions)
+        .set({
+          planId,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          status: 'active',
+          cancelAtPeriodEnd: false,
+          changedManuallyAt: now, // Mark as manually changed
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, existingSubscription[0].id));
+    } else {
+      // Create new subscription
+      await db.insert(subscriptions).values({
+        ownerId: ownerId as any,
+        planId,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        changedManuallyAt: now, // Mark as manually changed
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Subscription plan updated successfully',
+      data: {
+        ownerId,
+        planId,
+        planName: plan[0].name,
+        planDisplayName: plan[0].displayName,
+      }
+    });
+
+  } catch (error) {
+    console.error('Super admin change plan API error:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Failed to change subscription plan',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }

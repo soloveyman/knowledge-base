@@ -89,6 +89,7 @@ Your task:
 3. Enhance content organization and readability
 4. Fix formatting issues and improve structure
 5. Maintain the original hierarchy and order
+6. CRITICAL: Preserve the original document's language - do NOT translate to another language. Keep all text in the same language as the original document.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -117,7 +118,7 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 
-Preserve all original sections and tables, but improve their titles and content quality.`
+Preserve all original sections and tables, but improve their titles and content quality. Always maintain the original document's language - never translate the content to a different language.`
               },
               {
                 role: 'user',

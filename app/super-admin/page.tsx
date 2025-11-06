@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AppBar } from "@/components/common/app-bar";
 import { formatDateShort } from "@/lib/date-format";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { 
   Crown, 
   Users, 
@@ -17,7 +20,9 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Filter
+  Filter,
+  Loader2,
+  Search
 } from "lucide-react";
 
 interface OwnerSubscription {
@@ -26,17 +31,28 @@ interface OwnerSubscription {
   email: string;
   country: string | null;
   plan: {
+    id: string | null;
     name: string;
     displayName: string;
     price: number;
     currency: string;
   } | null;
   subscription: {
+    id: string | null;
     status: 'active' | 'cancelled' | 'expired';
     currentPeriodEnd: string;
     provider: 'stripe' | null;
+    changedManuallyAt: string | null;
   } | null;
   revenue: number;
+}
+
+interface SubscriptionPlan {
+  id: string;
+  name: string;
+  displayName: string;
+  price: number;
+  currency: string;
 }
 
 interface SubscriptionStats {
@@ -57,7 +73,11 @@ export default function SuperAdminPage() {
     newThisMonth: 0,
   });
   const [filterProvider, setFilterProvider] = useState<'all' | 'stripe'>('all');
+  const [filterType, setFilterType] = useState<'free-trial' | 'manual' | 'paid'>('free-trial');
+  const [searchText, setSearchText] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [changingPlan, setChangingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -72,8 +92,37 @@ export default function SuperAdminPage() {
 
     if (status === 'authenticated' && session?.user?.role === 'super-admin') {
       loadOwnersData();
+      loadPlans();
     }
   }, [session, status, router]);
+
+  // Clear search text when switching tabs
+  useEffect(() => {
+    setSearchText('');
+  }, [filterType]);
+
+  const loadPlans = async () => {
+    try {
+      const response = await fetch('/api/subscription');
+      const result = await response.json();
+      
+      if (result.success && result.data.plans) {
+        // Include all plans including free-trial, sorted by price (free-trial first)
+        const allPlans = result.data.plans
+          .map((plan: any) => ({
+            id: plan.id,
+            name: plan.name,
+            displayName: plan.displayName,
+            price: plan.price || 0,
+            currency: plan.currency || 'USD',
+          }))
+          .sort((a: SubscriptionPlan, b: SubscriptionPlan) => a.price - b.price); // Sort by price, free-trial (0) first
+        setPlans(allPlans);
+      }
+    } catch (error) {
+      console.error('Failed to load plans:', error);
+    }
+  };
 
   const loadOwnersData = async () => {
     try {
@@ -97,9 +146,65 @@ export default function SuperAdminPage() {
     }
   };
 
-  const filteredOwners = owners.filter(owner => 
-    filterProvider === 'all' || owner.subscription?.provider === filterProvider
-  );
+  const handleChangePlan = async (ownerId: string, planId: string) => {
+    try {
+      setChangingPlan(ownerId);
+      toast.loading('Changing subscription plan...', { id: 'change-plan' });
+      
+      const response = await fetch('/api/super-admin/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerId,
+          planId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`Plan changed to ${result.data.planDisplayName}`, { id: 'change-plan' });
+        // Reload owners data to reflect the change
+        loadOwnersData();
+      } else {
+        toast.error(result.message || 'Failed to change plan', { id: 'change-plan' });
+      }
+    } catch (error) {
+      console.error('Error changing plan:', error);
+      toast.error('Error changing plan', { id: 'change-plan' });
+    } finally {
+      setChangingPlan(null);
+    }
+  };
+
+  // Filter owners: show free trial users, manually changed plans, or paid plans based on filterType
+  const filteredOwners = owners.filter(owner => {
+    const matchesProvider = filterProvider === 'all' || owner.subscription?.provider === filterProvider;
+    
+    // Text search filter (for free-trial and manual tabs)
+    const matchesSearch = (filterType === 'free-trial' || filterType === 'manual')
+      ? (searchText.trim() === '' || 
+          owner.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+          owner.email?.toLowerCase().includes(searchText.toLowerCase()) ||
+          owner.country?.toLowerCase().includes(searchText.toLowerCase()))
+      : true; // No search filter for paid plans
+    
+    if (filterType === 'free-trial') {
+      const isFreeTrial = owner.plan?.name === 'free-trial';
+      return matchesProvider && isFreeTrial && matchesSearch;
+    } else if (filterType === 'manual') {
+      const isManuallyChanged = owner.subscription?.changedManuallyAt !== null && owner.subscription?.changedManuallyAt !== undefined;
+      return matchesProvider && isManuallyChanged && matchesSearch;
+    } else if (filterType === 'paid') {
+      const hasPaidPlan = owner.plan && owner.plan.price > 0 && owner.plan.name !== 'free-trial';
+      const isNotManuallyChanged = !owner.subscription?.changedManuallyAt || owner.subscription.changedManuallyAt === null;
+      return matchesProvider && hasPaidPlan && isNotManuallyChanged;
+    }
+    
+    return false;
+  });
 
   const getStatusIcon = (status: string | null) => {
     if (!status) return <AlertCircle className="h-4 w-4 text-gray-500" />;
@@ -224,30 +329,61 @@ export default function SuperAdminPage() {
         <TabsContent value="subscriptions" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>All Owner Subscriptions</CardTitle>
+              <CardTitle>Owner Subscriptions</CardTitle>
               <CardDescription>
-                Manage subscriptions for all owners
+                Manage subscription plans for owners
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Provider Filters */}
-              <div className="flex gap-2 mb-6">
-                <Button 
-                  variant={filterProvider === 'all' ? 'default' : 'outline'}
-                  onClick={() => setFilterProvider('all')}
-                  size="sm"
+              {/* Filter Tabs */}
+              <div className="mb-4 flex gap-2">
+                <button
+                  onClick={() => setFilterType('free-trial')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filterType === 'free-trial'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
                 >
-                  <Filter className="h-4 w-4 mr-2" />
-                  All Providers
-                </Button>
-                <Button 
-                  variant={filterProvider === 'stripe' ? 'default' : 'outline'}
-                  onClick={() => setFilterProvider('stripe')}
-                  size="sm"
+                  Free Trial Users
+                </button>
+                <button
+                  onClick={() => setFilterType('paid')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filterType === 'paid'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
                 >
-                  Stripe
-                </Button>
+                  Paid Plans
+                </button>
+                <button
+                  onClick={() => setFilterType('manual')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filterType === 'manual'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  Manually Changed Plans
+                </button>
               </div>
+
+              {/* Search Filter - Only for free-trial and manual tabs */}
+              {(filterType === 'free-trial' || filterType === 'manual') && (
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search by name, email, or country..."
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Owners Table */}
               <div className="space-y-4">
@@ -278,9 +414,16 @@ export default function SuperAdminPage() {
                             </div>
                           )}
                           {owner.subscription && (
-                            <div className="text-xs text-gray-500">
-                              Ends: {formatDateShort(owner.subscription.currentPeriodEnd)}
-                            </div>
+                            <>
+                              <div className="text-xs text-gray-500">
+                                Ends: {formatDateShort(owner.subscription.currentPeriodEnd)}
+                              </div>
+                              {owner.subscription.changedManuallyAt && (
+                                <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                  Changed: {formatDateShort(owner.subscription.changedManuallyAt)}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
 
@@ -289,6 +432,37 @@ export default function SuperAdminPage() {
                           {getStatusBadge(owner.subscription?.status || null)}
                           {getProviderBadge(owner.subscription?.provider || null)}
                         </div>
+
+                        {/* Plan Change Dropdown - Only for free trial users and manually changed plans */}
+                        {((owner.plan?.name === 'free-trial') || (owner.subscription?.changedManuallyAt !== null && owner.subscription?.changedManuallyAt !== undefined)) && plans.length > 0 && (
+                          <div className="min-w-[180px]">
+                            <Select
+                              value=""
+                              onValueChange={(planId) => handleChangePlan(owner.id, planId)}
+                              disabled={changingPlan === owner.id}
+                            >
+                              <SelectTrigger className="w-full">
+                                {changingPlan === owner.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Changing...</span>
+                                  </div>
+                                ) : (
+                                  <SelectValue placeholder="Change Plan" />
+                                )}
+                              </SelectTrigger>
+                              <SelectContent>
+                                {plans.map((plan) => (
+                                  <SelectItem key={plan.id} value={plan.id}>
+                                    {plan.displayName} - {plan.price === 0 || plan.name === 'free-trial' 
+                                      ? 'Free' 
+                                      : `$${(plan.price / 100).toFixed(2)}/${plan.currency === 'USD' ? 'mo' : 'mo'}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
                         <div className="text-right min-w-[80px]">
                           <div className="font-medium">${(owner.revenue / 100).toFixed(2)}</div>
