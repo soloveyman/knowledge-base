@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, documents, documentImages, users, usage } from '@/lib/db'
+import { db, documents, documentImages, users, usage, tableExists } from '@/lib/db'
 import { desc, eq, and, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
@@ -38,15 +38,14 @@ export async function GET() {
     const documentIds = allDocuments.map(doc => doc.id)
     let allImages: typeof documentImages.$inferSelect[] = []
     
-    if (documentIds.length > 0) {
+    if (documentIds.length > 0 && await tableExists('document_images')) {
       try {
         allImages = await db
           .select()
           .from(documentImages)
           .where(inArray(documentImages.documentId, documentIds))
       } catch (error) {
-        // Table might not exist yet - log but don't fail
-        console.warn('document_images table not found, skipping image fetch:', error instanceof Error ? error.message : 'Unknown error')
+        // Table might not exist yet - silently skip
         // Continue without images
       }
     }
@@ -141,10 +140,16 @@ export async function POST(request: Request) {
     if (existingDocument.length > 0) {
       const documentId = existingDocument[0].id
       
-      // Delete existing images for this document
-      await db
-        .delete(documentImages)
-        .where(eq(documentImages.documentId, documentId))
+      // Delete existing images for this document (if table exists)
+      if (await tableExists('document_images')) {
+        try {
+          await db
+            .delete(documentImages)
+            .where(eq(documentImages.documentId, documentId))
+        } catch (error) {
+          // Table might not exist - silently skip
+        }
+      }
       
       // Update existing document instead of creating a new one
       const updated = await db
@@ -164,17 +169,21 @@ export async function POST(request: Request) {
       
       savedDocument = updated[0]
       
-      // Save images to separate table
-      if (images.length > 0) {
-        await db.insert(documentImages).values(
-          images.map((img, idx) => ({
-            documentId,
-            filename: img.filename,
-            data: img.data,
-            type: img.type,
-            position: img.position ?? idx
-          }))
-        )
+      // Save images to separate table (if table exists)
+      if (images.length > 0 && await tableExists('document_images')) {
+        try {
+          await db.insert(documentImages).values(
+            images.map((img, idx) => ({
+              documentId,
+              filename: img.filename,
+              data: img.data,
+              type: img.type,
+              position: img.position ?? idx
+            }))
+          )
+        } catch (error) {
+          // Table might not exist - silently skip
+        }
       }
     } else {
       // Create new document
@@ -192,17 +201,21 @@ export async function POST(request: Request) {
       
       savedDocument = newDocument[0]
       
-      // Save images to separate table
-      if (images.length > 0) {
-        await db.insert(documentImages).values(
-          images.map((img, idx) => ({
-            documentId: savedDocument!.id,
-            filename: img.filename,
-            data: img.data,
-            type: img.type,
-            position: img.position ?? idx
-          }))
-        )
+      // Save images to separate table (if table exists)
+      if (images.length > 0 && await tableExists('document_images')) {
+        try {
+          await db.insert(documentImages).values(
+            images.map((img, idx) => ({
+              documentId: savedDocument!.id,
+              filename: img.filename,
+              data: img.data,
+              type: img.type,
+              position: img.position ?? idx
+            }))
+          )
+        } catch (error) {
+          // Table might not exist - silently skip
+        }
       }
     }
     

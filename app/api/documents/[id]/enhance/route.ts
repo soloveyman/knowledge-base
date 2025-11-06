@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, documents, documentImages } from '@/lib/db'
+import { db, documents, documentImages, tableExists } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
@@ -193,10 +193,17 @@ Preserve all original sections and tables, but improve their titles and content 
       enhancedContent.images = []
 
       // Fetch existing images from database to get count
-      const existingImages = await db
-        .select()
-        .from(documentImages)
-        .where(eq(documentImages.documentId, documentId))
+      let existingImages: typeof documentImages.$inferSelect[] = []
+      if (await tableExists('document_images')) {
+        try {
+          existingImages = await db
+            .select()
+            .from(documentImages)
+            .where(eq(documentImages.documentId, documentId))
+        } catch (error) {
+          // Table might not exist - silently skip
+        }
+      }
 
       // Update metadata
       enhancedContent.metadata = {
@@ -240,10 +247,17 @@ Preserve all original sections and tables, but improve their titles and content 
 
     // Images are preserved in document_images table (cascade delete is handled by DB)
     // Fetch images from database to include in response
-    const savedImages = await db
-      .select()
-      .from(documentImages)
-      .where(eq(documentImages.documentId, documentId))
+    let savedImages: typeof documentImages.$inferSelect[] = []
+    if (await tableExists('document_images')) {
+      try {
+        savedImages = await db
+          .select()
+          .from(documentImages)
+          .where(eq(documentImages.documentId, documentId))
+      } catch (error) {
+        // Table might not exist - silently skip
+      }
+    }
     
     // Merge images back into enhancedContent for response
     if (savedImages.length > 0) {

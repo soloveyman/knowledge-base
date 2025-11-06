@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import { sql } from 'drizzle-orm';
 import * as schema from './schema';
 
 // Validate DATABASE_URL at startup
@@ -65,3 +66,30 @@ if (typeof process !== 'undefined') {
 
 // Export all schema tables for easy access
 export * from './schema';
+
+// Helper to check if a table exists
+let tableExistsCache: Map<string, boolean> = new Map()
+
+export async function tableExists(tableName: string): Promise<boolean> {
+  // Check cache first
+  if (tableExistsCache.has(tableName)) {
+    return tableExistsCache.get(tableName)!
+  }
+  
+  try {
+    const result = await db.execute(
+      sql`SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = ${tableName}
+      )`
+    )
+    const exists = (result.rows[0] as { exists: boolean })?.exists ?? false
+    tableExistsCache.set(tableName, exists)
+    return exists
+  } catch {
+    // If check fails, assume table doesn't exist
+    tableExistsCache.set(tableName, false)
+    return false
+  }
+}

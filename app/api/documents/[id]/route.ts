@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, documents, documentImages, assignments, users } from '@/lib/db'
+import { db, documents, documentImages, assignments, users, tableExists } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
@@ -65,10 +65,18 @@ export async function GET(
     }
     
     // Fetch images for this document
-    const images = await db
-      .select()
-      .from(documentImages)
-      .where(eq(documentImages.documentId, id))
+    let images: typeof documentImages.$inferSelect[] = []
+    if (await tableExists('document_images')) {
+      try {
+        images = await db
+          .select()
+          .from(documentImages)
+          .where(eq(documentImages.documentId, id))
+      } catch (error) {
+        // Table might not exist yet - silently skip
+        // Continue without images
+      }
+    }
     
     // Merge images into parsedContent
     const document = doc[0]
