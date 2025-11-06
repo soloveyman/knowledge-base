@@ -1,5 +1,6 @@
 'use client'
 
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -16,6 +17,166 @@ interface DocumentRendererProps {
   className?: string
 }
 
+// React-friendly image component for document images
+function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: string | null }) {
+  // Process src synchronously to avoid hydration mismatches
+  const processSrc = (source: string | Blob | undefined): { imageSrc: string; hasError: boolean; isBlob: boolean } => {
+    if (!source) {
+      return { imageSrc: '', hasError: true, isBlob: false }
+    }
+
+    // Handle Blob - needs async processing
+    if (source instanceof Blob) {
+      return { imageSrc: '', hasError: false, isBlob: true }
+    }
+
+    let srcString = typeof source === 'string' ? source : ''
+    if (!srcString || srcString.trim() === '') {
+      return { imageSrc: '', hasError: true, isBlob: false }
+    }
+
+    // Fix malformed base64 URLs (e.g., "base64,..." should be "data:image/png;base64,...")
+    if (srcString.startsWith('base64,')) {
+      const base64Data = srcString.substring(7) // Remove "base64," prefix
+      // PNG signature: iVBORw0KGgo
+      // JPEG signature: /9j/4AAQ
+      // GIF signature: R0lGODlh
+      let mimeType = 'image/png' // Default to PNG
+      if (base64Data.startsWith('iVBORw0KGgo')) {
+        mimeType = 'image/png'
+      } else if (base64Data.startsWith('/9j/4AAQ') || base64Data.startsWith('/9j/')) {
+        mimeType = 'image/jpeg'
+      } else if (base64Data.startsWith('R0lGODlh')) {
+        mimeType = 'image/gif'
+      }
+      srcString = `data:${mimeType};base64,${base64Data}`
+    }
+
+    return { imageSrc: srcString, hasError: false, isBlob: false }
+  }
+
+  const processed = processSrc(src)
+  const [imageSrc, setImageSrc] = useState<string>(processed.imageSrc)
+  const [isLoading, setIsLoading] = useState(processed.isBlob)
+  const [hasError, setHasError] = useState(processed.hasError)
+
+  // Only use useEffect for Blob conversion (async operation)
+  React.useEffect(() => {
+    if (!src || !(src instanceof Blob)) return
+
+    // Convert Blob to data URL
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result
+      if (typeof result === 'string') {
+        setImageSrc(result)
+        setIsLoading(false)
+      } else {
+        setHasError(true)
+        setIsLoading(false)
+      }
+    }
+    reader.onerror = () => {
+      setHasError(true)
+      setIsLoading(false)
+    }
+    reader.readAsDataURL(src)
+  }, [src])
+
+  // Check if it's a data URL
+  const isDataUrl = imageSrc.startsWith('data:')
+  
+  // Check if it's a valid external URL
+  const isExternal = imageSrc.startsWith('http://') || imageSrc.startsWith('https://')
+  
+  // Check if it's a valid relative path (starts with /)
+  const isRelativePath = imageSrc.startsWith('/')
+
+  // Validate URL format for Next.js Image
+  let isValidForNextImage = false
+  if (isExternal || isRelativePath) {
+    try {
+      if (isExternal) {
+        new URL(imageSrc)
+        isValidForNextImage = true
+      } else if (isRelativePath) {
+        isValidForNextImage = true
+      }
+    } catch {
+      isValidForNextImage = false
+    }
+  }
+
+  // Consistent corner radius for all images
+  const imageRadius = 'rounded-lg'
+  
+  if (hasError || !imageSrc) {
+    return (
+      <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
+        <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
+          <p>Image failed to load</p>
+        </div>
+      </span>
+    )
+  }
+
+  // For data URLs, use regular img tag with React state management
+  if (isDataUrl || !isValidForNextImage) {
+    return (
+      <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
+        {isLoading && (
+          <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
+            <p>Loading image...</p>
+          </div>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageSrc}
+          alt={alt || ''}
+          className={`${imageRadius} border border-border max-w-full h-auto transition-opacity mx-auto ${
+            isLoading ? 'opacity-0' : 'opacity-100'
+          }`}
+          style={{ width: 'auto', height: 'auto' }}
+          loading="lazy"
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setHasError(true)
+            setIsLoading(false)
+          }}
+        />
+      </span>
+    )
+  }
+
+  // For valid external URLs or relative paths, use Next.js Image
+  return (
+    <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
+      {isLoading && (
+        <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
+          <p>Loading image...</p>
+        </div>
+      )}
+      <Image
+        src={imageSrc}
+        alt={alt || ''}
+        width={800}
+        height={600}
+        className={`${imageRadius} border border-border max-w-full h-auto transition-opacity mx-auto ${
+          isLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        style={{ width: 'auto', height: 'auto' }}
+        unoptimized={isExternal}
+        loading="lazy"
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true)
+          setIsLoading(false)
+        }}
+      />
+    </span>
+  )
+}
+
 export function DocumentRenderer({ content, tables, className = '' }: DocumentRendererProps) {
   // Если есть таблицы но нет контента, не показываем пустой контент
   const hasContent = content && content.trim().length > 0 && 
@@ -23,11 +184,11 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
     !content.includes('Document contains tables below.')
   
   return (
-    <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
-      <div className="document-content space-y-6">
+    <div className={`prose prose-slate dark:prose-invert max-w-none w-full ${className}`} suppressHydrationWarning>
+      <div className="document-content space-y-6 px-0 w-full max-w-full overflow-x-hidden wrap-break-word" suppressHydrationWarning>
         {hasContent && <DocumentContent content={content} />}
         {tables && tables.length > 0 && (
-          <div className={hasContent ? "mt-10 space-y-10" : "space-y-10"}>
+          <div className={hasContent ? "mt-10 space-y-10 w-full max-w-full" : "space-y-10 w-full max-w-full"} suppressHydrationWarning>
             {tables.map((table, idx) => (
               <TableRenderer key={idx} table={table} />
             ))}
@@ -39,18 +200,32 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
 }
 
 function DocumentContent({ content }: { content: string }) {
-  // Преобразуем форматирование в markdown
-  const markdown = convertToMarkdown(content)
+  // Content is already markdown from Mammoth - just clean up any remaining [BOLD]/[ITALIC] tags
+  // These might still exist from old parsing, so convert them to markdown
+  let markdown = content
+    .replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '**$1**')
+    .replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '*$1*')
+  
+  // Debug: log numbered lists in markdown
+  const numberedListMatches = markdown.match(/^\s*\d+\.\s+.+$/gm)
+  if (numberedListMatches && numberedListMatches.length > 0) {
+    console.log('DocumentContent: Found numbered list items in markdown:', numberedListMatches.length)
+    console.log('DocumentContent: First few numbered list items:', numberedListMatches.slice(0, 3))
+  }
+  
+  // Ensure numbered lists are properly grouped (no blank lines between consecutive items)
+  markdown = markdown.replace(/(^\s*\d+\.\s+.+)\n\n+(^\s*\d+\.\s+.+)/gm, '$1\n$2')
   
   return (
-    <ReactMarkdown
+    <div className="w-full max-w-full overflow-x-hidden wrap-break-word" suppressHydrationWarning>
+      <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeRaw, rehypeSanitize]}
       components={{
         h1: ({ children }) => {
           // Главный заголовок - самый крупный и выразительный
           return (
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border pb-4 leading-tight tracking-tight">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border pb-4 leading-tight tracking-tight wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h1>
           )
@@ -58,7 +233,7 @@ function DocumentContent({ content }: { content: string }) {
         h2: ({ children }) => {
           // Подзаголовок первого уровня - крупный и четкий
           return (
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border pb-3 leading-tight tracking-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border pb-3 leading-tight tracking-tight wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h2>
           )
@@ -66,7 +241,7 @@ function DocumentContent({ content }: { content: string }) {
         h3: ({ children }) => {
           // Подзаголовок второго уровня - средний размер с акцентом
           return (
-            <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold mt-8 mb-5 text-foreground leading-tight tracking-tight">
+            <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold mt-8 mb-5 text-foreground leading-tight tracking-tight wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h3>
           )
@@ -74,7 +249,7 @@ function DocumentContent({ content }: { content: string }) {
         h4: ({ children }) => {
           // Подзаголовок третьего уровня - заметный, но не перегруженный
           return (
-            <h4 className="text-2xl sm:text-3xl lg:text-4xl font-semibold mt-7 mb-4 text-foreground leading-tight tracking-normal">
+            <h4 className="text-2xl sm:text-3xl lg:text-4xl font-semibold mt-7 mb-4 text-foreground leading-tight tracking-normal wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h4>
           )
@@ -82,7 +257,7 @@ function DocumentContent({ content }: { content: string }) {
         h5: ({ children }) => {
           // Подзаголовок четвертого уровня - четкий акцент
           return (
-            <h5 className="text-xl sm:text-2xl lg:text-3xl font-semibold mt-6 mb-3 text-foreground/90 leading-tight tracking-normal">
+            <h5 className="text-xl sm:text-2xl lg:text-3xl font-semibold mt-6 mb-3 text-foreground/90 leading-tight tracking-normal wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h5>
           )
@@ -90,36 +265,78 @@ function DocumentContent({ content }: { content: string }) {
         h6: ({ children }) => {
           // Подзаголовок пятого уровня - аккуратный выделенный текст
           return (
-            <h6 className="text-lg sm:text-xl lg:text-2xl font-semibold mt-5 mb-3 text-foreground/80 leading-tight tracking-normal">
+            <h6 className="text-lg sm:text-xl lg:text-2xl font-semibold mt-5 mb-3 text-foreground/80 leading-tight tracking-normal wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </h6>
           )
         },
-        p: ({ children }) => (
-          <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground">
-            {children}
-          </p>
-        ),
+        p: ({ children }) => {
+          // Check if paragraph only contains an image - if so, don't wrap in <p> tag
+          // This prevents hydration errors where <div> or <span> (image wrapper) is inside <p>
+          const childrenArray = React.Children.toArray(children)
+          
+          // Check if any child is an image (could be wrapped in a span/div by our img component)
+          const hasImage = childrenArray.some(child => {
+            if (React.isValidElement(child)) {
+              // Check if it's an img element
+              if (child.type === 'img') return true
+              // Check if it's a span or div containing an img
+              if (child.type === 'span' || child.type === 'div') {
+                const props = child.props as { children?: React.ReactNode; className?: string }
+                // Check if it's our image wrapper (has block class and negative margins)
+                if (props.className?.includes('block') && props.className?.includes('-mx-2')) {
+                  return true
+                }
+                // Also check if it contains an img element
+                if (props.children) {
+                  const wrapperChildren = React.Children.toArray(props.children)
+                  return wrapperChildren.some(c => 
+                    React.isValidElement(c) && (c.type === 'img' || c.type === Image)
+                  )
+                }
+              }
+              // Check if it's the DocumentImage component directly
+              if (typeof child.type === 'function' && child.type.name === 'DocumentImage') {
+                return true
+              }
+            }
+            return false
+          })
+          
+          // If paragraph only contains an image (or image wrapper), don't wrap in <p>
+          if (hasImage && childrenArray.length === 1) {
+            return <>{children}</>
+          }
+          
+          return (
+            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
+              {children}
+            </p>
+          )
+        },
         ul: ({ children }) => {
           // Проверяем наличие эмодзи в элементах списка через строковое представление
           const childrenStr = String(children)
           const hasEmojis = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓✅🔴🍽️🍸👨‍🍳🏢🧼🚪📦🚚🔧📝💭]/u.test(childrenStr)
           
           return (
-            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`}>
+            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground wrap-break-word ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`} style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
               {children}
             </ul>
           )
         },
-        ol: ({ children }) => (
-          <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground">
-            {children}
-          </ol>
-        ),
+        ol: ({ children }) => {
+          console.log('DocumentContent: Rendering ordered list with', React.Children.count(children), 'items')
+          return (
+            <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
+              {children}
+            </ol>
+          )
+        },
         li: ({ children }) => {
           // Эмодзи уже добавлены в markdown, просто отображаем
           return (
-            <li className="leading-relaxed mb-1">{children}</li>
+            <li className="leading-relaxed mb-1 wrap-break-word" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>{children}</li>
           )
         },
         strong: ({ children }) => (
@@ -149,7 +366,7 @@ function DocumentContent({ content }: { content: string }) {
           </pre>
         ),
         table: ({ children }) => (
-          <div className="overflow-x-auto my-6 rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+          <div className="overflow-x-auto my-6 rounded-lg border border-border -mx-2 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
             <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
               {children}
             </table>
@@ -170,31 +387,7 @@ function DocumentContent({ content }: { content: string }) {
         ),
         img: ({ src, alt }) => {
           if (!src) return null
-          
-          // Convert src to string if it's a Blob
-          const srcString = typeof src === 'string' ? src : ''
-          if (!srcString) return null
-          
-          // Check if it's a data URL or external URL
-          const isDataUrl = srcString.startsWith('data:')
-          const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
-          
-          // For data URLs or if we need to use external images, use unoptimized
-          // Otherwise Next.js Image will handle optimization
-          return (
-            <div className="my-6 relative w-full">
-              <Image
-                src={srcString}
-                alt={alt || ''}
-                width={800}
-                height={600}
-                className="rounded-lg border border-border max-w-full h-auto"
-                style={{ width: 'auto', height: 'auto' }}
-                unoptimized={isDataUrl || isExternal}
-                loading="lazy"
-              />
-            </div>
-          )
+          return <DocumentImage src={src} alt={alt} />
         },
         a: ({ href, children }) => (
           <a 
@@ -213,6 +406,7 @@ function DocumentContent({ content }: { content: string }) {
     >
       {markdown}
     </ReactMarkdown>
+    </div>
   )
 }
 
@@ -318,7 +512,7 @@ function TableRenderer({ table }: {
           <span>Таблица</span>
         </h3>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+      <div className="overflow-x-auto rounded-lg border border-border -mx-2 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
         <table className="w-full divide-y divide-border bg-background border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
           {hasHeaders && (
             <thead className="bg-muted/50">
@@ -482,70 +676,5 @@ function getEmojiForContext(text: string, context?: 'heading' | 'list' | 'paragr
   }
   
   return ''
-}
-
-// Преобразует ваш формат в markdown с добавлением эмодзи
-function convertToMarkdown(content: string): string {
-  if (!content) return ''
-  
-  let md = content
-  
-  // Преобразуем [BOLD] и [ITALIC] теги
-  md = md.replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '**$1**')
-  md = md.replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '*$1*')
-  
-  // Преобразуем alignment теги в div с align атрибутом
-  md = md.replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '<div align="center">$1</div>')
-  md = md.replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '<div align="right">$1</div>')
-  md = md.replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '<div align="justify">$1</div>')
-  
-  // Убираем артефакты
-  md = md.replace(/;\s*\d+\./g, '')
-  md = md.replace(/\.\s*\d+\./g, '.')
-  md = md.replace(/\s+\d+\.\s*$/gm, '')
-  
-  // Добавляем эмодзи к заголовкам markdown (если их еще нет)
-  md = md.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, text) => {
-    // Проверяем, есть ли уже эмодзи в начале
-    if (!/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(text.trim())) {
-      const emoji = getEmojiForContext(text, 'heading')
-      return `${hashes} ${emoji ? emoji + ' ' : ''}${text}`
-    }
-    return match
-  })
-  
-  // Добавляем эмодзи к спискам и убираем оригинальные буллеты
-  md = md.replace(/^(\s*[-•*·–—]|\s*\d+\.)\s+(.+)$/gm, (match, marker, text) => {
-    const trimmedText = text.trim()
-    const indent = match.match(/^(\s*)/)?.[1] || ''
-    
-    // Проверяем, есть ли уже эмодзи в начале текста
-    const hasEmoji = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓]/u.test(trimmedText)
-    
-    if (!hasEmoji) {
-      const emoji = getEmojiForContext(trimmedText, 'list')
-      if (emoji) {
-        // Если нашли эмодзи, заменяем оригинальный буллет на стандартный маркер с эмодзи
-        return `${indent}- ${emoji} ${trimmedText}`
-      }
-      // Если эмодзи нет, нормализуем маркер но оставляем стандартный формат
-      // Определяем тип маркера
-      const isNumbered = /^\d+\./.test(marker.trim())
-      if (isNumbered) {
-        // Нумерованный список - оставляем как есть (будут нормализованы позже)
-        return match
-      }
-      // Маркированный список - нормализуем на стандартный
-      return `${indent}- ${trimmedText}`
-    }
-    // Если эмодзи уже есть, убираем оригинальный буллет и используем стандартный маркер
-    return `${indent}- ${trimmedText}`
-  })
-  
-  // Нормализуем нумерованные списки - просто преобразуем все в стандартный формат
-  // Не пытаемся проверять эмодзи в lookahead, так как это может вызвать проблемы
-  md = md.replace(/^(\s*)\d+\.\s+/gm, '$11. ')
-  
-  return md
 }
 

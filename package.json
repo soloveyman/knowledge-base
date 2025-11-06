@@ -28,6 +28,8 @@
     "test:smoke": "tsx scripts/smoke-test.ts",
     "test:security": "tsx scripts/test-security.ts",
     "test:auth": "tsx scripts/test-auth-flow.ts",
+    "test:account-deletion": "tsx scripts/test-account-deletion.ts",
+    "test:all": "tsx scripts/test-all.ts",
     "check:env": "tsx scripts/check-env.ts",
     "setup:env": "tsx scripts/setup-env.ts",
     "setup:trial": "tsx scripts/setup-trial-plan.ts",
@@ -36,6 +38,8 @@
     "assign:trial": "tsx scripts/assign-trial-to-existing-users.ts",
     "db:add-enhancement-columns": "tsx scripts/add-enhancement-columns.ts",
     "db:add-manual-plan-change-column": "tsx scripts/add-manual-plan-change-column.ts",
+    "db:cleanup-soft-deleted-docs": "tsx scripts/cleanup-soft-deleted-docs.ts",
+    "db:verify-documents": "tsx scripts/verify-documents.ts",
     "typecheck": "tsc --noEmit",
     "lint:ci": "next lint --max-warnings=0",
     "db:reset:test": "node scripts/reset-for-testing.js"
@@ -89,6 +93,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

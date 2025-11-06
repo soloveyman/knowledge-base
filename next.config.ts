@@ -36,12 +36,32 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/:path*',
+        headers: securityHeaders,
+      },
+      {
+        source: '/fonts/:path*',
         headers: [
-          ...securityHeaders,
-          // Performance headers
           {
-            key: 'Link',
-            value: '</fonts/Graphik-Regular.woff2>; rel=preload; as=font; type=font/woff2; crossorigin=anonymous',
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/_next/image',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
           },
         ],
       },
@@ -61,18 +81,24 @@ const nextConfig: NextConfig = {
       '@radix-ui/react-tabs',
     ],
   },
+  // Optimize output for better FCP
+  outputFileTracingIncludes: {
+    '/': ['./public/fonts/**/*'],
+  },
   // Performance optimizations
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  // Optimize images
+  // Optimize images for LCP
   images: {
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 60,
+    minimumCacheTTL: 31536000, // 1 year for better caching
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Enable priority hints for LCP images
+    remotePatterns: [],
   },
   // Compiler optimizations
   compiler: {
@@ -82,6 +108,8 @@ const nextConfig: NextConfig = {
   },
   // Turbopack optimizations (Next.js 16 uses Turbopack by default)
   turbopack: {},
+  // Output optimization
+  output: 'standalone',
 };
 
 export default nextConfig;

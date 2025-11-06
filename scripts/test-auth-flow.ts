@@ -289,7 +289,7 @@ async function main() {
   console.log(`Testing against: ${AUTH_TEST_BASE_URL}\n`)
   
   // Check if server is running
-  log('Checking if server is running...', 'info')
+  authLog('Checking if server is running...', 'info')
   const serverRunning = await checkServerRunning()
   
   if (!serverRunning) {
@@ -298,10 +298,10 @@ async function main() {
     process.exit(1)
   }
   
-  log('✅ Server is running\n', 'success')
+  authLog('✅ Server is running\n', 'success')
   
   // Run tests
-  log('=== Running Tests ===\n', 'info')
+  authLog('=== Running Tests ===\n', 'info')
   
   // Test 1: Registration
   const registrationResult = await testRegistration()

@@ -132,27 +132,89 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
     const images: Array<{filename: string, data: string, type: string}> = []
     
     try {
-      // Use Mammoth to convert DOCX to HTML
+      // First, parse DOCX XML to extract list numbering information
+      // This is needed because Mammoth.js loses list numbering
+      const uint8Array = new Uint8Array(buffer)
+      const zip = await JSZip.loadAsync(uint8Array)
+      const documentXml = await zip.file('word/document.xml')?.async('text')
+      
+      // Extract list numbering from XML using regex (works in all environments)
+      const numberedParagraphIndices = new Set<number>()
+      const numberedParagraphTexts = new Map<number, string>() // Store paragraph text to match with HTML
+      if (documentXml) {
+        // Find all paragraphs with numbering properties
+        // Pattern: <w:p>...<w:numPr>...<w:ilvl w:val="..."/>...<w:numId w:val="..."/>...
+        const paragraphMatches = documentXml.match(/<w:p[^>]*>[\s\S]*?<\/w:p>/gi)
+        if (paragraphMatches) {
+          paragraphMatches.forEach((paraMatch, index) => {
+            // Check if this paragraph has numbering
+            if (/<w:numPr>/.test(paraMatch) || /<w:numPr\s*\/>/.test(paraMatch)) {
+              numberedParagraphIndices.add(index)
+              // Extract text from paragraph to match with HTML later
+              const textMatch = paraMatch.match(/<w:t[^>]*>([^<]+)<\/w:t>/gi)
+              if (textMatch && textMatch.length > 0) {
+                const text = textMatch.map(m => m.replace(/<w:t[^>]*>/, '').replace(/<\/w:t>/, '')).join('').trim()
+                if (text) {
+                  numberedParagraphTexts.set(index, text.substring(0, 50)) // Store first 50 chars for matching
+                }
+              }
+            }
+          })
+        }
+        
+        console.log(`Extracted list numbering info: found ${numberedParagraphIndices.size} numbered paragraphs in XML`)
+        if (numberedParagraphTexts.size > 0) {
+          console.log(`First few numbered paragraph texts:`, Array.from(numberedParagraphTexts.values()).slice(0, 3))
+        }
+      }
+      
+      // Use Mammoth to convert DOCX to HTML with default settings
+      // Mammoth's default output preserves structure better (h1-h6, p, ol, ul, li, img)
       const result = await mammoth.convertToHtml({ arrayBuffer: buffer }, {
         ignoreEmptyParagraphs: true,
+        // Use default styleMap - Mammoth handles lists better by default
+        convertImage: mammoth.images.imgElement(function(image) {
+          // Extract image data and return img element
+          return image.read('base64').then((imageBuffer: string) => {
+            const extension = image.contentType?.split('/')[1] || 'png'
+            const filename = `image_${images.length + 1}.${extension}`
+            const base64Data = `data:${image.contentType};base64,${imageBuffer}`
+            
+            images.push({
+              filename: filename,
+              data: base64Data,
+              type: image.contentType || 'image/png'
+            })
+            console.log(`Extracted image: ${filename}`)
+            
+            return {
+              src: base64Data,
+              alt: filename
+            }
+          })
+        })
       })
       
       console.log('Mammoth conversion completed')
       console.log('Messages:', result.messages.length)
       result.messages.forEach(msg => console.log('Message:', msg.type, msg.message))
       
-      // Extract images from Mammoth messages
+      // Also extract images from Mammoth messages (fallback)
       result.messages
         .filter((msg: MammothMessage) => msg.type === 'image')
         .forEach((msg: MammothMessage) => {
           const image = msg.image
           if (image) {
-            images.push({
-              filename: image.filename || 'unknown.png',
-              data: image.src, // Already base64
-              type: image.contentType || 'image/png'
-            })
-            console.log(`Extracted image: ${image.filename || 'unknown'}`)
+            // Check if we already have this image
+            const existingImage = images.find(img => img.filename === (image.filename || 'unknown.png'))
+            if (!existingImage) {
+              images.push({
+                filename: image.filename || 'unknown.png',
+                data: image.src, // Already base64
+                type: image.contentType || 'image/png'
+              })
+              console.log(`Extracted image from message: ${image.filename || 'unknown'}`)
+            }
           }
         })
       
@@ -161,23 +223,79 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       console.log('HTML text length:', htmlText.length)
       console.log('First 200 chars of HTML:', htmlText.substring(0, 200))
       
-      // Convert HTML to plain text with formatting markers
-      // Process in order: first extract formatting markers, then structure
+      // Debug: Check for numbered lists in HTML
+      const olMatches = htmlText.match(/<ol[^>]*>[\s\S]*?<\/ol>/gi)
+      if (olMatches) {
+        console.log(`Found ${olMatches.length} <ol> tags in HTML`)
+        olMatches.forEach((match, idx) => {
+          const liCount = (match.match(/<li[^>]*>/gi) || []).length
+          console.log(`<ol> tag ${idx + 1} has ${liCount} <li> items`)
+        })
+      } else {
+        console.log('No <ol> tags found in HTML - checking for numbered paragraphs')
+        // Check for paragraphs that might be numbered lists
+        const numberedParagraphs = htmlText.match(/<p[^>]*>\s*\d+\.\s+[^<]+<\/p>/gi)
+        if (numberedParagraphs) {
+          console.log(`Found ${numberedParagraphs.length} paragraphs that start with numbers (potential list items)`)
+          console.log('First few numbered paragraphs:', numberedParagraphs.slice(0, 3))
+        } else {
+          console.log('No numbered paragraphs found either')
+        }
+        
+        // Also check for list items that might not be in <ol> tags
+        const allLiTags = htmlText.match(/<li[^>]*>[\s\S]*?<\/li>/gi)
+        if (allLiTags) {
+          console.log(`Found ${allLiTags.length} <li> tags total (some might be numbered lists)`)
+          // Check if any have numbers
+          const numberedLi = allLiTags.filter(li => /\d+\./.test(li))
+          if (numberedLi.length > 0) {
+            console.log(`Found ${numberedLi.length} <li> tags with numbers (potential ordered list items)`)
+            console.log('First few numbered <li> tags:', numberedLi.slice(0, 3))
+          }
+          
+          // Check for list items with numbering attributes or styles that indicate ordered lists
+          const liWithNumbering = allLiTags.filter(li => {
+            // Check for value attribute, numbering style, or other indicators
+            return /value=["']?\d+["']?/i.test(li) || 
+                   /list-style-type:\s*decimal/i.test(li) ||
+                   /mso-list/i.test(li)
+          })
+          if (liWithNumbering.length > 0) {
+            console.log(`Found ${liWithNumbering.length} <li> tags with numbering attributes/styles`)
+            console.log('First few <li> tags with numbering:', liWithNumbering.slice(0, 3))
+          }
+        }
+      }
       
-      // Step 1: Convert paragraph tags to double newlines for paragraph separation
-      let workingText = htmlText.replace(/<p[^>]*>/gi, '\n\n')
+      // Extract images from HTML img tags (in case they're embedded)
+      const imgTagRegex = /<img[^>]+src="([^"]+)"[^>]*>/gi
+      let imgMatch
+      while ((imgMatch = imgTagRegex.exec(htmlText)) !== null) {
+        const src = imgMatch[1]
+        // Check if it's a data URL we haven't seen
+        if (src.startsWith('data:image/')) {
+          const existingImage = images.find(img => img.data === src)
+          if (!existingImage) {
+            const match = src.match(/data:image\/([^;]+);base64,(.+)/)
+            if (match) {
+              images.push({
+                filename: `image_${images.length + 1}.${match[1]}`,
+                data: src,
+                type: `image/${match[1]}`
+              })
+              console.log(`Extracted image from HTML img tag: image_${images.length}.${match[1]}`)
+            }
+          }
+        }
+      }
       
-      // Step 2: Convert closing paragraph tags
-      workingText = workingText.replace(/<\/p>/gi, '')
+      // Convert Mammoth's HTML directly to markdown while preserving structure
+      // Mammoth's default output already has proper structure (h1-h6, p, ol, ul, li, img)
+      // We just need to convert it to markdown format
       
-      // Step 3: Convert formatting tags (bold, italic) - preserve nested tags
-      workingText = workingText
-        .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '[BOLD]$1[/BOLD]')
-        .replace(/<b[^>]*>(.*?)<\/b>/gi, '[BOLD]$1[/BOLD]')
-        .replace(/<em[^>]*>(.*?)<\/em>/gi, '[ITALIC]$1[/ITALIC]')
-        .replace(/<i[^>]*>(.*?)<\/i>/gi, '[ITALIC]$1[/ITALIC]')
+      let workingText = htmlText
       
-      // Step 4: Convert headings
+      // Step 1: Convert headings first (before other processing)
       workingText = workingText
         .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '\n\n# $1\n\n')
         .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '\n\n## $1\n\n')
@@ -186,16 +304,76 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         .replace(/<h5[^>]*>(.*?)<\/h5>/gi, '\n\n##### $1\n\n')
         .replace(/<h6[^>]*>(.*?)<\/h6>/gi, '\n\n###### $1\n\n')
       
-      // Step 5: Convert lists
-      workingText = workingText
-        .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, '\n\n$1\n\n')
-        .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, '\n\n$1\n\n')
-        .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
+      // Step 2: Convert ordered lists (<ol>) - preserve numbering
+      workingText = workingText.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, listContent) => {
+        const items: string[] = []
+        const listItemMatches = listContent.match(/<li[^>]*>(.*?)<\/li>/gi)
+        if (listItemMatches) {
+          console.log(`Found ordered list with ${listItemMatches.length} items`)
+          let itemNum = 1
+          listItemMatches.forEach((itemMatch: string) => {
+            let itemContent = itemMatch.replace(/<li[^>]*>/, '').replace(/<\/li>/, '').trim()
+            // Check for value attribute (custom numbering)
+            const valueMatch = itemMatch.match(/value=["']?(\d+)["']?/i)
+            if (valueMatch) {
+              itemNum = parseInt(valueMatch[1], 10)
+            }
+            // Remove any existing numbers from content
+            itemContent = itemContent.replace(/^\d+\.\s*/, '')
+            items.push(`${itemNum}. ${itemContent}`)
+            itemNum++
+          })
+        }
+        // Join items with single newline (no blank lines between items)
+        return '\n\n' + items.join('\n') + '\n\n'
+      })
       
-      // Step 6: Remove remaining HTML tags
+      // Step 3: Convert unordered lists (<ul>)
+      workingText = workingText.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, listContent) => {
+        const items: string[] = []
+        const listItemMatches = listContent.match(/<li[^>]*>(.*?)<\/li>/gi)
+        if (listItemMatches) {
+          console.log(`Found unordered list with ${listItemMatches.length} items`)
+          listItemMatches.forEach((itemMatch: string) => {
+            const itemContent = itemMatch.replace(/<li[^>]*>/, '').replace(/<\/li>/, '').trim()
+            items.push(`- ${itemContent}`)
+          })
+        }
+        return '\n\n' + items.join('\n') + '\n\n'
+      })
+      
+      // Step 4: Convert images before removing other HTML tags
+      workingText = workingText.replace(/<img[^>]+src="([^"]+)"[^>]*(?:alt="([^"]*)")?[^>]*>/gi, (match, src, alt) => {
+        const altText = alt || 'Image'
+        console.log(`Found image in HTML: ${altText}, src: ${src.substring(0, 50)}...`)
+        if (src.startsWith('data:image/')) {
+          const existingImage = images.find(img => img.data === src)
+          if (!existingImage) {
+            const match = src.match(/data:image\/([^;]+);base64,(.+)/)
+            if (match) {
+              images.push({
+                filename: `image_${images.length + 1}.${match[1]}`,
+                data: src,
+                type: `image/${match[1]}`
+              })
+            }
+          }
+        }
+        return `\n\n![${altText}](${src})\n\n`
+      })
+      
+      // Step 5: Convert formatting tags (bold, italic) to markdown
+      workingText = workingText
+        .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+        .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+        .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+        .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+      
+      // Step 7: Remove remaining HTML tags (br, div, span, etc.)
+      workingText = workingText.replace(/<br[^>]*\/?>/gi, '\n')
       workingText = workingText.replace(/<[^>]*>/g, '')
       
-      // Step 7: Decode HTML entities
+      // Step 8: Decode HTML entities
       workingText = workingText
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
@@ -204,7 +382,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
       
-      // Step 8: Clean up multiple newlines
+      // Step 9: Clean up multiple newlines
       workingText = workingText
         .replace(/\n{4,}/g, '\n\n\n') // Max 3 newlines
         .replace(/^\n+/, '') // Remove leading newlines
@@ -728,6 +906,16 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
     structuredContent.tables = [...structuredContent.tables, ...parseResult.tables]
   }
   
+  // Merge images from DOCX parsing if they exist
+  if ('images' in parseResult && parseResult.images && Array.isArray(parseResult.images) && parseResult.images.length > 0) {
+    console.log('Found images in parseResult:', parseResult.images.length)
+    structuredContent.images = parseResult.images.map((img, idx) => ({
+      ...img,
+      position: idx
+    }))
+    structuredContent.metadata.totalImages = parseResult.images.length
+  }
+  
   // Ensure line breaks are preserved in the content
   if (structuredContent.sections && structuredContent.sections.length > 0) {
     structuredContent.sections = structuredContent.sections.map(section => ({
@@ -738,6 +926,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   
   console.log('Structured content created:', structuredContent)
   console.log('Total tables in structured content:', structuredContent.tables.length)
+  console.log('Total images in structured content:', structuredContent.images.length)
   
   // Add parsing metadata to track improvements
   structuredContent.metadata = {
@@ -845,6 +1034,44 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         order: sectionOrder++
       }
     }
+    // Check for numbered headings (like "1. Title", "2. Title", etc.)
+    // Must be at start of line, followed by space and capital letter or Cyrillic capital
+    // BUT: We need to be careful not to misclassify numbered list items as headings
+    else if (/^\d+\.\s+[А-ЯЁA-Z]/.test(trimmedLine)) {
+      // Check if it's likely a heading (not a list item)
+      // Headings are usually short, don't end with punctuation, and are followed by content
+      const headingMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/)
+      if (headingMatch) {
+        const headingText = headingMatch[2].trim()
+        
+        // Check if the next line is also a numbered item (if so, it's a list, not a heading)
+        const nextLineIndex = lines.indexOf(line) + 1
+        const nextLine = nextLineIndex < lines.length ? lines[nextLineIndex] : null
+        const nextLineIsNumbered = nextLine && /^\s*\d+\.\s+/.test(nextLine.trim())
+        
+        // Heuristic: if it's short (< 100 chars) and doesn't end with period/comma, it's likely a heading
+        // BUT: if the next line is also numbered, it's definitely a list, not a heading
+        const isLikelyHeading = !nextLineIsNumbered && // Next line is NOT numbered (key indicator)
+          headingText.length < 100 && 
+          !headingText.match(/[.,;:]$/) &&
+          headingText.split(/\s+/).length < 15
+        
+        if (isLikelyHeading) {
+          if (currentSection) {
+            sections.push(currentSection)
+          }
+          
+          currentSection = {
+            title: trimmedLine, // Keep the number in the title
+            level: 2, // Numbered headings are typically level 2
+            content: '',
+            order: sectionOrder++
+          }
+          continue
+        }
+        // If it's not a heading, fall through to treat it as a list item
+      }
+    }
     // Check for days of the week (Monday, Tuesday, etc. or Russian equivalents)
     else if (isDayOfWeekHeading(trimmedLine)) {
       if (currentSection) {
@@ -880,6 +1107,10 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       } else {
         // Check if this line is a list item
         const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(trimmedLine)
+        
+        if (isListItem) {
+          console.log(`Found list item in content: ${trimmedLine.substring(0, 50)}...`)
+        }
         
         if (isListItem || trimmedLine.length > 0) {
           currentSection.content += (currentSection.content ? '\n' : '') + line

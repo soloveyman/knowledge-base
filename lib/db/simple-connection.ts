@@ -15,7 +15,8 @@ const pool = new Pool({
   // SSL for Railway or production
   ssl:
     process.env.NODE_ENV === 'production' ||
-    process.env.DATABASE_URL.includes('railway.app')
+    process.env.DATABASE_URL.includes('railway.app') ||
+    process.env.DATABASE_URL.includes('rlwy.net')
       ? { rejectUnauthorized: false }
       : false,
 });

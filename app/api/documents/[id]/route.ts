@@ -1,20 +1,47 @@
 import { NextResponse } from 'next/server'
-import { db, documents, assignments } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, documents, documentImages, assignments, users, tableExists } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
+import type { ParsedContent } from '@/lib/parsers'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { id } = await params
     const { searchParams } = new URL(request.url)
     const checkDependencies = searchParams.get('checkDependencies') === 'true'
     
     console.log('GET request for document ID:', id, 'checkDependencies:', checkDependencies)
 
-    // Find document by ID
-    const doc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    // Find document by ID with access control
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+    
+    let doc: typeof documents.$inferSelect[] = []
+    
+    if (userRole === 'super-admin') {
+      // Super-admin can see all documents
+      doc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    } else if (tenantId) {
+      // Filter by businessId (tenant isolation) - all other roles
+      const rows = await db
+        .select({ document: documents })
+        .from(documents)
+        .innerJoin(users, eq(documents.uploadedBy, users.id))
+        .where(and(
+          eq(documents.id, id),
+          eq(users.businessId, tenantId)
+        ))
+        .limit(1)
+      doc = rows.map(r => r.document)
+    }
     
     if (doc.length === 0) {
       return NextResponse.json({
@@ -37,9 +64,39 @@ export async function GET(
       })
     }
     
+    // Fetch images for this document
+    let images: typeof documentImages.$inferSelect[] = []
+    if (await tableExists('document_images')) {
+      try {
+        images = await db
+          .select()
+          .from(documentImages)
+          .where(eq(documentImages.documentId, id))
+      } catch (error) {
+        // Table might not exist yet - silently skip
+        // Continue without images
+      }
+    }
+    
+    // Merge images into parsedContent
+    const document = doc[0]
+    const parsedContent = document.parsedContent as ParsedContent | null
+    
+    if (parsedContent && images.length > 0) {
+      parsedContent.images = images
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map(img => ({
+          filename: img.filename,
+          data: img.data,
+          type: img.type,
+          position: img.position ?? undefined
+        }))
+      parsedContent.metadata.totalImages = images.length
+    }
+    
     return NextResponse.json({
       success: true,
-      data: { document: doc[0] }
+      data: { document }
     })
   } catch (error) {
     console.error('Get document API error:', error)
@@ -56,15 +113,54 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { id } = await params
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
 
-    // Check if document exists
-    const existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    console.log('DELETE request for document ID:', id, 'userRole:', userRole, 'tenantId:', tenantId)
+
+    // Check if document exists with access control
+    let existingDocument: typeof documents.$inferSelect[] = []
+    
+    if (userRole === 'super-admin') {
+      // Super-admin can delete all documents
+      existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    } else if (tenantId) {
+      // Filter by businessId (tenant isolation) - all other roles
+      const rows = await db
+        .select({ document: documents })
+        .from(documents)
+        .innerJoin(users, eq(documents.uploadedBy, users.id))
+        .where(and(
+          eq(documents.id, id),
+          eq(users.businessId, tenantId)
+        ))
+        .limit(1)
+      existingDocument = rows.map(r => r.document)
+    }
+    
     if (existingDocument.length === 0) {
-      return NextResponse.json({
-        success: false,
-        message: 'Document not found'
-      }, { status: 404 })
+      // Check if document exists at all (without tenant filtering) for better error message
+      const anyDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+      
+      if (anyDocument.length === 0) {
+        console.log('Document does not exist:', id)
+        return NextResponse.json({
+          success: false,
+          message: 'Document not found. It may have already been deleted.'
+        }, { status: 404 })
+      } else {
+        console.log('Document exists but access denied:', id, 'userRole:', userRole, 'tenantId:', tenantId)
+        return NextResponse.json({
+          success: false,
+          message: 'You do not have permission to delete this document'
+        }, { status: 403 })
+      }
     }
 
     // Check if document's module is used in assignments - if so, block deletion
@@ -83,8 +179,20 @@ export async function DELETE(
       }
     }
 
-    // Delete the document
+    // Hard delete: permanently remove document from database
+    // Also delete associated images
+    if (await tableExists('document_images')) {
+      try {
+        await db.delete(documentImages).where(eq(documentImages.documentId, id))
+      } catch (error) {
+        // Table might not exist - silently skip
+      }
+    }
+    
+    // Permanently delete the document
     await db.delete(documents).where(eq(documents.id, id))
+    
+    console.log('Document permanently deleted:', id)
 
     return NextResponse.json({
       success: true,

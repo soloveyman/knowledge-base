@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, documents } from '@/lib/db'
+import { db, documents, documentImages, tableExists } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
@@ -70,18 +70,23 @@ export async function POST(
         const startTime = Date.now()
         console.log(`Attempting Grok API enhancement with model: ${model}`)
 
-        grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: 'system',
-                content: `You are an expert document structure enhancer. Improve the structure and organization of parsed document content.
+        // Create AbortController for timeout
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 second timeout for enhancement
+        
+        try {
+          grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are an expert document structure enhancer. Improve the structure and organization of parsed document content.
 
 Your task:
 1. Analyze the provided document sections and tables
@@ -91,6 +96,7 @@ Your task:
 5. Correct spelling mistakes and grammar errors
 6. Maintain the original hierarchy and order
 7. CRITICAL: Preserve the original document's language - do NOT translate to another language. Keep all text in the same language as the original document.
+8. CRITICAL: Do NOT touch, modify, refine, or process images in any way. Images will be preserved automatically from the original document. Do not include images in your response - they will be added back automatically.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -119,18 +125,28 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 
-Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language.`
-              },
-              {
-                role: 'user',
-                content: `Enhance this parsed document content:\n\n${fullText}`
-              }
-            ],
-            temperature: 0.3,
-            max_tokens: 4000
+Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language. Do NOT include images in your JSON response - they will be preserved from the original document automatically.`
+                },
+                {
+                  role: 'user',
+                  content: `Enhance this parsed document content:\n\n${fullText}`
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 4000
+            }),
+            signal: controller.signal
           })
-        })
-
+          
+          clearTimeout(timeoutId)
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            throw new Error('Request timeout - Grok API took too long to respond')
+          }
+          throw fetchError
+        }
+        
         const duration = Date.now() - startTime
         console.log(`Grok API enhancement request to ${model} took ${duration}ms, status: ${grokResponse.status}`)
 
@@ -187,11 +203,21 @@ Preserve all original sections and tables, but improve their titles and content 
         throw new Error('Missing metadata')
       }
 
-      // Preserve images from original if they exist
-      if (parsedContent.images && Array.isArray(parsedContent.images)) {
-        enhancedContent.images = parsedContent.images
-      } else {
-        enhancedContent.images = []
+      // Preserve images from original - they're stored in document_images table
+      // We'll fetch them separately and merge them back
+      enhancedContent.images = []
+
+      // Fetch existing images from database to get count
+      let existingImages: typeof documentImages.$inferSelect[] = []
+      if (await tableExists('document_images')) {
+        try {
+          existingImages = await db
+            .select()
+            .from(documentImages)
+            .where(eq(documentImages.documentId, documentId))
+        } catch (error) {
+          // Table might not exist - silently skip
+        }
       }
 
       // Update metadata
@@ -199,7 +225,7 @@ Preserve all original sections and tables, but improve their titles and content 
         ...enhancedContent.metadata,
         totalSections: enhancedContent.sections.length,
         totalTables: enhancedContent.tables.length,
-        totalImages: enhancedContent.images.length,
+        totalImages: existingImages.length,
         wordCount: enhancedContent.sections.reduce((count, s) => count + (s.content?.split(/\s+/).length || 0), 0),
         parserVersion: parsedContent.metadata?.parserVersion || '1.0',
         ...(enhancedContent.metadata && typeof enhancedContent.metadata === 'object' ? enhancedContent.metadata : {})
@@ -218,15 +244,48 @@ Preserve all original sections and tables, but improve their titles and content 
       }, { status: 500 })
     }
 
+    // Remove images from parsedContent (they're stored separately in document_images table)
+    const enhancedContentWithoutImages = {
+      ...enhancedContent,
+      images: []
+    }
+
     // Update the document with enhanced content
     const updated = await db
       .update(documents)
       .set({
-        parsedContent: enhancedContent,
+        parsedContent: enhancedContentWithoutImages,
         updatedAt: new Date()
       })
       .where(eq(documents.id, documentId))
       .returning()
+
+    // Images are preserved in document_images table (cascade delete is handled by DB)
+    // Fetch images from database to include in response
+    let savedImages: typeof documentImages.$inferSelect[] = []
+    if (await tableExists('document_images')) {
+      try {
+        savedImages = await db
+          .select()
+          .from(documentImages)
+          .where(eq(documentImages.documentId, documentId))
+      } catch (error) {
+        // Table might not exist - silently skip
+      }
+    }
+    
+    // Merge images back into enhancedContent for response
+    if (savedImages.length > 0) {
+      enhancedContent.images = savedImages
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map(img => ({
+          filename: img.filename,
+          data: img.data,
+          type: img.type,
+          position: img.position ?? undefined
+        }))
+      enhancedContent.metadata.totalImages = savedImages.length
+    }
 
     return NextResponse.json({
       success: true,

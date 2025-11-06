@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions, assignments, assignmentUsers, testAttempts } from '@/lib/db'
+import { db, tests, questions, assignments, assignmentUsers, testAttempts, progress } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
 
 export async function GET(
   request: Request,
@@ -265,6 +266,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { id } = await params
     console.log('=== DELETE API Debug ===')
     console.log('Request URL:', request.url)
@@ -274,6 +281,8 @@ export async function DELETE(
 
     // Check if test exists - select id and questionIds for deletion
     let questionIds: string[] = []
+    let testExists = false
+    
     try {
       const existingTest = await db
         .select({
@@ -295,11 +304,17 @@ export async function DELETE(
 
       // Get question IDs from the test
       const test = existingTest[0]
+      testExists = true
       questionIds = (test.questionIds as string[]) || []
     } catch (selectError: unknown) {
       // Fallback if columns don't exist - just check existence
       const errorMessage = selectError instanceof Error ? selectError.message : String(selectError)
-      if (errorMessage.includes('column')) {
+      const errorCause = (selectError as any)?.cause
+      const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+      const fullErrorText = `${errorMessage} ${nestedMessage}`
+      
+      if (fullErrorText.includes('column')) {
+        console.log('Column error detected, using fallback query')
         const existingTest = await db
           .select({ id: tests.id })
           .from(tests)
@@ -311,10 +326,19 @@ export async function DELETE(
             message: 'Test not found'
           }, { status: 404 })
         }
+        testExists = true
         questionIds = []
       } else {
+        console.error('Unexpected error checking test:', selectError)
         throw selectError
       }
+    }
+    
+    if (!testExists) {
+      return NextResponse.json({
+        success: false,
+        message: 'Test not found'
+      }, { status: 404 })
     }
     
     // Check if test is used in assignments - if so, block deletion
@@ -331,21 +355,46 @@ export async function DELETE(
       }, { status: 400 })
     }
     
+    // Delete associated test attempts first (foreign key constraint)
+    try {
+      const deletedAttempts = await db.delete(testAttempts).where(eq(testAttempts.testId, id)).returning()
+      console.log(`Deleted ${deletedAttempts.length} test attempt(s)`)
+    } catch (attemptError) {
+      console.warn('Failed to delete test attempts (may not exist):', attemptError)
+      // Continue with deletion even if attempts deletion fails
+    }
+    
+    // Delete associated progress records (foreign key constraint)
+    try {
+      const deletedProgress = await db.delete(progress).where(eq(progress.testId, id)).returning()
+      console.log(`Deleted ${deletedProgress.length} progress record(s)`)
+    } catch (progressError) {
+      console.warn('Failed to delete progress records (may not exist):', progressError)
+      // Continue with deletion even if progress deletion fails
+    }
+    
     // Delete associated questions first (only if they are valid UUIDs)
     if (questionIds.length > 0) {
       console.log('Deleting associated questions:', questionIds)
       
       // Filter out non-UUID question IDs (like "q1", "q2" from mock data)
-      const validQuestionIds = questionIds.filter(id => 
-        typeof id === 'string' && 
-        id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+      const validQuestionIds = questionIds.filter(qId => 
+        typeof qId === 'string' && 
+        qId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
       )
       
       if (validQuestionIds.length > 0) {
         console.log('Deleting valid question IDs:', validQuestionIds)
         // Delete questions one by one (Drizzle doesn't support IN with delete easily)
+        // Wrap in try-catch to handle any foreign key constraint errors
         for (const questionId of validQuestionIds) {
-          await db.delete(questions).where(eq(questions.id, questionId))
+          try {
+            await db.delete(questions).where(eq(questions.id, questionId))
+            console.log('Deleted question:', questionId)
+          } catch (questionError) {
+            console.warn('Failed to delete question (may be referenced elsewhere):', questionId, questionError)
+            // Continue with other questions even if one fails
+          }
         }
       } else {
         console.log('No valid question IDs to delete (skipping mock question IDs)')
@@ -353,8 +402,13 @@ export async function DELETE(
     }
 
     // Delete the test
-    await db.delete(tests).where(eq(tests.id, id))
-    console.log('Test deleted successfully')
+    try {
+      await db.delete(tests).where(eq(tests.id, id))
+      console.log('Test deleted successfully')
+    } catch (deleteError) {
+      console.error('Failed to delete test:', deleteError)
+      throw deleteError
+    }
 
     return NextResponse.json({
       success: true,
@@ -362,10 +416,21 @@ export async function DELETE(
     })
   } catch (error) {
     console.error('Delete test API error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      error: error
+    })
     return NextResponse.json({
       success: false,
       message: 'Failed to delete test',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: errorMessage,
+      debug: process.env.NODE_ENV === 'development' ? {
+        stack: errorStack,
+        errorType: error?.constructor?.name
+      } : undefined
     }, { status: 500 })
   }
 }

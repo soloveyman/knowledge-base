@@ -1,16 +1,6 @@
-"use client"
-
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { redirect } from "next/navigation"
 
 export default function Home() {
-  // Static redirect for unauthenticated users
-  // Middleware handles authenticated user redirects
-  const router = useRouter()
-  
-  useEffect(() => {
-    router.replace("/auth/signin")
-  }, [router])
-
-  return null
+  // Server-side redirect for better FCP - no client-side JS needed
+  redirect("/auth/signin")
 }

@@ -54,7 +54,42 @@
   max-width: 100% !important;
   box-sizing: border-box;
   word-break: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  white-space: normal;
+}
+
+/* Ensure text elements wrap properly - break words that would overflow */
+.document-content p,
+.document-content li,
+.document-content span,
+.document-content div {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* Force long words to break and start on new line */
+.document-content p,
+.document-content li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+/* Ensure headings also wrap properly */
+.document-content h1,
+.document-content h2,
+.document-content h3,
+.document-content h4,
+.document-content h5,
+.document-content h6 {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  max-width: 100%;
 }
 
 /* Ensure images fit screen width */
@@ -81,7 +116,8 @@
 /* Mobile-first: ensure no horizontal scroll on small screens */
 @media (max-width: 640px) {
   .document-content {
-    padding: 0 0.5rem; /* 8px padding on mobile */
+    /* Padding is handled by parent container (px-2 = 8px) */
+    padding: 0;
   }
   
   .document-content p,
@@ -95,7 +131,8 @@
 /* Tablet optimizations */
 @media (min-width: 641px) and (max-width: 1024px) {
   .document-content {
-    padding: 0 0.5rem;
+    /* Padding is handled by parent container */
+    padding: 0;
     max-width: 100%;
     overflow-x: hidden;
     overflow-wrap: break-word;
