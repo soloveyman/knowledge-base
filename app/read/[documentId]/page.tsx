@@ -1,59 +1,11 @@
-"use client"
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import { Suspense } from "react"
+import { db, documents, assignments, users, tests } from "@/lib/db"
+import { eq, and } from "drizzle-orm"
+import { DocumentReaderClient } from "./document-reader-client"
 
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect, useState, useLayoutEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { DocumentTypeBadge } from "@/lib/badges"
-import { useNavigateBack, getRedirectUrl } from "@/lib/redirect-utils"
-import { DocumentRenderer } from "@/components/common/document-renderer"
-import { useTranslation } from "@/lib/translation-context"
-
-interface UserWithRole {
-  name?: string | null
-  email?: string | null
-  role?: string
-}
-
-interface Assignment {
-  id: string
-  name: string
-  description: string
-  document: {
-    id: number
-    name: string
-    type: string
-    uploadedAt: string
-  }
-  test: {
-    id: string
-    title: string
-    questionCount: number
-  }
-  assignedUsers: Array<{
-    id: number
-    name: string
-    email: string
-    role: string
-    department: string
-  }>
-  dueDate: string
-  createdAt: string
-  createdBy: string
-  status: string
-}
-import { 
-  FileText, 
-  X,
-  ArrowLeft,
-  TestTube,
-  CheckCircle
-} from "lucide-react"
-import { useParams } from "next/navigation"
-
-const formatFileSize = (bytes: number): string => {
+function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes'
   const k = 1024
   const sizes = ['Bytes', 'KB', 'MB', 'GB']
@@ -61,463 +13,208 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-const cleanDocumentContent = (content: string) => {
-  // Remove formatting tags like [CENTER], [/CENTER], etc.
-  return content
-    .replace(/\[CENTER\]/gi, '')
-    .replace(/\[\/CENTER\]/gi, '')
-    .replace(/\[BOLD\]/gi, '')
-    .replace(/\[\/BOLD\]/gi, '')
-    .replace(/\[ITALIC\]/gi, '')
-    .replace(/\[\/ITALIC\]/gi, '')
-    .replace(/\[.*?\]/gi, '') // Remove any other tags like [SIZE], [COLOR], etc.
-}
-
-interface DocumentData {
-  id: string
-  name: string
-  type: string
-  uploadedAt: string
-  uploadedBy: string
-  size: string
-  content: string
-  tables?: Array<{
-    title: string
-    headers: string[]
-    rows: string[][]
-  }>
-}
-
-interface AssignmentData {
-  id: string
-  name: string
-  description: string
-  document: DocumentData
-  test: {
-    id: string
-    title: string
-    questionCount: number
-  } | null
-  dueDate: string
-  status: string
-}
-
-export default function DocumentReaderPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const params = useParams()
-  const documentId = params.documentId as string
-  const navigateBack = useNavigateBack()
-  const { t } = useTranslation()
-
-  const [documentData, setDocumentData] = useState<DocumentData | null>(null)
-  const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return
-    if (status === "loading") return
-    if (!session) {
-      router.push("/auth/signin")
-      return
-    }
-
-    // Load assignment data from API
-    const loadAssignmentData = async () => {
-      try {
-        // Fetch document directly by ID (more efficient than fetching all documents)
-        // Try both documentId and moduleId formats since documentId might be either
-        const docResponse = await fetch(`/api/documents/${documentId}`, { cache: 'no-store' })
-        const docResult = await docResponse.json()
-        
-        let document = null
-        if (docResult.success && docResult.data.document) {
-          document = docResult.data.document
-        } else {
-          // Fallback: try fetching all documents if direct fetch fails
-          const allDocsResponse = await fetch('/api/documents', { cache: 'no-store' })
-          const allDocsResult = await allDocsResponse.json()
-          
-          if (allDocsResult.success && allDocsResult.data.documents) {
-            interface ApiDocument {
-              id: string | number
-              originalFileName?: string
-              title?: string
-              fileType?: string
-              createdAt?: string
-              uploadedBy?: string
-              fileSize?: number
-              moduleId?: string | null
-              parsedContent?: {
-                sections?: Array<{ content: string }>
-                tables?: Array<{
-                  title: string
-                  headers: string[]
-                  rows: string[][]
-                }>
-              }
-            }
-            
-            document = (allDocsResult.data.documents as ApiDocument[]).find((doc: ApiDocument) => 
-              String(doc.id) === String(documentId) || String(doc.moduleId) === String(documentId)
-            )
-          }
-        }
-        
-        if (!document) {
-          setLoading(false)
-          return
-        }
-        
-        console.log('Document parsedContent:', document.parsedContent)
-        console.log('Document sections:', document.parsedContent?.sections)
-        console.log('Document tables:', document.parsedContent?.tables)
-        
-        let content = ''
-        
-        // Handle sections (for docx files)
-        if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
-          // Join sections with proper spacing, preserving list structure
-          content = document.parsedContent!.sections
-            .map((s: { title?: string; content: string; level?: number }) => {
-              const sectionParts: string[] = []
-              const contentTrimmed = s.content?.trim() || ''
-              
-              // Only add title if content doesn't already start with a heading
-              // This prevents duplication when content already has markdown headings
-              if (s.title && !contentTrimmed.startsWith('#')) {
-                // Convert section title to markdown heading based on level
-                const level = s.level || 2
-                const headingPrefix = '#'.repeat(Math.min(level, 6))
-                sectionParts.push(`${headingPrefix} ${s.title}`)
-              }
-              
-              if (s.content) {
-                sectionParts.push(s.content)
-              }
-              
-              return sectionParts.join('\n')
-            })
-            .filter(Boolean)
-            .join('\n\n')
-        }
-        
-        // Extract tables separately (for xlsx files)
-        const tables = document.parsedContent?.tables || []
-        
-        // Fallback if no content
-        if (!content && tables.length === 0) {
-          content = 'Document content will be displayed here...'
-        }
-          
-        // Clean artifacts immediately after extraction (but preserve legitimate lists)
-        content = content
-          .replace(/;\s*1\./g, '')  // Remove "; 1." (artifact)
-          .replace(/\.\s*1\./g, '.')  // Remove ". 1." -> "." (artifact at end of sentence)
-          .replace(/\s+1\.\s*$/gm, '')  // Remove " 1." at END of lines only
-          // Note: Do NOT remove "1." at START of lines (legitimate lists)
-        
-        console.log('Final content for display:', content.substring(0, 200))
-        console.log('Found tables:', tables.length)
-        
-        const newDocumentData = {
-          id: String(document.id),
-          name: document.originalFileName || document.title || 'Untitled',
-          type: document.fileType?.toUpperCase() || 'DOCX',
-          uploadedAt: document.createdAt || new Date().toISOString(),
-          uploadedBy: document.uploadedBy || 'Unknown',
-          size: document.fileSize ? formatFileSize(document.fileSize) : 'Unknown',
-          content: content,
-          tables: tables.length > 0 ? tables : undefined
-        }
-          
-          setDocumentData(newDocumentData)
-            
-          // Find the assignment that has this document
-          const response = await fetch(`/api/assignments`, { cache: 'no-store' })
-          const result = await response.json()
-          
-          if (result.success) {
-            interface AssignmentWithModule {
-              id: string
-              moduleId?: string | null
-              testId?: string | null
-              title?: string
-              description?: string
-              dueDate?: string
-              status?: string
-            }
-            
-            // Find assignment that has this moduleId
-            const assignment = (result.data.assignments as AssignmentWithModule[]).find((a: AssignmentWithModule) => a.moduleId === document.moduleId)
-            
-            if (assignment) {
-              // Fetch test data if testId exists (non-blocking, will update when ready)
-              let testData = null
-              if (assignment.testId) {
-                // Fetch test in background (non-blocking)
-                fetch(`/api/tests/${assignment.testId}`, { cache: 'no-store' })
-                  .then(testResponse => testResponse.json())
-                  .then(testResult => {
-                    if (testResult.success && testResult.data.test) {
-                      const loadedTestData = {
-                        id: assignment.testId!,
-                        title: testResult.data.test.title,
-                        questionCount: testResult.data.test.questionIds?.length || 0
-                      }
-                      setAssignmentData(prev => prev ? {
-                        ...prev,
-                        test: loadedTestData
-                      } : null)
-                    }
-                  })
-                  .catch(error => {
-                    console.error('Error loading test:', error)
-                  })
-              }
-              
-              setAssignmentData({
-                id: assignment.id,
-                name: assignment.title || 'Assignment',
-                description: assignment.description || '',
-                document: newDocumentData,
-                test: testData,
-                dueDate: assignment.dueDate || '',
-                status: assignment.status || 'in_progress'
-              })
-            } else {
-              setAssignmentData({
-                id: String(document.id),
-                name: document.title || 'Document',
-                description: '',
-                document: newDocumentData,
-                test: null,
-                dueDate: '',
-                status: 'completed'
-              })
-            }
-          }
-      } catch (error) {
-        console.error('Error loading assignment:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadAssignmentData()
-  }, [session, status, router, documentId])
-
-
-  const handleTakeTest = () => {
-    if (assignmentData?.test) {
-      // Ensure test id is a string
-      const testId = String(assignmentData.test.id)
-      router.push(`/test/${testId}`)
-    }
+async function fetchDocumentAndAssignment(documentId: string) {
+  const session = await auth()
+  
+  if (!session?.user) {
+    redirect("/auth/signin")
   }
-
-  const handleCompleteAssignment = async () => {
-    if (!assignmentData?.id) return
+  
+  const userId = session.user.id
+  const tenantId = session.user.businessId
+  const userRole = session.user.role
+  
+  // Fetch document by ID
+  let doc: typeof documents.$inferSelect | null = null
+  
+  if (userRole === 'super-admin') {
+    const docs = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.id, documentId))
+      .limit(1)
     
-    // Only complete if there's no test (assignments with tests are completed via test attempts)
-    if (!assignmentData.test) {
-      try {
-        const response = await fetch(`/api/assignments/${assignmentData.id}/complete`, {
-          method: 'POST'
-        })
-        const result = await response.json()
+    if (docs.length > 0) {
+      doc = docs[0]
+    }
+  } else if (tenantId) {
+    const rows = await db
+      .select({ document: documents })
+      .from(documents)
+      .innerJoin(users, eq(documents.uploadedBy, users.id))
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(users.businessId, tenantId)
+        )
+      )
+      .limit(1)
+    
+    if (rows.length > 0) {
+      doc = rows[0].document
+    }
+  }
+  
+  if (!doc) {
+    // Document not found, redirect back
+    if (userRole === 'owner') {
+      redirect('/owner?tab=docs')
+    } else if (userRole === 'manager') {
+      redirect('/manager?tab=docs')
+    } else {
+      redirect('/employee?tab=assignments')
+    }
+  }
+  
+  // Extract content from sections
+  let content = ''
+  const parsedContent = doc.parsedContent as {
+    sections?: Array<{ title?: string; content: string; level?: number }>
+    tables?: Array<{
+      title: string
+      headers: string[]
+      rows: string[][]
+    }>
+  } | null
+  
+  if (parsedContent?.sections && parsedContent.sections.length > 0) {
+    content = parsedContent.sections
+      .map((s) => {
+        const sectionParts: string[] = []
+        const contentTrimmed = s.content?.trim() || ''
         
-        if (result.success) {
-          setAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null)
+        if (s.title && !contentTrimmed.startsWith('#')) {
+          const level = s.level || 2
+          const headingPrefix = '#'.repeat(Math.min(level, 6))
+          sectionParts.push(`${headingPrefix} ${s.title}`)
         }
-      } catch (error) {
-        console.error('Error completing assignment:', error)
+        
+        if (s.content) {
+          sectionParts.push(s.content)
+        }
+        
+        return sectionParts.join('\n')
+      })
+      .filter(Boolean)
+      .join('\n\n')
+    
+    // Clean artifacts (preserve legitimate lists)
+    content = content
+      .replace(/;\s*1\./g, '')
+      .replace(/\.\s*1\./g, '.')
+      .replace(/\s+1\.\s*$/gm, '')
+  }
+  
+  // Extract tables
+  const tables = parsedContent?.tables || []
+  
+  if (!content && tables.length === 0) {
+    content = 'Document content will be displayed here...'
+  }
+  
+  const documentData = {
+    id: String(doc.id),
+    name: doc.originalFileName || doc.title || 'Untitled',
+    type: doc.fileType?.toUpperCase() || 'DOCX',
+    uploadedAt: doc.createdAt?.toISOString() || new Date().toISOString(),
+    uploadedBy: doc.uploadedBy || 'Unknown',
+    size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+    content: content,
+    tables: tables.length > 0 ? tables : undefined
+  }
+  
+  // Find assignment that has this document
+  let assignmentData = null
+  
+  if (doc.moduleId) {
+    const assignmentRows = await db
+      .select({ assignment: assignments })
+      .from(assignments)
+      .where(eq(assignments.moduleId, doc.moduleId))
+      .limit(1)
+    
+    if (assignmentRows.length > 0) {
+      const assignment = assignmentRows[0].assignment
+      
+      // Fetch test data if testId exists
+      let testData = null
+      if (assignment.testId) {
+        const testRows = await db
+          .select()
+          .from(tests)
+          .where(eq(tests.id, assignment.testId))
+          .limit(1)
+        
+        if (testRows.length > 0) {
+          const test = testRows[0]
+          testData = {
+            id: test.id,
+            title: test.title,
+            questionCount: Array.isArray(test.questionIds) ? test.questionIds.length : 0
+          }
+        }
+      }
+      
+      assignmentData = {
+        id: assignment.id,
+        name: assignment.title || 'Assignment',
+        description: assignment.description || '',
+        test: testData,
+        dueDate: assignment.dueDate?.toISOString() || '',
+        status: assignment.status || 'in_progress'
       }
     }
   }
-
-  const handleBack = () => {
-    // Determine user role from session or default to employee
-    const userRole = (session?.user as UserWithRole)?.role || 'employee'
-    // Ensure userRole is a string and valid
-    const validRole = typeof userRole === 'string' ? userRole : 'employee'
-    navigateBack(validRole as 'employee' | 'manager' | 'owner', 'assignments')
+  
+  // If no assignment found, create a minimal one for display
+  if (!assignmentData) {
+    assignmentData = {
+      id: String(doc.id),
+      name: doc.title || 'Document',
+      description: '',
+      test: null,
+      dueDate: '',
+      status: 'completed'
+    }
   }
-
-
-  // Don't block UI while session loads - show page immediately
-  if (status === "loading") {
-    // Show page but with disabled state - don't block with spinner
+  
+  return {
+    document: documentData,
+    assignment: assignmentData
   }
+}
 
-  if (!session) {
-    return null
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    )
-  }
-
-  if (!documentData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center px-4">
-          <FileText className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 sm:mb-6 text-muted-foreground" />
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-white mb-3 sm:mb-4 leading-tight">
-            Document Not Found
-          </h2>
-          <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 leading-relaxed max-w-md mx-auto">
-            The requested document could not be found.
-          </p>
-          <Button onClick={handleBack} size="lg">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Assignments
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
+function DocumentReaderSkeleton() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-[1200px] mx-auto px-2 sm:px-6">
-          <div className="flex justify-between items-center h-16 sm:h-18">
-            <div className="flex items-center min-w-0 flex-1">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground dark:text-white truncate leading-tight mb-0.5">
-                  {assignmentData?.name || documentData.name}
-                </h1>
-                <p className="text-sm sm:text-base text-muted-foreground truncate leading-relaxed">
-                  {documentData.name}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={handleBack}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-
-      {/* Main Content */}
-      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
-        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
-          {/* Document Content */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold leading-tight">
-                    <FileText className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-                    <span className="break-words">{documentData.name}</span>
-                  </CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="px-2 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-              {documentData.type === 'PDF' ? (
-                <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
-                  <iframe 
-                    src={`/api/documents/${encodeURIComponent(documentData.name)}`}
-                    className="w-full h-full"
-                    title={documentData.name}
-                  />
-                </div>
-              ) : (
-                <DocumentRenderer 
-                  content={documentData.content} 
-                  tables={documentData.tables}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Card Section */}
-          {(assignmentData?.test || assignmentData) && (
-            <div>
-              <div className="w-full">
-                {/* Test Section */}
-                {assignmentData?.test ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
-                        <span className="text-2xl">📝</span>
-                        <span>{t('testAvailable')}</span>
-                      </CardTitle>
-                      <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
-                        {t('completeTheTestAfterReadingTheDocument')}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="text-sm sm:text-base text-muted-foreground space-y-2.5 leading-relaxed">
-                        <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                          <strong className="font-semibold text-foreground">{t('testLabel')}:</strong>
-                          <span>{assignmentData?.test?.title || t('test')}</span>
-                        </p>
-                        <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                          <strong className="font-semibold text-foreground">{t('questionsLabel')}:</strong>
-                          <span>{assignmentData?.test?.questionCount || 0}</span>
-                        </p>
-                        <p className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                          <strong className="font-semibold text-foreground">{t('estimatedTime')}:</strong>
-                          <span>15 {t('minutes')}</span>
-                        </p>
-                      </div>
-                      
-                      <Button 
-                        onClick={handleTakeTest}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                        disabled={assignmentData?.status === 'completed'}
-                      >
-                        <TestTube className="h-4 w-4 mr-2" />
-                        {assignmentData?.status === 'completed' ? t('testCompleted') : t('takeTest')}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  /* No test - show completion button */
-                  assignmentData && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2 leading-tight">
-                          <span className="text-2xl">📖</span>
-                          <span>{t('readingAssignment')}</span>
-                        </CardTitle>
-                        <CardDescription className="text-sm sm:text-base leading-relaxed mt-2">
-                          {assignmentData.status === 'completed' 
-                            ? t('assignmentCompleted') 
-                            : t('markAsCompleteAfterReading')}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <Button 
-                          onClick={handleCompleteAssignment}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                          disabled={assignmentData.status === 'completed'}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          {assignmentData.status === 'completed' 
-                            ? t('completed') 
-                            : t('markAsComplete')}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )
-                )}
-              </div>
-            </div>
-          )}
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
+      <div className="h-16 bg-background border-b" suppressHydrationWarning />
+      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10" suppressHydrationWarning>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div>
         </div>
       </main>
     </div>
   )
+}
+
+export default async function DocumentReaderPage({
+  params
+}: {
+  params: Promise<{ documentId: string }>
+}) {
+  const { documentId } = await params
+  
+  try {
+    const data = await fetchDocumentAndAssignment(documentId)
+    
+    return (
+      <Suspense fallback={<DocumentReaderSkeleton />}>
+        <DocumentReaderClient document={data.document} assignment={data.assignment} />
+      </Suspense>
+    )
+  } catch (error) {
+    // Error already handled in fetchDocumentAndAssignment with redirect
+    // This is just a fallback
+    redirect('/employee?tab=assignments')
+  }
 }
