@@ -1,0 +1,8 @@
+[33mcommit c31078c4fcd257c4e84ed36aa0f9b834ccc07800[m
+Author: soloveyman <your-email@example.com>
+Date:   Thu Nov 6 18:39:06 2025 +0300
+
+    react comp created for docs
+
+ app/docs/[filename]/document-viewer-client.tsx | 78 [32m++++++++++++++++++++++++++[m
+ 1 file changed, 78 insertions(+)
