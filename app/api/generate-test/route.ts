@@ -12,42 +12,13 @@ export async function POST(request: Request) {
 
     // Check if Grok API key is available
     if (!process.env.GROK_API_KEY) {
-      // Fallback to mock questions if no API key
-      const mockQuestions = [
+      return NextResponse.json(
         {
-          id: `q_${Date.now()}_1`,
-          type: "mcq",
-          prompt: "What is the main topic of this document?",
-          choices: ["Menu items", "Pricing", "Restaurant hours", "Contact information"],
-          correct_answer: "0",
-          explanation: "The document contains menu items and pricing information."
+          success: false,
+          error: "GROK_API_KEY is not configured. Please configure the API key to generate tests.",
         },
-        {
-          id: `q_${Date.now()}_2`,
-          type: "tf",
-          prompt: "This document contains pricing information.",
-          correct_answer: "true",
-          explanation: "The document includes prices for various menu items."
-        },
-        {
-          id: `q_${Date.now()}_3`,
-          type: "mcq",
-          prompt: "What type of cuisine is featured in this menu?",
-          choices: ["Italian", "Russian", "Mixed", "Fast food"],
-          correct_answer: "2",
-          explanation: "The menu contains a mix of different cuisines and styles."
-        }
-      ]
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          questions: mockQuestions,
-          totalGenerated: mockQuestions.length
-        },
-        provider: "mock",
-        message: "Using mock questions - GROK_API_KEY not configured"
-      })
+        { status: 400 }
+      )
     }
 
     // Generate questions using Grok API

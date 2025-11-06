@@ -39,20 +39,33 @@ async function seed() {
     console.log(`✅ User created: ${u.email} (${u.role})`)
   }
 
-  // 2) Create a simple module owned by manager
-  const [moduleRow] = await db.insert(modules).values({
-    title: 'Safety Guidelines',
-    description: 'Basic safety procedures',
-    content: '# Safety\nAlways be careful.',
-    createdBy: userIds['manager'],
-    status: 'published',
-  }).returning().catch(async () => {
-    // If constraint issue, pick any existing module created by manager
-    const existing = await db.select().from(modules).where(eq(modules.title, 'Safety Guidelines'))
-    return existing as any
-  })
-
-  const moduleId = Array.isArray(moduleRow) ? moduleRow[0].id : moduleRow.id
+  // 2) Create or get a simple module owned by manager
+  let moduleRow: any
+  let moduleId: string
+  try {
+    // First try to get existing module
+    const existing = await db.select().from(modules).where(eq(modules.title, 'Safety Guidelines')).limit(1)
+    if (existing.length > 0) {
+      moduleRow = existing[0]
+      moduleId = moduleRow.id
+      console.log('✅ Using existing module: Safety Guidelines')
+    } else {
+      // Create new module
+      const result = await db.insert(modules).values({
+        title: 'Safety Guidelines',
+        description: 'Basic safety procedures',
+        content: '# Safety\nAlways be careful.',
+        createdBy: userIds['manager'],
+        status: 'published',
+      }).returning()
+      moduleRow = result[0]
+      moduleId = moduleRow.id
+      console.log('✅ Created module: Safety Guidelines')
+    }
+  } catch (error: any) {
+    console.error('❌ Failed to create/get module:', error.message)
+    throw error
+  }
 
   // 3) Create a document linked to module
   const [docRow] = await db.insert(docsTable).values({
@@ -68,21 +81,43 @@ async function seed() {
     return existing as any
   })
 
-  // 4) Create a test linked to module
-  const [testRow] = await db.insert(testsTable).values({
-    moduleId,
-    title: 'Safety Test',
-    description: 'Quick safety check',
-    questionIds: [],
-    passingScore: 70,
-    status: 'published',
-    createdBy: userIds['manager'],
-  }).returning().catch(async () => {
-    const existing = await db.select().from(testsTable).where(eq(testsTable.title, 'Safety Test'))
-    return existing as any
-  })
+  // 4) Create a test linked to module (or update existing to link to this module)
+  let testRow: any
+  try {
+    // First check if test exists for this module
+    const existingForModule = await db.select().from(testsTable).where(eq(testsTable.moduleId, moduleId)).limit(1)
+    if (existingForModule.length > 0) {
+      testRow = existingForModule[0]
+      console.log('✅ Test already exists for module: Safety Test')
+    } else {
+      // Check if test exists but is linked to different module
+      const existing = await db.select().from(testsTable).where(eq(testsTable.title, 'Safety Test')).limit(1)
+      if (existing.length > 0) {
+        // Update to link to this module
+        await db.update(testsTable).set({ moduleId }).where(eq(testsTable.id, existing[0].id))
+        testRow = { ...existing[0], moduleId }
+        console.log('✅ Updated test to link to module: Safety Test')
+      } else {
+        // Create new test
+        const result = await db.insert(testsTable).values({
+          moduleId,
+          title: 'Safety Test',
+          description: 'Quick safety check',
+          questionIds: [],
+          passingScore: 70,
+          status: 'published',
+          createdBy: userIds['manager'],
+        }).returning()
+        testRow = result[0]
+        console.log('✅ Test created: Safety Test')
+      }
+    }
+  } catch (error: any) {
+    console.error('❌ Failed to create/update test:', error.message)
+    throw error
+  }
 
-  const testId = Array.isArray(testRow) ? testRow[0].id : testRow.id
+  const testId = testRow.id
 
   // 5) Create an assignment for employee
   const [assignmentRow] = await db.insert(assignmentsTable).values({

@@ -28,6 +28,8 @@
     "test:smoke": "tsx scripts/smoke-test.ts",
     "test:security": "tsx scripts/test-security.ts",
     "test:auth": "tsx scripts/test-auth-flow.ts",
+    "test:account-deletion": "tsx scripts/test-account-deletion.ts",
+    "test:all": "tsx scripts/test-all.ts",
     "check:env": "tsx scripts/check-env.ts",
     "setup:env": "tsx scripts/setup-env.ts",
     "setup:trial": "tsx scripts/setup-trial-plan.ts",

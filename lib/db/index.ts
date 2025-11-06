@@ -20,10 +20,11 @@ const pool = new Pool({
   idleTimeoutMillis: 30000, // 30 seconds
   connectionTimeoutMillis: 10000, // 10 seconds
   // SSL for production and Railway (Railway uses SSL)
-  // Also enable SSL if connection string contains 'railway.app' (connecting to Railway from anywhere)
+  // Also enable SSL if connection string contains 'railway.app' or 'rlwy.net' (connecting to Railway from anywhere)
   ssl:
     process.env.NODE_ENV === 'production' ||
-    process.env.DATABASE_URL?.includes('railway.app')
+    process.env.DATABASE_URL?.includes('railway.app') ||
+    process.env.DATABASE_URL?.includes('rlwy.net')
       ? { rejectUnauthorized: false }
       : false,
   // Log connections in development
