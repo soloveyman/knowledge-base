@@ -91,6 +91,7 @@ Your task:
 5. Correct spelling mistakes and grammar errors
 6. Maintain the original hierarchy and order
 7. CRITICAL: Preserve the original document's language - do NOT translate to another language. Keep all text in the same language as the original document.
+8. CRITICAL: Do NOT touch, modify, refine, or process images in any way. Images will be preserved automatically from the original document. Do not include images in your response - they will be added back automatically.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -119,7 +120,7 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 
-Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language.`
+Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language. Do NOT include images in your JSON response - they will be preserved from the original document automatically.`
               },
               {
                 role: 'user',
