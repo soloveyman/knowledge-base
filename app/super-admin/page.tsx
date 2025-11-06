@@ -271,14 +271,14 @@ export default function SuperAdminPage() {
       />
       <div className="container mx-auto px-4 sm:px-6 pt-6 pb-4 md:p-8">
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold break-words">
               ${stats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">Monthly recurring revenue</p>
@@ -287,43 +287,42 @@ export default function SuperAdminPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Active Subscriptions</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeSubscriptions}</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.activeSubscriptions}</div>
             <p className="text-xs text-muted-foreground">Currently active</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Churn Rate</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Churn Rate</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.churnRate}%</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.churnRate}%</div>
             <p className="text-xs text-muted-foreground">Monthly churn</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New This Month</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">New This Month</CardTitle>
             <Crown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.newThisMonth}</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.newThisMonth}</div>
             <p className="text-xs text-muted-foreground">New subscriptions</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="subscriptions" className="space-y-6">
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="subscriptions">Owner Subscriptions</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="settings">System Settings</TabsTrigger>
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="subscriptions" className="text-xs sm:text-sm">Owner Subscriptions</TabsTrigger>
+          <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscriptions" className="space-y-6">
@@ -336,10 +335,10 @@ export default function SuperAdminPage() {
             </CardHeader>
             <CardContent>
               {/* Filter Tabs */}
-              <div className="mb-4 flex gap-2">
+              <div className="mb-4 flex flex-wrap gap-2">
                 <button
                   onClick={() => setFilterType('free-trial')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                     filterType === 'free-trial'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -349,7 +348,7 @@ export default function SuperAdminPage() {
                 </button>
                 <button
                   onClick={() => setFilterType('paid')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                     filterType === 'paid'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -359,7 +358,7 @@ export default function SuperAdminPage() {
                 </button>
                 <button
                   onClick={() => setFilterType('manual')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                     filterType === 'manual'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -394,17 +393,17 @@ export default function SuperAdminPage() {
                   </div>
                 ) : (
                   filteredOwners.map((owner) => (
-                    <div key={owner.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div>
-                        <div className="font-medium">{owner.name || 'Unnamed Owner'}</div>
-                        <div className="text-sm text-gray-600">{owner.email}</div>
+                    <div key={owner.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{owner.name || 'Unnamed Owner'}</div>
+                        <div className="text-sm text-gray-600 truncate">{owner.email}</div>
                         {owner.country && (
                           <div className="text-xs text-gray-500">{owner.country}</div>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                        <div className="text-left sm:text-right flex-1 min-w-0">
                           <div className="font-medium">
                             {owner.plan?.displayName || 'No Plan'}
                           </div>
@@ -427,7 +426,7 @@ export default function SuperAdminPage() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {getStatusIcon(owner.subscription?.status || null)}
                           {getStatusBadge(owner.subscription?.status || null)}
                           {getProviderBadge(owner.subscription?.provider || null)}
@@ -435,17 +434,17 @@ export default function SuperAdminPage() {
 
                         {/* Plan Change Dropdown - Only for free trial users and manually changed plans */}
                         {((owner.plan?.name === 'free-trial') || (owner.subscription?.changedManuallyAt !== null && owner.subscription?.changedManuallyAt !== undefined)) && plans.length > 0 && (
-                          <div className="min-w-[180px]">
+                          <div className="w-full sm:w-auto sm:min-w-[140px]">
                             <Select
                               value=""
                               onValueChange={(planId) => handleChangePlan(owner.id, planId)}
                               disabled={changingPlan === owner.id}
                             >
-                              <SelectTrigger className="w-full">
+                              <SelectTrigger className="w-full sm:w-auto">
                                 {changingPlan === owner.id ? (
                                   <div className="flex items-center gap-2">
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>Changing...</span>
+                                    <span className="text-xs sm:text-sm">Changing...</span>
                                   </div>
                                 ) : (
                                   <SelectValue placeholder="Change Plan" />
@@ -464,7 +463,7 @@ export default function SuperAdminPage() {
                           </div>
                         )}
 
-                        <div className="text-right min-w-[80px]">
+                        <div className="text-left sm:text-right sm:min-w-[80px]">
                           <div className="font-medium">${(owner.revenue / 100).toFixed(2)}</div>
                           <div className="text-xs text-gray-500">Monthly</div>
                         </div>
@@ -489,23 +488,6 @@ export default function SuperAdminPage() {
               <div className="text-center py-8 text-muted-foreground">
                 <TrendingUp className="h-12 w-12 mx-auto mb-4" />
                 <p>Analytics dashboard will be implemented here</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>
-                Configure payment providers and system settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertCircle className="h-12 w-12 mx-auto mb-4" />
-                <p>System settings will be implemented here</p>
               </div>
             </CardContent>
           </Card>
