@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, documents, documentImages, assignments } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, documents, documentImages, assignments, users } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
 
 export async function GET(
@@ -8,14 +9,39 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { id } = await params
     const { searchParams } = new URL(request.url)
     const checkDependencies = searchParams.get('checkDependencies') === 'true'
     
     console.log('GET request for document ID:', id, 'checkDependencies:', checkDependencies)
 
-    // Find document by ID
-    const doc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    // Find document by ID with access control
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+    
+    let doc: typeof documents.$inferSelect[] = []
+    
+    if (userRole === 'super-admin') {
+      // Super-admin can see all documents
+      doc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    } else if (tenantId) {
+      // Filter by businessId (tenant isolation) - all other roles
+      const rows = await db
+        .select({ document: documents })
+        .from(documents)
+        .innerJoin(users, eq(documents.uploadedBy, users.id))
+        .where(and(
+          eq(documents.id, id),
+          eq(users.businessId, tenantId)
+        ))
+        .limit(1)
+      doc = rows.map(r => r.document)
+    }
     
     if (doc.length === 0) {
       return NextResponse.json({
@@ -79,10 +105,35 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { id } = await params
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
 
-    // Check if document exists
-    const existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    // Check if document exists with access control
+    let existingDocument: typeof documents.$inferSelect[] = []
+    
+    if (userRole === 'super-admin') {
+      // Super-admin can delete all documents
+      existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    } else if (tenantId) {
+      // Filter by businessId (tenant isolation) - all other roles
+      const rows = await db
+        .select({ document: documents })
+        .from(documents)
+        .innerJoin(users, eq(documents.uploadedBy, users.id))
+        .where(and(
+          eq(documents.id, id),
+          eq(users.businessId, tenantId)
+        ))
+        .limit(1)
+      existingDocument = rows.map(r => r.document)
+    }
+    
     if (existingDocument.length === 0) {
       return NextResponse.json({
         success: false,

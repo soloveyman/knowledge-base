@@ -7,24 +7,29 @@ import type { ParsedContent } from '@/lib/parsers'
 export async function GET() {
   try {
     const session = await auth()
-    const userRole = session?.user?.role
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
     
-    let allDocuments
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
     
-    // Owner sees all documents regardless of businessId
-    if (userRole === 'owner') {
+    let allDocuments: typeof documents.$inferSelect[] = []
+    
+    // All roles (including owner) filter by businessId for tenant isolation
+    // Only super-admin should see all documents across all businesses
+    if (userRole === 'super-admin') {
       allDocuments = await db
         .select()
         .from(documents)
         .orderBy(desc(documents.createdAt))
-    } else {
-      // Manager and other roles filter by businessId (tenant isolation)
-      const tenantId = session?.user?.businessId
+    } else if (tenantId) {
+      // Filter by businessId (tenant isolation) - all other roles
       const rows = await db
         .select({ document: documents, uploaderBusinessId: users.businessId })
         .from(documents)
-        .leftJoin(users, eq(documents.uploadedBy, users.id))
-        .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+        .innerJoin(users, eq(documents.uploadedBy, users.id))
+        .where(eq(users.businessId, tenantId))
         .orderBy(desc(documents.createdAt))
       allDocuments = rows.map(r => r.document)
     }
