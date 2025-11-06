@@ -40,7 +40,6 @@ export function UsersPage({
     title: user.name,
     subtitle: `${user.job} • ${user.email}`,
     metadata: [
-      `${t('role')}: ${user.role.charAt(0).toUpperCase() + user.role.slice(1)}`,
       `${t('created')}: ${formatDateShort(user.createdAt)}`
     ],
     badges: [
