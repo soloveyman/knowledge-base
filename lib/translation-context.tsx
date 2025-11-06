@@ -11,22 +11,48 @@ interface TranslationContextType {
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined)
 
-export function TranslationProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>('en')
+// Helper function to detect browser language based on region
+function detectBrowserLanguage(): Language {
+  if (typeof window === 'undefined') {
+    return 'en' // Default for SSR
+  }
 
-  // Load language from localStorage on mount
-  useEffect(() => {
+  // Get browser language/locale
+  const browserLang = navigator.language || (navigator as any).userLanguage || 'en'
+  
+  // Extract language code (e.g., 'ru' from 'ru-RU' or 'ru')
+  const langCode = browserLang.split('-')[0].toLowerCase()
+  
+  // Map language codes to our supported languages
+  // Russian/CIS countries -> 'ru'
+  if (langCode === 'ru' || langCode === 'uk' || langCode === 'be' || langCode === 'kk') {
+    return 'ru'
+  }
+  
+  // Default to English for all other languages
+  return 'en'
+}
+
+export function TranslationProvider({ children }: { children: React.ReactNode }) {
+  // Initialize with language from localStorage or detect from browser
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window === 'undefined') {
+      return 'en' // SSR default
+    }
+    
+    // Check localStorage first (synchronous)
     const savedLanguage = localStorage.getItem('language') as Language
     if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'ru')) {
-      // Use setTimeout to defer the state update
-      setTimeout(() => {
-        setLanguage(savedLanguage)
-      }, 0)
+      return savedLanguage
     }
-  }, [])
+    
+    // No saved language, detect from browser region
+    return detectBrowserLanguage()
+  })
 
-  // Save language to localStorage when it changes
+  // Save language to localStorage when it changes (including initial detection)
   useEffect(() => {
+    if (typeof window === 'undefined') return
     localStorage.setItem('language', language)
   }, [language])
 
