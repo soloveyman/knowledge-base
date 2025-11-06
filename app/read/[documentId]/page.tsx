@@ -180,7 +180,8 @@ async function fetchDocumentAndAssignment(documentId: string) {
   
   return {
     document: documentData,
-    assignment: assignmentData
+    assignment: assignmentData,
+    userRole: session.user.role || 'employee'
   }
 }
 
@@ -209,7 +210,7 @@ export default async function DocumentReaderPage({
     
     return (
       <Suspense fallback={<DocumentReaderSkeleton />}>
-        <DocumentReaderClient document={data.document} assignment={data.assignment} />
+        <DocumentReaderClient document={data.document} assignment={data.assignment} userRole={data.userRole} />
       </Suspense>
     )
   } catch (error) {

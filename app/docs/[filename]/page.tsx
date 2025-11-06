@@ -185,7 +185,8 @@ async function fetchDocumentData(filenameOrId: string) {
     size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
     content: content,
     tables: tables,
-    filenameOrId: filenameOrId
+    filenameOrId: filenameOrId,
+    userRole: session.user.role || 'manager'
   }
 }
 
@@ -212,7 +213,7 @@ export default async function DocumentViewer({
     
     return (
       <Suspense fallback={<DocumentViewerSkeleton />}>
-        <DocumentViewerClient document={document} />
+        <DocumentViewerClient document={document} userRole={document.userRole} />
       </Suspense>
     )
   } catch (error) {

@@ -45,7 +45,6 @@ if (typeof process !== 'undefined' && !process.env.NEXTAUTH_URL) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   trustHost: true, // Allow NextAuth to trust the host from request headers (important for Vercel)
-  debug: process.env.NODE_ENV === 'development', // Enable debug logging in development
   providers: [
     ...oauthProviders,
     CredentialsProvider({

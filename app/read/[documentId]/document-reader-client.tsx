@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { useNavigateBack } from "@/lib/redirect-utils"
 import { DocumentRenderer } from "@/components/common/document-renderer"
 import { useTranslation } from "@/lib/translation-context"
-import { useSession } from "next-auth/react"
 import { 
   FileText, 
   X,
@@ -39,11 +38,11 @@ interface DocumentReaderClientProps {
     dueDate: string
     status: string
   } | null
+  userRole: string
 }
 
-export function DocumentReaderClient({ document, assignment }: DocumentReaderClientProps) {
+export function DocumentReaderClient({ document, assignment, userRole }: DocumentReaderClientProps) {
   const router = useRouter()
-  const { data: session } = useSession()
   const navigateBack = useNavigateBack()
   const { t } = useTranslation()
 
@@ -75,7 +74,6 @@ export function DocumentReaderClient({ document, assignment }: DocumentReaderCli
   }
 
   const handleBack = () => {
-    const userRole = (session?.user as { role?: string })?.role || 'employee'
     navigateBack(userRole as 'employee' | 'manager' | 'owner', 'assignments')
   }
 
@@ -100,12 +98,12 @@ export function DocumentReaderClient({ document, assignment }: DocumentReaderCli
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-[1200px] mx-auto px-2 sm:px-6">
-          <div className="flex justify-between items-center h-16 sm:h-18">
-            <div className="flex items-center min-w-0 flex-1">
+      <header className="bg-card border-b border-border sticky top-0 z-50" suppressHydrationWarning>
+        <div className="max-w-[1200px] mx-auto px-2 sm:px-6" suppressHydrationWarning>
+          <div className="flex justify-between items-center h-16 sm:h-18" suppressHydrationWarning>
+            <div className="flex items-center min-w-0 flex-1" suppressHydrationWarning>
               <div className="min-w-0 flex-1">
                 <h1 className="text-xl sm:text-2xl font-bold text-foreground dark:text-white truncate leading-tight mb-0.5">
                   {assignment?.name || document.name}
@@ -115,7 +113,7 @@ export function DocumentReaderClient({ document, assignment }: DocumentReaderCli
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2" suppressHydrationWarning>
               <Button variant="ghost" size="sm" onClick={handleBack}>
                 <X className="h-4 w-4" />
               </Button>
@@ -125,8 +123,8 @@ export function DocumentReaderClient({ document, assignment }: DocumentReaderCli
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
-        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
+      <main className="max-w-[1200px] mx-auto px-2 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10" suppressHydrationWarning>
+        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8" suppressHydrationWarning>
           {/* Document Content */}
           <Card>
             <CardHeader>
@@ -139,7 +137,7 @@ export function DocumentReaderClient({ document, assignment }: DocumentReaderCli
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="px-2 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+            <CardContent className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 overflow-x-hidden" suppressHydrationWarning>
               {document.type === 'PDF' ? (
                 <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
                   <iframe 
@@ -149,10 +147,12 @@ export function DocumentReaderClient({ document, assignment }: DocumentReaderCli
                   />
                 </div>
               ) : (
-                <DocumentRenderer 
-                  content={document.content} 
-                  tables={document.tables}
-                />
+                <div className="w-full max-w-full overflow-x-hidden" suppressHydrationWarning>
+                  <DocumentRenderer 
+                    content={document.content} 
+                    tables={document.tables}
+                  />
+                </div>
               )}
             </CardContent>
           </Card>

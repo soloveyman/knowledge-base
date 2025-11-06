@@ -107,10 +107,13 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
     }
   }
 
+  // Consistent corner radius for all images
+  const imageRadius = 'rounded-lg'
+  
   if (hasError || !imageSrc) {
     return (
       <span className="my-6 -mx-2 sm:mx-0 block">
-        <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
+        <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
           <p>Image failed to load</p>
         </div>
       </span>
@@ -122,7 +125,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
     return (
       <span className="my-6 -mx-2 sm:mx-0 block">
         {isLoading && (
-          <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
+          <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
             <p>Loading image...</p>
           </div>
         )}
@@ -130,7 +133,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
         <img
           src={imageSrc}
           alt={alt || ''}
-          className={`rounded-lg border border-border max-w-full h-auto transition-opacity w-full ${
+          className={`${imageRadius} border border-border max-w-full h-auto transition-opacity w-full ${
             isLoading ? 'opacity-0' : 'opacity-100'
           }`}
           style={{ width: 'auto', height: 'auto' }}
@@ -149,7 +152,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
   return (
     <span className="my-6 -mx-2 sm:mx-0 block">
       {isLoading && (
-        <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
+        <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
           <p>Loading image...</p>
         </div>
       )}
@@ -158,7 +161,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
         alt={alt || ''}
         width={800}
         height={600}
-        className={`rounded-lg border border-border max-w-full h-auto transition-opacity w-full ${
+        className={`${imageRadius} border border-border max-w-full h-auto transition-opacity w-full ${
           isLoading ? 'opacity-0' : 'opacity-100'
         }`}
         style={{ width: 'auto', height: 'auto' }}
@@ -181,11 +184,11 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
     !content.includes('Document contains tables below.')
   
   return (
-    <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
-      <div className="document-content space-y-6 px-0">
+    <div className={`prose prose-slate dark:prose-invert max-w-none w-full ${className}`} suppressHydrationWarning>
+      <div className="document-content space-y-6 px-0 w-full max-w-full overflow-x-hidden wrap-break-word" suppressHydrationWarning>
         {hasContent && <DocumentContent content={content} />}
         {tables && tables.length > 0 && (
-          <div className={hasContent ? "mt-10 space-y-10" : "space-y-10"}>
+          <div className={hasContent ? "mt-10 space-y-10 w-full max-w-full" : "space-y-10 w-full max-w-full"} suppressHydrationWarning>
             {tables.map((table, idx) => (
               <TableRenderer key={idx} table={table} />
             ))}
@@ -214,7 +217,8 @@ function DocumentContent({ content }: { content: string }) {
   markdown = markdown.replace(/(^\s*\d+\.\s+.+)\n\n+(^\s*\d+\.\s+.+)/gm, '$1\n$2')
   
   return (
-    <ReactMarkdown
+    <div className="w-full max-w-full overflow-x-hidden wrap-break-word" suppressHydrationWarning>
+      <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeRaw, rehypeSanitize]}
       components={{
@@ -305,7 +309,7 @@ function DocumentContent({ content }: { content: string }) {
           }
           
           return (
-            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground">
+            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground wrap-break-word">
               {children}
             </p>
           )
@@ -316,7 +320,7 @@ function DocumentContent({ content }: { content: string }) {
           const hasEmojis = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓✅🔴🍽️🍸👨‍🍳🏢🧼🚪📦🚚🔧📝💭]/u.test(childrenStr)
           
           return (
-            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`}>
+            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground wrap-break-word ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`}>
               {children}
             </ul>
           )
@@ -324,7 +328,7 @@ function DocumentContent({ content }: { content: string }) {
         ol: ({ children }) => {
           console.log('DocumentContent: Rendering ordered list with', React.Children.count(children), 'items')
           return (
-            <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground">
+            <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground wrap-break-word">
               {children}
             </ol>
           )
@@ -332,7 +336,7 @@ function DocumentContent({ content }: { content: string }) {
         li: ({ children }) => {
           // Эмодзи уже добавлены в markdown, просто отображаем
           return (
-            <li className="leading-relaxed mb-1">{children}</li>
+            <li className="leading-relaxed mb-1 wrap-break-word">{children}</li>
           )
         },
         strong: ({ children }) => (
@@ -402,6 +406,7 @@ function DocumentContent({ content }: { content: string }) {
     >
       {markdown}
     </ReactMarkdown>
+    </div>
   )
 }
 
