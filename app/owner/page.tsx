@@ -6,15 +6,10 @@ import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense, u
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { UsersPage } from "@/components/pages/users-page"
-import { TestsPage } from "@/components/pages/tests-page"
-import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { AppBar } from "@/components/common/app-bar"
 import { EmptyState } from "@/components/common/empty-state"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 import { GreetingCard } from "@/components/common/greeting-card"
-import UserProgressReport from "@/components/reports/user-progress-report"
-import SubscriptionManager from "@/components/subscription/subscription-manager"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { Badge } from "@/components/ui/badge"
@@ -28,6 +23,24 @@ import {
 import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
 import { cleanupDocumentFromLocalStorage, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
 import { formatDateShort } from "@/lib/date-format"
+import dynamic from "next/dynamic"
+
+// Lazy load heavy tab components to reduce initial bundle size
+const UsersPage = dynamic(() => import("@/components/pages/users-page").then(mod => ({ default: mod.UsersPage })), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
+const TestsPage = dynamic(() => import("@/components/pages/tests-page").then(mod => ({ default: mod.TestsPage })), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
+const AssignmentsPage = dynamic(() => import("@/components/pages/assignments-page").then(mod => ({ default: mod.AssignmentsPage })), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
+const UserProgressReport = dynamic(() => import("@/components/reports/user-progress-report"), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
+const SubscriptionManager = dynamic(() => import("@/components/subscription/subscription-manager"), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
 
 // Component to handle tabs overflow detection
 function TabsContainer({ children }: { children: React.ReactNode }) {
@@ -167,50 +180,47 @@ function OwnerPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Initialize tests from localStorage to prevent empty state on refresh
-  const [savedTests, setSavedTests] = useState<SavedTest[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('owner-tests')
-        return saved ? JSON.parse(saved) : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
-  
-  // Initialize assignments from localStorage to prevent empty state on refresh
-  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('owner-assignments')
-        return saved ? JSON.parse(saved) : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
-  
-  // Initialize documents from localStorage to prevent empty state on refresh
-  const [documents, setDocuments] = useState<SavedDocument[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('owner-documents')
-        return saved ? JSON.parse(saved) : []
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
-  
+  // Initialize state without blocking render - load from localStorage asynchronously
+  const [savedTests, setSavedTests] = useState<SavedTest[]>([])
+  const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
+  const [documents, setDocuments] = useState<SavedDocument[]>([])
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>([])
   
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
   const [isLoadingTests, setIsLoadingTests] = useState(false)
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
+  
+  // Load from localStorage asynchronously after initial render to avoid blocking FCP
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    try {
+      const savedTests = localStorage.getItem('owner-tests')
+      if (savedTests) {
+        setSavedTests(JSON.parse(savedTests))
+      }
+    } catch {
+      // Ignore errors
+    }
+    
+    try {
+      const savedAssignments = localStorage.getItem('owner-assignments')
+      if (savedAssignments) {
+        setSavedAssignments(JSON.parse(savedAssignments))
+      }
+    } catch {
+      // Ignore errors
+    }
+    
+    try {
+      const savedDocuments = localStorage.getItem('owner-documents')
+      if (savedDocuments) {
+        setDocuments(JSON.parse(savedDocuments))
+      }
+    } catch {
+      // Ignore errors
+    }
+  }, []) // Run once on mount
 
   // Set documents with localStorage persistence for smoother reloads
   const setDocumentsWithLog = (newDocuments: SavedDocument[]) => {
@@ -282,6 +292,7 @@ function OwnerPageInner() {
     }
   }, [defaultTab])
 
+  // Handle auth redirect without blocking initial render
   useEffect(() => {
     if (status === "loading") return
     
@@ -450,19 +461,22 @@ function OwnerPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id])
 
-  useLayoutEffect(() => {
-    // Only run on client side
-    if (typeof window === 'undefined') return
+  // Defer data loading until after initial render to improve FCP
+  useEffect(() => {
+    // Only run on client side and after session is ready
+    if (typeof window === 'undefined' || status === 'loading' || !session) return
     
-    const fetchData = async () => {
-      await loadData()
+    // Use requestIdleCallback or setTimeout to defer heavy data loading
+    const timeoutId = setTimeout(() => {
+      loadData().catch(console.error)
       // Preload subscription data in parallel (non-blocking) for instant tab switch
       fetch('/api/subscription', { cache: 'no-store' }).catch(() => {
         // Silently fail - SubscriptionManager will load it if needed
       })
-    }
-    fetchData()
-  }, [loadData])
+    }, 0)
+    
+    return () => clearTimeout(timeoutId)
+  }, [loadData, status, session])
 
   // Only reload data when tab changes if data is missing or stale
   // This prevents unnecessary delays when switching tabs
@@ -696,16 +710,46 @@ function OwnerPageInner() {
     router.push(`/user-builder?edit=${id}`)
   }
 
-  if (status === "loading") {
+  // Memoize completion rate calculation to avoid recalculating on every render
+  const completionStats = useMemo(() => {
+    let totalUserAssignments = 0
+    let completedUserAssignments = 0
+    
+    savedAssignments.forEach(assignment => {
+      if (assignment.users && Array.isArray(assignment.users)) {
+        assignment.users.forEach((au: AssignedUser) => {
+          totalUserAssignments++
+          if (au.status === 'completed') {
+            completedUserAssignments++
+          }
+        })
+      }
+    })
+    
+    return {
+      percentage: totalUserAssignments > 0 
+        ? Math.round((completedUserAssignments / totalUserAssignments) * 100)
+        : 0,
+      label: `${completedUserAssignments} of ${totalUserAssignments} ${t('completedOfTotal')}`
+    }
+  }, [savedAssignments, t])
+
+  // Show skeleton immediately instead of blocking on session/auth
+  // This improves FCP significantly
+  if (status === "loading" || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      <div className="min-h-screen bg-background">
+        <div className="h-16 bg-background border-b" />
+        <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:py-8">
+          <div className="h-20 bg-muted rounded-lg animate-pulse mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" />
+            ))}
+          </div>
+        </main>
       </div>
     )
-  }
-
-  if (!session) {
-    return null
   }
 
   return (
@@ -787,46 +831,8 @@ function OwnerPageInner() {
                   <span className="text-2xl">📊</span>
                 </CardHeader>
                 <CardContent className="pt-4 px-4 md:px-6 pb-2 flex-1 flex flex-col justify-between">
-                  <div className="text-2xl font-bold">
-                    {(() => {
-                      let totalUserAssignments = 0
-                      let completedUserAssignments = 0
-                      
-                      savedAssignments.forEach(assignment => {
-                        if (assignment.users && Array.isArray(assignment.users)) {
-                          assignment.users.forEach((au: AssignedUser) => {
-                            totalUserAssignments++
-                            if (au.status === 'completed') {
-                              completedUserAssignments++
-                            }
-                          })
-                        }
-                      })
-                      
-                      return totalUserAssignments > 0 
-                        ? Math.round((completedUserAssignments / totalUserAssignments) * 100)
-                        : 0
-                    })()}%
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {(() => {
-                      let totalUserAssignments = 0
-                      let completedUserAssignments = 0
-                      
-                      savedAssignments.forEach(assignment => {
-                        if (assignment.users && Array.isArray(assignment.users)) {
-                          assignment.users.forEach((au: AssignedUser) => {
-                            totalUserAssignments++
-                            if (au.status === 'completed') {
-                              completedUserAssignments++
-                            }
-                          })
-                        }
-                      })
-                      
-                      return `${completedUserAssignments} of ${totalUserAssignments} ${t('completedOfTotal')}`
-                    })()}
-                  </p>
+                  <div className="text-2xl font-bold">{completionStats.percentage}%</div>
+                  <p className="text-xs text-muted-foreground mt-2">{completionStats.label}</p>
                 </CardContent>
               </Card>
             </div>
