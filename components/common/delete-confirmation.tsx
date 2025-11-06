@@ -80,7 +80,7 @@ export function DeleteConfirmation({
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        {trigger && (
+        {trigger && !isControlled && (
           <DialogTrigger asChild>
             {trigger}
           </DialogTrigger>

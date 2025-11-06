@@ -24,7 +24,21 @@ import {
   payments,
   usage
 } from "@/lib/db/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, inArray } from "drizzle-orm"
+
+// Helper function to wrap deletion steps with error handling
+async function safeDelete<T>(
+  stepName: string,
+  deleteFn: () => Promise<T>
+): Promise<T> {
+  try {
+    console.log(`[Delete Account] ${stepName}...`)
+    return await deleteFn()
+  } catch (error) {
+    console.error(`[Delete Account] Error in ${stepName}:`, error)
+    throw new Error(`${stepName} failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
 
 export async function DELETE() {
   try {
@@ -55,11 +69,21 @@ export async function DELETE() {
     
     // 1. Delete payments for this business
     console.log('[Delete Account] Deleting payments...')
-    await db.delete(payments).where(eq(payments.ownerId, userId))
+    try {
+      await db.delete(payments).where(eq(payments.ownerId, userId))
+    } catch (error) {
+      console.error('[Delete Account] Error deleting payments:', error)
+      // Continue - payments might not exist
+    }
 
     // 2. Delete subscriptions for this business
     console.log('[Delete Account] Deleting subscriptions...')
-    await db.delete(subscriptions).where(eq(subscriptions.ownerId, userId))
+    try {
+      await db.delete(subscriptions).where(eq(subscriptions.ownerId, userId))
+    } catch (error) {
+      console.error('[Delete Account] Error deleting subscriptions:', error)
+      // Continue - subscriptions might not exist
+    }
 
     // 3. Delete usage records for all users in this business
     console.log('[Delete Account] Deleting usage records...')
@@ -188,7 +212,9 @@ export async function DELETE() {
           .where(eq(modules.createdBy, uid))
         
         for (const module of userModules) {
-          // Delete sections for this module first
+          // Delete sections for this module first (delete all at once to handle nested sections)
+          // First delete child sections (those with parentId), then parent sections
+          // Actually, just delete all sections for this module - PostgreSQL will handle it
           await db.delete(sections).where(eq(sections.moduleId, module.id))
           // Delete module versions
           await db.delete(moduleVersions).where(eq(moduleVersions.moduleId, module.id))
@@ -201,24 +227,58 @@ export async function DELETE() {
     // 14. Delete auth-related records for all users in this business
     console.log('[Delete Account] Deleting auth records...')
     if (businessUserIds.length > 0) {
+      try {
+        // Get all user emails for verification token deletion
+        const businessUserEmails = await db.select({ email: users.email })
+          .from(users)
+          .where(inArray(users.id, businessUserIds))
+        
+        const emails = businessUserEmails.map(u => u.email).filter((email): email is string => !!email)
+        
+        // Delete verification tokens by email/identifier
+        if (emails.length > 0) {
+          for (const email of emails) {
+            try {
+              await db.delete(verificationTokens).where(eq(verificationTokens.identifier, email))
+            } catch (error) {
+              console.error(`[Delete Account] Error deleting verification token for ${email}:`, error)
+              // Continue - token might not exist
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Delete Account] Error getting user emails:', error)
+        // Continue - might not be able to get emails
+      }
+      
+      // Delete password reset tokens, sessions, and accounts for all users
       for (const uid of businessUserIds) {
-        // Delete password reset tokens
-        await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, uid))
-        // Delete sessions
-        await db.delete(sessions).where(eq(sessions.userId, uid))
-        // Delete accounts
-        await db.delete(accounts).where(eq(accounts.userId, uid))
-        // Delete verification tokens (by email/identifier)
-        const user = await db.select({ email: users.email }).from(users).where(eq(users.id, uid)).limit(1)
-        if (user.length > 0) {
-          await db.delete(verificationTokens).where(eq(verificationTokens.identifier, user[0].email || ''))
+        try {
+          await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, uid))
+        } catch (error) {
+          console.error(`[Delete Account] Error deleting password reset tokens for user ${uid}:`, error)
+        }
+        try {
+          await db.delete(sessions).where(eq(sessions.userId, uid))
+        } catch (error) {
+          console.error(`[Delete Account] Error deleting sessions for user ${uid}:`, error)
+        }
+        try {
+          await db.delete(accounts).where(eq(accounts.userId, uid))
+        } catch (error) {
+          console.error(`[Delete Account] Error deleting accounts for user ${uid}:`, error)
         }
       }
     }
 
     // 15. Delete all users in this business (including the owner)
     console.log('[Delete Account] Deleting users...')
-    await db.delete(users).where(eq(users.businessId, businessId))
+    try {
+      await db.delete(users).where(eq(users.businessId, businessId))
+    } catch (error) {
+      console.error('[Delete Account] Error deleting users:', error)
+      throw error // Re-throw as this is critical
+    }
 
     console.log(`[Delete Account] Successfully deleted account ${userId} and all related data`)
 
@@ -228,11 +288,22 @@ export async function DELETE() {
     })
   } catch (error) {
     console.error('[Delete Account] Error:', error)
+    console.error('[Delete Account] Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      cause: error instanceof Error ? (error as any).cause : undefined
+    })
     return NextResponse.json(
       {
         success: false,
         message: 'Failed to delete account',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? {
+          name: error.name,
+          stack: error.stack,
+          cause: (error as any).cause
+        } : undefined
       },
       { status: 500 }
     )

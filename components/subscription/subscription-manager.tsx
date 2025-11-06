@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { signOut } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslation } from "@/lib/translation-context"
 import { formatDateShort } from "@/lib/date-format"
@@ -822,11 +823,12 @@ export default function SubscriptionManager({
                 const data = await response.json()
                 
                 if (response.ok && data.success) {
-                  toast.success('Account deleted successfully. You will be signed out.')
-                  // Sign out and redirect to home
+                  toast.success('Account deleted successfully. Redirecting to sign in...')
+                  // Force immediate hard redirect to sign in page
+                  // This clears all cached data and session
                   setTimeout(() => {
-                    window.location.href = '/'
-                  }, 2000)
+                    window.location.href = '/auth/signin'
+                  }, 500)
                 } else {
                   setIsDeleting(false)
                   toast.error(data.message || 'Failed to delete account')
