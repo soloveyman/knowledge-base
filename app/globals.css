@@ -81,7 +81,8 @@
 /* Mobile-first: ensure no horizontal scroll on small screens */
 @media (max-width: 640px) {
   .document-content {
-    padding: 0 0.5rem; /* 8px padding on mobile */
+    /* Padding is handled by parent container (px-2 = 8px) */
+    padding: 0;
   }
   
   .document-content p,
@@ -95,7 +96,8 @@
 /* Tablet optimizations */
 @media (min-width: 641px) and (max-width: 1024px) {
   .document-content {
-    padding: 0 0.5rem;
+    /* Padding is handled by parent container */
+    padding: 0;
     max-width: 100%;
     overflow-x: hidden;
     overflow-wrap: break-word;

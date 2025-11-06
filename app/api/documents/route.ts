@@ -31,12 +31,20 @@ export async function GET() {
 
     // Fetch images for all documents and merge them into parsedContent
     const documentIds = allDocuments.map(doc => doc.id)
-    const allImages = documentIds.length > 0 
-      ? await db
+    let allImages: typeof documentImages.$inferSelect[] = []
+    
+    if (documentIds.length > 0) {
+      try {
+        allImages = await db
           .select()
           .from(documentImages)
           .where(inArray(documentImages.documentId, documentIds))
-      : []
+      } catch (error) {
+        // Table might not exist yet - log but don't fail
+        console.warn('document_images table not found, skipping image fetch:', error instanceof Error ? error.message : 'Unknown error')
+        // Continue without images
+      }
+    }
 
     // Group images by documentId
     const imagesByDocumentId = new Map<string, typeof allImages>()

@@ -19,44 +19,20 @@ interface DocumentRendererProps {
 
 // React-friendly image component for document images
 function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: string | null }) {
-  const [imageSrc, setImageSrc] = useState<string>('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasError, setHasError] = useState(false)
-
-  React.useEffect(() => {
-    if (!src) {
-      setHasError(true)
-      setIsLoading(false)
-      return
+  // Process src synchronously to avoid hydration mismatches
+  const processSrc = (source: string | Blob | undefined): { imageSrc: string; hasError: boolean; isBlob: boolean } => {
+    if (!source) {
+      return { imageSrc: '', hasError: true, isBlob: false }
     }
 
-    // Convert src to string if it's a Blob
-    if (src instanceof Blob) {
-      // Convert Blob to data URL
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const result = reader.result
-        if (typeof result === 'string') {
-          setImageSrc(result)
-          setIsLoading(false)
-        } else {
-          setHasError(true)
-          setIsLoading(false)
-        }
-      }
-      reader.onerror = () => {
-        setHasError(true)
-        setIsLoading(false)
-      }
-      reader.readAsDataURL(src)
-      return
+    // Handle Blob - needs async processing
+    if (source instanceof Blob) {
+      return { imageSrc: '', hasError: false, isBlob: true }
     }
 
-    let srcString = typeof src === 'string' ? src : ''
+    let srcString = typeof source === 'string' ? source : ''
     if (!srcString || srcString.trim() === '') {
-      setHasError(true)
-      setIsLoading(false)
-      return
+      return { imageSrc: '', hasError: true, isBlob: false }
     }
 
     // Fix malformed base64 URLs (e.g., "base64,..." should be "data:image/png;base64,...")
@@ -76,8 +52,35 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
       srcString = `data:${mimeType};base64,${base64Data}`
     }
 
-    setImageSrc(srcString)
-    setIsLoading(false)
+    return { imageSrc: srcString, hasError: false, isBlob: false }
+  }
+
+  const processed = processSrc(src)
+  const [imageSrc, setImageSrc] = useState<string>(processed.imageSrc)
+  const [isLoading, setIsLoading] = useState(processed.isBlob)
+  const [hasError, setHasError] = useState(processed.hasError)
+
+  // Only use useEffect for Blob conversion (async operation)
+  React.useEffect(() => {
+    if (!src || !(src instanceof Blob)) return
+
+    // Convert Blob to data URL
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result
+      if (typeof result === 'string') {
+        setImageSrc(result)
+        setIsLoading(false)
+      } else {
+        setHasError(true)
+        setIsLoading(false)
+      }
+    }
+    reader.onerror = () => {
+      setHasError(true)
+      setIsLoading(false)
+    }
+    reader.readAsDataURL(src)
   }, [src])
 
   // Check if it's a data URL
@@ -106,7 +109,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
 
   if (hasError || !imageSrc) {
     return (
-      <span className="my-6 relative w-full block">
+      <span className="my-6 -mx-2 sm:mx-0 block">
         <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
           <p>Image failed to load</p>
         </div>
@@ -117,7 +120,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
   // For data URLs, use regular img tag with React state management
   if (isDataUrl || !isValidForNextImage) {
     return (
-      <span className="my-6 relative w-full block">
+      <span className="my-6 -mx-2 sm:mx-0 block">
         {isLoading && (
           <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
             <p>Loading image...</p>
@@ -127,7 +130,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
         <img
           src={imageSrc}
           alt={alt || ''}
-          className={`rounded-lg border border-border max-w-full h-auto transition-opacity ${
+          className={`rounded-lg border border-border max-w-full h-auto transition-opacity w-full ${
             isLoading ? 'opacity-0' : 'opacity-100'
           }`}
           style={{ width: 'auto', height: 'auto' }}
@@ -144,7 +147,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
 
   // For valid external URLs or relative paths, use Next.js Image
   return (
-    <span className="my-6 relative w-full block">
+    <span className="my-6 -mx-2 sm:mx-0 block">
       {isLoading && (
         <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
           <p>Loading image...</p>
@@ -155,7 +158,7 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
         alt={alt || ''}
         width={800}
         height={600}
-        className={`rounded-lg border border-border max-w-full h-auto transition-opacity ${
+        className={`rounded-lg border border-border max-w-full h-auto transition-opacity w-full ${
           isLoading ? 'opacity-0' : 'opacity-100'
         }`}
         style={{ width: 'auto', height: 'auto' }}
@@ -179,7 +182,7 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
   
   return (
     <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
-      <div className="document-content space-y-6">
+      <div className="document-content space-y-6 px-0">
         {hasContent && <DocumentContent content={content} />}
         {tables && tables.length > 0 && (
           <div className={hasContent ? "mt-10 space-y-10" : "space-y-10"}>
@@ -265,22 +268,32 @@ function DocumentContent({ content }: { content: string }) {
         },
         p: ({ children }) => {
           // Check if paragraph only contains an image - if so, don't wrap in <p> tag
-          // This prevents hydration errors where <div> (image wrapper) is inside <p>
+          // This prevents hydration errors where <div> or <span> (image wrapper) is inside <p>
           const childrenArray = React.Children.toArray(children)
           
-          // Check if any child is an image (could be wrapped in a div by our img component)
+          // Check if any child is an image (could be wrapped in a span/div by our img component)
           const hasImage = childrenArray.some(child => {
             if (React.isValidElement(child)) {
-              // Check if it's an img element or a div containing an img
+              // Check if it's an img element
               if (child.type === 'img') return true
-              if (child.type === 'div') {
-                const props = child.props as { children?: React.ReactNode }
+              // Check if it's a span or div containing an img
+              if (child.type === 'span' || child.type === 'div') {
+                const props = child.props as { children?: React.ReactNode; className?: string }
+                // Check if it's our image wrapper (has block class and negative margins)
+                if (props.className?.includes('block') && props.className?.includes('-mx-2')) {
+                  return true
+                }
+                // Also check if it contains an img element
                 if (props.children) {
-                  const divChildren = React.Children.toArray(props.children)
-                  return divChildren.some(c => 
-                    React.isValidElement(c) && c.type === 'img'
+                  const wrapperChildren = React.Children.toArray(props.children)
+                  return wrapperChildren.some(c => 
+                    React.isValidElement(c) && (c.type === 'img' || c.type === Image)
                   )
                 }
+              }
+              // Check if it's the DocumentImage component directly
+              if (typeof child.type === 'function' && child.type.name === 'DocumentImage') {
+                return true
               }
             }
             return false
@@ -658,26 +671,5 @@ function getEmojiForContext(text: string, context?: 'heading' | 'list' | 'paragr
   }
   
   return ''
-}
-
-// Legacy function - content should already be markdown from Mammoth
-// Just handles any remaining [BOLD]/[ITALIC] tags and ensures proper list formatting
-function convertToMarkdown(content: string): string {
-  if (!content) return ''
-  
-  let md = content
-  
-  // Convert any remaining [BOLD]/[ITALIC] tags to markdown (backward compatibility)
-  md = md.replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '**$1**')
-  md = md.replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '*$1*')
-  
-  // Ensure numbered lists are properly grouped (no blank lines between consecutive items)
-  // This is required for ReactMarkdown to recognize them as ordered lists
-  md = md.replace(/(^\s*\d+\.\s+.+)\n\n+(^\s*\d+\.\s+.+)/gm, '$1\n$2')
-  
-  // Add blank line before numbered lists if they don't have one
-  md = md.replace(/([^\n])\n(^\s*\d+\.\s+.+)/gm, '$1\n\n$2')
-  
-  return md
 }
 

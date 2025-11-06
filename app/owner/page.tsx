@@ -180,6 +180,9 @@ function OwnerPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
+  // Track if component has mounted to avoid hydration mismatches
+  const [isMounted, setIsMounted] = useState(false)
+  
   // Initialize state without blocking render - load from localStorage asynchronously
   const [savedTests, setSavedTests] = useState<SavedTest[]>([])
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>([])
@@ -189,6 +192,11 @@ function OwnerPageInner() {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false)
   const [isLoadingTests, setIsLoadingTests] = useState(false)
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
+  
+  // Mark as mounted after initial render to avoid hydration mismatches
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
   
   // Load from localStorage asynchronously after initial render to avoid blocking FCP
   useEffect(() => {
@@ -223,13 +231,54 @@ function OwnerPageInner() {
   }, []) // Run once on mount
 
   // Set documents with localStorage persistence for smoother reloads
+  // Strip images and large data to avoid localStorage quota issues
   const setDocumentsWithLog = (newDocuments: SavedDocument[]) => {
     setDocuments(newDocuments)
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('owner-documents', JSON.stringify(newDocuments))
+        // Strip images and large parsedContent to save space
+        const lightweightDocs = newDocuments.map(doc => {
+          const parsedContent = doc.parsedContent as any // Type assertion for localStorage optimization
+          return {
+            ...doc,
+            parsedContent: parsedContent ? {
+              ...parsedContent,
+              images: [], // Remove images - they're stored in DB separately
+              sections: Array.isArray(parsedContent.sections) ? parsedContent.sections.slice(0, 5) : [],
+              tables: Array.isArray(parsedContent.tables) ? parsedContent.tables.slice(0, 3) : [],
+            } : null
+          }
+        })
+        localStorage.setItem('owner-documents', JSON.stringify(lightweightDocs))
       } catch (error) {
-        console.error('Error saving documents to localStorage:', error)
+        // If still too large, try storing only metadata
+        if (error instanceof Error && error.name === 'QuotaExceededError') {
+          try {
+            const minimalDocs = newDocuments.map(doc => ({
+              id: doc.id,
+              name: doc.name,
+              type: doc.type,
+              uploadedAt: doc.uploadedAt,
+              size: doc.size,
+              status: doc.status,
+              moduleId: doc.moduleId,
+              createdAt: doc.createdAt,
+              updatedAt: doc.updatedAt,
+              parsedContent: null // Remove all parsedContent
+            }))
+            localStorage.setItem('owner-documents', JSON.stringify(minimalDocs))
+          } catch (minimalError) {
+            console.warn('Could not save documents to localStorage, quota exceeded:', minimalError)
+            // Clear localStorage and try again with empty array
+            try {
+              localStorage.removeItem('owner-documents')
+            } catch {
+              // Ignore
+            }
+          }
+        } else {
+          console.error('Error saving documents to localStorage:', error)
+        }
       }
     }
   }
@@ -734,22 +783,10 @@ function OwnerPageInner() {
     }
   }, [savedAssignments, t])
 
-  // Show skeleton immediately instead of blocking on session/auth
-  // This improves FCP significantly
-  if (status === "loading" || !session) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="h-16 bg-background border-b" />
-        <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:py-8">
-          <div className="h-20 bg-muted rounded-lg animate-pulse mb-6" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" />
-            ))}
-          </div>
-        </main>
-      </div>
-    )
+  // Show skeleton until mounted and session is ready
+  // This ensures server and client render the same initial HTML
+  if (!isMounted || status === "loading" || !session) {
+    return <OwnerPageSkeleton />
   }
 
   return (
@@ -1049,9 +1086,27 @@ function OwnerPageInner() {
   )
 }
 
+// Loading skeleton that matches server and client render
+// suppressHydrationWarning prevents warnings from browser extensions adding attributes
+function OwnerPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
+      <div className="h-16 bg-background border-b" suppressHydrationWarning />
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:py-8" suppressHydrationWarning>
+        <div className="h-20 bg-muted rounded-lg animate-pulse mb-6" suppressHydrationWarning />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6" suppressHydrationWarning>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" suppressHydrationWarning />
+          ))}
+        </div>
+      </main>
+    </div>
+  )
+}
+
 export default function OwnerPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div></div>}>
+    <Suspense fallback={<OwnerPageSkeleton />}>
       <OwnerPageInner />
     </Suspense>
   )
