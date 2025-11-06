@@ -32,6 +32,7 @@ const graphik = localFont({
   fallback: ["system-ui", "arial"],
   display: "swap", // Improve FCP by showing fallback font immediately
   preload: true, // Preload critical font
+  adjustFontFallback: false, // Disable automatic adjustment to prevent layout shift
 });
 
 const graphikMono = localFont({
@@ -44,11 +45,22 @@ const graphikMono = localFont({
   ],
   variable: "--font-graphik-mono",
   fallback: ["ui-monospace", "monospace"],
+  display: "swap",
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
   title: "Knowledge Base Platform",
   description: "Employee training and knowledge management system",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+  },
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+  ],
 };
 
 export default function RootLayout({
@@ -62,32 +74,10 @@ export default function RootLayout({
         {/* Preconnect to external domains for faster resource loading */}
         <link rel="preconnect" href="https://api.x.ai" />
         <link rel="dns-prefetch" href="https://api.x.ai" />
-        {/* Preload critical font */}
-        <link
-          rel="preload"
-          href="/fonts/Graphik-Regular.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
+        {/* Theme script - inline and optimized for FCP */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                function getThemePreference() {
-                  if (localStorage.theme === 'dark' || localStorage.theme === 'light') {
-                    return localStorage.theme;
-                  }
-                  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-                const theme = getThemePreference();
-                if (theme === 'dark') {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              })();
-            `,
+            __html: `(function(){const t=localStorage.theme==='dark'||localStorage.theme==='light'?localStorage.theme:window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.classList.toggle('dark',t==='dark')})();`,
           }}
         />
       </head>
