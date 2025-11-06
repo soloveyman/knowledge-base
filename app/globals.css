@@ -81,7 +81,7 @@
 /* Mobile-first: ensure no horizontal scroll on small screens */
 @media (max-width: 640px) {
   .document-content {
-    padding: 0 1rem; /* 16px padding on mobile */
+    padding: 0 0.5rem; /* 8px padding on mobile */
   }
   
   .document-content p,
