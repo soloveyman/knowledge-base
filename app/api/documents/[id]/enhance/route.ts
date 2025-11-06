@@ -96,7 +96,13 @@ Your task:
 5. Correct spelling mistakes and grammar errors
 6. Maintain the original hierarchy and order
 7. CRITICAL: Preserve the original document's language - do NOT translate to another language. Keep all text in the same language as the original document.
-8. CRITICAL: Do NOT touch, modify, refine, or process images in any way. Images will be preserved automatically from the original document. Do not include images in your response - they will be added back automatically.
+
+IMAGE HANDLING - CRITICAL INSTRUCTIONS:
+- Do NOT refine, adjust, modify, or process images in any way
+- Do NOT include images in your JSON response
+- Images will be automatically preserved from the original document and placed in the correct positions
+- Focus ONLY on text content enhancement - this makes the process faster and more efficient
+- Images are handled separately and will be merged back automatically
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -125,7 +131,9 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 
-Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language. Do NOT include images in your JSON response - they will be preserved from the original document automatically.`
+Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language. 
+
+REMEMBER: Do NOT include images in your JSON response - they will be preserved from the original document automatically and placed in the correct positions. Focus only on text enhancement to speed up processing.`
                 },
                 {
                   role: 'user',
