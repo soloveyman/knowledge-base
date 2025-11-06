@@ -84,7 +84,7 @@ export default function TestBuilderPage() {
       validationRules.required,
       validationRules.integer,
       validationRules.min(1),
-      validationRules.max(50)
+      validationRules.max(20)
     ],
     type: [validationRules.required],
     difficulty: [validationRules.required],
@@ -394,7 +394,7 @@ export default function TestBuilderPage() {
       }
     } catch (error) {
       console.error('Test Builder: Error loading test for editing:', error)
-      setError('Failed to load test for editing')
+      setError(t('failedToLoadTest'))
     }
   }, [])
 
@@ -425,6 +425,22 @@ export default function TestBuilderPage() {
       })
     }
   }, [session, status, router, loadTestForEditing, documents.length, testLoaded])
+
+  // Simple language detection based on Cyrillic characters
+  const detectLanguage = (text: string): 'ru' | 'en' => {
+    if (!text || text.length === 0) return 'en' // Default to English
+    
+    // Count Cyrillic characters (Russian)
+    const cyrillicCount = (text.match(/[\u0400-\u04FF]/g) || []).length
+    const totalChars = text.replace(/[^\w]/g, '').length
+    
+    // If more than 10% Cyrillic, assume Russian
+    if (totalChars > 0 && (cyrillicCount / totalChars) > 0.1) {
+      return 'ru'
+    }
+    
+    return 'en'
+  }
 
   const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc)
@@ -469,6 +485,18 @@ export default function TestBuilderPage() {
     // If no parsed content, document content is not available
     if (!documentContent) {
       documentContent = ''
+    }
+    
+    // Auto-detect and set language from document content
+    const detectedLocale = detectLanguage(documentContent)
+    setValue('locale', detectedLocale)
+    setFieldTouched('locale')
+    
+    // Also check if document metadata has language info
+    const metadataLocale = doc.parsedContent?.metadata?.language || doc.parsedContent?.metadata?.locale
+    if (metadataLocale && (metadataLocale === 'ru' || metadataLocale === 'en')) {
+      setValue('locale', metadataLocale as 'ru' | 'en')
+      setFieldTouched('locale')
     }
     
     setContext(prev => ({
@@ -523,12 +551,12 @@ export default function TestBuilderPage() {
   const handleGenerateTest = async () => {
     // Validate all fields before generating
     if (!validateAll()) {
-      setError("Please fix the errors below")
+      setError(t('pleaseFixErrors'))
       return
     }
     
     if (!selectedDocument) {
-      setError("Please select a document first")
+      setError(t('pleaseSelectDocument'))
       return
     }
 
@@ -672,7 +700,7 @@ export default function TestBuilderPage() {
         q.id === questionId 
           ? { 
               ...q, 
-              choices: [...(q.choices || []), "New choice"]
+              choices: [...(q.choices || []), t('newChoice')]
             } 
           : q
       )
@@ -680,19 +708,19 @@ export default function TestBuilderPage() {
   }
 
   const handleClearAllQuestions = () => {
-    if (confirm('Are you sure you want to clear all questions? This action cannot be undone.')) {
+    if (confirm(t('clearAllQuestions'))) {
       setGeneratedQuestions([])
     }
   }
 
   const handleSaveTest = async () => {
     if (generatedQuestions.length === 0) {
-      setError("No questions to save")
+      setError(t('noQuestionsToSave'))
       return
     }
 
     if (!selectedDocument) {
-      setError("Please select a document")
+      setError(t('pleaseSelectDocumentForSave'))
       return
     }
 
@@ -776,7 +804,7 @@ export default function TestBuilderPage() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save test')
+      setError(err instanceof Error ? err.message : t('failedToSaveTest'))
     } finally {
       setIsSaving(false)
     }
@@ -881,13 +909,35 @@ export default function TestBuilderPage() {
                     error={touched.count ? errors.count : undefined}
                   >
                     <Input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={testConfig.count}
-                      onChange={(e) => setValue('count', parseInt(e.target.value) || 1)}
-                      onBlur={() => setFieldTouched('count')}
+                      type="text"
+                      inputMode="numeric"
+                      value={testConfig.count ? String(testConfig.count) : ''}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        // Allow empty string for typing, or valid positive integers up to 20
+                        if (value === '' || /^\d+$/.test(value)) {
+                          if (value === '') {
+                            // Allow empty while typing - validation will catch it
+                            setValue('count', 0)
+                          } else {
+                            const numValue = parseInt(value, 10)
+                            if (!isNaN(numValue) && numValue > 0 && numValue <= 20) {
+                              setValue('count', numValue)
+                            }
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        setFieldTouched('count')
+                        // Ensure we have a valid number on blur
+                        if (!testConfig.count || testConfig.count < 1) {
+                          setValue('count', 5) // Default to 5 if invalid
+                        } else if (testConfig.count > 20) {
+                          setValue('count', 20) // Cap at 20 if over limit
+                        }
+                      }}
                       className="w-full"
+                      placeholder={t('enterNumberOfQuestions')}
                     />
                   </FormField>
                   <FormField
@@ -1138,7 +1188,7 @@ export default function TestBuilderPage() {
                             <Input
                               value={question.correct_answer || ''}
                               onChange={(e) => handleUpdateQuestionField(question.id, 'correct_answer', e.target.value)}
-                              placeholder="e.g., A, B, C, or D"
+                              placeholder={t('correctAnswerPlaceholder')}
                               className="w-full"
                             />
                           </div>
@@ -1150,7 +1200,7 @@ export default function TestBuilderPage() {
                               onChange={(e) => handleUpdateQuestionField(question.id, 'explanation', e.target.value)}
                               className="w-full"
                               rows={2}
-                              placeholder="Explanation for the correct answer..."
+                              placeholder={t('explanationPlaceholder')}
                             />
                           </div>
                         </div>

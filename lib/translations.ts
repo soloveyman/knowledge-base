@@ -241,6 +241,7 @@ export const translations = {
     // selectDocument: "Select Document", // Already exists
     chooseDocumentToGenerate: "Choose a document to generate questions from...",
     numberOfQuestions: "Number of Questions",
+    enterNumberOfQuestions: "Enter number of questions",
     questionType: "Question Type",
     difficulty: "Difficulty",
     // language: "Language", // Already exists
@@ -251,8 +252,11 @@ export const translations = {
     // question: "Question", // Already exists
     answerChoices: "Answer Choices",
     addChoice: "Add Choice",
+    newChoice: "New choice",
     // correctAnswer: "Correct Answer", // Already exists
     explanation: "Explanation",
+    correctAnswerPlaceholder: "e.g., A, B, C, or D",
+    explanationPlaceholder: "Explanation for the correct answer...",
     multipleChoiceSingle: "Multiple Choice (Single)",
     multipleChoiceMultiple: "Multiple Choice (Multiple)",
     trueFalse: "True/False",
@@ -403,6 +407,7 @@ export const translations = {
     apply: "Apply",
     reset: "Reset",
     clear: "Clear",
+    clearAllQuestions: "Are you sure you want to clear all questions? This action cannot be undone.",
     // selectAll: "Select All", // Already exists
     // deselectAll: "Deselect All", // Already exists
     
@@ -431,6 +436,12 @@ export const translations = {
     passwordTooShort: "Password too short",
     passwordsDoNotMatch: "Passwords do not match",
     invalidDate: "Invalid date",
+    pleaseFixErrors: "Please fix the errors below",
+    pleaseSelectDocument: "Please select a document first",
+    noQuestionsToSave: "No questions to save",
+    pleaseSelectDocumentForSave: "Please select a document",
+    failedToLoadTest: "Failed to load test for editing",
+    failedToSaveTest: "Failed to save test",
     
     // Notifications
     loadingData: "Loading data...",
@@ -825,6 +836,7 @@ export const translations = {
     selectDocument: "Выберите документ",
     chooseDocumentToGenerate: "Выберите документ для генерации вопросов...",
     numberOfQuestions: "Количество вопросов",
+    enterNumberOfQuestions: "Введите количество вопросов",
     questionType: "Тип вопроса",
     difficulty: "Сложность",
     // language: "Язык", // Already exists
@@ -835,7 +847,10 @@ export const translations = {
     // question: "Вопрос", // Already exists
     answerChoices: "Варианты ответов",
     addChoice: "Добавить вариант",
+    newChoice: "Новый вариант",
     explanation: "Объяснение",
+    correctAnswerPlaceholder: "например, A, B, C или D",
+    explanationPlaceholder: "Объяснение правильного ответа...",
     multipleChoiceSingle: "Множественный выбор (один)",
     multipleChoiceMultiple: "Множественный выбор (несколько)",
     trueFalse: "Правда/Ложь",
@@ -974,6 +989,7 @@ export const translations = {
     apply: "Применить",
     reset: "Сбросить",
     clear: "Очистить",
+    clearAllQuestions: "Вы уверены, что хотите удалить все вопросы? Это действие нельзя отменить.",
     // selectAll: "Выбрать всё", // Already exists
     // deselectAll: "Отменить выбор", // Already exists
     
@@ -1002,6 +1018,12 @@ export const translations = {
     passwordTooShort: "Слишком короткий пароль",
     passwordsDoNotMatch: "Пароли не совпадают",
     invalidDate: "Некорректная дата",
+    pleaseFixErrors: "Пожалуйста, исправьте ошибки ниже",
+    pleaseSelectDocument: "Пожалуйста, сначала выберите документ",
+    noQuestionsToSave: "Нет вопросов для сохранения",
+    pleaseSelectDocumentForSave: "Пожалуйста, выберите документ",
+    failedToLoadTest: "Не удалось загрузить тест для редактирования",
+    failedToSaveTest: "Не удалось сохранить тест",
     
     // Notifications
     loadingData: "Загрузка данных...",
