@@ -60,6 +60,7 @@ export async function GET() {
             maxUsers: sub.plan.maxUsers,
             maxImportsPerMonth: sub.plan.maxImportsPerMonth,
             maxGenerationsPerMonth: sub.plan.maxGenerationsPerMonth,
+            maxEnhancementsPerMonth: sub.plan.maxEnhancementsPerMonth,
           } : null,
         };
       }
@@ -95,11 +96,13 @@ export async function GET() {
       month: userUsage[0].month,
       importsCount: userUsage[0].importsCount || 0,
       generationsCount: userUsage[0].generationsCount || 0,
+      enhancementsCount: userUsage[0].enhancementsCount || 0,
       usersCount: usersCount,
     } : {
       month: currentMonth,
       importsCount: 0,
       generationsCount: 0,
+      enhancementsCount: 0,
       usersCount: usersCount,
     };
 
@@ -164,6 +167,7 @@ export async function GET() {
           maxUsers: plan.maxUsers,
           maxImportsPerMonth: plan.maxImportsPerMonth,
           maxGenerationsPerMonth: plan.maxGenerationsPerMonth,
+          maxEnhancementsPerMonth: plan.maxEnhancementsPerMonth,
           features: plan.features,
         })),
         currentSubscription,

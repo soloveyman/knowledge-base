@@ -55,6 +55,18 @@ export async function getOrCreateTrialPlan() {
     .limit(1);
 
   if (existing.length > 0) {
+    // Update existing plan if maxEnhancementsPerMonth is not set
+    if (existing[0].maxEnhancementsPerMonth === null || existing[0].maxEnhancementsPerMonth === undefined) {
+      const [updated] = await db
+        .update(subscriptionPlans)
+        .set({
+          maxEnhancementsPerMonth: 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionPlans.id, existing[0].id))
+        .returning();
+      return updated;
+    }
     return existing[0];
   }
 
@@ -71,6 +83,7 @@ export async function getOrCreateTrialPlan() {
       maxUsers: 10, // Reasonable trial limits
       maxImportsPerMonth: 50,
       maxGenerationsPerMonth: 100,
+      maxEnhancementsPerMonth: 1,
       features: [
         'Access to all features',
         '10 team members',

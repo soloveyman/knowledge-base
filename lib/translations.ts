@@ -299,6 +299,7 @@ export const translations = {
     refunded: "Refunded",
     mostPopular: "Most Popular",
     updated: "Updated",
+    enhance: "Enhance",
     active: "Active",
     // inProgress: "In Progress", // Already exists
     // notStarted: "Not Started", // Already exists
@@ -551,6 +552,7 @@ export const translations = {
     currentUsage: "Current Usage",
     importsThisMonth: "Imports this month",
     aiGenerations: "AI Generations",
+    documentEnhancements: "Document Enhancements",
     billingSettings: "Billing Settings",
     noActiveSubscription: "No active subscription",
     selectPlanToGetStarted: "Select a plan below to get started",
@@ -880,6 +882,7 @@ export const translations = {
     refunded: "Возвращено",
     mostPopular: "Самый популярный",
     updated: "Обновлено",
+    enhance: "Улучшено",
     active: "Активный",
     // inProgress: "В процессе", // Already exists
     // notStarted: "Не начато", // Already exists
@@ -1116,6 +1119,7 @@ export const translations = {
     currentUsage: "Текущее использование",
     importsThisMonth: "Импортов в этом месяце",
     aiGenerations: "AI генерации",
+    documentEnhancements: "Улучшения документов",
     billingSettings: "Настройки платежей",
     noActiveSubscription: "Нет активной подписки",
     selectPlanToGetStarted: "Выберите план ниже, чтобы начать",

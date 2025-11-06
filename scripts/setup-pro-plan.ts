@@ -54,6 +54,7 @@ async function setupProPlan() {
           maxUsers: 25,
           maxImportsPerMonth: 100,
           maxGenerationsPerMonth: 500,
+          maxEnhancementsPerMonth: 50,
           features: [
             'Access to all features',
             '25 team members',
@@ -88,6 +89,7 @@ async function setupProPlan() {
           maxUsers: 25,
           maxImportsPerMonth: 100,
           maxGenerationsPerMonth: 500,
+          maxEnhancementsPerMonth: 50,
           features: [
             'Access to all features',
             '25 team members',

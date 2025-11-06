@@ -47,6 +47,7 @@ async function setupStarterPlan() {
         .update(subscriptionPlans)
         .set({
           displayName: 'Optimal',
+          maxEnhancementsPerMonth: 20,
           updatedAt: new Date(),
         })
         .where(eq(subscriptionPlans.id, existing[0].id))
@@ -72,6 +73,7 @@ async function setupStarterPlan() {
         maxUsers: 10,
         maxImportsPerMonth: 20,
         maxGenerationsPerMonth: 100,
+        maxEnhancementsPerMonth: 20,
         features: [
           'Access to all features',
           '10 team members',

@@ -36,9 +36,10 @@ interface SubscriptionPlan {
   price: number
   currency: string
   interval: 'month' | 'year'
-  maxUsers: number
-  maxImportsPerMonth: number
-  maxGenerationsPerMonth: number
+  maxUsers: number | null
+  maxImportsPerMonth: number | null
+  maxGenerationsPerMonth: number | null
+  maxEnhancementsPerMonth: number | null
   features: string[]
   isPopular?: boolean
   isCurrent?: boolean
@@ -63,6 +64,7 @@ interface CurrentSubscription {
     maxUsers: number | null
     maxImportsPerMonth: number | null
     maxGenerationsPerMonth: number | null
+    maxEnhancementsPerMonth: number | null
   } | null
 }
 
@@ -70,6 +72,7 @@ interface Usage {
   month: string
   importsCount: number
   generationsCount: number
+  enhancementsCount: number
   usersCount: number
 }
 
@@ -459,6 +462,21 @@ export default function SubscriptionManager({
                             </div>
                             <Progress 
                               value={getUsagePercentage(usage.generationsCount, currentSubscription.plan.maxGenerationsPerMonth)} 
+                              className="h-2"
+                            />
+                          </div>
+                        )}
+
+                        {currentSubscription.plan.maxEnhancementsPerMonth !== null && (
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span>{t('documentEnhancements')}</span>
+                              <span className={getUsageColor(getUsagePercentage(usage.enhancementsCount, currentSubscription.plan.maxEnhancementsPerMonth))}>
+                                {usage.enhancementsCount}/{currentSubscription.plan.maxEnhancementsPerMonth}
+                              </span>
+                            </div>
+                            <Progress 
+                              value={getUsagePercentage(usage.enhancementsCount, currentSubscription.plan.maxEnhancementsPerMonth)} 
                               className="h-2"
                             />
                           </div>

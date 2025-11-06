@@ -75,6 +75,7 @@ const badgeTranslationMap: Record<string, string> = {
   'popular': 'mostPopular',
   'most popular': 'mostPopular',
   'updated': 'updated',
+  'enhance': 'enhance',
 }
 
 export function translateBadgeLabel(label: string): string {

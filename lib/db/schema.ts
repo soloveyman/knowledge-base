@@ -235,6 +235,7 @@ export const subscriptionPlans = pgTable('subscription_plans', {
   maxUsers: integer('max_users'),
   maxImportsPerMonth: integer('max_imports_per_month'),
   maxGenerationsPerMonth: integer('max_generations_per_month'),
+  maxEnhancementsPerMonth: integer('max_enhancements_per_month'),
   features: json('features'), // Array of feature strings
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
@@ -273,6 +274,7 @@ export const usage = pgTable('usage', {
   month: text('month').notNull(), // YYYY-MM format
   importsCount: integer('imports_count').default(0),
   generationsCount: integer('generations_count').default(0),
+  enhancementsCount: integer('enhancements_count').default(0),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

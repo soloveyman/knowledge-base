@@ -130,6 +130,12 @@ function ManagerPageInner() {
     status?: string
     createdAt?: string
     updatedAt?: string
+    parsedContent?: {
+      metadata?: {
+        enhancedBy?: string
+        enhancementTimestamp?: number
+      }
+    } | null
   }>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -156,6 +162,12 @@ function ManagerPageInner() {
     status?: string
     createdAt?: string
     updatedAt?: string
+    parsedContent?: {
+      metadata?: {
+        enhancedBy?: string
+        enhancementTimestamp?: number
+      }
+    } | null
   }>) => {
     console.log('Manager: setDocuments called with:', newDocuments.length, 'documents')
     if (newDocuments.length === 0) {
@@ -301,6 +313,12 @@ function ManagerPageInner() {
           updatedAt?: string
           fileSize?: number
           status?: string
+          parsedContent?: {
+            metadata?: {
+              enhancedBy?: string
+              enhancementTimestamp?: number
+            }
+          } | null
         }) => ({
           id: doc.id,
           name: doc.originalFileName || doc.title,
@@ -309,7 +327,8 @@ function ManagerPageInner() {
           size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
           status: doc.status || 'ready',
           createdAt: doc.createdAt,
-          updatedAt: doc.updatedAt
+          updatedAt: doc.updatedAt,
+          parsedContent: doc.parsedContent || null
         }))
         console.log('Manager: Transformed documents:', transformedDocs)
         setDocumentsWithLog(transformedDocs)
@@ -801,32 +820,38 @@ function ManagerPageInner() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
-                            {doc.updatedAt && doc.createdAt && new Date(doc.updatedAt) > new Date(doc.createdAt) && (
+                            {doc.parsedContent?.metadata?.enhancedBy ? (
+                              <Badge variant="secondary" className="text-xs">
+                                {translateBadge('enhance')}
+                              </Badge>
+                            ) : doc.updatedAt && doc.createdAt && new Date(doc.updatedAt) > new Date(doc.createdAt) ? (
                               <Badge variant="secondary" className="text-xs">
                                 {translateBadge('updated')}
                               </Badge>
-                            )}
+                            ) : null}
                           </div>
                           <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                         </div>
                         <div className="shrink-0 flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-primary"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEnhanceDocument(doc.id)
-                            }}
-                            disabled={enhancingDocId === doc.id}
-                            title="Enhance with Grok API"
-                          >
-                            {enhancingDocId === doc.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-4 w-4" />
-                            )}
-                          </Button>
+                          {!doc.parsedContent?.metadata?.enhancedBy && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEnhanceDocument(doc.id)
+                              }}
+                              disabled={enhancingDocId === doc.id}
+                              title="Enhance with Grok API"
+                            >
+                              {enhancingDocId === doc.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           <DeleteConfirmation
                             onConfirm={() => handleDeleteDocument(doc.id)}
                             itemName={doc.name}
