@@ -2,10 +2,21 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { useNavigateBack } from "@/lib/redirect-utils"
 import { DocumentRenderer } from "@/components/common/document-renderer"
+import { DocumentLoadingSkeleton } from "@/components/common/loading-skeleton"
+import dynamic from "next/dynamic"
+
+// Dynamically import heavy components to reduce initial bundle
+const DocumentRendererDynamic = dynamic(
+  () => import("@/components/common/document-renderer").then(mod => ({ default: mod.DocumentRenderer })),
+  {
+    loading: () => <DocumentLoadingSkeleton />,
+    ssr: false
+  }
+)
 
 interface UserWithRole {
   name?: string | null
@@ -68,6 +79,7 @@ export default function DocumentViewer() {
 
   const [documentData, setDocumentData] = useState<DocumentData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -271,6 +283,25 @@ export default function DocumentViewer() {
 
 
   if (status === "loading" || loading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <DocumentLoadingSkeleton />
+      </div>
+    )
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="text-center space-y-4">
+          <p className="text-destructive">{error}</p>
+          <Button onClick={() => router.back()}>Go Back</Button>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!documentData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
