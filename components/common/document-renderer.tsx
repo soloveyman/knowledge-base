@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -15,6 +15,160 @@ interface DocumentRendererProps {
     rows: string[][]
   }>
   className?: string
+}
+
+// React-friendly image component for document images
+function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: string | null }) {
+  const [imageSrc, setImageSrc] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
+
+  React.useEffect(() => {
+    if (!src) {
+      setHasError(true)
+      setIsLoading(false)
+      return
+    }
+
+    // Convert src to string if it's a Blob
+    if (src instanceof Blob) {
+      // Convert Blob to data URL
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          setImageSrc(result)
+          setIsLoading(false)
+        } else {
+          setHasError(true)
+          setIsLoading(false)
+        }
+      }
+      reader.onerror = () => {
+        setHasError(true)
+        setIsLoading(false)
+      }
+      reader.readAsDataURL(src)
+      return
+    }
+
+    let srcString = typeof src === 'string' ? src : ''
+    if (!srcString || srcString.trim() === '') {
+      setHasError(true)
+      setIsLoading(false)
+      return
+    }
+
+    // Fix malformed base64 URLs (e.g., "base64,..." should be "data:image/png;base64,...")
+    if (srcString.startsWith('base64,')) {
+      const base64Data = srcString.substring(7) // Remove "base64," prefix
+      // PNG signature: iVBORw0KGgo
+      // JPEG signature: /9j/4AAQ
+      // GIF signature: R0lGODlh
+      let mimeType = 'image/png' // Default to PNG
+      if (base64Data.startsWith('iVBORw0KGgo')) {
+        mimeType = 'image/png'
+      } else if (base64Data.startsWith('/9j/4AAQ') || base64Data.startsWith('/9j/')) {
+        mimeType = 'image/jpeg'
+      } else if (base64Data.startsWith('R0lGODlh')) {
+        mimeType = 'image/gif'
+      }
+      srcString = `data:${mimeType};base64,${base64Data}`
+    }
+
+    setImageSrc(srcString)
+    setIsLoading(false)
+  }, [src])
+
+  // Check if it's a data URL
+  const isDataUrl = imageSrc.startsWith('data:')
+  
+  // Check if it's a valid external URL
+  const isExternal = imageSrc.startsWith('http://') || imageSrc.startsWith('https://')
+  
+  // Check if it's a valid relative path (starts with /)
+  const isRelativePath = imageSrc.startsWith('/')
+
+  // Validate URL format for Next.js Image
+  let isValidForNextImage = false
+  if (isExternal || isRelativePath) {
+    try {
+      if (isExternal) {
+        new URL(imageSrc)
+        isValidForNextImage = true
+      } else if (isRelativePath) {
+        isValidForNextImage = true
+      }
+    } catch {
+      isValidForNextImage = false
+    }
+  }
+
+  if (hasError || !imageSrc) {
+    return (
+      <span className="my-6 relative w-full block">
+        <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
+          <p>Image failed to load</p>
+        </div>
+      </span>
+    )
+  }
+
+  // For data URLs, use regular img tag with React state management
+  if (isDataUrl || !isValidForNextImage) {
+    return (
+      <span className="my-6 relative w-full block">
+        {isLoading && (
+          <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
+            <p>Loading image...</p>
+          </div>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageSrc}
+          alt={alt || ''}
+          className={`rounded-lg border border-border max-w-full h-auto transition-opacity ${
+            isLoading ? 'opacity-0' : 'opacity-100'
+          }`}
+          style={{ width: 'auto', height: 'auto' }}
+          loading="lazy"
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setHasError(true)
+            setIsLoading(false)
+          }}
+        />
+      </span>
+    )
+  }
+
+  // For valid external URLs or relative paths, use Next.js Image
+  return (
+    <span className="my-6 relative w-full block">
+      {isLoading && (
+        <div className="rounded-lg border border-border bg-muted/50 p-8 text-center text-muted-foreground">
+          <p>Loading image...</p>
+        </div>
+      )}
+      <Image
+        src={imageSrc}
+        alt={alt || ''}
+        width={800}
+        height={600}
+        className={`rounded-lg border border-border max-w-full h-auto transition-opacity ${
+          isLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        style={{ width: 'auto', height: 'auto' }}
+        unoptimized={isExternal}
+        loading="lazy"
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true)
+          setIsLoading(false)
+        }}
+      />
+    </span>
+  )
 }
 
 export function DocumentRenderer({ content, tables, className = '' }: DocumentRendererProps) {
@@ -195,7 +349,7 @@ function DocumentContent({ content }: { content: string }) {
           </pre>
         ),
         table: ({ children }) => (
-          <div className="overflow-x-auto my-6 rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+          <div className="overflow-x-auto my-6 rounded-lg border border-border -mx-2 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
             <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
               {children}
             </table>
@@ -216,92 +370,7 @@ function DocumentContent({ content }: { content: string }) {
         ),
         img: ({ src, alt }) => {
           if (!src) return null
-          
-          // Convert src to string if it's a Blob
-          let srcString = typeof src === 'string' ? src : ''
-          if (!srcString || srcString.trim() === '') return null
-          
-          // Fix malformed base64 URLs (e.g., "base64,..." should be "data:image/png;base64,...")
-          // This can happen if the parser doesn't properly format the data URL
-          if (srcString.startsWith('base64,')) {
-            // Try to detect image type from the base64 data
-            const base64Data = srcString.substring(7) // Remove "base64," prefix
-            // PNG signature: iVBORw0KGgo
-            // JPEG signature: /9j/4AAQ
-            // GIF signature: R0lGODlh
-            let mimeType = 'image/png' // Default to PNG
-            if (base64Data.startsWith('iVBORw0KGgo')) {
-              mimeType = 'image/png'
-            } else if (base64Data.startsWith('/9j/4AAQ') || base64Data.startsWith('/9j/')) {
-              mimeType = 'image/jpeg'
-            } else if (base64Data.startsWith('R0lGODlh')) {
-              mimeType = 'image/gif'
-            }
-            srcString = `data:${mimeType};base64,${base64Data}`
-          }
-          
-          // Check if it's a data URL
-          const isDataUrl = srcString.startsWith('data:')
-          
-          // Check if it's a valid external URL
-          const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
-          
-          // Check if it's a valid relative path (starts with /)
-          const isRelativePath = srcString.startsWith('/')
-          
-          // Validate URL format for Next.js Image
-          // Next.js Image requires valid URLs or relative paths
-          let isValidForNextImage = false
-          if (isExternal || isRelativePath) {
-            try {
-              // Try to construct a URL to validate it
-              if (isExternal) {
-                new URL(srcString)
-                isValidForNextImage = true
-              } else if (isRelativePath) {
-                // Relative paths starting with / are valid for Next.js Image
-                isValidForNextImage = true
-              }
-            } catch {
-              // Invalid URL, will use regular img tag
-              isValidForNextImage = false
-            }
-          }
-          
-          // For data URLs or invalid URLs, use regular img tag
-          // Next.js Image doesn't handle data URLs or malformed URLs
-          // Use span with block display to avoid hydration errors (div inside p is invalid)
-          if (isDataUrl || !isValidForNextImage) {
-            return (
-              <span className="my-6 relative w-full block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={srcString}
-                  alt={alt || ''}
-                  className="rounded-lg border border-border max-w-full h-auto"
-                  style={{ width: 'auto', height: 'auto' }}
-                  loading="lazy"
-                />
-              </span>
-            )
-          }
-          
-          // For valid external URLs or relative paths, use Next.js Image
-          // Use span with block display to avoid hydration errors (div inside p is invalid)
-          return (
-            <span className="my-6 relative w-full block">
-              <Image
-                src={srcString}
-                alt={alt || ''}
-                width={800}
-                height={600}
-                className="rounded-lg border border-border max-w-full h-auto"
-                style={{ width: 'auto', height: 'auto' }}
-                unoptimized={isExternal}
-                loading="lazy"
-              />
-            </span>
-          )
+          return <DocumentImage src={src} alt={alt} />
         },
         a: ({ href, children }) => (
           <a 
@@ -425,7 +494,7 @@ function TableRenderer({ table }: {
           <span>Таблица</span>
         </h3>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+      <div className="overflow-x-auto rounded-lg border border-border -mx-2 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
         <table className="w-full divide-y divide-border bg-background border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
           {hasHeaders && (
             <thead className="bg-muted/50">

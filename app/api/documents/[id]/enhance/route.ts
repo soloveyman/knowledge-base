@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, documents } from '@/lib/db'
+import { db, documents, documentImages } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
@@ -188,19 +188,22 @@ Preserve all original sections and tables, but improve their titles and content 
         throw new Error('Missing metadata')
       }
 
-      // Preserve images from original if they exist
-      if (parsedContent.images && Array.isArray(parsedContent.images)) {
-        enhancedContent.images = parsedContent.images
-      } else {
-        enhancedContent.images = []
-      }
+      // Preserve images from original - they're stored in document_images table
+      // We'll fetch them separately and merge them back
+      enhancedContent.images = []
+
+      // Fetch existing images from database to get count
+      const existingImages = await db
+        .select()
+        .from(documentImages)
+        .where(eq(documentImages.documentId, documentId))
 
       // Update metadata
       enhancedContent.metadata = {
         ...enhancedContent.metadata,
         totalSections: enhancedContent.sections.length,
         totalTables: enhancedContent.tables.length,
-        totalImages: enhancedContent.images.length,
+        totalImages: existingImages.length,
         wordCount: enhancedContent.sections.reduce((count, s) => count + (s.content?.split(/\s+/).length || 0), 0),
         parserVersion: parsedContent.metadata?.parserVersion || '1.0',
         ...(enhancedContent.metadata && typeof enhancedContent.metadata === 'object' ? enhancedContent.metadata : {})
@@ -219,15 +222,41 @@ Preserve all original sections and tables, but improve their titles and content 
       }, { status: 500 })
     }
 
+    // Remove images from parsedContent (they're stored separately in document_images table)
+    const enhancedContentWithoutImages = {
+      ...enhancedContent,
+      images: []
+    }
+
     // Update the document with enhanced content
     const updated = await db
       .update(documents)
       .set({
-        parsedContent: enhancedContent,
+        parsedContent: enhancedContentWithoutImages,
         updatedAt: new Date()
       })
       .where(eq(documents.id, documentId))
       .returning()
+
+    // Images are preserved in document_images table (cascade delete is handled by DB)
+    // Fetch images from database to include in response
+    const savedImages = await db
+      .select()
+      .from(documentImages)
+      .where(eq(documentImages.documentId, documentId))
+    
+    // Merge images back into enhancedContent for response
+    if (savedImages.length > 0) {
+      enhancedContent.images = savedImages
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map(img => ({
+          filename: img.filename,
+          data: img.data,
+          type: img.type,
+          position: img.position ?? undefined
+        }))
+      enhancedContent.metadata.totalImages = savedImages.length
+    }
 
     return NextResponse.json({
       success: true,

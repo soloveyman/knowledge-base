@@ -907,7 +907,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   }
   
   // Merge images from DOCX parsing if they exist
-  if ('images' in parseResult && parseResult.images && parseResult.images.length > 0) {
+  if ('images' in parseResult && parseResult.images && Array.isArray(parseResult.images) && parseResult.images.length > 0) {
     console.log('Found images in parseResult:', parseResult.images.length)
     structuredContent.images = parseResult.images.map((img, idx) => ({
       ...img,

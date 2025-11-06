@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, documents, assignments } from '@/lib/db'
+import { db, documents, documentImages, assignments } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import type { ParsedContent } from '@/lib/parsers'
 
 export async function GET(
   request: Request,
@@ -37,9 +38,31 @@ export async function GET(
       })
     }
     
+    // Fetch images for this document
+    const images = await db
+      .select()
+      .from(documentImages)
+      .where(eq(documentImages.documentId, id))
+    
+    // Merge images into parsedContent
+    const document = doc[0]
+    const parsedContent = document.parsedContent as ParsedContent | null
+    
+    if (parsedContent && images.length > 0) {
+      parsedContent.images = images
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map(img => ({
+          filename: img.filename,
+          data: img.data,
+          type: img.type,
+          position: img.position ?? undefined
+        }))
+      parsedContent.metadata.totalImages = images.length
+    }
+    
     return NextResponse.json({
       success: true,
-      data: { document: doc[0] }
+      data: { document }
     })
   } catch (error) {
     console.error('Get document API error:', error)
