@@ -269,7 +269,8 @@ export default function SuperAdminPage() {
           image: session?.user?.image
         }}
       />
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:p-8">
+      <div className="flex-1 w-full">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:p-8 h-full">
       {/* Statistics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <Card>
@@ -493,6 +494,7 @@ export default function SuperAdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+        </div>
       </div>
     </div>
   );
