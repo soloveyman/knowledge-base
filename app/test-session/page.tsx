@@ -10,7 +10,7 @@ export default function TestSessionPage() {
   const router = useRouter()
 
   return (
-    <div className="container mx-auto p-8">
+    <div className="max-w-[1200px] mx-auto p-8">
       <Card>
         <CardHeader>
           <CardTitle>Current Session</CardTitle>

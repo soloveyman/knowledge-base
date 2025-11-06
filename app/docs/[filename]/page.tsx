@@ -317,7 +317,7 @@ export default function DocumentViewer() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
@@ -334,7 +334,7 @@ export default function DocumentViewer() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:py-8">
         {/* Document Content */}
         <div className="min-h-screen w-full">
           {documentData?.type === 'PDF' ? (

@@ -364,7 +364,7 @@ export default function DocumentReaderPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-16 sm:h-18">
             <div className="flex items-center min-w-0 flex-1">
               <div className="min-w-0 flex-1">
@@ -387,7 +387,7 @@ export default function DocumentReaderPage() {
 
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
         <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
           {/* Document Content */}
           <Card>

@@ -249,7 +249,7 @@ export default function SuperAdminPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="max-w-[1200px] mx-auto p-6">
         <div className="text-center py-8">Loading...</div>
       </div>
     );
@@ -269,7 +269,7 @@ export default function SuperAdminPage() {
           image: session?.user?.image
         }}
       />
-      <div className="container mx-auto px-4 sm:px-6 pt-6 pb-4 md:p-8">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:p-8">
       {/* Statistics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         <Card>

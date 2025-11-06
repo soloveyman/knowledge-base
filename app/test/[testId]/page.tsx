@@ -312,7 +312,7 @@ export default function TestPage() {
       <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="bg-card border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center min-w-0">
                 <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
@@ -377,7 +377,7 @@ export default function TestPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0">
               <div className="min-w-0">
@@ -404,7 +404,7 @@ export default function TestPage() {
 
       {/* Progress */}
       <div className="bg-card border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-2">
           <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
             <span>{t('progress')}</span>
             <span>{Math.round(progress)}%</span>

@@ -14,7 +14,7 @@ interface PageHeaderProps {
 export function PageHeader({ title, icon, onClose, showCloseButton = true }: PageHeaderProps) {
   return (
     <header className="bg-card border-b border-border sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-3 min-w-0">
             <Image

@@ -483,7 +483,7 @@ function AssignmentBuilderPageContent() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3 min-w-0">
               <Image
@@ -508,7 +508,7 @@ function AssignmentBuilderPageContent() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
           {/* Configuration Panel */}
           <div className="space-y-3 md:space-y-6">
