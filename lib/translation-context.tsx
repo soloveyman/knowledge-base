@@ -34,27 +34,33 @@ function detectBrowserLanguage(): Language {
 }
 
 export function TranslationProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with language from localStorage or detect from browser
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window === 'undefined') {
-      return 'en' // SSR default
-    }
+  // Always start with 'en' to avoid hydration mismatch
+  // Then update to saved/detected language after mount
+  const [language, setLanguage] = useState<Language>('en')
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Initialize language after mount to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true)
     
-    // Check localStorage first (synchronous)
+    // Check localStorage first
     const savedLanguage = localStorage.getItem('language') as Language
     if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'ru')) {
-      return savedLanguage
+      setLanguage(savedLanguage)
+      return
     }
     
     // No saved language, detect from browser region
-    return detectBrowserLanguage()
-  })
+    const detected = detectBrowserLanguage()
+    setLanguage(detected)
+    localStorage.setItem('language', detected)
+  }, [])
 
-  // Save language to localStorage when it changes (including initial detection)
+  // Save language to localStorage when it changes (after initial mount)
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (!isMounted || typeof window === 'undefined') return
     localStorage.setItem('language', language)
-  }, [language])
+  }, [language, isMounted])
 
   const t = (key: TranslationKey): string => {
     return translations[language][key] || translations.en[key] || key

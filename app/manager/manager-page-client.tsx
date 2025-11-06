@@ -351,13 +351,14 @@ export function ManagerPageClient({
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      setDocuments(docs => docs.filter(doc => doc.id !== id))
       cleanupDocumentFromLocalStorage(id)
       
       const response = await fetch(`/api/documents/${id}`, { method: 'DELETE' })
       const result = await response.json()
       
       if (result.success) {
+        // Remove from local state immediately
+        setDocuments(docs => docs.filter(doc => doc.id !== id))
         toast.success('Document deleted successfully')
       } else {
         loadData(false)

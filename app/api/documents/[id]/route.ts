@@ -122,6 +122,8 @@ export async function DELETE(
     const userRole = session.user.role
     const tenantId = session.user.businessId
 
+    console.log('DELETE request for document ID:', id, 'userRole:', userRole, 'tenantId:', tenantId)
+
     // Check if document exists with access control
     let existingDocument: typeof documents.$inferSelect[] = []
     
@@ -143,10 +145,22 @@ export async function DELETE(
     }
     
     if (existingDocument.length === 0) {
-      return NextResponse.json({
-        success: false,
-        message: 'Document not found'
-      }, { status: 404 })
+      // Check if document exists at all (without tenant filtering) for better error message
+      const anyDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+      
+      if (anyDocument.length === 0) {
+        console.log('Document does not exist:', id)
+        return NextResponse.json({
+          success: false,
+          message: 'Document not found. It may have already been deleted.'
+        }, { status: 404 })
+      } else {
+        console.log('Document exists but access denied:', id, 'userRole:', userRole, 'tenantId:', tenantId)
+        return NextResponse.json({
+          success: false,
+          message: 'You do not have permission to delete this document'
+        }, { status: 403 })
+      }
     }
 
     // Check if document's module is used in assignments - if so, block deletion
@@ -165,8 +179,20 @@ export async function DELETE(
       }
     }
 
-    // Delete the document
+    // Hard delete: permanently remove document from database
+    // Also delete associated images
+    if (await tableExists('document_images')) {
+      try {
+        await db.delete(documentImages).where(eq(documentImages.documentId, id))
+      } catch (error) {
+        // Table might not exist - silently skip
+      }
+    }
+    
+    // Permanently delete the document
     await db.delete(documents).where(eq(documents.id, id))
+    
+    console.log('Document permanently deleted:', id)
 
     return NextResponse.json({
       success: true,

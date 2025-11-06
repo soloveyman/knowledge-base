@@ -18,6 +18,7 @@ export async function GET() {
     
     // All roles (including owner) filter by businessId for tenant isolation
     // Only super-admin should see all documents across all businesses
+    // Hard delete is used, so no need to filter by deleted_at
     if (userRole === 'super-admin') {
       allDocuments = await db
         .select()

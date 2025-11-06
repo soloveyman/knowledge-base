@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { PlanBadge, StatusBadge, InvoiceStatusBadge } from "@/lib/badges"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
+import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 import { 
   Crown, 
   Shield, 
@@ -114,6 +116,8 @@ export default function SubscriptionManager({
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[] | null>(null)
   const [isStripeEnabled, setIsStripeEnabled] = useState<boolean>(false)
+  const [showFinalConfirm, setShowFinalConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Use module-level cache (persists across component remounts)
   const dataCache = useRef(subscriptionDataCache)
@@ -767,6 +771,77 @@ export default function SubscriptionManager({
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Account Card */}
+      <Card className="border-destructive/50 px-4 md:px-6 py-4 md:py-6">
+        <CardHeader className="px-0 md:px-0">
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            Delete My Account
+          </CardTitle>
+          <CardDescription>
+            Permanently delete your account and all related data from the system. This action cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 md:px-0">
+          <DeleteConfirmation
+            trigger={
+              <Button variant="destructive" disabled={isDeleting}>
+                {isDeleting ? 'Deleting...' : 'Delete My Account'}
+              </Button>
+            }
+            title="Delete My Account"
+            description="Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently delete all your data."
+            dataLossWarning="This will permanently delete your account, all documents, tests, assignments, users, and all related data. This cannot be reversed."
+            variant="destructive"
+            isLoading={isDeleting}
+            onConfirm={() => {
+              // First confirmation - show final warning
+              setShowFinalConfirm(true)
+            }}
+          />
+          
+          <DeleteConfirmation
+            open={showFinalConfirm}
+            onOpenChange={setShowFinalConfirm}
+            title="Final Warning"
+            description="This is your final warning. Clicking Delete will permanently delete your account and all related data. This cannot be reversed."
+            variant="destructive"
+            isLoading={isDeleting}
+            onConfirm={async () => {
+              setIsDeleting(true)
+              setShowFinalConfirm(false)
+              
+              try {
+                const response = await fetch('/api/users/delete-account', {
+                  method: 'DELETE',
+                })
+                
+                const data = await response.json()
+                
+                if (response.ok && data.success) {
+                  toast.success('Account deleted successfully. You will be signed out.')
+                  // Sign out and redirect to home
+                  setTimeout(() => {
+                    window.location.href = '/'
+                  }, 2000)
+                } else {
+                  setIsDeleting(false)
+                  toast.error(data.message || 'Failed to delete account')
+                }
+              } catch (error) {
+                console.error('Error deleting account:', error)
+                setIsDeleting(false)
+                toast.error('Failed to delete account. Please try again.')
+              }
+            }}
+            onCancel={() => {
+              setShowFinalConfirm(false)
+              setIsDeleting(false)
+            }}
+          />
         </CardContent>
       </Card>
     </div>

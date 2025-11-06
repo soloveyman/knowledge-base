@@ -23,6 +23,8 @@ interface DeleteConfirmationProps {
   isLoading?: boolean
   variant?: "default" | "destructive"
   dataLossWarning?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function DeleteConfirmation({
@@ -34,20 +36,32 @@ export function DeleteConfirmation({
   trigger,
   isLoading = false,
   variant = "destructive",
-  dataLossWarning
+  dataLossWarning,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange
 }: DeleteConfirmationProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  
+  const handleSetOpen = (newOpen: boolean) => {
+    if (isControlled && controlledOnOpenChange) {
+      controlledOnOpenChange(newOpen)
+    } else if (!isControlled) {
+      setInternalOpen(newOpen)
+    }
+  }
 
   const handleConfirm = (e?: React.MouseEvent) => {
     e?.stopPropagation()
     onConfirm()
-    setOpen(false)
+    handleSetOpen(false)
   }
 
   const handleCancel = (e?: React.MouseEvent) => {
     e?.stopPropagation()
     onCancel?.()
-    setOpen(false)
+    handleSetOpen(false)
   }
 
   const displayTitle = itemName ? `Delete ${itemName}` : title
@@ -56,7 +70,7 @@ export function DeleteConfirmation({
     : description
 
   const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen)
+    handleSetOpen(newOpen)
     if (!newOpen) {
       // Dialog is closing - ensure any parent click handlers don't fire
       // This is handled by the Dialog component itself, but we add this for safety
@@ -66,14 +80,11 @@ export function DeleteConfirmation({
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogTrigger asChild>
-          {trigger || (
-            <Button variant="destructive" size="sm">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
-          )}
-        </DialogTrigger>
+        {trigger && (
+          <DialogTrigger asChild>
+            {trigger}
+          </DialogTrigger>
+        )}
       <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-lg">
         <DialogHeader className="gap-4 text-left">
           <div className="flex items-start gap-3">
@@ -82,19 +93,19 @@ export function DeleteConfirmation({
             </div>
             <div className="flex-1 min-w-0 pr-8">
               <DialogTitle className="text-left" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{displayTitle}</DialogTitle>
-              <DialogDescription className="text-left mt-2 space-y-2" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              <DialogDescription className="text-left mt-2" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 {displayDescription}
-                {dataLossWarning && (
-                  <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 rounded-md">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
-                      <p className="text-sm text-orange-900 dark:text-orange-200">
-                        {dataLossWarning}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </DialogDescription>
+              {dataLossWarning && (
+                <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                    <p className="text-sm text-orange-900 dark:text-orange-200">
+                      {dataLossWarning}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </DialogHeader>

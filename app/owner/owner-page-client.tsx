@@ -20,7 +20,7 @@ import {
   Loader2
 } from "lucide-react"
 import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
-import { cleanupDocumentFromLocalStorage } from "@/lib/localStorage-utils"
+import { cleanupDocumentFromLocalStorage, syncLocalStorageWithDatabase, clearAllDocumentLocalStorage } from "@/lib/localStorage-utils"
 import { formatDateShort } from "@/lib/date-format"
 import dynamic from "next/dynamic"
 
@@ -181,7 +181,8 @@ export function OwnerPageClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  const [documents, setDocuments] = useState<SavedDocument[]>(initialDocuments)
+  // Start with empty array and load from server immediately to avoid stale deleted documents
+  const [documents, setDocuments] = useState<SavedDocument[]>([])
   const [savedTests, setSavedTests] = useState<SavedTest[]>(initialTests)
   const [savedAssignments, setSavedAssignments] = useState<SavedAssignment[]>(initialAssignments)
   const [savedUsers, setSavedUsers] = useState<SavedUser[]>(initialUsers)
@@ -231,12 +232,20 @@ export function OwnerPageClient({
         setIsLoadingAssignments(true)
       }
 
-      const fetchOptions: RequestInit = preserveDocuments ? { cache: 'no-store' } : {}
+      // Always use no-store cache to ensure fresh data (prevents showing deleted documents)
+      const fetchOptions: RequestInit = { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
         fetch('/api/users', fetchOptions),
         fetch('/api/assignments', fetchOptions),
         fetch('/api/tests', fetchOptions),
-        fetch('/api/documents', fetchOptions)
+        fetch(`/api/documents?t=${Date.now()}`, fetchOptions) // Add timestamp to bust cache
       ])
 
       const usersResult = await usersResponse.json()
@@ -244,12 +253,38 @@ export function OwnerPageClient({
         setSavedUsers((usersResult.data.users as SavedUser[]).filter(u => u.id !== userId))
       }
 
-      const assignmentsResult = await assignmentsResponse.json()
-      if (assignmentsResult.success) {
-        setSavedAssignments(assignmentsResult.data.assignments)
+      // Handle assignments response - check if it's valid JSON
+      if (assignmentsResponse.ok) {
+        try {
+          const assignmentsResult = await assignmentsResponse.json()
+          if (assignmentsResult.success) {
+            setSavedAssignments(assignmentsResult.data.assignments)
+          }
+        } catch (error) {
+          console.error('Error parsing assignments response:', error)
+          // If assignments API fails, just continue without assignments
+          setSavedAssignments([])
+        }
+      } else {
+        console.warn('Assignments API returned error:', assignmentsResponse.status)
+        // If assignments API fails, just continue without assignments
+        setSavedAssignments([])
       }
 
-      const testsResult = await testsResponse.json()
+      // Handle tests response - check if it's valid JSON
+      let testsResult
+      if (testsResponse.ok) {
+        try {
+          testsResult = await testsResponse.json()
+        } catch (error) {
+          console.error('Error parsing tests response:', error)
+          testsResult = { success: false }
+        }
+      } else {
+        console.warn('Tests API returned error:', testsResponse.status)
+        testsResult = { success: false }
+      }
+      
       if (testsResult.success) {
         const transformedTests = await Promise.all(
           (testsResult.data.tests as Array<{
@@ -295,37 +330,59 @@ export function OwnerPageClient({
         setSavedTests(transformedTests)
       }
 
-      const documentsResult = await documentsResponse.json()
+      // Handle documents response - check if it's valid JSON
+      let documentsResult
+      if (documentsResponse.ok) {
+        try {
+          documentsResult = await documentsResponse.json()
+        } catch (error) {
+          console.error('Error parsing documents response:', error)
+          documentsResult = { success: false }
+        }
+      } else {
+        console.warn('Documents API returned error:', documentsResponse.status)
+        documentsResult = { success: false }
+      }
+      
       if (documentsResult.success && documentsResult.data.documents && Array.isArray(documentsResult.data.documents)) {
-        const transformedDocs = documentsResult.data.documents.map((doc: {
-          id: string
-          originalFileName?: string
-          title: string
-          fileType?: string
-          createdAt: string
-          updatedAt?: string
-          fileSize?: number
-          status?: string
-          moduleId?: string | null
-          parsedContent?: {
-            metadata?: {
-              enhancedBy?: string
-              enhancementTimestamp?: number
-            }
-          } | null
-        }) => ({
-          id: doc.id,
-          name: doc.originalFileName || doc.title,
-          type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-          uploadedAt: formatDateShort(doc.createdAt),
-          size: doc.fileSize ? formatFileSize(doc.fileSize) : undefined,
-          status: doc.status || 'ready',
-          moduleId: doc.moduleId || null,
-          createdAt: doc.createdAt,
-          updatedAt: doc.updatedAt,
-          parsedContent: doc.parsedContent || null
-        }))
+        // Hard delete is used, so documents are permanently removed from DB
+        // Filter out any documents that might have deletedAt set (safety check)
+        const transformedDocs = documentsResult.data.documents
+          .filter((doc: any) => !doc.deletedAt) // Safety filter (shouldn't be needed with hard delete)
+          .map((doc: {
+            id: string
+            originalFileName?: string
+            title: string
+            fileType?: string
+            createdAt: string
+            updatedAt?: string
+            fileSize?: number
+            status?: string
+            moduleId?: string | null
+            parsedContent?: {
+              metadata?: {
+                enhancedBy?: string
+                enhancementTimestamp?: number
+              }
+            } | null
+          }) => ({
+            id: doc.id,
+            name: doc.originalFileName || doc.title,
+            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+            uploadedAt: formatDateShort(doc.createdAt),
+            size: doc.fileSize ? formatFileSize(doc.fileSize) : undefined,
+            status: doc.status || 'ready',
+            moduleId: doc.moduleId || null,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+            parsedContent: doc.parsedContent || null
+          }))
+        
         setDocuments(transformedDocs)
+        // Sync localStorage with database to remove any stale deleted documents
+        if (typeof window !== 'undefined') {
+          syncLocalStorageWithDatabase(transformedDocs)
+        }
       } else if (!preserveDocuments) {
         setDocuments([])
       }
@@ -340,6 +397,29 @@ export function OwnerPageClient({
       setIsLoadingAssignments(false)
     }
   }, [userId])
+
+  // Load documents from server on mount to ensure we have the latest data
+  // This prevents showing deleted documents from initial server render
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Clear all document cache to ensure fresh data
+      clearAllDocumentLocalStorage()
+      
+      // Clear browser cache for documents API
+      if ('caches' in window) {
+        caches.keys().then(cacheNames => {
+          cacheNames.forEach(cacheName => {
+            if (cacheName.includes('documents') || cacheName.includes('api')) {
+              caches.delete(cacheName)
+            }
+          })
+        })
+      }
+      
+      // Immediately load documents from server (bypasses initial server-rendered list)
+      loadData(false)
+    }
+  }, []) // Only run once on mount
 
   // Reload data when tab changes if data is missing
   useEffect(() => {
@@ -400,24 +480,41 @@ export function OwnerPageClient({
     }
   }
 
+
   const handleDeleteDocument = async (id: string) => {
     try {
-      setDocuments(docs => docs.filter(doc => doc.id !== id))
       cleanupDocumentFromLocalStorage(id)
+      
+      // Optimistically remove from UI for instant feedback
+      setDocuments(docs => docs.filter(doc => doc.id !== id))
       
       const response = await fetch(`/api/documents/${id}`, { method: 'DELETE' })
       const result = await response.json()
       
       if (result.success) {
         toast.success('Document deleted successfully')
+        // Refresh the list from server to ensure it's in sync (hard delete removes from DB immediately)
+        setTimeout(() => loadData(false), 200)
       } else {
+        // Document might have been already deleted (404) or other error
+        if (response.status === 404) {
+          toast.info('Document was already deleted')
+        } else {
+          toast.error(result.message || 'Failed to delete document')
+        }
+        // Always refresh list to sync with database
         loadData(false)
-        toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
+      // Refresh list on error (document might have been already deleted)
       loadData(false)
       console.error('Error deleting document:', error)
-      toast.error('Error deleting document')
+      // Check if it's a 404 (document already deleted)
+      if (error instanceof Error && error.message.includes('404')) {
+        toast.info('Document was already deleted')
+      } else {
+        toast.error('Error deleting document')
+      }
     }
   }
 

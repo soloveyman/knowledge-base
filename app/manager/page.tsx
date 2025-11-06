@@ -125,7 +125,7 @@ async function fetchManagerData() {
       }
     })(),
     
-    // Documents - filter by businessId
+    // Documents - filter by businessId (hard delete is used, so no need to filter by deleted_at)
     db
       .select({ document: documents, uploaderBusinessId: users.businessId })
       .from(documents)
