@@ -57,6 +57,7 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
 // ===== KNOWLEDGE BASE MANAGEMENT =====
 export const modules = pgTable('modules', {
   id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').notNull(), // Tenant isolation - owner's businessId
   title: text('title').notNull(),
   description: text('description'),
   content: text('content'), // Markdown content
@@ -99,6 +100,7 @@ export const sections = pgTable('sections', {
 export const documents = pgTable('documents', {
   id: uuid('id').primaryKey().defaultRandom(),
   moduleId: uuid('module_id').references(() => modules.id),
+  businessId: uuid('business_id').notNull(), // Tenant isolation - owner's businessId
   title: text('title').notNull(),
   originalFileName: text('original_file_name'),
   fileType: text('file_type'), // 'docx', 'xlsx', 'pdf'
@@ -126,6 +128,7 @@ export const questions = pgTable('questions', {
   id: uuid('id').primaryKey().defaultRandom(),
   moduleId: uuid('module_id').references(() => modules.id),
   sectionId: uuid('section_id').references(() => sections.id),
+  businessId: uuid('business_id').notNull(), // Tenant isolation - owner's businessId
   title: text('title').notNull(),
   content: text('content').notNull(), // Question text
   type: text('type').notNull().default('multiple_choice'), // 'multiple_choice', 'true_false', 'text'
@@ -145,6 +148,7 @@ export const questions = pgTable('questions', {
 export const tests = pgTable('tests', {
   id: uuid('id').primaryKey().defaultRandom(),
   moduleId: uuid('module_id').references(() => modules.id),
+  businessId: uuid('business_id').notNull(), // Tenant isolation - owner's businessId
   title: text('title').notNull(),
   description: text('description'),
   questionIds: json('question_ids'), // Array of question IDs
@@ -182,6 +186,7 @@ export const userGroupMembers = pgTable('user_group_members', {
 
 export const assignments = pgTable('assignments', {
   id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').notNull(), // Tenant isolation - owner's businessId
   title: text('title'), // Custom name for the assignment
   description: text('description'), // Description of the assignment
   moduleId: uuid('module_id').references(() => modules.id),

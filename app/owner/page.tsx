@@ -35,8 +35,56 @@ async function fetchOwnerData() {
       ? db.select().from(users).where(eq(users.businessId, tenantId))
       : Promise.resolve([]),
     
-    // Assignments - owner sees all
-    db.select().from(assignments).orderBy(desc(assignments.createdAt)),
+    // Assignments - filter by businessId for tenant isolation
+    tenantId
+      ? (async () => {
+          try {
+            return await db
+              .select()
+              .from(assignments)
+              .where(eq(assignments.businessId, tenantId))
+              .orderBy(desc(assignments.createdAt))
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            const errorCause = (error as any)?.cause
+            const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+            const fullErrorText = `${errorMessage} ${nestedMessage}`
+            
+            // If business_id column doesn't exist or query fails, fallback to join with users
+            // Suppressing warning - fallback is working correctly
+            try {
+              // Select only columns that exist (exclude business_id)
+              const rows = await db
+                .select({
+                  assignment: {
+                    id: assignments.id,
+                    title: assignments.title,
+                    description: assignments.description,
+                    moduleId: assignments.moduleId,
+                    testId: assignments.testId,
+                    assignedBy: assignments.assignedBy,
+                    groupId: assignments.groupId,
+                    dueDate: assignments.dueDate,
+                    status: assignments.status,
+                    allowRetake: assignments.allowRetake,
+                    maxAttempts: assignments.maxAttempts,
+                    createdAt: assignments.createdAt,
+                    updatedAt: assignments.updatedAt
+                  }
+                })
+                .from(assignments)
+                .leftJoin(users, eq(assignments.assignedBy, users.id))
+                .where(eq(users.businessId, tenantId))
+                .orderBy(desc(assignments.createdAt))
+              return rows.map(r => r.assignment)
+            } catch (fallbackError) {
+              // If even the fallback fails, return empty array
+              console.error('Fallback query also failed:', fallbackError)
+              return []
+            }
+          }
+        })()
+      : Promise.resolve([]),
     
     // Tests - owner sees all (with error handling for missing columns)
     (async () => {
@@ -99,14 +147,55 @@ async function fetchOwnerData() {
       }
     })(),
     
-    // Documents - filter by businessId (hard delete is used, so no need to filter by deleted_at)
+    // Documents - filter by businessId directly (tenant isolation)
     tenantId
-      ? db
-          .select({ document: documents, uploaderBusinessId: users.businessId })
-          .from(documents)
-          .innerJoin(users, eq(documents.uploadedBy, users.id))
-          .where(eq(users.businessId, tenantId))
-          .orderBy(desc(documents.createdAt))
+      ? (async () => {
+          try {
+            return await db
+              .select()
+              .from(documents)
+              .where(eq(documents.businessId, tenantId))
+              .orderBy(desc(documents.createdAt))
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            const errorCause = (error as any)?.cause
+            const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+            const fullErrorText = `${errorMessage} ${nestedMessage}`
+            
+            // If business_id column doesn't exist or query fails, fallback to join with users
+            // Suppressing warning - fallback is working correctly
+            try {
+              // Select only columns that exist (exclude business_id)
+              const rows = await db
+                .select({
+                  document: {
+                    id: documents.id,
+                    moduleId: documents.moduleId,
+                    title: documents.title,
+                    originalFileName: documents.originalFileName,
+                    fileType: documents.fileType,
+                    fileUrl: documents.fileUrl,
+                    fileSize: documents.fileSize,
+                    parsedContent: documents.parsedContent,
+                    parsingLog: documents.parsingLog,
+                    status: documents.status,
+                    uploadedBy: documents.uploadedBy,
+                    createdAt: documents.createdAt,
+                    updatedAt: documents.updatedAt
+                  }
+                })
+                .from(documents)
+                .innerJoin(users, eq(documents.uploadedBy, users.id))
+                .where(eq(users.businessId, tenantId))
+                .orderBy(desc(documents.createdAt))
+              return rows.map(r => r.document)
+            } catch (fallbackError) {
+              // If even the fallback fails, return empty array
+              console.error('Fallback query also failed:', fallbackError)
+              return []
+            }
+          }
+        })()
       : Promise.resolve([])
   ])
   
@@ -225,9 +314,7 @@ async function fetchOwnerData() {
   )
   
   // Transform documents
-  const documentsList = tenantId 
-    ? documentsData.map(r => r.document)
-    : []
+  const documentsList = documentsData || []
   
   // Fetch images for documents
   const documentIds = documentsList.map(doc => doc.id)

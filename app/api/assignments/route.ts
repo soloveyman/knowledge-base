@@ -10,23 +10,61 @@ export async function GET() {
     
     let assignmentsData
     
-    // Owner sees all assignments regardless of businessId
-    if (userRole === 'owner') {
+    // All roles (including owner) filter by businessId for tenant isolation
+    // Only super-admin should see all assignments across all businesses
+    const tenantId = session?.user?.businessId
+    
+    if (userRole === 'super-admin') {
       assignmentsData = await db
         .select()
         .from(assignments)
         .orderBy(desc(assignments.createdAt))
+    } else if (tenantId) {
+      // Filter by businessId directly (tenant isolation) - all other roles
+      try {
+        assignmentsData = await db
+          .select()
+          .from(assignments)
+          .where(eq(assignments.businessId, tenantId))
+          .orderBy(desc(assignments.createdAt))
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorCause = (error as any)?.cause
+        const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+        const fullErrorText = `${errorMessage} ${nestedMessage}`
+        
+        // If business_id column doesn't exist, fallback to join with users
+        if (fullErrorText.includes('column "business_id" does not exist') || 
+            fullErrorText.includes('column "businessId" does not exist')) {
+          // Suppressing warning - fallback is working correctly
+          const rows = await db
+            .select({
+              id: assignments.id,
+              title: assignments.title,
+              description: assignments.description,
+              moduleId: assignments.moduleId,
+              testId: assignments.testId,
+              assignedBy: assignments.assignedBy,
+              groupId: assignments.groupId,
+              dueDate: assignments.dueDate,
+              status: assignments.status,
+              allowRetake: assignments.allowRetake,
+              maxAttempts: assignments.maxAttempts,
+              createdAt: assignments.createdAt,
+              updatedAt: assignments.updatedAt
+            })
+            .from(assignments)
+            .leftJoin(users, eq(assignments.assignedBy, users.id))
+            .where(eq(users.businessId, tenantId))
+            .orderBy(desc(assignments.createdAt))
+          assignmentsData = rows
+        } else {
+          throw error
+        }
+      }
     } else {
-      // Manager and other roles filter by businessId (tenant isolation)
-      const tenantId = session?.user?.businessId
-      // Fetch assignments scoped to tenant via the assigner (owner/manager within tenant)
-      const rows = await db
-        .select({ assignment: assignments, assignerBusinessId: users.businessId })
-        .from(assignments)
-        .leftJoin(users, eq(assignments.assignedBy, users.id))
-        .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
-      
-      assignmentsData = rows.map(r => r.assignment)
+      // No businessId - return empty array for security
+      assignmentsData = []
     }
     
     // Fetch users for each assignment
@@ -140,12 +178,16 @@ export async function POST(request: Request) {
     if (!moduleId) {
       console.log('Document has no moduleId, creating default module...')
       
+      // Get user's businessId for tenant isolation
+      const businessId = session.user.businessId || session.user.id
+      
       // Create a default module for this document
       const defaultModule = await db.insert(modules).values({
         title: `Module for ${document[0].title}`,
         description: `Auto-generated module for document: ${document[0].title}`,
         content: '',
         status: 'published',
+        businessId, // Set businessId for tenant isolation
         createdBy: assignedBy // Use the same user who is creating the assignment
       }).returning()
       
@@ -178,12 +220,23 @@ export async function POST(request: Request) {
       assignmentId = existingAssignments[0].id
       console.log('Found existing assignment:', assignmentId)
     } else {
+      // Get user's businessId for tenant isolation
+      const businessId = session.user.businessId || session.user.id
+      
+      if (!businessId) {
+        return NextResponse.json({
+          success: false,
+          message: 'User must have a businessId to create assignments'
+        }, { status: 400 })
+      }
+      
       // Create a new assignment
       const newAssignment = await db.insert(assignments).values({
         title: title || `Assignment for ${document[0].title}`,
         description: description || '',
         moduleId,
         testId,
+        businessId, // Set businessId for tenant isolation
         assignedBy,
         dueDate: dueDate ? new Date(dueDate) : null,
         status: status || 'pending'

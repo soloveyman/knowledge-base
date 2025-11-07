@@ -18,21 +18,57 @@ export async function GET() {
     
     // All roles (including owner) filter by businessId for tenant isolation
     // Only super-admin should see all documents across all businesses
-    // Hard delete is used, so no need to filter by deleted_at
     if (userRole === 'super-admin') {
       allDocuments = await db
         .select()
         .from(documents)
         .orderBy(desc(documents.createdAt))
     } else if (tenantId) {
-      // Filter by businessId (tenant isolation) - all other roles
-      const rows = await db
-        .select({ document: documents, uploaderBusinessId: users.businessId })
-        .from(documents)
-        .innerJoin(users, eq(documents.uploadedBy, users.id))
-        .where(eq(users.businessId, tenantId))
-        .orderBy(desc(documents.createdAt))
-      allDocuments = rows.map(r => r.document)
+      // Filter by businessId directly (tenant isolation) - all other roles
+      try {
+        allDocuments = await db
+          .select()
+          .from(documents)
+          .where(eq(documents.businessId, tenantId))
+          .orderBy(desc(documents.createdAt))
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorCause = (error as any)?.cause
+        const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+        const fullErrorText = `${errorMessage} ${nestedMessage}`
+        
+        // If business_id column doesn't exist, fallback to join with users
+        if (fullErrorText.includes('column "business_id" does not exist') || 
+            fullErrorText.includes('column "businessId" does not exist')) {
+          // Suppressing warning - fallback is working correctly
+          const rows = await db
+            .select({
+              id: documents.id,
+              moduleId: documents.moduleId,
+              title: documents.title,
+              originalFileName: documents.originalFileName,
+              fileType: documents.fileType,
+              fileUrl: documents.fileUrl,
+              fileSize: documents.fileSize,
+              parsedContent: documents.parsedContent,
+              parsingLog: documents.parsingLog,
+              status: documents.status,
+              uploadedBy: documents.uploadedBy,
+              createdAt: documents.createdAt,
+              updatedAt: documents.updatedAt
+            })
+            .from(documents)
+            .innerJoin(users, eq(documents.uploadedBy, users.id))
+            .where(eq(users.businessId, tenantId))
+            .orderBy(desc(documents.createdAt))
+          allDocuments = rows
+        } else {
+          throw error
+        }
+      }
+    } else {
+      // No businessId - return empty array for security
+      allDocuments = []
     }
 
     // Fetch images for all documents and merge them into parsedContent
@@ -129,11 +165,24 @@ export async function POST(request: Request) {
       }
     } : null
 
-    // Check if document with same title already exists
+    // Get user's businessId for tenant isolation
+    const businessId = session.user.businessId || session.user.id // Fallback to user id if no businessId
+    
+    if (!businessId) {
+      return NextResponse.json({
+        success: false,
+        message: 'User must have a businessId to create documents'
+      }, { status: 400 })
+    }
+
+    // Check if document with same title already exists in this business
     const existingDocument = await db
       .select()
       .from(documents)
-      .where(eq(documents.title, title))
+      .where(and(
+        eq(documents.title, title),
+        eq(documents.businessId, businessId)
+      ))
       .limit(1)
 
     let savedDocument: typeof existingDocument[0] | undefined
@@ -153,6 +202,7 @@ export async function POST(request: Request) {
       }
       
       // Update existing document instead of creating a new one
+      // Ensure businessId is preserved and matches current user's businessId
       const updated = await db
         .update(documents)
         .set({
@@ -163,9 +213,13 @@ export async function POST(request: Request) {
           parsedContent: parsedContentWithoutImages,
           parsingLog,
           status: 'ready',
+          businessId, // Ensure businessId is set correctly
           updatedAt: new Date()
         })
-        .where(eq(documents.id, documentId))
+        .where(and(
+          eq(documents.id, documentId),
+          eq(documents.businessId, businessId) // Security: only update if businessId matches
+        ))
         .returning()
       
       savedDocument = updated[0]
@@ -187,7 +241,7 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      // Create new document
+      // Create new document with businessId for tenant isolation
       const newDocument = await db.insert(documents).values({
         title,
         originalFileName,
@@ -196,6 +250,7 @@ export async function POST(request: Request) {
         fileSize,
         parsedContent: parsedContentWithoutImages,
         parsingLog,
+        businessId, // Set businessId for tenant isolation
         uploadedBy: session.user.id,
         status: 'ready' // Set status to 'ready' since parsing is complete
       }).returning()

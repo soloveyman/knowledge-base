@@ -30,17 +30,41 @@ export async function GET(
       // Super-admin can see all documents
       doc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
     } else if (tenantId) {
-      // Filter by businessId (tenant isolation) - all other roles
-      const rows = await db
-        .select({ document: documents })
-        .from(documents)
-        .innerJoin(users, eq(documents.uploadedBy, users.id))
-        .where(and(
-          eq(documents.id, id),
-          eq(users.businessId, tenantId)
-        ))
-        .limit(1)
-      doc = rows.map(r => r.document)
+      // Filter by businessId directly (tenant isolation) - all other roles
+      try {
+        doc = await db
+          .select()
+          .from(documents)
+          .where(and(
+            eq(documents.id, id),
+            eq(documents.businessId, tenantId)
+          ))
+          .limit(1)
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorCause = (error as any)?.cause
+        const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+        const fullErrorText = `${errorMessage} ${nestedMessage}`.toLowerCase()
+        
+        // If business_id column doesn't exist, fallback to join with users
+        if (fullErrorText.includes('business_id') && fullErrorText.includes('does not exist') ||
+            fullErrorText.includes('businessid') && fullErrorText.includes('does not exist') ||
+            fullErrorText.includes('column') && fullErrorText.includes('business') && fullErrorText.includes('not exist')) {
+          // Suppressing warning - fallback is working correctly
+          const rows = await db
+            .select({ document: documents })
+            .from(documents)
+            .innerJoin(users, eq(documents.uploadedBy, users.id))
+            .where(and(
+              eq(documents.id, id),
+              eq(users.businessId, tenantId)
+            ))
+            .limit(1)
+          doc = rows.map(r => r.document)
+        } else {
+          throw error
+        }
+      }
     }
     
     if (doc.length === 0) {
@@ -131,17 +155,41 @@ export async function DELETE(
       // Super-admin can delete all documents
       existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
     } else if (tenantId) {
-      // Filter by businessId (tenant isolation) - all other roles
-      const rows = await db
-        .select({ document: documents })
-        .from(documents)
-        .innerJoin(users, eq(documents.uploadedBy, users.id))
-        .where(and(
-          eq(documents.id, id),
-          eq(users.businessId, tenantId)
-        ))
-        .limit(1)
-      existingDocument = rows.map(r => r.document)
+      // Filter by businessId directly (tenant isolation) - all other roles
+      try {
+        existingDocument = await db
+          .select()
+          .from(documents)
+          .where(and(
+            eq(documents.id, id),
+            eq(documents.businessId, tenantId)
+          ))
+          .limit(1)
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorCause = (error as any)?.cause
+        const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+        const fullErrorText = `${errorMessage} ${nestedMessage}`.toLowerCase()
+        
+        // If business_id column doesn't exist, fallback to join with users
+        if (fullErrorText.includes('business_id') && fullErrorText.includes('does not exist') ||
+            fullErrorText.includes('businessid') && fullErrorText.includes('does not exist') ||
+            fullErrorText.includes('column') && fullErrorText.includes('business') && fullErrorText.includes('not exist')) {
+          // Suppressing warning - fallback is working correctly
+          const rows = await db
+            .select({ document: documents })
+            .from(documents)
+            .innerJoin(users, eq(documents.uploadedBy, users.id))
+            .where(and(
+              eq(documents.id, id),
+              eq(users.businessId, tenantId)
+            ))
+            .limit(1)
+          existingDocument = rows.map(r => r.document)
+        } else {
+          throw error
+        }
+      }
     }
     
     if (existingDocument.length === 0) {

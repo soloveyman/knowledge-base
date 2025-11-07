@@ -19,9 +19,15 @@ export async function GET() {
     // Explicitly select columns that exist (handle case where new columns don't exist yet)
     // Try with all columns first, fallback to excluding new columns if they don't exist
     try {
-      // Owner sees all tests regardless of businessId
-      if (userRole === 'owner') {
-        const allTests = await db
+      // All roles (including owner) filter by businessId for tenant isolation
+      // Only super-admin should see all tests across all businesses
+      const tenantId = session?.user?.businessId
+      
+      let allTests
+      
+      if (userRole === 'super-admin') {
+        // Super-admin can see all tests
+        allTests = await db
           .select({
             id: tests.id,
             moduleId: tests.moduleId,
@@ -44,70 +50,133 @@ export async function GET() {
           })
           .from(tests)
           .orderBy(desc(tests.createdAt))
-        
-        return NextResponse.json({
-          success: true,
-          data: {
-            tests: allTests
+      } else if (tenantId) {
+        // Filter by businessId directly (tenant isolation) - all other roles
+        try {
+          allTests = await db
+            .select({
+              id: tests.id,
+              moduleId: tests.moduleId,
+              title: tests.title,
+              description: tests.description,
+              questionIds: tests.questionIds,
+              type: tests.type,
+              difficulty: tests.difficulty,
+              locale: tests.locale,
+              passingScore: tests.passingScore,
+              timeLimit: tests.timeLimit,
+              maxAttempts: tests.maxAttempts,
+              shuffleQuestions: tests.shuffleQuestions,
+              showCorrectAnswers: tests.showCorrectAnswers,
+              status: tests.status,
+              isActive: tests.isActive,
+              createdBy: tests.createdBy,
+              createdAt: tests.createdAt,
+              updatedAt: tests.updatedAt
+            })
+            .from(tests)
+            .where(eq(tests.businessId, tenantId))
+            .orderBy(desc(tests.createdAt))
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          const errorCause = (error as any)?.cause
+          const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
+          const errorString = String(error)
+          const fullErrorText = `${errorMessage} ${nestedMessage} ${errorString}`.toLowerCase()
+          
+          // If business_id column doesn't exist, fallback to join with users
+          // Check for various error message formats
+          if (fullErrorText.includes('business_id') && fullErrorText.includes('does not exist') ||
+              fullErrorText.includes('businessid') && fullErrorText.includes('does not exist') ||
+              fullErrorText.includes('column') && fullErrorText.includes('business') && fullErrorText.includes('not exist')) {
+            // Suppressing warning - fallback is working correctly
+            try {
+              // Try with all columns first
+              const rows = await db
+                .select({
+                  id: tests.id,
+                  moduleId: tests.moduleId,
+                  title: tests.title,
+                  description: tests.description,
+                  questionIds: tests.questionIds,
+                  type: tests.type,
+                  difficulty: tests.difficulty,
+                  locale: tests.locale,
+                  passingScore: tests.passingScore,
+                  timeLimit: tests.timeLimit,
+                  maxAttempts: tests.maxAttempts,
+                  shuffleQuestions: tests.shuffleQuestions,
+                  showCorrectAnswers: tests.showCorrectAnswers,
+                  status: tests.status,
+                  isActive: tests.isActive,
+                  createdBy: tests.createdBy,
+                  createdAt: tests.createdAt,
+                  updatedAt: tests.updatedAt
+                })
+                .from(tests)
+                .innerJoin(users, eq(tests.createdBy, users.id))
+                .where(eq(users.businessId, tenantId))
+                .orderBy(desc(tests.createdAt))
+              allTests = rows
+            } catch (fallbackError: unknown) {
+              // If fallback fails due to missing columns, try without them
+              const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+              const fallbackErrorCause = (fallbackError as any)?.cause
+              const fallbackNestedMessage = fallbackErrorCause instanceof Error ? fallbackErrorCause.message : String(fallbackErrorCause || '')
+              const fallbackErrorText = `${fallbackErrorMessage} ${fallbackNestedMessage}`
+              
+              if (fallbackErrorText.includes('column "type" does not exist') || 
+                  fallbackErrorText.includes('column "difficulty" does not exist') ||
+                  fallbackErrorText.includes('column "locale" does not exist')) {
+                console.warn('Tests API: Fallback query missing columns, using minimal select')
+                try {
+                  const rows = await db
+                    .select({
+                      id: tests.id,
+                      moduleId: tests.moduleId,
+                      title: tests.title,
+                      description: tests.description,
+                      questionIds: tests.questionIds,
+                      passingScore: tests.passingScore,
+                      timeLimit: tests.timeLimit,
+                      maxAttempts: tests.maxAttempts,
+                      shuffleQuestions: tests.shuffleQuestions,
+                      showCorrectAnswers: tests.showCorrectAnswers,
+                      status: tests.status,
+                      isActive: tests.isActive,
+                      createdBy: tests.createdBy,
+                      createdAt: tests.createdAt,
+                      updatedAt: tests.updatedAt
+                    })
+                    .from(tests)
+                    .innerJoin(users, eq(tests.createdBy, users.id))
+                    .where(eq(users.businessId, tenantId))
+                    .orderBy(desc(tests.createdAt))
+                  // Add null values for missing columns
+                  allTests = rows.map(row => ({
+                    ...row,
+                    type: null,
+                    difficulty: null,
+                    locale: null
+                  }))
+                } catch (minimalError) {
+                  console.error('Tests API: Minimal fallback query also failed:', minimalError)
+                  allTests = []
+                }
+              } else {
+                // If fallback fails for other reasons, log and return empty array
+                console.error('Tests API: Fallback query also failed:', fallbackError)
+                allTests = []
+              }
+            }
+          } else {
+            throw error
           }
-        })
+        }
+      } else {
+        // No businessId - return empty array for security
+        allTests = []
       }
-      
-      // Manager and other roles filter by businessId (tenant isolation)
-      const tenantId = session?.user?.businessId
-      
-      if (!tenantId) {
-        // If no businessId, return empty array for non-owner users
-        return NextResponse.json({
-          success: true,
-          data: {
-            tests: []
-          }
-        })
-      }
-      
-      // Get user IDs for the tenant first
-      const tenantUsers = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.businessId, tenantId))
-      
-      const tenantUserIds = tenantUsers.map(u => u.id)
-      
-      if (tenantUserIds.length === 0) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            tests: []
-          }
-        })
-      }
-      
-      // Query tests created by users in the tenant
-      const allTests = await db
-        .select({
-          id: tests.id,
-          moduleId: tests.moduleId,
-          title: tests.title,
-          description: tests.description,
-          questionIds: tests.questionIds,
-          type: tests.type,
-          difficulty: tests.difficulty,
-          locale: tests.locale,
-          passingScore: tests.passingScore,
-          timeLimit: tests.timeLimit,
-          maxAttempts: tests.maxAttempts,
-          shuffleQuestions: tests.shuffleQuestions,
-          showCorrectAnswers: tests.showCorrectAnswers,
-          status: tests.status,
-          isActive: tests.isActive,
-          createdBy: tests.createdBy,
-          createdAt: tests.createdAt,
-          updatedAt: tests.updatedAt
-        })
-        .from(tests)
-        .where(inArray(tests.createdBy, tenantUserIds))
-        .orderBy(desc(tests.createdAt))
 
       return NextResponse.json({
         success: true,
@@ -120,14 +189,66 @@ export async function GET() {
       const errorMessage = selectError instanceof Error ? selectError.message : String(selectError)
       const errorCause = (selectError as any)?.cause
       const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
-      const fullErrorText = `${errorMessage} ${nestedMessage}`
+      const errorString = String(selectError)
+      const fullErrorText = `${errorMessage} ${nestedMessage} ${errorString}`.toLowerCase()
       
-      if (fullErrorText.includes('column "type" does not exist') || 
-          fullErrorText.includes('column "difficulty" does not exist') ||
-          fullErrorText.includes('column "locale" does not exist')) {
-        console.log('New columns not found, using fallback query without type/difficulty/locale')
+      // Check for missing business_id column
+      const hasBusinessIdError = (fullErrorText.includes('business_id') && fullErrorText.includes('does not exist')) ||
+                                  (fullErrorText.includes('businessid') && fullErrorText.includes('does not exist')) ||
+                                  (fullErrorText.includes('column') && fullErrorText.includes('business') && fullErrorText.includes('not exist'))
+      
+      // Check for missing type/difficulty/locale columns
+      const hasTypeError = fullErrorText.includes('column') && fullErrorText.includes('type') && fullErrorText.includes('does not exist')
+      const hasDifficultyError = fullErrorText.includes('column') && fullErrorText.includes('difficulty') && fullErrorText.includes('does not exist')
+      const hasLocaleError = fullErrorText.includes('column') && fullErrorText.includes('locale') && fullErrorText.includes('does not exist')
+      
+      if (hasTypeError || hasDifficultyError || hasLocaleError || hasBusinessIdError) {
+        // Suppressing warnings - fallback is working correctly
+        if (!hasBusinessIdError) {
+          console.log('New columns not found, using fallback query without type/difficulty/locale')
+        }
         
         // Fallback: select without new columns
+        // For business_id errors, always use join method
+        if (userRole === 'super-admin') {
+          // Super-admin can see all tests
+          const allTests = await db
+            .select({
+              id: tests.id,
+              moduleId: tests.moduleId,
+              title: tests.title,
+              description: tests.description,
+              questionIds: tests.questionIds,
+              passingScore: tests.passingScore,
+              timeLimit: tests.timeLimit,
+              maxAttempts: tests.maxAttempts,
+              shuffleQuestions: tests.shuffleQuestions,
+              showCorrectAnswers: tests.showCorrectAnswers,
+              status: tests.status,
+              isActive: tests.isActive,
+              createdBy: tests.createdBy,
+              createdAt: tests.createdAt,
+              updatedAt: tests.updatedAt
+            })
+            .from(tests)
+            .orderBy(desc(tests.createdAt))
+          
+          // Add default values for missing columns
+          const testsWithDefaults = allTests.map(test => ({
+            ...test,
+            type: null,
+            difficulty: null,
+            locale: null
+          }))
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              tests: testsWithDefaults
+            }
+          })
+        }
+        
         if (userRole === 'owner') {
           const allTests = await db
             .select({
@@ -240,8 +361,67 @@ export async function GET() {
     const errorMessage = error instanceof Error ? error.message : String(error)
     const errorCause = (error as any)?.cause
     const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
-    const fullErrorText = `${errorMessage} ${nestedMessage}`
+    const errorString = String(error)
+    const fullErrorText = `${errorMessage} ${nestedMessage} ${errorString}`.toLowerCase()
     console.error('Full tests API error:', fullErrorText)
+    console.error('Error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
+    
+    // If it's a business_id error, try one more fallback
+    if (fullErrorText.includes('business') && fullErrorText.includes('not exist')) {
+      // Suppressing warning - fallback is working correctly
+      try {
+        const session = await auth()
+        const tenantId = session?.user?.businessId
+        if (tenantId) {
+          const tenantUsers = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.businessId, tenantId))
+          
+          const tenantUserIds = tenantUsers.map(u => u.id)
+          
+          if (tenantUserIds.length > 0) {
+            const allTests = await db
+              .select({
+                id: tests.id,
+                moduleId: tests.moduleId,
+                title: tests.title,
+                description: tests.description,
+                questionIds: tests.questionIds,
+                passingScore: tests.passingScore,
+                timeLimit: tests.timeLimit,
+                maxAttempts: tests.maxAttempts,
+                shuffleQuestions: tests.shuffleQuestions,
+                showCorrectAnswers: tests.showCorrectAnswers,
+                status: tests.status,
+                isActive: tests.isActive,
+                createdBy: tests.createdBy,
+                createdAt: tests.createdAt,
+                updatedAt: tests.updatedAt
+              })
+              .from(tests)
+              .where(inArray(tests.createdBy, tenantUserIds))
+              .orderBy(desc(tests.createdAt))
+            
+            const testsWithDefaults = allTests.map(test => ({
+              ...test,
+              type: null,
+              difficulty: null,
+              locale: null
+            }))
+            
+            return NextResponse.json({
+              success: true,
+              data: {
+                tests: testsWithDefaults
+              }
+            })
+          }
+        }
+      } catch (finalError) {
+        console.error('Final fallback also failed:', finalError)
+      }
+    }
     
     return NextResponse.json({
       success: false,
@@ -340,8 +520,15 @@ export async function POST(request: Request) {
         
         console.log('Processed question data:', JSON.stringify(questionData, null, 2))
         
+        // Get user's businessId for tenant isolation
+        const businessId = session.user.businessId || session.user.id
+        
         savedQuestions = await db.insert(questionsTable).values(
-          questionData.map((q: typeof questionData[number]) => ({ ...q, createdBy: session.user.id }))
+          questionData.map((q: typeof questionData[number]) => ({ 
+            ...q, 
+            businessId, // Set businessId for tenant isolation
+            createdBy: session.user.id 
+          }))
         ).returning()
 
         finalQuestionIds = savedQuestions.map(q => q.id)
@@ -357,12 +544,23 @@ export async function POST(request: Request) {
       }
     }
 
+    // Get user's businessId for tenant isolation
+    const businessId = session.user.businessId || session.user.id // Fallback to user id if no businessId
+    
+    if (!businessId) {
+      return NextResponse.json({
+        success: false,
+        message: 'User must have a businessId to create tests'
+      }, { status: 400 })
+    }
+
     // Create the test - handle missing columns gracefully
     // Don't include type, difficulty, locale initially (they might not exist in DB)
     const baseTestValues = {
       title,
       description: description || '',
       moduleId: null, // Documents are not modules, so set to null
+      businessId, // Set businessId for tenant isolation
       questionIds: finalQuestionIds, // Array of question IDs
       passingScore: passingScore || 70,
       timeLimit: timeLimit || null,
