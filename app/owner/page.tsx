@@ -435,12 +435,16 @@ function OwnerPageInner() {
           setDocumentsWithLog(transformedDocs)
         } else {
           console.log('Owner: No documents in API response')
-          // Only clear documents if preserveData is false AND we're not on docs tab
-          // This prevents clearing documents when returning from import
-          if (!preserveData && defaultTab !== 'docs') {
+          // NEVER clear documents if preserveData is true - this prevents empty state flicker
+          // Only clear if preserveData is false AND we're not on docs tab AND documents array is empty
+          if (!preserveData && defaultTab !== 'docs' && documents.length === 0) {
             setDocumentsWithLog([])
           } else {
-            console.log('Owner: Keeping existing documents to avoid empty state flicker')
+            console.log('Owner: Keeping existing documents to avoid empty state flicker', {
+              preserveData,
+              defaultTab,
+              documentsLength: documents.length
+            })
           }
         }
         
@@ -448,15 +452,22 @@ function OwnerPageInner() {
         // which always saves to owner-documents localStorage key
       } else {
         console.error('Owner: Documents API failed:', documentsResult.message || documentsResult.error)
-        if (!preserveData) {
-          // Only clear documents if we're not preserving them and the API call failed
+        // NEVER clear documents if preserveData is true - this prevents empty state flicker
+        // Only clear if preserveData is false AND documents array is empty
+        if (!preserveData && documents.length === 0) {
           setDocumentsWithLog([])
+        } else {
+          console.log('Owner: Keeping existing documents after API error to avoid empty state flicker')
         }
       }
     } catch (error) {
       console.error('Error loading data:', error)
-      if (!preserveData) {
+      // NEVER clear documents if preserveData is true - this prevents empty state flicker
+      // Only clear if preserveData is false AND documents array is empty
+      if (!preserveData && documents.length === 0) {
         setDocumentsWithLog([])
+      } else {
+        console.log('Owner: Keeping existing documents after error to avoid empty state flicker')
       }
     } finally {
       // Clear loading states
@@ -933,20 +944,49 @@ function OwnerPageInner() {
                 </div>
               </CardHeader>
               <CardContent>
-                {isLoadingDocuments ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-                    <span className="ml-3 text-muted-foreground">{t('refreshingDocuments')}</span>
-                  </div>
-                ) : documents.length === 0 ? (
-                  <EmptyState
-                    icon={<span className="text-5xl">📄</span>}
-                    title={t('noDocumentsUploaded')}
-                    description={t('getStartedImportDocument')}
-                    actionLabel={t('importDocument')}
-                    onAction={handleImportDocument}
-                  />
-                ) : (
+                {(() => {
+                  // Check if we're returning from import (has timestamp parameter)
+                  const hasTimestamp = searchParams.has('_t')
+                  const tab = getTabFromUrl(searchParams)
+                  const isReturningFromImport = hasTimestamp && tab === 'docs'
+                  
+                  // Show loading if actually loading
+                  if (isLoadingDocuments) {
+                    return (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                        <span className="ml-3 text-muted-foreground">{t('refreshingDocuments')}</span>
+                      </div>
+                    )
+                  }
+                  
+                  // Only show empty state if:
+                  // 1. No documents AND
+                  // 2. NOT returning from import (to prevent flicker after saving)
+                  if (documents.length === 0 && !isReturningFromImport) {
+                    return (
+                      <EmptyState
+                        icon={<span className="text-5xl">📄</span>}
+                        title={t('noDocumentsUploaded')}
+                        description={t('getStartedImportDocument')}
+                        actionLabel={t('importDocument')}
+                        onAction={handleImportDocument}
+                      />
+                    )
+                  }
+                  
+                  // If returning from import but no documents yet, show loading
+                  if (isReturningFromImport && documents.length === 0) {
+                    return (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                        <span className="ml-3 text-muted-foreground">{t('refreshingDocuments')}</span>
+                      </div>
+                    )
+                  }
+                  
+                  // Show documents
+                  return (
                   <div className="space-y-3">
                     {documents.map((doc) => (
                       <div 
@@ -1007,7 +1047,8 @@ function OwnerPageInner() {
                       </div>
                     ))}
                   </div>
-                )}
+                  )
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
