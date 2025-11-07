@@ -305,19 +305,17 @@ function OwnerPageInner() {
   }, [session, status, router])
 
   // Load data from APIs - parallel fetching for faster loading
-  const loadData = useCallback(async (preserveDocuments = false) => {
+  const loadData = useCallback(async (preserveData = false) => {
     try {
-      // Set loading states if we're refreshing (but don't show loading for docs to avoid flicker)
-      if (preserveDocuments) {
-        // Only show loading for tests and assignments, not documents
-        setIsLoadingTests(true)
-        setIsLoadingAssignments(true)
-        // Don't set isLoadingDocuments to true to avoid showing empty state
+      // Set loading states if we're refreshing (but don't show loading to avoid flicker)
+      if (preserveData) {
+        // Don't set loading states to true to avoid showing empty state
+        // Data will be updated seamlessly
       }
 
       // Fetch all data in parallel for instant loading
       // Use cache: 'no-store' to force fresh data when switching tabs
-      const fetchOptions: RequestInit = preserveDocuments ? { cache: 'no-store' } : {}
+      const fetchOptions: RequestInit = preserveData ? { cache: 'no-store' } : {}
       // Always use cache-busting for tests, assignments, and users to ensure deleted items don't appear
       const testsFetchOptions: RequestInit = { cache: 'no-store' }
       const assignmentsFetchOptions: RequestInit = { cache: 'no-store' }
@@ -437,9 +435,9 @@ function OwnerPageInner() {
           setDocumentsWithLog(transformedDocs)
         } else {
           console.log('Owner: No documents in API response')
-          // Only clear documents if preserveDocuments is false AND we're not on docs tab
+          // Only clear documents if preserveData is false AND we're not on docs tab
           // This prevents clearing documents when returning from import
-          if (!preserveDocuments && defaultTab !== 'docs') {
+          if (!preserveData && defaultTab !== 'docs') {
             setDocumentsWithLog([])
           } else {
             console.log('Owner: Keeping existing documents to avoid empty state flicker')
@@ -450,14 +448,14 @@ function OwnerPageInner() {
         // which always saves to owner-documents localStorage key
       } else {
         console.error('Owner: Documents API failed:', documentsResult.message || documentsResult.error)
-        if (!preserveDocuments) {
+        if (!preserveData) {
           // Only clear documents if we're not preserving them and the API call failed
           setDocumentsWithLog([])
         }
       }
     } catch (error) {
       console.error('Error loading data:', error)
-      if (!preserveDocuments) {
+      if (!preserveData) {
         setDocumentsWithLog([])
       }
     } finally {
@@ -486,36 +484,53 @@ function OwnerPageInner() {
     return () => clearTimeout(timeoutId)
   }, [loadData, status, session])
 
-  // Only reload data when tab changes if data is missing or stale
-  // This prevents unnecessary delays when switching tabs
+  // Always reload data when tab changes to ensure fresh data
+  // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
-    // Always reload docs tab when activated (especially after import)
-    // This ensures fresh data after returning from import page
     if (defaultTab === 'docs') {
       console.log('Owner: Docs tab activated, loading documents...')
-      loadData(true) // Use preserveDocuments=true to avoid flickering
-    } else if (defaultTab === 'tests' && savedTests.length === 0) {
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'tests') {
       console.log('Owner: Tests tab activated, loading tests...')
-      loadData(false)
-    } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'assignments') {
       console.log('Owner: Assignments tab activated, loading assignments...')
-      loadData(false)
-    } else if (defaultTab === 'overview' && (savedUsers.length === 0 || savedAssignments.length === 0)) {
-      console.log('Owner: Overview tab activated, loading missing data...')
-      loadData(false)
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'overview') {
+      console.log('Owner: Overview tab activated, loading data...')
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'users') {
+      console.log('Owner: Users tab activated, loading users...')
+      loadData(true) // Use preserveData=true to avoid flickering
     }
-  }, [defaultTab, loadData, documents.length, savedTests.length, savedAssignments.length, savedUsers.length])
+  }, [defaultTab, loadData])
 
-  // Reload tests when returning from test-builder (detected via URL change)
-  // Only reload if data is missing to avoid unnecessary delays
+  // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
     const tab = getTabFromUrl(searchParams)
-    if (tab === 'tests' && savedTests.length === 0) {
-      // Load immediately without delay (router navigation is already complete)
-      console.log('Owner: Detected tests tab in URL, loading tests...')
-      loadData(false)
+    const hasTimestamp = searchParams.has('_t')
+    
+    // If we have a timestamp parameter, it means we're returning from a create/edit page
+    // Force reload the appropriate tab to show newly saved/updated data
+    if (hasTimestamp) {
+      if (tab === 'docs') {
+        console.log('Owner: Detected return from import, reloading documents...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'tests') {
+        console.log('Owner: Detected return from test-builder, reloading tests...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'assignments') {
+        console.log('Owner: Detected return from assignment-builder, reloading assignments...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'users') {
+        console.log('Owner: Detected return from user-builder, reloading users...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'overview') {
+        console.log('Owner: Detected return to overview, reloading data...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      }
     }
-  }, [searchParams, loadData, savedTests.length])
+  }, [searchParams, loadData])
 
   // Reload data when tab changes to settings
   useEffect(() => {

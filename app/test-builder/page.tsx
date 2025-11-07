@@ -673,15 +673,21 @@ export default function TestBuilderPage() {
     // Redirect based on returnTo parameter or user role
     const urlParams = new URLSearchParams(window.location.search)
     const returnTo = urlParams.get('returnTo')
+    
+    // Add timestamp parameter to force data reload
+    const addTimestamp = (url: string) => {
+      return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
+    }
+    
     if (returnTo) {
-      router.push(returnTo)
+      router.push(addTimestamp(returnTo))
     } else {
       // Fallback: redirect based on user role
       const userRole = session?.user?.role
       if (userRole === 'owner') {
-        router.push('/owner?tab=tests')
+        router.push(addTimestamp('/owner?tab=tests'))
       } else {
-        router.push('/manager?tab=tests')
+        router.push(addTimestamp('/manager?tab=tests'))
       }
     }
   }
@@ -823,15 +829,21 @@ export default function TestBuilderPage() {
       // Redirect based on returnTo parameter or user role
       const urlParams = new URLSearchParams(window.location.search)
       const returnTo = urlParams.get('returnTo')
+      
+      // Add timestamp parameter to force data reload
+      const addTimestamp = (url: string) => {
+        return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
+      }
+      
       if (returnTo) {
-        router.push(returnTo)
+        router.push(addTimestamp(returnTo))
       } else {
         // Fallback: redirect based on user role
         const userRole = session?.user?.role
         if (userRole === 'owner') {
-          router.push('/owner?tab=tests')
+          router.push(addTimestamp('/owner?tab=tests'))
         } else {
-          router.push('/manager?tab=tests')
+          router.push(addTimestamp('/manager?tab=tests'))
         }
       }
     } catch (err) {

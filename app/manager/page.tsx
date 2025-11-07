@@ -256,13 +256,12 @@ function ManagerPageInner() {
   }, [session, status, router])
 
   // Load data from APIs - parallel fetching for faster loading
-  const loadData = useCallback(async (preserveDocuments = false) => {
+  const loadData = useCallback(async (preserveData = false) => {
     try {
-      // Set loading states if we're refreshing
-      if (preserveDocuments) {
-        setIsLoadingDocuments(true)
-        setIsLoadingTests(true)
-        setIsLoadingAssignments(true)
+      // Set loading states if we're refreshing (but don't show loading to avoid flicker)
+      if (preserveData) {
+        // Don't set loading states to true to avoid showing empty state
+        // Data will be updated seamlessly
       }
 
       // Fetch all data in parallel for instant loading
@@ -337,9 +336,9 @@ function ManagerPageInner() {
         syncLocalStorageWithDatabase(transformedDocs)
       } else {
         console.log('Manager: No documents in API response')
-        // Only clear documents if preserveDocuments is false AND we're not on docs tab
+        // Only clear documents if preserveData is false AND we're not on docs tab
         // This prevents clearing documents when returning from import
-        if (!preserveDocuments && defaultTab !== 'docs') {
+        if (!preserveData && defaultTab !== 'docs') {
           setDocumentsWithLog([])
         } else {
           console.log('Manager: Keeping existing documents to avoid empty state flicker')
@@ -390,7 +389,7 @@ function ManagerPageInner() {
       }
     } catch (error) {
       console.error('Error loading data:', error)
-      if (!preserveDocuments) {
+      if (!preserveData) {
         setDocumentsWithLog([])
       }
     } finally {
@@ -411,66 +410,78 @@ function ManagerPageInner() {
     fetchData()
   }, [loadData])
 
-  // Only reload data when tab changes if data is missing
-  // This prevents unnecessary delays when switching tabs
+  // Always reload data when tab changes to ensure fresh data
+  // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
-    // Skip reload if data already exists (instant render like overview tab)
     if (defaultTab === 'docs') {
       console.log('Manager: Docs tab activated, loading documents...')
-      loadData(true) // Use preserveDocuments=true to avoid flickering
-    } else if (defaultTab === 'tests' && savedTests.length === 0) {
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'tests') {
       console.log('Manager: Tests tab activated, loading tests...')
-      loadData(false)
-    } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'assignments') {
       console.log('Manager: Assignments tab activated, loading assignments...')
-      loadData(false)
-    } else if (defaultTab === 'overview' && (documents.length === 0 || savedTests.length === 0 || savedAssignments.length === 0)) {
-      console.log('Manager: Overview tab activated, loading missing data...')
-      loadData(false)
+      loadData(true) // Use preserveData=true to avoid flickering
+    } else if (defaultTab === 'overview') {
+      console.log('Manager: Overview tab activated, loading data...')
+      loadData(true) // Use preserveData=true to avoid flickering
     }
-  }, [defaultTab, loadData, documents.length, savedTests.length, savedAssignments.length])
+  }, [defaultTab, loadData])
 
-  // Reload tests when returning from test-builder (detected via URL change)
-  // Only reload if data is missing to avoid unnecessary delays
+  // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
     const tab = getTabFromUrl(searchParams)
-    if (tab === 'tests' && savedTests.length === 0) {
-      // Load immediately without delay (router navigation is already complete)
-      console.log('Manager: Detected tests tab in URL, loading tests...')
-      loadData(false)
+    const hasTimestamp = searchParams.has('_t')
+    
+    // If we have a timestamp parameter, it means we're returning from a create/edit page
+    // Force reload the appropriate tab to show newly saved/updated data
+    if (hasTimestamp) {
+      if (tab === 'docs') {
+        console.log('Manager: Detected return from import, reloading documents...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'tests') {
+        console.log('Manager: Detected return from test-builder, reloading tests...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'assignments') {
+        console.log('Manager: Detected return from assignment-builder, reloading assignments...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (tab === 'overview') {
+        console.log('Manager: Detected return to overview, reloading data...')
+        loadData(true) // Use preserveData=true to avoid flickering
+      }
     }
-  }, [searchParams, loadData, savedTests.length])
+  }, [searchParams, loadData])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer)
   // Only reload if data is missing to avoid unnecessary delays
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Only reload if data is missing for the current tab
+        // Reload data for the current tab when page becomes visible
         if (defaultTab === 'docs') {
           console.log('Manager: Page became visible, loading documents...')
-          loadData(true) // Use preserveDocuments=true to avoid flickering
-        } else if (defaultTab === 'tests' && savedTests.length === 0) {
+          loadData(true) // Use preserveData=true to avoid flickering
+        } else if (defaultTab === 'tests') {
           console.log('Manager: Page became visible, loading tests...')
-          loadData(false)
-        } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+          loadData(true) // Use preserveData=true to avoid flickering
+        } else if (defaultTab === 'assignments') {
           console.log('Manager: Page became visible, loading assignments...')
-          loadData(false)
+          loadData(true) // Use preserveData=true to avoid flickering
         }
       }
     }
 
     const handleFocus = () => {
-      // Only reload if data is missing for the current tab
+      // Reload data for the current tab when window is focused
       if (defaultTab === 'docs') {
         console.log('Manager: Window focused, loading documents...')
-        loadData(true) // Use preserveDocuments=true to avoid flickering
-      } else if (defaultTab === 'tests' && savedTests.length === 0) {
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (defaultTab === 'tests') {
         console.log('Manager: Window focused, loading tests...')
-        loadData(false)
-      } else if (defaultTab === 'assignments' && savedAssignments.length === 0) {
+        loadData(true) // Use preserveData=true to avoid flickering
+      } else if (defaultTab === 'assignments') {
         console.log('Manager: Window focused, loading assignments...')
-        loadData(false)
+        loadData(true) // Use preserveData=true to avoid flickering
       }
     }
 

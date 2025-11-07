@@ -231,9 +231,11 @@ function DocImportPageInner() {
     const readyFiles = files.filter(f => f.status === 'ready')
     if (readyFiles.length === 0) return
 
+    setIsUploading(true)
+    
     try {
-      // Save each file to the database
-      for (const file of readyFiles) {
+      // Save all files in parallel and wait for all to complete
+      const savePromises = readyFiles.map(async (file) => {
         console.log('Saving document:', file.name)
         console.log('ParsedContent exists:', !!file.parsedContent)
         console.log('ParsedContent sections:', file.parsedContent?.sections?.length || 0)
@@ -259,16 +261,34 @@ function DocImportPageInner() {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           console.error('Failed to save document:', file.name, errorData)
+          throw new Error(`Failed to save ${file.name}`)
         } else {
           const result = await response.json()
           console.log('Document saved successfully:', file.name, result)
+          return result
         }
-      }
+      })
 
-      // Redirect to the specified return URL
-      router.push(safeReturnTo)
+      // Wait for all saves to complete
+      await Promise.all(savePromises)
+      
+      console.log('All documents saved successfully, redirecting...')
+      
+      // Add a small delay to ensure database transaction is committed
+      // This prevents race condition where redirect happens before DB commit
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Redirect to the specified return URL with cache-busting
+      // Add a timestamp to force fresh data load
+      const redirectUrl = safeReturnTo.includes('?') 
+        ? `${safeReturnTo}&_t=${Date.now()}`
+        : `${safeReturnTo}?_t=${Date.now()}`
+      
+      router.push(redirectUrl)
     } catch (error) {
       console.error('Error saving documents:', error)
+      setError('Failed to save some documents. Please try again.')
+      setIsUploading(false)
     }
   }
 
