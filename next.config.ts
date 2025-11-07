@@ -108,8 +108,8 @@ const nextConfig: NextConfig = {
   },
   // Turbopack optimizations (Next.js 16 uses Turbopack by default)
   turbopack: {},
-  // Output optimization
-  output: 'standalone',
+  // Output optimization - standalone for Docker/Railway (skip on Windows due to symlink issues)
+  output: process.platform === 'win32' && process.env.CI !== 'true' ? undefined : 'standalone',
 };
 
 export default nextConfig;
