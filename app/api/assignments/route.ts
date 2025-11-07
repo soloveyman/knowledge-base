@@ -8,25 +8,30 @@ export async function GET() {
     const session = await auth()
     const userRole = session?.user?.role
     
+    const tenantId = session?.user?.businessId
+    
     let assignmentsData
     
-    // Owner sees all assignments regardless of businessId
-    if (userRole === 'owner') {
+    // Super-admin sees all assignments
+    if (userRole === 'super-admin') {
       assignmentsData = await db
         .select()
         .from(assignments)
         .orderBy(desc(assignments.createdAt))
     } else {
-      // Manager and other roles filter by businessId (tenant isolation)
-      const tenantId = session?.user?.businessId
-      // Fetch assignments scoped to tenant via the assigner (owner/manager within tenant)
-      const rows = await db
-        .select({ assignment: assignments, assignerBusinessId: users.businessId })
-        .from(assignments)
-        .leftJoin(users, eq(assignments.assignedBy, users.id))
-        .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
-      
-      assignmentsData = rows.map(r => r.assignment)
+      // All other roles (owner, manager, employee) filter by businessId (tenant isolation)
+      if (!tenantId) {
+        assignmentsData = []
+      } else {
+        // Fetch assignments scoped to tenant via the assigner (owner/manager within tenant)
+        const rows = await db
+          .select({ assignment: assignments, assignerBusinessId: users.businessId })
+          .from(assignments)
+          .leftJoin(users, eq(assignments.assignedBy, users.id))
+          .where(eq(users.businessId, tenantId))
+        
+        assignmentsData = rows.map(r => r.assignment)
+      }
     }
     
     // Fetch users for each assignment

@@ -172,8 +172,16 @@ function DocumentContent({ content }: { content: string }) {
           if (!src) return null
           
           // Convert src to string if it's a Blob
-          const srcString = typeof src === 'string' ? src : ''
+          let srcString = typeof src === 'string' ? src : ''
           if (!srcString) return null
+          
+          // Fix base64 images that are missing the data: prefix
+          if (srcString.startsWith('base64,')) {
+            srcString = `data:image/png;${srcString}`
+          } else if (!srcString.includes(',') && srcString.length > 100 && /^[A-Za-z0-9+/=]+$/.test(srcString.substring(0, 50))) {
+            // If it looks like base64 without prefix, add it
+            srcString = `data:image/png;base64,${srcString}`
+          }
           
           // Check if it's a data URL or external URL
           const isDataUrl = srcString.startsWith('data:')

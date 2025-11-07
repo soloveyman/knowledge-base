@@ -8,8 +8,20 @@ export async function GET() {
     const session = await auth()
     const userRole = session?.user?.role
     
-    // Owner sees all documents regardless of businessId
-    if (userRole === 'owner') {
+    // All roles filter by businessId for tenant isolation (except super-admin)
+    const tenantId = session?.user?.businessId
+    
+    if (!tenantId && userRole !== 'super-admin') {
+      return NextResponse.json({
+        success: true,
+        data: {
+          documents: []
+        }
+      })
+    }
+    
+    // Super-admin sees all documents
+    if (userRole === 'super-admin') {
       const allDocuments = await db
         .select()
         .from(documents)
@@ -22,9 +34,6 @@ export async function GET() {
         }
       })
     }
-    
-    // Manager and other roles filter by businessId (tenant isolation)
-    const tenantId = session?.user?.businessId
     const rows = await db
       .select({ document: documents, uploaderBusinessId: users.businessId })
       .from(documents)

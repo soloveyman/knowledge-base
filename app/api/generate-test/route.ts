@@ -51,6 +51,20 @@ export async function POST(request: Request) {
     }
 
     // Generate questions using Grok API
+    // Clean content to remove images and save tokens
+    const cleanContent = (text: string): string => {
+      if (!text) return ''
+      // Remove markdown image syntax ![alt](src)
+      let cleaned = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+      // Remove HTML img tags
+      cleaned = cleaned.replace(/<img[^>]*>/gi, '')
+      // Remove base64 image data
+      cleaned = cleaned.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image removed]')
+      return cleaned
+    }
+
+    const cleanedContextText = cleanContent(context?.text || '')
+    
     // Try different model names: grok-4 (latest), grok-beta (beta), grok-2 (older)
     const models = ['grok-4', 'grok-beta', 'grok-2']
     let grokResponse: Response | null = null
@@ -82,6 +96,7 @@ export async function POST(request: Request) {
             - Provide clear explanations for answers
             - Difficulty level: ${params?.difficulty || 'medium'}
             - Language: ${params?.locale || 'English'}
+            - IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content.
             
             Return ONLY a valid JSON array with this exact format:
             [
@@ -97,7 +112,7 @@ export async function POST(request: Request) {
           },
           {
             role: 'user',
-            content: `Generate questions based on this content:\n\n${context?.text || 'No content provided'}`
+            content: `Generate questions based on this content (images are excluded to save tokens):\n\n${cleanedContextText || 'No content provided'}`
           }
         ],
         temperature: 0.7,

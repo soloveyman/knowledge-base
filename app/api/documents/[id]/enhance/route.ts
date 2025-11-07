@@ -46,14 +46,30 @@ export async function POST(
       }, { status: 500 })
     }
 
-    // Prepare content for Grok enhancement
+    // Prepare content for Grok enhancement (skip images to save tokens)
+    // Remove image references from content
+    const cleanContent = (text: string): string => {
+      // Remove markdown image syntax ![alt](src)
+      let cleaned = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+      // Remove HTML img tags
+      cleaned = cleaned.replace(/<img[^>]*>/gi, '')
+      // Remove base64 image data
+      cleaned = cleaned.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image removed]')
+      return cleaned
+    }
+
     const sectionsText = parsedContent.sections
-      ?.map((s, idx) => `${s.title || `Section ${idx + 1}`}\n${s.content}`)
+      ?.map((s, idx) => {
+        const cleanTitle = cleanContent(s.title || `Section ${idx + 1}`)
+        const cleanContentText = cleanContent(s.content || '')
+        return `${cleanTitle}\n${cleanContentText}`
+      })
       .join('\n\n') || ''
 
     const tablesText = parsedContent.tables
       ?.map(t => {
-        const tableText = `Table: ${t.title || 'Untitled'}\nHeaders: ${t.headers.join(' | ')}\n${t.rows.map(r => r.join(' | ')).join('\n')}`
+        const cleanTitle = cleanContent(t.title || 'Untitled')
+        const tableText = `Table: ${cleanTitle}\nHeaders: ${t.headers.join(' | ')}\n${t.rows.map(r => r.join(' | ')).join('\n')}`
         return tableText
       })
       .join('\n\n') || ''
@@ -91,6 +107,7 @@ Your task:
 5. Correct spelling mistakes and grammar errors
 6. Maintain the original hierarchy and order
 7. CRITICAL: Preserve the original document's language - do NOT translate to another language. Keep all text in the same language as the original document.
+8. IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content. Images will be preserved separately.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -123,7 +140,7 @@ Preserve all original sections and tables, but improve their titles and content 
               },
               {
                 role: 'user',
-                content: `Enhance this parsed document content:\n\n${fullText}`
+                content: `Enhance this parsed document content (images are excluded to save tokens):\n\n${fullText}`
               }
             ],
             temperature: 0.3,

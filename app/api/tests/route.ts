@@ -19,8 +19,11 @@ export async function GET() {
     // Explicitly select columns that exist (handle case where new columns don't exist yet)
     // Try with all columns first, fallback to excluding new columns if they don't exist
     try {
-      // Owner sees all tests regardless of businessId
-      if (userRole === 'owner') {
+      // All roles filter by businessId for tenant isolation (except super-admin)
+      const tenantId = session?.user?.businessId
+      
+      // Super-admin sees all tests
+      if (userRole === 'super-admin') {
         const allTests = await db
           .select({
             id: tests.id,
@@ -52,9 +55,6 @@ export async function GET() {
           }
         })
       }
-      
-      // Manager and other roles filter by businessId (tenant isolation)
-      const tenantId = session?.user?.businessId
       
       if (!tenantId) {
         // If no businessId, return empty array for non-owner users
