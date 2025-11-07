@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { db, tests, questions as questionsTable, users, usage } from '@/lib/db'
 import { eq, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import type { InferSelectModel } from 'drizzle-orm'
+
+type Test = InferSelectModel<typeof tests>
+type TestWithSelectedFields = Pick<Test, 'id' | 'moduleId' | 'title' | 'description' | 'questionIds' | 'type' | 'difficulty' | 'locale' | 'passingScore' | 'timeLimit' | 'maxAttempts' | 'shuffleQuestions' | 'showCorrectAnswers' | 'status' | 'isActive' | 'createdBy' | 'createdAt' | 'updatedAt'>
 
 export async function GET() {
   try {
@@ -23,7 +27,7 @@ export async function GET() {
       // Only super-admin should see all tests across all businesses
       const tenantId = session?.user?.businessId
       
-      let allTests
+      let allTests: TestWithSelectedFields[] = []
       
       if (userRole === 'super-admin') {
         // Super-admin can see all tests

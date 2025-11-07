@@ -8,9 +8,9 @@
 
 import { createIntl } from 'react-intl'
 
-type DateInput = string | number | Date
+export type DateInput = string | number | Date
 
-interface FormatDateOptions {
+export interface FormatDateOptions {
   locale?: string
   dateStyle?: 'full' | 'long' | 'medium' | 'short'
   timeStyle?: 'full' | 'long' | 'medium' | 'short'

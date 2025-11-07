@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server'
 import { db, assignments, documents, modules, assignmentUsers, testAttempts, users } from '@/lib/db'
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import type { InferSelectModel } from 'drizzle-orm'
+
+type Assignment = InferSelectModel<typeof assignments>
+type AssignmentWithSelectedFields = Pick<Assignment, 'id' | 'title' | 'description' | 'moduleId' | 'testId' | 'assignedBy' | 'groupId' | 'dueDate' | 'status' | 'allowRetake' | 'maxAttempts' | 'createdAt' | 'updatedAt'>
 
 export async function GET() {
   try {
     const session = await auth()
     const userRole = session?.user?.role
     
-    let assignmentsData
+    let assignmentsData: Assignment[] | AssignmentWithSelectedFields[] = []
     
     // All roles (including owner) filter by businessId for tenant isolation
     // Only super-admin should see all assignments across all businesses

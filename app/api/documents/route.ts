@@ -3,6 +3,10 @@ import { db, documents, documentImages, users, usage, tableExists } from '@/lib/
 import { desc, eq, and, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
+import type { InferSelectModel } from 'drizzle-orm'
+
+type Document = InferSelectModel<typeof documents>
+type DocumentWithoutBusinessId = Omit<Document, 'businessId'>
 
 export async function GET() {
   try {
@@ -14,7 +18,7 @@ export async function GET() {
     const userRole = session.user.role
     const tenantId = session.user.businessId
     
-    let allDocuments: typeof documents.$inferSelect[] = []
+    let allDocuments: Document[] | DocumentWithoutBusinessId[] = []
     
     // All roles (including owner) filter by businessId for tenant isolation
     // Only super-admin should see all documents across all businesses
