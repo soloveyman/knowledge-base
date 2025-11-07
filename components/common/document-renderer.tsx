@@ -206,20 +206,35 @@ function DocumentContent({ content }: { content: string }) {
           const hasEmojis = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓✅🔴🍽️🍸👨‍🍳🏢🧼🚪📦🚚🔧📝💭]/u.test(childrenStr)
           
           return (
-            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground ${hasEmojis ? 'list-none ml-0' : 'list-disc ml-6'}`}>
+            <ul className={`mb-6 space-y-3 text-base sm:text-lg text-foreground ${hasEmojis ? 'list-none ml-0 pl-0' : 'list-disc ml-4 sm:ml-6'}`}>
               {children}
             </ul>
           )
         },
         ol: ({ children }) => (
-          <ol className="mb-6 ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground">
+          <ol className="mb-6 ml-4 sm:ml-6 list-decimal space-y-3 text-base sm:text-lg text-foreground">
             {children}
           </ol>
         ),
         li: ({ children }) => {
-          // Эмодзи уже добавлены в markdown, просто отображаем
+          // Проверяем, начинается ли элемент с эмодзи
+          const childrenStr = String(children)
+          const emojiMatch = childrenStr.trim().match(/^([\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓✅🔴🍽️🍸👨‍🍳🏢🧼🚪📦🚚🔧📝💭])\s*(.+)$/u)
+          
+          // Для элементов с эмодзи: используем flex для правильного выравнивания на мобильных
+          if (emojiMatch) {
+            const [, emoji, text] = emojiMatch
+            return (
+              <li className="flex items-start gap-2 leading-relaxed mb-1 pl-0 ml-0">
+                <span className="flex-shrink-0 mt-0.5 text-base">{emoji}</span>
+                <span className="flex-1 min-w-0 break-words">{text}</span>
+              </li>
+            )
+          }
+          
+          // Обычные элементы списка
           return (
-            <li className="leading-relaxed mb-1">{children}</li>
+            <li className="leading-relaxed mb-1 pl-0 break-words">{children}</li>
           )
         },
         strong: ({ children }) => (
