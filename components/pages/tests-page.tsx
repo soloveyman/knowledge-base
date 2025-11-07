@@ -26,6 +26,7 @@ interface TestsPageProps {
   onViewTest: (id: string) => void
   onEditTest: (id: string) => void
   isLoading?: boolean
+  hideEmptyState?: boolean
 }
 
 export function TestsPage({ 
@@ -33,7 +34,8 @@ export function TestsPage({
   onDeleteTest, 
   onViewTest,
   onEditTest,
-  isLoading = false
+  isLoading = false,
+  hideEmptyState = false
 }: TestsPageProps) {
   const router = useRouter()
   const { t } = useTranslation()
@@ -66,6 +68,7 @@ export function TestsPage({
       items={testItems}
       showEditButton={true}
       isLoading={isLoading}
+      hideEmptyState={hideEmptyState}
       emptyState={{
         icon: <span className="text-5xl">🧪</span>,
         title: t('noTestsCreated'),

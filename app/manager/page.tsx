@@ -971,6 +971,11 @@ function ManagerPageInner() {
               onViewTest={handleViewTest}
               onEditTest={handleEditTest}
               isLoading={isLoadingTests}
+              hideEmptyState={(() => {
+                const hasTimestamp = searchParams.has('_t')
+                const tab = getTabFromUrl(searchParams)
+                return hasTimestamp && tab === 'tests'
+              })()}
             />
           </TabsContent>
 
@@ -1024,6 +1029,11 @@ function ManagerPageInner() {
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}
               isLoading={isLoadingAssignments}
+              hideEmptyState={(() => {
+                const hasTimestamp = searchParams.has('_t')
+                const tab = getTabFromUrl(searchParams)
+                return hasTimestamp && tab === 'assignments'
+              })()}
             />
           </TabsContent>
 

@@ -42,6 +42,7 @@ interface AssignmentsPageProps {
   onViewAssignment: (id: string) => void
   onEditAssignment: (id: string) => void
   isLoading?: boolean
+  hideEmptyState?: boolean
 }
 
 export function AssignmentsPage({ 
@@ -49,7 +50,8 @@ export function AssignmentsPage({
   onDeleteAssignment, 
   onViewAssignment,
   onEditAssignment,
-  isLoading = false
+  isLoading = false,
+  hideEmptyState = false
 }: AssignmentsPageProps) {
   const router = useRouter()
   const { t } = useTranslation()
@@ -86,6 +88,7 @@ export function AssignmentsPage({
       items={assignmentItems}
       showEditButton={true}
       isLoading={isLoading}
+      hideEmptyState={hideEmptyState}
       emptyState={{
         icon: <span className="text-5xl">📋</span>,
         title: t('noAssignmentsCreated'),

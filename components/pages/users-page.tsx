@@ -23,13 +23,15 @@ interface UsersPageProps {
   onDeleteUser: (id: string) => void
   onViewUser: (id: string) => void
   onEditUser: (id: string) => void
+  hideEmptyState?: boolean
 }
 
 export function UsersPage({ 
   users, 
   onDeleteUser, 
   onViewUser,
-  onEditUser
+  onEditUser,
+  hideEmptyState = false
 }: UsersPageProps) {
   const router = useRouter()
   const { t } = useTranslation()
@@ -70,6 +72,7 @@ export function UsersPage({
       }}
       items={userItems}
       showEditButton={true}
+      hideEmptyState={hideEmptyState}
       emptyState={{
         icon: <span className="text-5xl">👥</span>,
         title: t('noUsersCreatedYet'),

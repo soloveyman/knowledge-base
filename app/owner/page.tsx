@@ -923,6 +923,11 @@ function OwnerPageInner() {
               onDeleteUser={handleDeleteUser}
               onViewUser={handleViewUser}
               onEditUser={handleEditUser}
+              hideEmptyState={(() => {
+                const hasTimestamp = searchParams.has('_t')
+                const tab = getTabFromUrl(searchParams)
+                return hasTimestamp && tab === 'users'
+              })()}
             />
           </TabsContent>
 
@@ -1060,6 +1065,11 @@ function OwnerPageInner() {
               onViewTest={handleViewTest}
               onEditTest={handleEditTest}
               isLoading={isLoadingTests}
+              hideEmptyState={(() => {
+                const hasTimestamp = searchParams.has('_t')
+                const tab = getTabFromUrl(searchParams)
+                return hasTimestamp && tab === 'tests'
+              })()}
             />
           </TabsContent>
 
@@ -1119,6 +1129,11 @@ function OwnerPageInner() {
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}
               isLoading={isLoadingAssignments}
+              hideEmptyState={(() => {
+                const hasTimestamp = searchParams.has('_t')
+                const tab = getTabFromUrl(searchParams)
+                return hasTimestamp && tab === 'assignments'
+              })()}
             />
           </TabsContent>
 

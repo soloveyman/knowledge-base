@@ -37,6 +37,7 @@ interface ManagementPageProps {
     onAction?: () => void
   }
   isLoading?: boolean
+  hideEmptyState?: boolean // Hide empty state when returning from edit/import
 }
 
 export function ManagementPage({
@@ -47,7 +48,8 @@ export function ManagementPage({
   items,
   showEditButton = false,
   emptyState,
-  isLoading = false
+  isLoading = false,
+  hideEmptyState = false
 }: ManagementPageProps) {
   return (
     <ManagementCard
@@ -62,8 +64,14 @@ export function ManagementPage({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             <span className="ml-2 text-gray-600">Loading...</span>
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && !hideEmptyState ? (
           <EmptyState {...emptyState} />
+        ) : items.length === 0 && hideEmptyState ? (
+          // Show loading when returning from edit but no items yet
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <span className="ml-2 text-gray-600">Loading...</span>
+          </div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
