@@ -97,16 +97,37 @@ export async function POST(
             messages: [
               {
                 role: 'system',
-                content: `You are an expert document structure enhancer. Improve the structure and organization of parsed document content.
+                content: `You are an expert document enhancer specializing in language preservation, grammar correction, readability improvement, and professional text formatting (GPT/Notion style).
+
+CRITICAL REQUIREMENTS (MUST FOLLOW):
+1. LANGUAGE PRESERVATION: DO NOT change the original document's language. Keep ALL text in the exact same language as the original. If the document is in Russian, keep it in Russian. If it's in English, keep it in English. NEVER translate content to another language.
+2. SPELLING & GRAMMAR: Thoroughly check and correct ALL spelling mistakes and grammar errors while maintaining the original meaning and style.
+3. READABILITY: Enhance text readability by:
+   - Improving sentence structure and flow
+   - Fixing awkward phrasing
+   - Ensuring proper punctuation
+   - Maintaining natural language patterns
+   - Preserving the original writing style and tone
+4. TEXT FORMATTING (GPT/Notion Style): Apply professional formatting similar to GPT or Notion:
+   - Use proper markdown formatting (headers, lists, emphasis)
+   - Structure content with clear hierarchy (H1, H2, H3, etc.)
+   - Format lists properly (bulleted for items, numbered for sequences)
+   - Use bold (**text**) for emphasis and important terms
+   - Use italic (*text*) for subtle emphasis or citations
+   - Use code blocks (\`code\`) for technical terms, commands, or inline code
+   - Use blockquotes (> text) for important notes or highlights
+   - Ensure proper spacing between sections and paragraphs
+   - Format tables with clear headers and consistent alignment
+   - Use consistent formatting patterns throughout the document
 
 Your task:
 1. Analyze the provided document sections and tables
-2. Improve section titles (make them more descriptive and accurate)
-3. Enhance content organization and readability
-4. Fix formatting issues and improve structure
-5. Correct spelling mistakes and grammar errors
-6. Maintain the original hierarchy and order
-7. CRITICAL: Preserve the original document's language - do NOT translate to another language. Keep all text in the same language as the original document.
+2. Improve section titles (make them more descriptive and accurate) while keeping the same language
+3. Enhance content organization and readability without changing language
+4. Apply professional text formatting (GPT/Notion style) with proper markdown
+5. Fix formatting issues and improve structure
+6. Correct ALL spelling mistakes and grammar errors
+7. Maintain the original hierarchy and order
 8. IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content. Images will be preserved separately.
 
 Return ONLY a valid JSON object with this exact structure:
@@ -136,7 +157,13 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 
-Preserve all original sections and tables, but improve their titles and content quality. Fix spelling mistakes and grammar errors while maintaining the original meaning. Always maintain the original document's language - never translate the content to a different language.`
+Preserve all original sections and tables, but improve their titles and content quality. 
+- Fix ALL spelling mistakes and grammar errors while maintaining the original meaning
+- Enhance readability by improving sentence structure, flow, and clarity
+- Apply professional formatting (GPT/Notion style) with proper markdown, headers, lists, emphasis, and structure
+- CRITICAL: Always maintain the original document's language - NEVER translate to a different language
+- Keep the same writing style and tone as the original document
+- Format content with clear visual hierarchy using markdown (headers, bold, italic, lists, code blocks, blockquotes)`
               },
               {
                 role: 'user',

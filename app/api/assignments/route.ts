@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db, assignments, documents, modules, assignmentUsers, testAttempts, users } from '@/lib/db'
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import type { InferSelectModel } from 'drizzle-orm'
 
 export async function GET() {
   try {
@@ -10,7 +11,7 @@ export async function GET() {
     
     const tenantId = session?.user?.businessId
     
-    let assignmentsData
+    let assignmentsData: InferSelectModel<typeof assignments>[] = []
     
     // Super-admin sees all assignments
     if (userRole === 'super-admin') {

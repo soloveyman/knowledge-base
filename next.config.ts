@@ -67,12 +67,19 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Optimize images
   images: {
+    // Modern formats with AVIF first (best compression)
     formats: ['image/avif', 'image/webp'],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    // Optimized device sizes - removed 3840 (rarely needed, increases bundle)
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    // Optimized image sizes for icons/thumbnails
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 60,
+    // 1 year cache TTL for better performance (images rarely change)
+    minimumCacheTTL: 31536000,
+    // Allow SVG with security
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Remote patterns for external images (add domains as needed)
+    remotePatterns: [],
   },
   // Compiler optimizations
   compiler: {

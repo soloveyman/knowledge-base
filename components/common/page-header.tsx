@@ -24,6 +24,8 @@ export function PageHeader({ title, icon, onClose, showCloseButton = true }: Pag
               height={38}
               className="object-contain flex-shrink-0"
               priority
+              sizes="38px"
+              quality={90}
             />
             <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
               {title}

@@ -187,20 +187,29 @@ function DocumentContent({ content }: { content: string }) {
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
-          // For data URLs or if we need to use external images, use unoptimized
+          // For data URLs or external images, use unoptimized
           // Otherwise Next.js Image will handle optimization
+          const isOptimized = !isDataUrl && !isExternal
+          
           return (
-            <div className="my-6 relative w-full">
-              <Image
-                src={srcString}
-                alt={alt || ''}
-                width={800}
-                height={600}
-                className="rounded-lg border border-border max-w-full h-auto"
-                style={{ width: 'auto', height: 'auto' }}
-                unoptimized={isDataUrl || isExternal}
-                loading="lazy"
-              />
+            <div className="my-6 relative w-full flex justify-center">
+              <div className="relative w-full max-w-4xl">
+                <Image
+                  src={srcString}
+                  alt={alt || ''}
+                  width={1200}
+                  height={800}
+                  className="rounded-lg border border-border w-full h-auto"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1200px"
+                  unoptimized={!isOptimized}
+                  loading="lazy"
+                  quality={85}
+                  {...(isOptimized && {
+                    placeholder: "blur" as const,
+                    blurDataURL: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+                  })}
+                />
+              </div>
             </div>
           )
         },
