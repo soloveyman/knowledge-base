@@ -98,6 +98,7 @@ export default function ForgotPasswordPage() {
           <div className="text-center text-sm mt-6">
             <Link
               href="/auth/signin"
+              prefetch={true}
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium inline-flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />

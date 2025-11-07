@@ -75,11 +75,12 @@ export default function RootLayout({
         {/* Preconnect to external domains for faster resource loading */}
         <link rel="preconnect" href="https://api.x.ai" />
         <link rel="dns-prefetch" href="https://api.x.ai" />
-        {/* Theme script - inline and optimized for FCP */}
+        {/* Theme script - inline and optimized for FCP, blocking to prevent flash */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){const t=localStorage.theme==='dark'||localStorage.theme==='light'?localStorage.theme:window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.classList.toggle('dark',t==='dark')})();`,
           }}
+          suppressHydrationWarning
         />
       </head>
       <body

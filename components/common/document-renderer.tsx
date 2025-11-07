@@ -83,11 +83,29 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
     reader.readAsDataURL(src)
   }, [src])
 
-  // Check if it's a data URL (base64)
+  // Check if it's a data URL
   const isDataUrl = imageSrc.startsWith('data:')
   
-  // Check if it's an external URL
+  // Check if it's a valid external URL
   const isExternal = imageSrc.startsWith('http://') || imageSrc.startsWith('https://')
+  
+  // Check if it's a valid relative path (starts with /)
+  const isRelativePath = imageSrc.startsWith('/')
+
+  // Validate URL format for Next.js Image
+  let isValidForNextImage = false
+  if (isExternal || isRelativePath) {
+    try {
+      if (isExternal) {
+        new URL(imageSrc)
+        isValidForNextImage = true
+      } else if (isRelativePath) {
+        isValidForNextImage = true
+      }
+    } catch {
+      isValidForNextImage = false
+    }
+  }
 
   // Consistent corner radius for all images
   const imageRadius = 'rounded-lg'
@@ -102,8 +120,35 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
     )
   }
 
-  // Use Next.js Image component for all images
-  // For data URLs and external URLs, use unoptimized prop
+  // For data URLs, use regular img tag with React state management
+  if (isDataUrl || !isValidForNextImage) {
+    return (
+      <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
+        {isLoading && (
+          <div className={`${imageRadius} border border-border bg-muted/50 p-8 text-center text-muted-foreground`}>
+            <p>Loading image...</p>
+          </div>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageSrc}
+          alt={alt || ''}
+          className={`${imageRadius} border border-border max-w-full h-auto transition-opacity mx-auto ${
+            isLoading ? 'opacity-0' : 'opacity-100'
+          }`}
+          style={{ width: 'auto', height: 'auto' }}
+          loading="lazy"
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setHasError(true)
+            setIsLoading(false)
+          }}
+        />
+      </span>
+    )
+  }
+
+  // For valid external URLs or relative paths, use Next.js Image
   return (
     <span className="my-6 -mx-2 sm:mx-0 flex justify-center items-center">
       {isLoading && (
@@ -120,8 +165,10 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
           isLoading ? 'opacity-0' : 'opacity-100'
         }`}
         style={{ width: 'auto', height: 'auto' }}
-        unoptimized={isDataUrl || isExternal}
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 800px"
+        unoptimized={isExternal}
         loading="lazy"
+        quality={85}
         onLoad={() => setIsLoading(false)}
         onError={() => {
           setHasError(true)

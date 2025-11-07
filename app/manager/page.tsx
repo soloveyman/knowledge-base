@@ -1,10 +1,15 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { Suspense } from "react"
+import { unstable_cache } from "next/cache"
 import { db, documents, tests, assignments, users, documentImages, assignmentUsers, testAttempts, tableExists } from "@/lib/db"
 import { desc, eq, and, inArray } from "drizzle-orm"
 import { formatDateShort } from "@/lib/date-format"
 import { ManagerPageClient, type SavedDocument, SavedTest, SavedAssignment, SavedUser } from "./manager-page-client"
+
+// Force dynamic rendering for authenticated pages
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes'
