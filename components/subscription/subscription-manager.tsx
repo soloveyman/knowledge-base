@@ -547,25 +547,13 @@ export default function SubscriptionManager({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isStripeEnabled && (
-            <Alert className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Payment processing is currently unavailable. You can view subscription plans, but payment features are disabled. Please contact support for assistance.
-              </AlertDescription>
-            </Alert>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {
               const isOptimal = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Optimal'
               return (
               <div
                 key={plan.id}
-                className={`p-6 border rounded-3xl flex flex-col ${
-                  !isStripeEnabled 
-                    ? 'opacity-60 cursor-not-allowed' 
-                    : 'cursor-pointer transition-all shadow-none'
-                } ${
+                className={`p-6 border rounded-3xl flex flex-col cursor-pointer transition-all shadow-none ${
                   selectedPlan === plan.id
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/50 dark:border-blue-400'
                     : plan.isPopular
@@ -574,7 +562,7 @@ export default function SubscriptionManager({
                     ? 'border-primary hover:border-primary/80'
                     : 'border-border hover:border-blue-300 dark:hover:border-blue-700'
                 }`}
-                onClick={() => isStripeEnabled && handlePlanSelect(plan.id)}
+                onClick={() => handlePlanSelect(plan.id)}
               >
                 {/* Header */}
                 <div>
@@ -625,7 +613,13 @@ export default function SubscriptionManager({
                     <Button
                       className={isOptimal ? "w-full" : "w-full text-primary border-primary hover:bg-primary hover:text-primary-foreground"}
                       variant={selectedPlan === plan.id || isOptimal ? 'default' : 'outline'}
-                      disabled={plan.id === currentSubscription?.plan?.id || !isStripeEnabled}
+                      disabled={plan.id === currentSubscription?.plan?.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (plan.id !== currentSubscription?.plan?.id) {
+                          handlePlanSelect(plan.id)
+                        }
+                      }}
                     >
                       {plan.id === currentSubscription?.plan?.id ? t('currentPlan') : t('selectPlan')}
                     </Button>
