@@ -209,35 +209,89 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       console.log('HTML text length:', htmlText.length)
       console.log('First 200 chars of HTML:', htmlText.substring(0, 200))
       
-      // Also extract images from HTML img tags that Mammoth created
+      // Extract images from HTML img tags that Mammoth created, with their positions
       const imgTagRegex = /<img[^>]+src="data:([^;]+);base64,([^"]+)"[^>]*>/gi
-      let imgMatch
+      const imagePositions: Array<{ htmlPos: number; image: { filename: string; data: string; type: string } }> = []
       let htmlImageCount = 0
-      while ((imgMatch = imgTagRegex.exec(htmlText)) !== null) {
-        const mimeType = imgMatch[1]
-        const base64Data = imgMatch[2]
+      
+      // First pass: collect all image matches with their HTML positions
+      const allMatches: Array<{ match: RegExpMatchArray; htmlPos: number }> = []
+      let match
+      while ((match = imgTagRegex.exec(htmlText)) !== null) {
+        allMatches.push({ match, htmlPos: match.index })
+      }
+      
+      // Process matches in reverse order to preserve positions when replacing
+      for (let i = allMatches.length - 1; i >= 0; i--) {
+        const { match, htmlPos } = allMatches[i]
+        const mimeType = match[1]
+        const base64Data = match[2]
         // Check if we already have this image (avoid duplicates)
         const existingImage = images.find(img => img.data.includes(base64Data.substring(0, 50)))
         if (!existingImage) {
-          images.push({
+          const imageData = {
             filename: `image_${images.length + 1}.${mimeType.split('/')[1] || 'png'}`,
             data: `data:${mimeType};base64,${base64Data}`,
             type: mimeType
-          })
+          }
+          images.push(imageData)
+          imagePositions.push({ htmlPos, image: imageData })
           htmlImageCount++
-          console.log(`✅ Extracted image from HTML: image_${images.length} (${mimeType})`)
+          console.log(`✅ Extracted image from HTML: ${imageData.filename} (${mimeType}) at HTML position ${htmlPos}`)
         }
       }
+      
       if (htmlImageCount > 0) {
         console.log(`📸 Extracted ${htmlImageCount} additional images from HTML`)
       }
       console.log(`📸 Total images after HTML extraction: ${images.length}`)
       
+      // Replace img tags with placeholders before converting to text
+      // This preserves position information
+      // Sort by HTML position (descending) to process from end to start
+      const sortedImagePositions = [...imagePositions].sort((a, b) => b.htmlPos - a.htmlPos)
+      
+      let htmlWithPlaceholders = htmlText
+      for (let i = 0; i < sortedImagePositions.length; i++) {
+        const { htmlPos, image } = sortedImagePositions[i]
+        // Extract a portion of the base64 data to match the img tag
+        const base64Prefix = image.data.split(',')[1]?.substring(0, 50) || ''
+        
+        // Try to find the img tag by matching the base64 data
+        // First try at the exact position
+        let beforeImg = htmlWithPlaceholders.substring(0, htmlPos)
+        let afterImg = htmlWithPlaceholders.substring(htmlPos)
+        let imgTagMatch = afterImg.match(/^<img[^>]+src="data:[^"]+"[^>]*>/i)
+        
+        // If not found at exact position, search for img tag with matching base64 data
+        if (!imgTagMatch || !imgTagMatch[0].includes(base64Prefix)) {
+          // Search for img tag containing this base64 data
+          const imgTagRegex = new RegExp(`<img[^>]+src="data:[^"]*${base64Prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"]*"[^>]*>`, 'i')
+          const globalMatch = htmlWithPlaceholders.match(imgTagRegex)
+          if (globalMatch && globalMatch.index !== undefined) {
+            beforeImg = htmlWithPlaceholders.substring(0, globalMatch.index)
+            afterImg = htmlWithPlaceholders.substring(globalMatch.index)
+            imgTagMatch = afterImg.match(/^<img[^>]+src="data:[^"]+"[^>]*>/i)
+            console.log(`📸 Found img tag for "${image.filename}" at position ${globalMatch.index} (was looking for ${htmlPos})`)
+          }
+        }
+        
+        if (imgTagMatch) {
+          // Use the original index from imagePositions array as the placeholder index
+          const originalIndex = imagePositions.findIndex(ip => ip.image === image)
+          const placeholder = `[IMAGE_PLACEHOLDER_${originalIndex}]`
+          htmlWithPlaceholders = beforeImg + placeholder + afterImg.substring(imgTagMatch[0].length)
+          console.log(`📸 Replaced img tag with placeholder [IMAGE_PLACEHOLDER_${originalIndex}] for image "${image.filename}"`)
+        } else {
+          console.warn(`⚠️ Could not find img tag for image "${image.filename}" at HTML position ${htmlPos}`)
+        }
+      }
+      
       // Convert HTML to plain text with formatting markers
       // Process in order: first extract formatting markers, then structure
       
       // Step 1: Convert paragraph tags to double newlines for paragraph separation
-      let workingText = htmlText.replace(/<p[^>]*>/gi, '\n\n')
+      let workingText = htmlWithPlaceholders.replace(/<p[^>]*>/gi, '\n\n')
       
       // Step 2: Convert closing paragraph tags
       workingText = workingText.replace(/<\/p>/gi, '')
@@ -264,8 +318,23 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, '\n\n$1\n\n')
         .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
       
-      // Step 6: Remove remaining HTML tags
+      // Step 6: Remove remaining HTML tags (but preserve placeholders)
+      // First, temporarily replace placeholders with a safe marker
+      const placeholderMap = new Map<string, string>()
+      imagePositions.forEach(({ image }, index) => {
+        const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
+        const safeMarker = `__PLACEHOLDER_${index}__`
+        placeholderMap.set(safeMarker, placeholder)
+        workingText = workingText.replace(new RegExp(placeholder.replace(/[\[\]]/g, '\\$&'), 'g'), safeMarker)
+      })
+      
+      // Now remove HTML tags
       workingText = workingText.replace(/<[^>]*>/g, '')
+      
+      // Restore placeholders
+      placeholderMap.forEach((placeholder, safeMarker) => {
+        workingText = workingText.replace(new RegExp(safeMarker.replace(/[\[\]]/g, '\\$&'), 'g'), placeholder)
+      })
       
       // Step 7: Decode HTML entities
       workingText = workingText
@@ -281,6 +350,30 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         .replace(/\n{4,}/g, '\n\n\n') // Max 3 newlines
         .replace(/^\n+/, '') // Remove leading newlines
         .replace(/\n+$/, '') // Remove trailing newlines
+      
+      // Step 9: Map image positions from HTML to text positions
+      // Find placeholder positions in the converted text, then remove them in reverse order
+      const placeholderPositions: Array<{ index: number; pos: number }> = []
+      imagePositions.forEach(({ image }, index) => {
+        const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
+        const placeholderPos = workingText.indexOf(placeholder)
+        if (placeholderPos !== -1) {
+          // Store the position in the image data
+          ;(image as any).textPosition = placeholderPos
+          placeholderPositions.push({ index, pos: placeholderPos })
+          console.log(`📸 Mapped image "${image.filename}" to text position ${placeholderPos}`)
+        } else {
+          // Placeholder not found - log warning but don't fail
+          console.warn(`⚠️ Placeholder [IMAGE_PLACEHOLDER_${index}] not found for image "${image.filename}"`)
+        }
+      })
+      
+      // Remove placeholders in reverse order to preserve positions
+      placeholderPositions.sort((a, b) => b.pos - a.pos) // Sort by position descending
+      placeholderPositions.forEach(({ index }) => {
+        const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
+        workingText = workingText.replace(placeholder, '')
+      })
       
       text = workingText.trim()
       
@@ -803,13 +896,22 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   // Merge images from DOCX parsing if they exist
   if ('images' in parseResult && parseResult.images && Array.isArray(parseResult.images) && parseResult.images.length > 0) {
     console.log('Found images in parseResult:', parseResult.images.length)
-    structuredContent.images = parseResult.images.map((img, index) => ({
-      filename: img.filename || `image_${index + 1}.png`,
-      data: img.data,
-      type: img.type || 'image/png',
-      position: index
-    }))
+    structuredContent.images = parseResult.images.map((img, index) => {
+      // Use textPosition if available (from HTML parsing), otherwise use index
+      const position = (img as any).textPosition !== undefined 
+        ? (img as any).textPosition 
+        : (img.position !== undefined ? img.position : undefined)
+      return {
+        filename: img.filename || `image_${index + 1}.png`,
+        data: img.data,
+        type: img.type || 'image/png',
+        position: position
+      }
+    })
     console.log('Images added to structured content:', structuredContent.images.length)
+    structuredContent.images.forEach((img, idx) => {
+      console.log(`Image ${idx + 1}: ${img.filename}, position: ${img.position}`)
+    })
   } else {
     // Ensure images array exists even if empty
     structuredContent.images = []

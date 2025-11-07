@@ -349,52 +349,90 @@ export default function DocumentViewer() {
               }
             }
             
-            // Insert images - sort by position first
+            // Insert images - sort by position first, then insert at their actual positions
             const sortedImages = [...images].sort((a, b) => {
               const posA = a.position ?? Infinity
               const posB = b.position ?? Infinity
               return posA - posB
             })
             
+            // Separate images with valid positions from those without
+            const imagesWithPositions = sortedImages.filter(img => 
+              img.position !== undefined && 
+              img.position >= 0 && 
+              img.position < content.length && 
+              img.position > 0
+            )
+            const imagesWithoutPositions = sortedImages.filter(img => 
+              !(img.position !== undefined && 
+                img.position >= 0 && 
+                img.position < content.length && 
+                img.position > 0)
+            )
+            
             let contentWithImages = content
             let offset = 0
-            let firstImageInserted = false
             
-            sortedImages.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
+            // First, insert images with valid positions
+            imagesWithPositions.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
               const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
-              
-              // Use insertPosition only for the first image if available
-              if (insertPosition !== null && !firstImageInserted) {
-                // Insert first image after "1. General Principles" section
-                const insertPos = insertPosition + offset
+              const insertPos = img.position! + offset
+              if (insertPos < contentWithImages.length) {
                 contentWithImages = 
                   contentWithImages.slice(0, insertPos) + 
                   imageMarkdown + 
                   contentWithImages.slice(insertPos)
                 offset += imageMarkdown.length
-                firstImageInserted = true
-                console.log(`📸 Inserted first image "${img.filename}" at position ${insertPos}`)
-              } else if (img.position !== undefined && img.position >= 0 && img.position < content.length && img.position > 0) {
-                // Insert at the specified position (but not at 0)
-                const insertPos = img.position + offset
-                if (insertPos < contentWithImages.length) {
+                console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (adjusted: ${insertPos})`)
+              } else {
+                // Position is out of bounds after previous insertions, append at the end
+                contentWithImages += imageMarkdown
+                console.log(`📸 Appended image "${img.filename}" at the end (position ${insertPos} out of bounds)`)
+              }
+            })
+            
+            // Then, distribute images without positions evenly throughout the document
+            if (imagesWithoutPositions.length > 0) {
+              // Calculate positions to distribute images evenly
+              const contentLength = contentWithImages.length
+              const sectionSize = Math.floor(contentLength / (imagesWithoutPositions.length + 1))
+              
+              imagesWithoutPositions.forEach((img: { filename: string; data: string; type: string; position?: number }, index: number) => {
+                const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
+                
+                // Try fallback position first if available
+                if (insertPosition !== null && index === 0) {
+                  // First image without position goes to fallback position
+                  const insertPos = insertPosition + offset
+                  if (insertPos < contentWithImages.length) {
+                    contentWithImages = 
+                      contentWithImages.slice(0, insertPos) + 
+                      imageMarkdown + 
+                      contentWithImages.slice(insertPos)
+                    offset += imageMarkdown.length
+                    console.log(`📸 Inserted image "${img.filename}" at fallback position ${insertPos}`)
+                  } else {
+                    // Fallback position is out of bounds, distribute evenly
+                    const insertPos = Math.min((index + 1) * sectionSize + offset, contentWithImages.length)
+                    contentWithImages = 
+                      contentWithImages.slice(0, insertPos) + 
+                      imageMarkdown + 
+                      contentWithImages.slice(insertPos)
+                    offset += imageMarkdown.length
+                    console.log(`📸 Inserted image "${img.filename}" at distributed position ${insertPos}`)
+                  }
+                } else {
+                  // Distribute remaining images evenly
+                  const insertPos = Math.min((index + 1) * sectionSize + offset, contentWithImages.length)
                   contentWithImages = 
                     contentWithImages.slice(0, insertPos) + 
                     imageMarkdown + 
                     contentWithImages.slice(insertPos)
                   offset += imageMarkdown.length
-                  console.log(`📸 Inserted image "${img.filename}" at specified position ${insertPos}`)
-                } else {
-                  // Position is out of bounds, append at the end
-                  contentWithImages += imageMarkdown
-                  console.log(`📸 Appended image "${img.filename}" at the end (position ${insertPos} out of bounds)`)
+                  console.log(`📸 Inserted image "${img.filename}" at distributed position ${insertPos}`)
                 }
-              } else {
-                // Append at the end
-                contentWithImages += imageMarkdown
-                console.log(`📸 Appended image "${img.filename}" at the end`)
-              }
-            })
+              })
+            }
             
             content = contentWithImages
             
