@@ -317,10 +317,14 @@ function OwnerPageInner() {
       // Fetch all data in parallel for instant loading
       // Use cache: 'no-store' to force fresh data when switching tabs
       const fetchOptions: RequestInit = preserveDocuments ? { cache: 'no-store' } : {}
+      // Always use cache-busting for tests, assignments, and users to ensure deleted items don't appear
+      const testsFetchOptions: RequestInit = { cache: 'no-store' }
+      const assignmentsFetchOptions: RequestInit = { cache: 'no-store' }
+      const usersFetchOptions: RequestInit = { cache: 'no-store' }
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
-        fetch('/api/users', fetchOptions),
-        fetch('/api/assignments', fetchOptions),
-        fetch('/api/tests', fetchOptions),
+        fetch('/api/users', usersFetchOptions),
+        fetch('/api/assignments', assignmentsFetchOptions),
+        fetch('/api/tests', testsFetchOptions),
         fetch('/api/documents', fetchOptions)
       ])
 
@@ -617,21 +621,24 @@ function OwnerPageInner() {
       setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
       
       const response = await fetch(`/api/tests/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
       if (result.success) {
         toast.success('Test deleted successfully')
+        // Refresh data to ensure UI is in sync with database
+        await loadData(false)
       } else {
         // Revert on error - reload data
-        loadData(false)
+        await loadData(false)
         console.error('Failed to delete test:', result.message)
         toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
       // Revert on error - reload data
-      loadData(false)
+      await loadData(false)
       console.error('Error deleting test:', error)
       toast.error('Error deleting test')
     }
@@ -654,21 +661,24 @@ function OwnerPageInner() {
       setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
       
       const response = await fetch(`/api/assignments/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
       if (result.success) {
         toast.success('Assignment deleted successfully')
+        // Refresh data to ensure UI is in sync with database
+        await loadData(false)
       } else {
         // Revert on error - reload data
-        loadData(false)
+        await loadData(false)
         console.error('Failed to delete assignment:', result.message)
         toast.error(result.message || 'Failed to delete assignment')
       }
     } catch (error) {
       // Revert on error - reload data
-      loadData(false)
+      await loadData(false)
       console.error('Error deleting assignment:', error)
       toast.error('Error deleting assignment')
     }
@@ -687,18 +697,30 @@ function OwnerPageInner() {
   // User handlers
   const handleDeleteUser = async (id: string) => {
     try {
+      // Optimistically update UI immediately
+      setSavedUsers(prev => prev.filter(u => u.id !== id))
+      
       const response = await fetch(`/api/users/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
       if (result.success) {
-        setSavedUsers(prev => prev.filter(u => u.id !== id))
+        toast.success('User deleted successfully')
+        // Refresh data to ensure UI is in sync with database
+        await loadData(false)
       } else {
+        // Revert on error - reload data
+        await loadData(false)
         console.error('Failed to delete user:', result.message)
+        toast.error(result.message || 'Failed to delete user')
       }
     } catch (error) {
+      // Revert on error - reload data
+      await loadData(false)
       console.error('Error deleting user:', error)
+      toast.error('Error deleting user')
     }
   }
 

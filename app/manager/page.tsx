@@ -585,21 +585,24 @@ function ManagerPageInner() {
       setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
       
       const response = await fetch(`/api/tests/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
       if (result.success) {
         toast.success('Test deleted successfully')
+        // Refresh data to ensure UI is in sync with database
+        await loadData(false)
       } else {
         // Revert on error - reload data
-        loadData(false)
+        await loadData(false)
         console.error('Failed to delete test:', result.message)
         toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
       // Revert on error - reload data
-      loadData(false)
+      await loadData(false)
       console.error('Error deleting test:', error)
       toast.error('Error deleting test')
     }
@@ -623,21 +626,24 @@ function ManagerPageInner() {
       setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
       
       const response = await fetch(`/api/assignments/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
       if (result.success) {
         toast.success('Assignment deleted successfully')
+        // Refresh data to ensure UI is in sync with database
+        await loadData(false)
       } else {
         // Revert on error - reload data
-        loadData(false)
+        await loadData(false)
         console.error('Failed to delete assignment:', result.message)
         toast.error(result.message || 'Failed to delete assignment')
       }
     } catch (error) {
       // Revert on error - reload data
-      loadData(false)
+      await loadData(false)
       console.error('Error deleting assignment:', error)
       toast.error('Error deleting assignment')
     }
