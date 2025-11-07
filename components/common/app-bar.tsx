@@ -44,7 +44,7 @@ export function AppBar({ role, onSignOut, user }: AppBarProps) {
               alt="Logo"
               width={38}
               height={38}
-              className="object-contain flex-shrink-0"
+              className="object-contain shrink-0"
               priority
             />
             <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
