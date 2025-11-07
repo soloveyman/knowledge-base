@@ -5,8 +5,7 @@ import { db, assignments, assignmentUsers, testAttempts, users } from "@/lib/db"
 import { eq, and, desc, inArray } from "drizzle-orm"
 import { EmployeePageClient, type Assignment, TestAttempt } from "./employee-page-client"
 
-// Split data fetching into separate async components for streaming SSR
-async function fetchUserInfo() {
+async function fetchEmployeeData() {
   const session = await auth()
   
   if (!session?.user) {
@@ -17,18 +16,18 @@ async function fetchUserInfo() {
     redirect("/")
   }
   
-  return {
-    userId: session.user.id,
-    userName: session.user.name,
-    userEmail: session.user.email,
-    userImage: session.user.image,
-    tenantId: session.user.businessId
-  }
-}
-
-async function fetchAssignments(userId: string, tenantId: string | null): Promise<Assignment[]> {
+  const userId = session.user.id
+  const tenantId = session.user.businessId
+  
   if (!tenantId) {
-    return []
+    return {
+      assignments: [],
+      testAttempts: [],
+      userId,
+      userName: session.user.name,
+      userEmail: session.user.email,
+      userImage: session.user.image
+    }
   }
   
   // Fetch all assignments for the tenant
@@ -48,6 +47,12 @@ async function fetchAssignments(userId: string, tenantId: string | null): Promis
       .from(assignmentUsers)
       .where(inArray(assignmentUsers.assignmentId, assignmentIds))
   }
+  
+  // Fetch test attempts for the user
+  const attemptsData = await db
+    .select()
+    .from(testAttempts)
+    .where(eq(testAttempts.userId, userId))
   
   // Fetch test scores for assignments
   const assignmentsWithUsers = await Promise.all(
@@ -101,7 +106,7 @@ async function fetchAssignments(userId: string, tenantId: string | null): Promis
   })
   
   // Transform assignments
-  return userAssignments.map(a => ({
+  const transformedAssignments: Assignment[] = userAssignments.map(a => ({
     id: a.id,
     title: a.title || undefined,
     description: a.description || undefined,
@@ -113,15 +118,9 @@ async function fetchAssignments(userId: string, tenantId: string | null): Promis
     status: a.status,
     users: (a as any).users || []
   }))
-}
-
-async function fetchTestAttempts(userId: string): Promise<TestAttempt[]> {
-  const attemptsData = await db
-    .select()
-    .from(testAttempts)
-    .where(eq(testAttempts.userId, userId))
   
-  return attemptsData.map(attempt => ({
+  // Transform test attempts
+  const transformedTestAttempts: TestAttempt[] = attemptsData.map(attempt => ({
     id: attempt.id,
     testId: attempt.testId,
     userId: attempt.userId,
@@ -129,6 +128,15 @@ async function fetchTestAttempts(userId: string): Promise<TestAttempt[]> {
     status: attempt.status || 'completed',
     completedAt: attempt.completedAt?.toISOString() || null
   }))
+  
+  return {
+    assignments: transformedAssignments,
+    testAttempts: transformedTestAttempts,
+    userId,
+    userName: session.user.name,
+    userEmail: session.user.email,
+    userImage: session.user.image
+  }
 }
 
 function EmployeePageSkeleton() {
@@ -148,24 +156,17 @@ function EmployeePageSkeleton() {
 }
 
 export default async function EmployeePage() {
-  // Fetch user info first (fast, no streaming needed)
-  const userInfo = await fetchUserInfo()
-  
-  // Stream assignments and test attempts independently
-  const [assignments, testAttempts] = await Promise.all([
-    fetchAssignments(userInfo.userId, userInfo.tenantId),
-    fetchTestAttempts(userInfo.userId)
-  ])
+  const data = await fetchEmployeeData()
   
   return (
     <Suspense fallback={<EmployeePageSkeleton />}>
       <EmployeePageClient
-        initialAssignments={assignments}
-        initialTestAttempts={testAttempts}
-        userId={userInfo.userId}
-        userName={userInfo.userName}
-        userEmail={userInfo.userEmail}
-        userImage={userInfo.userImage}
+        initialAssignments={data.assignments}
+        initialTestAttempts={data.testAttempts}
+        userId={data.userId}
+        userName={data.userName}
+        userEmail={data.userEmail}
+        userImage={data.userImage}
       />
     </Suspense>
   )

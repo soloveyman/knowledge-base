@@ -14,8 +14,7 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// Split data fetching for streaming SSR
-async function fetchUserInfo() {
+async function fetchOwnerData() {
   const session = await auth()
   
   if (!session?.user) {
@@ -26,17 +25,10 @@ async function fetchUserInfo() {
     redirect("/")
   }
   
-  return {
-    userId: session.user.id,
-    userName: session.user.name,
-    userEmail: session.user.email,
-    userImage: session.user.image,
-    tenantId: session.user.businessId
-  }
-}
-
-async function fetchOwnerData(tenantId: string | null) {
-  // Fetch all data in parallel for streaming
+  const userId = session.user.id
+  const tenantId = session.user.businessId
+  
+  // Fetch all data in parallel
   const [usersData, assignmentsData, testsData, documentsData] = await Promise.all([
     // Users - filter by businessId and exclude owner
     tenantId 
@@ -370,7 +362,11 @@ async function fetchOwnerData(tenantId: string | null) {
     documents: savedDocuments,
     tests: savedTests,
     assignments: savedAssignments,
-    users: savedUsers
+    users: savedUsers,
+    userId,
+    userName: session.user.name,
+    userEmail: session.user.email,
+    userImage: session.user.image
   }
 }
 
@@ -391,11 +387,7 @@ function OwnerPageSkeleton() {
 }
 
 export default async function OwnerPage() {
-  // Fetch user info first (fast, no streaming needed)
-  const userInfo = await fetchUserInfo()
-  
-  // Stream data fetching in parallel
-  const data = await fetchOwnerData(userInfo.tenantId)
+  const data = await fetchOwnerData()
   
   return (
     <Suspense fallback={<OwnerPageSkeleton />}>
@@ -404,10 +396,10 @@ export default async function OwnerPage() {
         initialTests={data.tests}
         initialAssignments={data.assignments}
         initialUsers={data.users}
-        userId={userInfo.userId}
-        userName={userInfo.userName}
-        userEmail={userInfo.userEmail}
-        userImage={userInfo.userImage}
+        userId={data.userId}
+        userName={data.userName}
+        userEmail={data.userEmail}
+        userImage={data.userImage}
       />
     </Suspense>
   )

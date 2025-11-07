@@ -14,8 +14,7 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// Split data fetching for streaming SSR
-async function fetchUserInfo() {
+async function fetchManagerData() {
   const session = await auth()
   
   if (!session?.user) {
@@ -26,26 +25,23 @@ async function fetchUserInfo() {
     redirect("/")
   }
   
-  return {
-    userId: session.user.id,
-    userName: session.user.name,
-    userEmail: session.user.email,
-    userImage: session.user.image,
-    tenantId: session.user.businessId
-  }
-}
-
-async function fetchManagerData(tenantId: string | null) {
+  const userId = session.user.id
+  const tenantId = session.user.businessId
+  
   if (!tenantId) {
     return {
       documents: [],
       tests: [],
       assignments: [],
-      users: []
+      users: [],
+      userId,
+      userName: session.user.name,
+      userEmail: session.user.email,
+      userImage: session.user.image
     }
   }
   
-  // Fetch all data in parallel for streaming
+  // Fetch all data in parallel
   const [usersData, assignmentsData, testsData, documentsData] = await Promise.all([
     // Users - filter by businessId
     db.select().from(users).where(eq(users.businessId, tenantId)),
@@ -359,7 +355,11 @@ async function fetchManagerData(tenantId: string | null) {
     documents: savedDocuments,
     tests: savedTests,
     assignments: savedAssignments,
-    users: savedUsers
+    users: savedUsers,
+    userId,
+    userName: session.user.name,
+    userEmail: session.user.email,
+    userImage: session.user.image
   }
 }
 
@@ -380,11 +380,7 @@ function ManagerPageSkeleton() {
 }
 
 export default async function ManagerPage() {
-  // Fetch user info first (fast, no streaming needed)
-  const userInfo = await fetchUserInfo()
-  
-  // Stream data fetching in parallel
-  const data = await fetchManagerData(userInfo.tenantId)
+  const data = await fetchManagerData()
   
   return (
     <Suspense fallback={<ManagerPageSkeleton />}>
@@ -393,10 +389,10 @@ export default async function ManagerPage() {
         initialTests={data.tests}
         initialAssignments={data.assignments}
         initialUsers={data.users}
-        userId={userInfo.userId}
-        userName={userInfo.userName}
-        userEmail={userInfo.userEmail}
-        userImage={userInfo.userImage}
+        userId={data.userId}
+        userName={data.userName}
+        userEmail={data.userEmail}
+        userImage={data.userImage}
       />
     </Suspense>
   )
