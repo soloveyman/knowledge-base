@@ -1,12 +1,17 @@
 /**
- * Date formatting utilities using Intl.DateTimeFormat
+ * Date formatting utilities using react-intl
  * Provides consistent, locale-aware date formatting across the application
+ * 
+ * Note: For React components, use the useDateFormat() hook to get formatting functions
+ * that automatically use the current locale from IntlProvider.
  */
+
+import { createIntl } from 'react-intl'
 
 type DateInput = string | number | Date
 
 interface FormatDateOptions {
-  locale?: string | string[]
+  locale?: string
   dateStyle?: 'full' | 'long' | 'medium' | 'short'
   timeStyle?: 'full' | 'long' | 'medium' | 'short'
   year?: 'numeric' | '2-digit'
@@ -19,7 +24,7 @@ interface FormatDateOptions {
 }
 
 /**
- * Formats a date using Intl.DateTimeFormat
+ * Formats a date using react-intl
  */
 export function formatDate(
   date: DateInput,
@@ -51,7 +56,13 @@ export function formatDate(
     Object.assign(formatOptions, otherOptions)
   }
 
-  return new Intl.DateTimeFormat(locale, formatOptions).format(dateObj)
+  // Use react-intl's createIntl for formatting
+  const intl = createIntl({
+    locale,
+    defaultLocale: 'en-US'
+  })
+
+  return intl.formatDate(dateObj, formatOptions)
 }
 
 /**
@@ -59,7 +70,7 @@ export function formatDate(
  */
 export function formatDateTime(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
@@ -77,7 +88,7 @@ export function formatDateTime(
  */
 export function formatDateShort(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
@@ -92,7 +103,7 @@ export function formatDateShort(
  */
 export function formatDateLong(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
@@ -105,7 +116,7 @@ export function formatDateLong(
  */
 export function formatDateMedium(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
@@ -118,7 +129,7 @@ export function formatDateMedium(
  */
 export function formatTime(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
@@ -133,7 +144,7 @@ export function formatTime(
  */
 export function formatDateCompact(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
@@ -150,11 +161,20 @@ export function formatDateCompact(
  */
 export function formatDatePretty(
   date: DateInput,
-  locale: string | string[] = 'en-US'
+  locale: string = 'en-US'
 ): string {
   return formatDate(date, {
     locale,
     dateStyle: 'long'
   })
 }
+
+/**
+ * Hook to get date formatting functions that use the current locale from react-intl
+ * Usage: const { formatDate, formatDateTime, formatDateShort } = useDateFormat()
+ * 
+ * Note: This hook requires the component to be wrapped in IntlProvider (via TranslationProvider)
+ * 
+ * This is exported separately to avoid circular dependencies with translation-context
+ */
 

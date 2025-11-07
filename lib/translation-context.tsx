@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { IntlProvider } from 'react-intl'
 import { translations, Language, TranslationKey } from '@/lib/translations'
 
 interface TranslationContextType {
@@ -66,9 +67,14 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     return translations[language][key] || translations.en[key] || key
   }
 
+  // Map language codes to react-intl locale codes
+  const intlLocale = language === 'ru' ? 'ru-RU' : 'en-US'
+
   return (
     <TranslationContext.Provider value={{ language, setLanguage, t }}>
-      {children}
+      <IntlProvider locale={intlLocale} defaultLocale="en-US">
+        {children}
+      </IntlProvider>
     </TranslationContext.Provider>
   )
 }
