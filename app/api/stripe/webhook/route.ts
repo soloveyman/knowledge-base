@@ -5,6 +5,81 @@ import { db, subscriptions, payments, users } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
 
+/**
+ * Create or get user from Stripe checkout session
+ * For guest checkout, creates a new user account
+ */
+async function getOrCreateUserFromCheckout(session: Stripe.Checkout.Session): Promise<string | null> {
+  const userId = session.metadata?.userId;
+  const isGuestCheckout = session.metadata?.isGuestCheckout === 'true';
+  const customerEmail = session.metadata?.customerEmail || session.customer_email || session.customer_details?.email;
+  const customerName = session.metadata?.customerName || session.customer_details?.name;
+
+  // If authenticated user, return existing userId
+  if (userId && !isGuestCheckout) {
+    // Verify user exists
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    
+    if (existingUser.length > 0) {
+      return userId;
+    }
+  }
+
+  // For guest checkout or missing user, create/find by email
+  if (!customerEmail) {
+    console.error('[Stripe Webhook] No email found in checkout session for user creation:', session.id);
+    return null;
+  }
+
+  const normalizedEmail = customerEmail.toLowerCase().trim();
+
+  // Check if user already exists by email
+  const existingUser = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalizedEmail))
+    .limit(1);
+
+  if (existingUser.length > 0) {
+    // User exists - update businessId if not set
+    const user = existingUser[0];
+    if (!user.businessId) {
+      await db
+        .update(users)
+        .set({ businessId: user.id })
+        .where(eq(users.id, user.id));
+    }
+    return user.id;
+  }
+
+  // Create new user for guest checkout
+  try {
+    const [created] = await db.insert(users).values({
+      email: normalizedEmail,
+      name: customerName || null,
+      role: 'owner',
+      businessId: undefined, // Will be set below
+      country: 'US',
+    }).returning();
+
+    // Set businessId to user id
+    await db
+      .update(users)
+      .set({ businessId: created.id })
+      .where(eq(users.id, created.id));
+
+    console.log('[Stripe Webhook] Created new user from guest checkout:', created.id, normalizedEmail);
+    return created.id;
+  } catch (error) {
+    console.error('[Stripe Webhook] Failed to create user from checkout:', error);
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Check if Stripe is configured
@@ -99,11 +174,18 @@ export async function POST(request: Request) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const userId = session.metadata?.userId;
   const planId = session.metadata?.planId;
 
-  if (!userId || !planId) {
-    console.error('[Stripe Webhook] Missing metadata in checkout session:', session.id);
+  if (!planId) {
+    console.error('[Stripe Webhook] Missing planId in checkout session:', session.id);
+    return;
+  }
+
+  // Get or create user from checkout session
+  const userId = await getOrCreateUserFromCheckout(session);
+  
+  if (!userId) {
+    console.error('[Stripe Webhook] Could not get or create user for checkout session:', session.id);
     return;
   }
 
@@ -154,11 +236,27 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     });
   }
 
+  // Get subscription ID for payment record
+  let subscriptionDbId: string | undefined;
+  if (existing.length > 0) {
+    subscriptionDbId = existing[0].id;
+  } else {
+    // Find the subscription we just created
+    const newSubscription = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, userId))
+      .limit(1);
+    if (newSubscription.length > 0) {
+      subscriptionDbId = newSubscription[0].id;
+    }
+  }
+
   // Create payment record
   if (session.amount_total && session.amount_total > 0) {
     await db.insert(payments).values({
       ownerId: userId,
-      subscriptionId: existing.length > 0 ? existing[0].id : undefined,
+      subscriptionId: subscriptionDbId,
       provider: 'stripe',
       providerPaymentId: session.id,
       amount: session.amount_total,

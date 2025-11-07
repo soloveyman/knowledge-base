@@ -18,20 +18,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Authenticate user
+    // Authenticate user (optional - allow guest checkout)
     const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Unauthorized. Please sign in.',
-        },
-        { status: 401 }
-      );
-    }
-
-    // Only owners can create subscriptions
-    if (session.user.role !== 'owner') {
+    const isAuthenticated = !!session?.user;
+    
+    // If authenticated, verify owner role
+    if (isAuthenticated && session.user.role !== 'owner') {
       return NextResponse.json(
         {
           success: false,
@@ -56,7 +48,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const { planId, successUrl, cancelUrl } = validationResult.data;
+    const { planId, successUrl, cancelUrl, email, name } = validationResult.data;
+    
+    // For guest checkout, email is required
+    if (!isAuthenticated && !email) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Email is required for guest checkout.',
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Use authenticated user's email or provided email
+    const customerEmail = isAuthenticated ? session.user.email : email;
 
     // Get plan from database
     const [plan] = await db
@@ -85,30 +91,48 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if user already has an active subscription
-    const existingSubscription = await db
-      .select()
-      .from(subscriptions)
-      .where(eq(subscriptions.ownerId, session.user.id))
-      .limit(1);
+    // Check if user already has an active subscription (only for authenticated users)
+    if (isAuthenticated) {
+      const existingSubscription = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.ownerId, session.user.id))
+        .limit(1);
 
-    if (existingSubscription.length > 0 && existingSubscription[0].status === 'active') {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'You already have an active subscription. Please cancel it first or manage it from your account.',
-        },
-        { status: 400 }
-      );
+      if (existingSubscription.length > 0 && existingSubscription[0].status === 'active') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'You already have an active subscription. Please cancel it first or manage it from your account.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Create Stripe Checkout session
     const stripe = requireStripe();
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
+    // Prepare metadata - include userId if authenticated, or email for guest checkout
+    const metadata: Record<string, string> = {
+      planId: plan.id,
+    };
+    
+    if (isAuthenticated) {
+      metadata.userId = session.user.id;
+    } else {
+      // For guest checkout, store email and name in metadata
+      metadata.customerEmail = customerEmail || '';
+      if (name) {
+        metadata.customerName = name;
+      }
+      metadata.isGuestCheckout = 'true';
+    }
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      customer_email: session.user.email || undefined,
+      customer_email: customerEmail || undefined,
       line_items: [
         {
           price_data: {
@@ -125,11 +149,8 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      metadata: {
-        userId: session.user.id,
-        planId: plan.id,
-      },
-      success_url: successUrl || `${baseUrl}/subscription?success=true`,
+      metadata,
+      success_url: successUrl || `${baseUrl}/auth/signin?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${baseUrl}/subscription?canceled=true`,
     });
 

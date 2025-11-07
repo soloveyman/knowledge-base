@@ -44,6 +44,12 @@ interface ApiDocument {
       headers: string[]
       rows: string[][]
     }>
+    images?: Array<{
+      filename: string
+      data: string
+      type: string
+      position?: number
+    }>
     metadata?: {
       parserVersion?: string
     }

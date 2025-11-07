@@ -8,6 +8,8 @@ export const createCheckoutSessionSchema = z.object({
   planId: z.string().uuid('Plan ID must be a valid UUID'),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
+  email: z.string().email().optional(), // Required for guest checkout
+  name: z.string().optional(), // Optional name for guest checkout
 });
 
 export const createPortalSessionSchema = z.object({
