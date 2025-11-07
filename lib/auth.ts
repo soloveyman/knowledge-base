@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import type { Session } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
+import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { z } from "zod"
 import { NextResponse } from "next/server"
 import { db, users } from "./db"
@@ -43,6 +44,7 @@ if (typeof process !== 'undefined' && !process.env.NEXTAUTH_URL) {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: DrizzleAdapter(db),
   secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   trustHost: true, // Allow NextAuth to trust the host from request headers (important for Vercel)
   providers: [
@@ -151,46 +153,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false
       }
     },
-    async jwt({ token, user }) {
+    async session({ session, user }) {
       try {
-        if (user) {
-          // Ensure token.sub is always the DB user id (important for OAuth providers)
-          // so session.user.id matches our users.id UUID everywhere
-          const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string }
-          token.sub = u.id ?? token.sub
-          token.role = ((u.role as string | undefined)?.toLowerCase() as UserRole) ?? (token.role as UserRole)
-          token.businessId = u.businessId ?? token.businessId
-          token.businessName = u.businessName ?? token.businessName
-        } else {
-          // Fallback: if role/businessId/businessName missing, hydrate from DB
-          if ((!token.role || !token.businessId || !token.businessName) && token.sub) {
-            try {
-              const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
-              if (dbUsers.length > 0) {
-                const dbUser = dbUsers[0] as { role: string | null; businessId?: string | null }
-                if (!token.role) token.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
-                if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
-                if (!token.businessName) token.businessName = 'Knowledge Base'
-              }
-            } catch (error) {
-              console.error("[Auth] jwt callback DB fallback error:", error)
-              // non-fatal; leave token as-is
+        if (user && user.id) {
+          // For database sessions, user object is already populated by adapter
+          // But we need to query DB for custom fields (role, businessId)
+          const dbUsers = await db.select().from(users).where(eq(users.id, user.id)).limit(1)
+          if (dbUsers.length > 0) {
+            const dbUser = dbUsers[0] as { 
+              id: string
+              email: string
+              name: string | null
+              role: string | null
+              businessId: string | null
+              image: string | null
             }
+            // Use user object from adapter for standard fields, DB for custom fields
+            session.user.id = dbUser.id
+            session.user.email = dbUser.email
+            session.user.name = dbUser.name ?? user.name ?? undefined
+            session.user.image = dbUser.image ?? user.image ?? undefined
+            session.user.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
+            session.user.businessId = dbUser.businessId ?? dbUser.id
+            session.user.businessName = 'Knowledge Base'
+          } else {
+            // Fallback if user not found in DB
+            session.user.id = user.id
+            session.user.email = user.email ?? ''
+            session.user.name = user.name ?? undefined
+            session.user.image = user.image ?? undefined
+            session.user.role = 'employee' as UserRole
+            session.user.businessId = user.id
+            session.user.businessName = 'Knowledge Base'
           }
-        }
-        return token
-      } catch (error) {
-        console.error("[Auth] jwt callback error:", error)
-        return token // Return token even on error to avoid breaking auth
-      }
-    },
-    async session({ session, token }) {
-      try {
-        if (token && token.sub) {
-          session.user.id = token.sub
-          session.user.role = (token.role as UserRole) ?? 'employee'
-          session.user.businessId = token.businessId ?? token.sub
-          session.user.businessName = token.businessName ?? 'Knowledge Base'
         }
         return session
       } catch (error) {
@@ -203,7 +198,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/auth/signin",
   },
   session: {
-    strategy: "jwt",
+    strategy: "database",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours - update session once per day
+  },
+  cookies: {
+    sessionToken: {
+      name: `${process.env.NODE_ENV === 'production' ? '__Secure-' : ''}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    callbackUrl: {
+      name: `${process.env.NODE_ENV === 'production' ? '__Secure-' : ''}next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+    csrfToken: {
+      name: `${process.env.NODE_ENV === 'production' ? '__Host-' : ''}next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
   },
 })
 

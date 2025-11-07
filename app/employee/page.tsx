@@ -1,14 +1,9 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { Suspense } from "react"
-import { unstable_cache } from "next/cache"
 import { db, assignments, assignmentUsers, testAttempts, users } from "@/lib/db"
 import { eq, and, desc, inArray } from "drizzle-orm"
 import { EmployeePageClient, type Assignment, TestAttempt } from "./employee-page-client"
-
-// Force dynamic rendering for authenticated pages
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 async function fetchEmployeeData() {
   const session = await auth()

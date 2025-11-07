@@ -46,8 +46,6 @@ export function AppBar({ role, onSignOut, user }: AppBarProps) {
               height={38}
               className="object-contain shrink-0"
               priority
-              sizes="38px"
-              quality={90}
             />
             <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate" suppressHydrationWarning>
               {title}

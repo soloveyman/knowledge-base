@@ -165,10 +165,8 @@ function DocumentImage({ src, alt }: { src: string | Blob | undefined; alt?: str
           isLoading ? 'opacity-0' : 'opacity-100'
         }`}
         style={{ width: 'auto', height: 'auto' }}
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 800px"
         unoptimized={isExternal}
         loading="lazy"
-        quality={85}
         onLoad={() => setIsLoading(false)}
         onError={() => {
           setHasError(true)
