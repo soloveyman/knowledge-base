@@ -202,11 +202,57 @@ export default function SubscriptionManager({
       '25 team members': `25 ${t('teamMembers')}`,
       '100 document imports per month': `100 ${t('documentImportsPerMonth')}`,
       '500 AI test generations per month': `500 ${t('aiTestGenerationsPerMonth')}`,
+      // New trial features
+      'Up to 5 users': t('upToUsers').replace('{count}', '5'),
+      '10 document imports': `10 ${t('documentImports')}`,
+      '20 AI test generations': `20 ${t('aiTestGenerations')}`,
+      '3 document enhancements': `3 ${t('documentEnhancements')}`,
+      'Full analytics and support during Trial': t('fullAnalyticsAndSupportDuringTrial'),
+      // Standard plan features
+      'Up to 10 users': t('upToUsers').replace('{count}', '10'),
+      '20 document enhancements per month': `20 ${t('documentEnhancements')} ${t('perMonth')}`,
+      'Learning effectiveness analytics': t('learningEffectivenessAnalytics'),
+      // Pro plan features
+      'Up to 25 users': t('upToUsers').replace('{count}', '25'),
+      '80 document imports per month': `80 ${t('documentImportsPerMonth')}`,
+      '250 AI test generations per month': `250 ${t('aiTestGenerationsPerMonth')}`,
+      '40 document enhancements per month': `40 ${t('documentEnhancements')} ${t('perMonth')}`,
+      'Extended analytics and priority support': t('extendedAnalyticsAndPrioritySupport'),
     }
     
     // Check if we have a direct translation
     if (featureMap[feature]) {
       return featureMap[feature]
+    }
+    
+    // Try to parse dynamic features like "Up to X users"
+    const upToUsersMatch = feature.match(/^Up to (\d+)\s+users$/i)
+    if (upToUsersMatch) {
+      return t('upToUsers').replace('{count}', upToUsersMatch[1])
+    }
+    
+    // Try to parse "X document imports" (without "per month")
+    const importsMatch = feature.match(/^(\d+)\s+document\s+imports$/i)
+    if (importsMatch) {
+      return `${importsMatch[1]} ${t('documentImports')}`
+    }
+    
+    // Try to parse "X AI test generations" (without "per month")
+    const generationsMatch = feature.match(/^(\d+)\s+AI\s+test\s+generations$/i)
+    if (generationsMatch) {
+      return `${generationsMatch[1]} ${t('aiTestGenerations')}`
+    }
+    
+    // Try to parse "X document enhancements"
+    const enhancementsMatch = feature.match(/^(\d+)\s+document\s+enhancements$/i)
+    if (enhancementsMatch) {
+      return `${enhancementsMatch[1]} ${t('documentEnhancements')}`
+    }
+    
+    // Try to parse "X document enhancements per month"
+    const enhancementsPerMonthMatch = feature.match(/^(\d+)\s+document\s+enhancements\s+per\s+month$/i)
+    if (enhancementsPerMonthMatch) {
+      return `${enhancementsPerMonthMatch[1]} ${t('documentEnhancements')} ${t('perMonth')}`
     }
     
     // Try to parse dynamic features like "X team members", "X document imports per month", etc.
@@ -215,14 +261,14 @@ export default function SubscriptionManager({
       return `${teamMembersMatch[1]} ${t('teamMembers')}`
     }
     
-    const importsMatch = feature.match(/^(\d+)\s+document\s+imports\s+per\s+month$/i)
-    if (importsMatch) {
-      return `${importsMatch[1]} ${t('documentImportsPerMonth')}`
+    const importsPerMonthMatch = feature.match(/^(\d+)\s+document\s+imports\s+per\s+month$/i)
+    if (importsPerMonthMatch) {
+      return `${importsPerMonthMatch[1]} ${t('documentImportsPerMonth')}`
     }
     
-    const generationsMatch = feature.match(/^(\d+)\s+AI\s+test\s+generations\s+per\s+month$/i)
-    if (generationsMatch) {
-      return `${generationsMatch[1]} ${t('aiTestGenerationsPerMonth')}`
+    const generationsPerMonthMatch = feature.match(/^(\d+)\s+AI\s+test\s+generations\s+per\s+month$/i)
+    if (generationsPerMonthMatch) {
+      return `${generationsPerMonthMatch[1]} ${t('aiTestGenerationsPerMonth')}`
     }
     
     // Return original if no translation found
@@ -232,7 +278,8 @@ export default function SubscriptionManager({
   const translatePlanName = (displayName: string): string => {
     // Map plan names for consistency
     const nameMap: Record<string, string> = {
-      'Starter': 'Optimal',
+      'Starter': 'Standard',
+      'Optimal': 'Standard',
     }
     
     // Return mapped name if exists, otherwise return original
@@ -243,8 +290,11 @@ export default function SubscriptionManager({
     // Map plan descriptions to translation keys
     const descriptionMap: Record<string, string> = {
       '14-day free trial to explore all features': t('freeTrialDescription'),
+      '7 days of full access': t('freeTrialDescription'),
       'Small teams, startups': t('starterDescription'),
+      'For small teams and startups': t('starterDescription'),
       'Growing companies, medium-sized teams': t('proDescription'),
+      'For growing companies and networks': t('proDescription'),
     }
     
     // Check if we have a direct translation
@@ -260,7 +310,9 @@ export default function SubscriptionManager({
     switch (planName.toLowerCase()) {
       case 'free':
       case 'free-trial': return <Shield className="h-6 w-6" />
-      case 'starter': return <Users className="h-6 w-6" />
+      case 'starter':
+      case 'optimal':
+      case 'standard': return <Users className="h-6 w-6" />
       case 'pro': return <Zap className="h-6 w-6" />
       case 'business': return <Crown className="h-6 w-6" />
       default: return <Shield className="h-6 w-6" />
@@ -271,7 +323,9 @@ export default function SubscriptionManager({
     switch (planName.toLowerCase()) {
       case 'free':
       case 'free-trial': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-      case 'starter': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'starter':
+      case 'optimal':
+      case 'standard': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'pro': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'business': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'

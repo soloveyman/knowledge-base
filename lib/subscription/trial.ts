@@ -55,19 +55,27 @@ export async function getOrCreateTrialPlan() {
     .limit(1);
 
   if (existing.length > 0) {
-    // Update existing plan if maxEnhancementsPerMonth is not set
-    if (existing[0].maxEnhancementsPerMonth === null || existing[0].maxEnhancementsPerMonth === undefined) {
-      const [updated] = await db
-        .update(subscriptionPlans)
-        .set({
-          maxEnhancementsPerMonth: 1,
-          updatedAt: new Date(),
-        })
-        .where(eq(subscriptionPlans.id, existing[0].id))
-        .returning();
-      return updated;
-    }
-    return existing[0];
+    // Update existing plan with new trial limits
+    const [updated] = await db
+      .update(subscriptionPlans)
+      .set({
+        description: '7 days of full access',
+        maxUsers: 5,
+        maxImportsPerMonth: 10,
+        maxGenerationsPerMonth: 20,
+        maxEnhancementsPerMonth: 3,
+        features: [
+          'Up to 5 users',
+          '10 document imports',
+          '20 AI test generations',
+          '3 document enhancements',
+          'Full analytics and support during Trial',
+        ],
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptionPlans.id, existing[0].id))
+      .returning();
+    return updated;
   }
 
   // Create trial plan if it doesn't exist
@@ -76,20 +84,20 @@ export async function getOrCreateTrialPlan() {
     .values({
       name: TRIAL_CONFIG.PLAN_NAME,
       displayName: 'Free Trial',
-      description: '14-day free trial to explore all features',
+      description: '7 days of full access',
       price: 0, // Free
       currency: 'USD',
       interval: 'month',
-      maxUsers: 10, // Reasonable trial limits
-      maxImportsPerMonth: 50,
-      maxGenerationsPerMonth: 100,
-      maxEnhancementsPerMonth: 1,
+      maxUsers: 5,
+      maxImportsPerMonth: 10,
+      maxGenerationsPerMonth: 20,
+      maxEnhancementsPerMonth: 3,
       features: [
-        'Access to all features',
-        '10 team members',
-        '50 document imports per month',
-        '100 AI test generations per month',
-        'Full support during trial',
+        'Up to 5 users',
+        '10 document imports',
+        '20 AI test generations',
+        '3 document enhancements',
+        'Full analytics and support during Trial',
       ],
       isActive: true,
     })
