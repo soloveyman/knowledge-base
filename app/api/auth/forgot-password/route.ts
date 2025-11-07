@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db, users, passwordResetTokens } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import crypto from 'crypto'
+import { sendPasswordResetEmail } from '@/lib/email'
 
 export async function POST(req: Request) {
   try {
@@ -40,14 +41,20 @@ export async function POST(req: Request) {
       used: false,
     })
 
-    // In production, you would send an email here
-    // For now, we'll log it (in development) or use your email service
-    const resetUrl = `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/auth/reset-password?token=${token}`
+    const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+    const resetUrl = `${baseUrl}/auth/reset-password?token=${token}`
     
-    console.log('[Password Reset] Reset URL:', resetUrl)
-    
-    // TODO: Send email with reset link
-    // await sendPasswordResetEmail(user.email, resetUrl)
+    // Send email with reset link
+    try {
+      await sendPasswordResetEmail(user.email, resetUrl)
+    } catch (emailError) {
+      // Log error but don't fail the request (security best practice)
+      console.error('[Password Reset] Failed to send email:', emailError)
+      // In development, still log the URL
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Password Reset] Reset URL (email failed):', resetUrl)
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
