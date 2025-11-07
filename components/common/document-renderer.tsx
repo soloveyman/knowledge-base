@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -67,17 +68,75 @@ function DocumentContent({ content }: { content: string }) {
   console.log('📄 Markdown preview (first 500 chars):', markdown.substring(0, 500))
   console.log('📄 Markdown contains image markdown:', /!\[.*?\]\(data:/gi.test(markdown))
   
+  // Convert markdown images to HTML img tags (ReactMarkdown with rehypeRaw can handle HTML)
+  // This avoids parsing issues with very long data URLs
+  let processedMarkdown = markdown
+  const imagePattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
+  const imageMatches: Array<{ match: string; alt: string; src: string }> = []
+  let imageMatch
+  while ((imageMatch = imagePattern.exec(markdown)) !== null) {
+    imageMatches.push({
+      match: imageMatch[0],
+      alt: imageMatch[1] || '',
+      src: imageMatch[2]
+    })
+  }
+  
+  // Replace markdown images with HTML img tags (in reverse order to preserve positions)
+  for (let i = imageMatches.length - 1; i >= 0; i--) {
+    const { match, alt, src } = imageMatches[i]
+    // Escape alt text for HTML (but not src - data URLs must remain unescaped)
+    const escapedAlt = alt.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    // Use HTML img tag instead of markdown syntax
+    // Note: src contains data URL which must remain unescaped (browser handles it correctly in quotes)
+    const htmlImg = `<img src="${src}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
+    processedMarkdown = processedMarkdown.replace(match, htmlImg)
+    console.log(`📸 Converted image ${i + 1}:`, {
+      alt,
+      srcLength: src.length,
+      srcPreview: src.substring(0, 50),
+      htmlImgPreview: htmlImg.substring(0, 100)
+    })
+  }
+  
+  console.log(`📸 Converted ${imageMatches.length} markdown images to HTML img tags`)
+  
+  // Custom rehype plugin to preserve image src attributes (especially data URLs)
+  const preserveImageSrc = () => {
+    return (tree: any) => {
+      const visit = (node: any) => {
+        if (node.type === 'element' && node.tagName === 'img' && node.properties?.src) {
+          // Store the src in a data attribute as backup
+          const src = node.properties.src
+          if (typeof src === 'string' && src.startsWith('data:')) {
+            // Ensure src is preserved
+            node.properties['data-original-src'] = src
+            console.log('📸 Preserved image src in rehype plugin:', {
+              srcLength: src.length,
+              srcPreview: src.substring(0, 50)
+            })
+          }
+        }
+        if (node.children) {
+          node.children.forEach(visit)
+        }
+      }
+      visit(tree)
+    }
+  }
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[
         rehypeRaw,
+        preserveImageSrc,
         [
           rehypeSanitize,
           {
             tagNames: ['img', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'hr'],
             attributes: {
-              img: ['src', 'alt', 'width', 'height', 'className'],
+              img: ['src', 'alt', 'width', 'height', 'className', 'data-original-src', 'class', 'style', 'loading'],
               div: ['align', 'className'],
               a: ['href', 'target', 'rel', 'className'],
             },
@@ -209,22 +268,49 @@ function DocumentContent({ content }: { content: string }) {
             {children}
           </td>
         ),
-        img: ({ src, alt, width, height }) => {
-          console.log('Image component called:', { 
-            hasSrc: !!src, 
-            srcType: typeof src, 
-            srcLength: typeof src === 'string' ? src.length : 0,
-            srcPreview: typeof src === 'string' ? src.substring(0, 50) : 'N/A',
-            alt 
-          })
+        img: ({ src, alt, width, height, className, node, ...props }) => {
+          // HTML img tags from rehypeRaw may have src in node.properties
+          let actualSrc = src
+          if (!actualSrc && node?.properties) {
+            const nodeProps = node.properties as Record<string, unknown>
+            // Try to get src - it might be in different formats
+            actualSrc = nodeProps.src as string | undefined
+            if (!actualSrc) {
+              actualSrc = nodeProps.SRC as string | undefined
+            }
+            // Sometimes properties are arrays (from rehypeSanitize)
+            if (!actualSrc && Array.isArray(nodeProps.src)) {
+              actualSrc = nodeProps.src[0] as string | undefined
+            }
+            // Try backup data attribute
+            if (!actualSrc) {
+              actualSrc = nodeProps['data-original-src'] as string | undefined
+            }
+            // Log what we found
+            console.log('Extracted src from node:', { 
+              hasSrc: !!actualSrc,
+              srcLength: typeof actualSrc === 'string' ? actualSrc.length : 0,
+              srcPreview: typeof actualSrc === 'string' ? actualSrc.substring(0, 50) : 'N/A',
+              nodeProps: Object.keys(nodeProps),
+              srcType: typeof nodeProps.src,
+              srcValue: nodeProps.src ? (typeof nodeProps.src === 'string' ? nodeProps.src.substring(0, 50) : String(nodeProps.src).substring(0, 50)) : 'undefined',
+              altValue: nodeProps.alt
+            })
+          }
           
-          if (!src) {
-            console.log('Image component: No src provided')
+          if (!actualSrc) {
+            const nodeProps = node?.properties as Record<string, unknown> | undefined
+            console.log('Image component: No src provided', { 
+              hasSrc: !!src,
+              hasNode: !!node,
+              hasNodeProps: !!node?.properties,
+              nodeProps: nodeProps ? Object.keys(nodeProps) : []
+            })
             return null
           }
           
           // Convert src to string if it's a Blob
-          let srcString = typeof src === 'string' ? src : ''
+          let srcString = typeof actualSrc === 'string' ? actualSrc : ''
           if (!srcString) {
             console.log('Image component: src is not a string')
             return null
@@ -233,7 +319,7 @@ function DocumentContent({ content }: { content: string }) {
           // Fix base64 images that are missing the data: prefix
           if (srcString.startsWith('base64,')) {
             srcString = `data:image/png;${srcString}`
-          } else if (!srcString.includes(',') && srcString.length > 100 && /^[A-Za-z0-9+/=]+$/.test(srcString.substring(0, 50))) {
+          } else if (!srcString.includes('data:') && !srcString.startsWith('http') && srcString.length > 100 && /^[A-Za-z0-9+/=]+$/.test(srcString.substring(0, 50))) {
             // If it looks like base64 without prefix, add it
             srcString = `data:image/png;base64,${srcString}`
           }
@@ -242,35 +328,30 @@ function DocumentContent({ content }: { content: string }) {
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
-          console.log('Image component: Rendering image', {
-            isDataUrl,
-            isExternal,
-            srcLength: srcString.length,
-            srcPreview: srcString.substring(0, 50)
-          })
-          
           // Determine image dimensions
-          // Try to extract from props, or use defaults based on image type
-          let imgWidth = typeof width === 'number' ? width : typeof width === 'string' ? parseInt(width) : 1200
-          let imgHeight = typeof height === 'number' ? height : typeof height === 'string' ? parseInt(height) : 800
+          let imgWidth = typeof width === 'number' ? width : typeof width === 'string' ? parseInt(width) : undefined
+          let imgHeight = typeof height === 'number' ? height : typeof height === 'string' ? parseInt(height) : undefined
+          
+          // If no dimensions provided, use defaults
+          if (!imgWidth || isNaN(imgWidth) || imgWidth <= 0) imgWidth = 1200
+          if (!imgHeight || isNaN(imgHeight) || imgHeight <= 0) imgHeight = 800
           
           // For data URLs, try to detect dimensions from the image
-          // For now, use defaults but detect small images
           const isSmallImage = imgWidth <= 256 || imgHeight <= 256
           const isQRCode = isLikelyQRCode(imgWidth, imgHeight)
           const isIcon = isLikelyIcon(imgWidth, imgHeight)
           
           // Special handling for small images (icons, QR codes, thumbnails)
           const containerClass = isSmallImage || isQRCode || isIcon
-            ? "my-3 relative inline-flex justify-center" // Inline for small images
-            : "my-6 relative w-full flex justify-center" // Full width for large images
+            ? "my-3 relative inline-flex justify-center"
+            : "my-6 relative w-full flex justify-center"
           
-          const imageClass = isSmallImage || isQRCode || isIcon
-            ? "rounded border border-border max-w-full h-auto" // Simpler styling for small images
-            : "rounded-lg border border-border w-full h-auto max-w-4xl" // Full styling for large images
+          const imageClass = className || (isSmallImage || isQRCode || isIcon
+            ? "rounded border border-border max-w-full h-auto"
+            : "rounded-lg border border-border w-full h-auto max-w-4xl")
           
-          // Next.js Image component doesn't support data URIs, use regular img tag
-          if (isDataUrl) {
+          // Always use regular img tag for data URLs (Next.js Image doesn't support them)
+          if (isDataUrl || !isExternal) {
             return (
               <div className={containerClass}>
                 <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
@@ -280,23 +361,32 @@ function DocumentContent({ content }: { content: string }) {
                     width={imgWidth}
                     height={imgHeight}
                     className={imageClass}
-                    loading="lazy"
+                    loading={isSmallImage || isQRCode ? "eager" : "lazy"}
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                    onError={(e) => {
+                      console.error('Image failed to load:', { src: srcString.substring(0, 100), alt })
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                    onLoad={() => {
+                      console.log('Image loaded successfully:', { src: srcString.substring(0, 100), alt })
+                    }}
                   />
                 </div>
               </div>
             )
           }
           
-          // For external URLs, use Next.js Image component
+          // For external URLs only, use Next.js Image component
           const category = getImageSizeCategory(imgWidth, imgHeight)
           const optimizedProps = getOptimizedImageProps(category, {
             width: imgWidth,
             height: imgHeight,
             src: srcString,
             alt: alt || '',
-            isDataUrl,
-            isExternal,
-            priority: false, // Documents are lazy-loaded
+            isDataUrl: false,
+            isExternal: true,
+            priority: false,
           })
           
           return (
@@ -305,16 +395,14 @@ function DocumentContent({ content }: { content: string }) {
                 <Image
                   {...optimizedProps}
                   className={imageClass}
-                  // Override for small images: higher quality, no blur
                   {...(isSmallImage && {
                     quality: 95,
                     loading: 'eager' as const,
                   })}
-                  // Special handling for QR codes
                   {...(isQRCode && {
-                    quality: 100, // Maximum quality for QR codes (readability is critical)
+                    quality: 100,
                     loading: 'eager' as const,
-                    priority: true, // QR codes should load immediately
+                    priority: true,
                   })}
                 />
               </div>
@@ -336,7 +424,7 @@ function DocumentContent({ content }: { content: string }) {
         ),
       }}
     >
-      {markdown}
+      {processedMarkdown}
     </ReactMarkdown>
   )
 }
@@ -621,21 +709,24 @@ function convertToMarkdown(content: string): string {
   
   // Extract all images (both data URLs and regular URLs) in one pass
   // Match: ![alt](src) - handle both data: URLs and regular URLs
-  // For data URLs, match everything until the closing parenthesis
-  // Use a more specific pattern for data URLs that handles very long base64 strings
-  const imagePattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
+  // For data URLs, match everything until the closing parenthesis (non-greedy to avoid issues)
+  // Use a more robust pattern that handles very long base64 strings
   const images: Array<{ match: string; placeholder: string }> = []
   
+  // First, try to match data URLs (they can be very long, so we need a more permissive pattern)
+  // Match: ![alt](data:image/type;base64,verylongstring)
+  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
   let match
-  while ((match = imagePattern.exec(md)) !== null) {
+  while ((match = dataUrlPattern.exec(md)) !== null) {
     const fullMatch = match[0]
     const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
     imagePlaceholders.push(fullMatch)
     images.push({ match: fullMatch, placeholder })
-    console.log(`📸 Preserved image in markdown: ${fullMatch.substring(0, 100)}...`)
+    console.log(`📸 Preserved data URL image in markdown: ${fullMatch.substring(0, 100)}...`)
   }
   
-  // Also handle regular URLs (non-data URLs)
+  // Also handle regular URLs (non-data URLs) - must come after data URL matching
+  // Match: ![alt](http://... or https://... or relative paths)
   const regularImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
   let regularMatch
   while ((regularMatch = regularImagePattern.exec(md)) !== null) {
@@ -646,6 +737,23 @@ function convertToMarkdown(content: string): string {
       imagePlaceholders.push(fullMatch)
       images.push({ match: fullMatch, placeholder })
       console.log(`📸 Preserved regular image in markdown: ${fullMatch}`)
+    }
+  }
+  
+  // Also handle base64 strings without data: prefix (fallback)
+  // Match: ![alt](base64string) where base64string looks like base64
+  const base64Pattern = /!\[([^\]]*)\]\(([A-Za-z0-9+/=]{100,})\)/g
+  let base64Match
+  while ((base64Match = base64Pattern.exec(md)) !== null) {
+    const fullMatch = base64Match[0]
+    // Skip if already processed
+    if (!images.some(img => img.match === fullMatch)) {
+      const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
+      // Convert to proper data URL format
+      const fixedMatch = fullMatch.replace(/\(([A-Za-z0-9+/=]+)\)$/, '(data:image/png;base64,$1)')
+      imagePlaceholders.push(fixedMatch)
+      images.push({ match: fullMatch, placeholder })
+      console.log(`📸 Preserved base64 image (fixed) in markdown: ${fullMatch.substring(0, 100)}...`)
     }
   }
   

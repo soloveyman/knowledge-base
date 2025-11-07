@@ -349,31 +349,46 @@ export default function DocumentViewer() {
               }
             }
             
-            // Insert images
+            // Insert images - sort by position first
+            const sortedImages = [...images].sort((a, b) => {
+              const posA = a.position ?? Infinity
+              const posB = b.position ?? Infinity
+              return posA - posB
+            })
+            
             let contentWithImages = content
             let offset = 0
+            let firstImageInserted = false
             
-            images.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
+            sortedImages.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
               const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
               
-              if (insertPosition !== null) {
-                // Insert after "1. General Principles" section
+              // Use insertPosition only for the first image if available
+              if (insertPosition !== null && !firstImageInserted) {
+                // Insert first image after "1. General Principles" section
                 const insertPos = insertPosition + offset
                 contentWithImages = 
                   contentWithImages.slice(0, insertPos) + 
                   imageMarkdown + 
                   contentWithImages.slice(insertPos)
                 offset += imageMarkdown.length
-                console.log(`📸 Inserted image "${img.filename}" at position ${insertPos}`)
+                firstImageInserted = true
+                console.log(`📸 Inserted first image "${img.filename}" at position ${insertPos}`)
               } else if (img.position !== undefined && img.position >= 0 && img.position < content.length && img.position > 0) {
                 // Insert at the specified position (but not at 0)
                 const insertPos = img.position + offset
-                contentWithImages = 
-                  contentWithImages.slice(0, insertPos) + 
-                  imageMarkdown + 
-                  contentWithImages.slice(insertPos)
-                offset += imageMarkdown.length
-                console.log(`📸 Inserted image "${img.filename}" at specified position ${insertPos}`)
+                if (insertPos < contentWithImages.length) {
+                  contentWithImages = 
+                    contentWithImages.slice(0, insertPos) + 
+                    imageMarkdown + 
+                    contentWithImages.slice(insertPos)
+                  offset += imageMarkdown.length
+                  console.log(`📸 Inserted image "${img.filename}" at specified position ${insertPos}`)
+                } else {
+                  // Position is out of bounds, append at the end
+                  contentWithImages += imageMarkdown
+                  console.log(`📸 Appended image "${img.filename}" at the end (position ${insertPos} out of bounds)`)
+                }
               } else {
                 // Append at the end
                 contentWithImages += imageMarkdown
