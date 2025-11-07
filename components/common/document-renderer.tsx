@@ -22,13 +22,14 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
   // Check if content has actual text (not just whitespace or placeholder text)
   // Note: We check for actual text AFTER extracting text from formatting tags, because
   // content might only have text inside [BOLD] or [ITALIC] tags
+  // Check if content has actual content (text or images)
+  const hasImages = /!\[.*?\]\(.*?\)/.test(content)
   const hasActualContent = content && 
     content.trim().length > 0 && 
     !content.includes('Document content will be displayed here...') &&
     !content.includes('Document contains tables below.') &&
-    // Check if content has actual text characters (not just whitespace)
-    // Extract text from inside formatting tags before checking
-    (() => {
+    // Check if content has actual text characters (not just whitespace) OR images
+    (hasImages || (() => {
       // First extract text from inside formatting tags, then remove tags
       let textCheck = content
         .replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '$1') // Extract text from [BOLD]...[/BOLD]
@@ -36,11 +37,11 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
         .replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '$1') // Extract text from [CENTER]...[/CENTER]
         .replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '$1') // Extract text from [RIGHT]...[/RIGHT]
         .replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '$1') // Extract text from [JUSTIFY]...[/JUSTIFY]
-        .replace(/!\[.*?\]\(.*?\)/g, '') // Remove image markdown
+        .replace(/!\[.*?\]\(.*?\)/g, '') // Remove image markdown for text check
         .replace(/#+\s+/g, '') // Remove markdown heading markers but keep text
         .replace(/\s+/g, '') // Remove all whitespace
       return textCheck.length > 0
-    })()
+    })())
   
   return (
     <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
@@ -65,7 +66,23 @@ function DocumentContent({ content }: { content: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeRaw, rehypeSanitize]}
+      rehypePlugins={[
+        rehypeRaw,
+        [
+          rehypeSanitize,
+          {
+            tagNames: ['img', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'hr'],
+            attributes: {
+              img: ['src', 'alt', 'width', 'height', 'className'],
+              div: ['align', 'className'],
+              a: ['href', 'target', 'rel', 'className'],
+            },
+            protocols: {
+              src: ['http', 'https', 'data'],
+            },
+          },
+        ],
+      ]}
       components={{
         h1: ({ children }) => {
           // Главный заголовок - самый крупный и выразительный
@@ -189,11 +206,17 @@ function DocumentContent({ content }: { content: string }) {
           </td>
         ),
         img: ({ src, alt, width, height }) => {
-          if (!src) return null
+          if (!src) {
+            console.log('Image component: No src provided')
+            return null
+          }
           
           // Convert src to string if it's a Blob
           let srcString = typeof src === 'string' ? src : ''
-          if (!srcString) return null
+          if (!srcString) {
+            console.log('Image component: src is not a string')
+            return null
+          }
           
           // Fix base64 images that are missing the data: prefix
           if (srcString.startsWith('base64,')) {
@@ -207,6 +230,13 @@ function DocumentContent({ content }: { content: string }) {
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
+          console.log('Image component: Rendering image', {
+            isDataUrl,
+            isExternal,
+            srcLength: srcString.length,
+            srcPreview: srcString.substring(0, 50)
+          })
+          
           // Determine image dimensions
           // Try to extract from props, or use defaults based on image type
           let imgWidth = typeof width === 'number' ? width : typeof width === 'string' ? parseInt(width) : 1200
@@ -218,7 +248,34 @@ function DocumentContent({ content }: { content: string }) {
           const isQRCode = isLikelyQRCode(imgWidth, imgHeight)
           const isIcon = isLikelyIcon(imgWidth, imgHeight)
           
-          // Get size category and optimized props
+          // Special handling for small images (icons, QR codes, thumbnails)
+          const containerClass = isSmallImage || isQRCode || isIcon
+            ? "my-3 relative inline-flex justify-center" // Inline for small images
+            : "my-6 relative w-full flex justify-center" // Full width for large images
+          
+          const imageClass = isSmallImage || isQRCode || isIcon
+            ? "rounded border border-border max-w-full h-auto" // Simpler styling for small images
+            : "rounded-lg border border-border w-full h-auto max-w-4xl" // Full styling for large images
+          
+          // Next.js Image component doesn't support data URIs, use regular img tag
+          if (isDataUrl) {
+            return (
+              <div className={containerClass}>
+                <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
+                  <img
+                    src={srcString}
+                    alt={alt || ''}
+                    width={imgWidth}
+                    height={imgHeight}
+                    className={imageClass}
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )
+          }
+          
+          // For external URLs, use Next.js Image component
           const category = getImageSizeCategory(imgWidth, imgHeight)
           const optimizedProps = getOptimizedImageProps(category, {
             width: imgWidth,
@@ -229,15 +286,6 @@ function DocumentContent({ content }: { content: string }) {
             isExternal,
             priority: false, // Documents are lazy-loaded
           })
-          
-          // Special handling for small images (icons, QR codes, thumbnails)
-          const containerClass = isSmallImage || isQRCode || isIcon
-            ? "my-3 relative inline-flex justify-center" // Inline for small images
-            : "my-6 relative w-full flex justify-center" // Full width for large images
-          
-          const imageClass = isSmallImage || isQRCode || isIcon
-            ? "rounded border border-border" // Simpler styling for small images
-            : "rounded-lg border border-border w-full h-auto" // Full styling for large images
           
           return (
             <div className={containerClass}>
@@ -555,6 +603,14 @@ function convertToMarkdown(content: string): string {
   
   let md = content
   
+  // Preserve images before processing - extract and restore them
+  const imagePlaceholders: string[] = []
+  md = md.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+    const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
+    imagePlaceholders.push(match)
+    return placeholder
+  })
+  
   // Remove empty formatting tags first (e.g., [BOLD][/BOLD] or [BOLD] [/BOLD])
   md = md.replace(/\[BOLD\]\s*\[\/BOLD\]/gi, '')
   md = md.replace(/\[ITALIC\]\s*\[\/ITALIC\]/gi, '')
@@ -582,14 +638,28 @@ function convertToMarkdown(content: string): string {
   md = md.replace(/\.\s*\d+\./g, '.')
   md = md.replace(/\s+\d+\.\s*$/gm, '')
   
-  // Добавляем эмодзи к заголовкам markdown (если их еще нет)
+  // Don't add emojis to headings - just normalize them
+  // Remove any existing emojis and bold formatting from headings (headers are already bold)
   md = md.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, text) => {
-    // Проверяем, есть ли уже эмодзи в начале
-    if (!/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(text.trim())) {
-      const emoji = getEmojiForContext(text, 'heading')
-      return `${hashes} ${emoji ? emoji + ' ' : ''}${text}`
+    // Remove emojis from the start
+    const emojiPattern = /\p{Emoji}/u
+    let cleanedText = text.trim()
+    
+    // Remove emoji at the start if present
+    if (emojiPattern.test(cleanedText.charAt(0))) {
+      cleanedText = cleanedText.replace(/^\p{Emoji}\s*/u, '')
     }
-    return match
+    
+    // Remove bold markdown (**text**) from headers since headers are already bold
+    cleanedText = cleanedText.replace(/\*\*(.+?)\*\*/g, '$1')
+    // Remove italic markdown (*text*) from headers
+    cleanedText = cleanedText.replace(/\*(.+?)\*/g, '$1')
+    // Remove any remaining single asterisks at the end
+    cleanedText = cleanedText.replace(/\*+$/, '')
+    // Remove any remaining single asterisks at the start
+    cleanedText = cleanedText.replace(/^\*+/, '')
+    
+    return `${hashes} ${cleanedText.trim()}`
   })
   
   // Обрабатываем списки: разделяем нумерованные и маркированные
@@ -614,6 +684,11 @@ function convertToMarkdown(content: string): string {
   // Нормализуем нумерованные списки - сохраняем оригинальную нумерацию
   // Не заменяем числа, только нормализуем формат (убираем лишние пробелы)
   md = md.replace(/^(\s*)(\d+)\.\s+/gm, '$1$2. ')
+  
+  // Restore images
+  imagePlaceholders.forEach((image, index) => {
+    md = md.replace(`__IMAGE_PLACEHOLDER_${index}__`, image)
+  })
   
   return md
 }

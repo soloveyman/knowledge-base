@@ -288,6 +288,10 @@ export default function DocumentViewer() {
                 content += imageMarkdown
               }
             })
+            // Debug: Check if images are in content
+            const imageCount = (content.match(/!\[.*?\]\(data:image/gi) || []).length
+            console.log(`📸 Images in content string: ${imageCount}`)
+            console.log(`📸 Content includes image markdown: ${content.includes('![image')}`)
           }
           
           // If no sections but we have tables, leave content empty (tables will be shown)
