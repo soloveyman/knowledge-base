@@ -287,6 +287,9 @@ export default function SubscriptionManager({
   }
 
   const translatePlanDescription = (description: string): string => {
+    // Normalize description (trim whitespace)
+    const normalized = description?.trim() || ''
+    
     // Map plan descriptions to translation keys
     const descriptionMap: Record<string, string> = {
       '14-day free trial to explore all features': t('freeTrialDescription'),
@@ -298,12 +301,20 @@ export default function SubscriptionManager({
     }
     
     // Check if we have a direct translation
-    if (descriptionMap[description]) {
-      return descriptionMap[description]
+    if (descriptionMap[normalized]) {
+      return descriptionMap[normalized]
+    }
+    
+    // Fallback: try case-insensitive match
+    const lowerNormalized = normalized.toLowerCase()
+    for (const [key, translation] of Object.entries(descriptionMap)) {
+      if (key.toLowerCase() === lowerNormalized) {
+        return translation
+      }
     }
     
     // Return original if no translation found
-    return description
+    return normalized || description
   }
 
   const getPlanIcon = (planName: string) => {
@@ -525,7 +536,7 @@ export default function SubscriptionManager({
                         {currentSubscription.plan.maxEnhancementsPerMonth !== null && (
                           <div>
                             <div className="flex justify-between text-sm mb-1">
-                              <span>{t('documentEnhancements')}</span>
+                              <span>{t('documentEnhancementsLabel')}</span>
                               <span className={getUsageColor(getUsagePercentage(usage.enhancementsCount, currentSubscription.plan.maxEnhancementsPerMonth))}>
                                 {usage.enhancementsCount}/{currentSubscription.plan.maxEnhancementsPerMonth}
                               </span>
@@ -605,10 +616,11 @@ export default function SubscriptionManager({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {
               const isOptimal = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Optimal'
+              const isStandard = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Standard'
               return (
               <div
                 key={plan.id}
-                className={`p-6 border rounded-3xl flex flex-col cursor-pointer transition-all shadow-none ${
+                className={`relative p-6 border rounded-3xl flex flex-col cursor-pointer transition-all shadow-none ${
                   selectedPlan === plan.id
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/50 dark:border-blue-400'
                     : plan.isPopular
@@ -619,9 +631,18 @@ export default function SubscriptionManager({
                 }`}
                 onClick={() => handlePlanSelect(plan.id)}
               >
+                {/* Popular Badge at top center border - for Standard plan */}
+                {isStandard && (
+                  <div className="absolute -top-[14px] left-1/2 -translate-x-1/2 z-10">
+                    <Badge className="bg-primary text-primary-foreground px-2 py-0.5 text-xs">
+                      {t('mostPopular')}
+                    </Badge>
+                  </div>
+                )}
+
                 {/* Header */}
                 <div>
-                  {plan.isPopular && (
+                  {plan.isPopular && !isStandard && (
                     <div className="text-center mb-4">
                       <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                         {t('mostPopular')}
