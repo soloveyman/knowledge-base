@@ -47,9 +47,26 @@ export async function POST(req: Request) {
     // Send email with reset link
     try {
       await sendPasswordResetEmail(user.email, resetUrl)
+      console.log('[Password Reset] Email sent successfully to:', user.email)
     } catch (emailError) {
-      // Log error but don't fail the request (security best practice)
-      console.error('[Password Reset] Failed to send email:', emailError)
+      // Log detailed error for debugging
+      const errorMessage = emailError instanceof Error ? emailError.message : String(emailError)
+      console.error('[Password Reset] Failed to send email:', errorMessage)
+      console.error('[Password Reset] Error details:', emailError)
+      
+      // Check if SMTP is configured
+      const smtpConfigured = !!(
+        process.env.SMTP_HOST &&
+        process.env.SMTP_PORT &&
+        process.env.SMTP_USER &&
+        process.env.SMTP_PASSWORD
+      )
+      
+      if (!smtpConfigured) {
+        console.error('[Password Reset] SMTP not configured! Required env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD')
+        console.error('[Password Reset] For Gmail: Use App Password (https://support.google.com/accounts/answer/185833)')
+      }
+      
       // In development, still log the URL
       if (process.env.NODE_ENV === 'development') {
         console.log('[Password Reset] Reset URL (email failed):', resetUrl)

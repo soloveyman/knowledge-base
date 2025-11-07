@@ -24,10 +24,13 @@ const createTransporter = (): Transporter | { sendMail: (options: MailOptions) =
     process.env.SMTP_USER &&
     process.env.SMTP_PASSWORD
   ) {
+    const port = parseInt(process.env.SMTP_PORT, 10)
+    const secure = process.env.SMTP_SECURE === 'true' || port === 465
+    
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT, 10),
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      port,
+      secure,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
