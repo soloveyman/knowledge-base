@@ -19,16 +19,35 @@ interface DocumentRendererProps {
 
 export function DocumentRenderer({ content, tables, className = '' }: DocumentRendererProps) {
   // Если есть таблицы но нет контента, не показываем пустой контент
-  const hasContent = content && content.trim().length > 0 && 
+  // Check if content has actual text (not just whitespace or placeholder text)
+  // Note: We check for actual text AFTER extracting text from formatting tags, because
+  // content might only have text inside [BOLD] or [ITALIC] tags
+  const hasActualContent = content && 
+    content.trim().length > 0 && 
     !content.includes('Document content will be displayed here...') &&
-    !content.includes('Document contains tables below.')
+    !content.includes('Document contains tables below.') &&
+    // Check if content has actual text characters (not just whitespace)
+    // Extract text from inside formatting tags before checking
+    (() => {
+      // First extract text from inside formatting tags, then remove tags
+      let textCheck = content
+        .replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '$1') // Extract text from [BOLD]...[/BOLD]
+        .replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '$1') // Extract text from [ITALIC]...[/ITALIC]
+        .replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '$1') // Extract text from [CENTER]...[/CENTER]
+        .replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '$1') // Extract text from [RIGHT]...[/RIGHT]
+        .replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '$1') // Extract text from [JUSTIFY]...[/JUSTIFY]
+        .replace(/!\[.*?\]\(.*?\)/g, '') // Remove image markdown
+        .replace(/#+\s+/g, '') // Remove markdown heading markers but keep text
+        .replace(/\s+/g, '') // Remove all whitespace
+      return textCheck.length > 0
+    })()
   
   return (
     <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
       <div className="document-content space-y-6">
-        {hasContent && <DocumentContent content={content} />}
+        {hasActualContent && <DocumentContent content={content} />}
         {tables && tables.length > 0 && (
-          <div className={hasContent ? "mt-10 space-y-10" : "space-y-10"}>
+          <div className={hasActualContent ? "mt-10 space-y-10" : "space-y-10"}>
             {tables.map((table, idx) => (
               <TableRenderer key={idx} table={table} />
             ))}
@@ -536,6 +555,16 @@ function convertToMarkdown(content: string): string {
   
   let md = content
   
+  // Remove empty formatting tags first (e.g., [BOLD][/BOLD] or [BOLD] [/BOLD])
+  md = md.replace(/\[BOLD\]\s*\[\/BOLD\]/gi, '')
+  md = md.replace(/\[ITALIC\]\s*\[\/ITALIC\]/gi, '')
+  md = md.replace(/\[CENTER\]\s*\[\/CENTER\]/gi, '')
+  md = md.replace(/\[RIGHT\]\s*\[\/RIGHT\]/gi, '')
+  md = md.replace(/\[JUSTIFY\]\s*\[\/JUSTIFY\]/gi, '')
+  
+  // Clean up headings that only contain empty formatting tags (e.g., "## [BOLD]" becomes "##")
+  md = md.replace(/^(#{1,6})\s+\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]\s*$/gim, '$1')
+  
   // Преобразуем [BOLD] и [ITALIC] теги
   md = md.replace(/\[BOLD\]([\s\S]*?)\[\/BOLD\]/g, '**$1**')
   md = md.replace(/\[ITALIC\]([\s\S]*?)\[\/ITALIC\]/g, '*$1*')
@@ -544,6 +573,9 @@ function convertToMarkdown(content: string): string {
   md = md.replace(/\[CENTER\]([\s\S]*?)\[\/CENTER\]/g, '<div align="center">$1</div>')
   md = md.replace(/\[RIGHT\]([\s\S]*?)\[\/RIGHT\]/g, '<div align="right">$1</div>')
   md = md.replace(/\[JUSTIFY\]([\s\S]*?)\[\/JUSTIFY\]/g, '<div align="justify">$1</div>')
+  
+  // Remove empty headings (e.g., "##" with no text)
+  md = md.replace(/^(#{1,6})\s*$/gm, '')
   
   // Убираем артефакты
   md = md.replace(/;\s*\d+\./g, '')

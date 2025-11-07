@@ -82,6 +82,12 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { title, originalFileName, fileType, fileUrl, fileSize, parsedContent, parsingLog } = body
 
+    console.log('POST /api/documents - Saving document:', title)
+    console.log('ParsedContent exists:', !!parsedContent)
+    console.log('ParsedContent sections:', parsedContent?.sections?.length || 0)
+    console.log('ParsedContent tables:', parsedContent?.tables?.length || 0)
+    console.log('ParsedContent metadata:', parsedContent?.metadata)
+
     // Validate required fields
     if (!title) {
       return NextResponse.json({
@@ -133,6 +139,11 @@ export async function POST(request: Request) {
       
       savedDocument = newDocument[0]
     }
+
+    console.log('Document saved - ID:', savedDocument.id)
+    console.log('Saved parsedContent exists:', !!savedDocument.parsedContent)
+    console.log('Saved parsedContent sections:', (savedDocument.parsedContent as any)?.sections?.length || 0)
+    console.log('Saved parsedContent tables:', (savedDocument.parsedContent as any)?.tables?.length || 0)
 
     // Update usage counter for imports (only for owners and only when creating new document)
     if (session.user.role === 'owner' && existingDocument.length === 0) {

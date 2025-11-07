@@ -12,18 +12,26 @@ import * as JSZip from 'jszip'
 function normalizeWhitespace(text: string): string {
   return text
     // Normalize tabs and multiple spaces to single space (within a line)
-    .replace(/[ \t]+/g, ' ')
+    // Split by lines first to avoid breaking formatting tags
+    .split('\n')
+    .map(line => {
+      // Preserve empty lines (they're important for structure)
+      if (line.trim().length === 0) return ''
+      // Normalize spaces/tabs within the line, but preserve formatting tags
+      // Replace multiple spaces/tabs with single space, but be careful with tags
+      let normalized = line.replace(/[ \t]+/g, ' ')
+      // Trim leading/trailing spaces
+      return normalized.trim()
+    })
+    .join('\n')
     // Preserve paragraph breaks (2+ newlines)
     .replace(/\n{3,}/g, '\n\n')
     // Normalize single line breaks
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    // Trim each line to prevent leading/trailing spaces
-    .split('\n')
-    .map(line => line.trim())
-    .join('\n')
-    // Final trim
-    .trim()
+    // Final trim (but preserve structure)
+    .replace(/^\n+/, '')
+    .replace(/\n+$/, '')
 }
 
 export interface ParseResult {
@@ -837,7 +845,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   // Additional cleaning to remove any remaining HTML/CSS artifacts
   // Preserve structure and readability
   let cleanedText = text
-    // Remove any HTML tags
+    // Remove any HTML tags (but preserve our custom formatting tags)
     .replace(/<html[^>]*>/gi, '')
     .replace(/<\/html>/gi, '')
     .replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, '')
@@ -845,7 +853,8 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     .replace(/<\/body>/gi, '')
     .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '') // Remove CSS
     .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '') // Remove JavaScript
-    .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+    // Only remove HTML tags, not our custom formatting tags like [BOLD], [ITALIC], etc.
+    .replace(/<(?![A-Z])[^>]*>/g, '') // Remove HTML tags but not our custom tags
     // Decode HTML entities
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -854,11 +863,25 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove any other entities
-    // Remove CSS property patterns
-    .replace(/([a-z-]+):\s*[^;]+;?/gi, '')
+    // Remove CSS property patterns (but be careful not to remove content)
+    // Skip this - it's too aggressive and removes content
   
-  // Normalize whitespace while preserving structure
-  cleanedText = normalizeWhitespace(cleanedText)
+  // Only normalize whitespace if text doesn't already have good structure
+  // If text has many newlines, it likely has good structure already
+  const hasGoodStructure = (cleanedText.match(/\n/g) || []).length > 10
+  if (!hasGoodStructure) {
+    // Normalize whitespace while preserving structure
+    cleanedText = normalizeWhitespace(cleanedText)
+  } else {
+    // Just normalize line endings
+    cleanedText = cleanedText
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      // Normalize excessive whitespace within lines (but preserve line breaks)
+      .replace(/[ \t]+/g, ' ')
+      // Preserve paragraph breaks
+      .replace(/\n{3,}/g, '\n\n')
+  }
   
   console.log('Cleaned text for structured content:', cleanedText.substring(0, 200))
   console.log('Line breaks in cleaned text:', (cleanedText.match(/\n/g) || []).length)
@@ -912,19 +935,38 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     
     // Check for markdown-style headings (with #)
     if (trimmedLine.startsWith('#')) {
-      if (currentSection) {
-        sections.push(currentSection)
-      }
-      
       const level = (trimmedLine.match(/^#+/) || [''])[0].length
       const title = trimmedLine.replace(/^#+\s*/, '').trim()
       
-      currentSection = {
-        title,
-        level: Math.min(level, 6), // Max level 6
-        content: '',
-        order: sectionOrder++
+      // Skip empty headings or headings that are just formatting tags (with or without closing tag)
+      const isEmptyHeading = !title || 
+        /^\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]\s*\[\/\1\]$/i.test(title) ||
+        /^\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]$/i.test(title)
+      
+      if (!isEmptyHeading) {
+        // Only create a new section if the heading has actual content
+        if (currentSection) {
+          sections.push(currentSection)
+        }
+        
+        currentSection = {
+          title,
+          level: Math.min(level, 6), // Max level 6
+          content: '',
+          order: sectionOrder++
+        }
       }
+      // If it's an empty heading, continue adding content to current section (or create one if none exists)
+      else if (!currentSection) {
+        // Create a default section if we don't have one yet
+        currentSection = {
+          title: fileName.replace(/\.[^/.]+$/, ''), // Use filename as title
+          level: 1,
+          content: '',
+          order: sectionOrder++
+        }
+      }
+      // Otherwise, just continue with current section (don't create a new one)
     }
     // Check for days of the week (Monday, Tuesday, etc. or Russian equivalents)
     else if (isDayOfWeekHeading(trimmedLine)) {

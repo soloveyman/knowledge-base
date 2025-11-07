@@ -28,9 +28,20 @@ export async function GET(
       }, { status: 404 })
     }
 
+    const document = doc[0]
+    console.log('GET /api/documents/[id] - Document ID:', id)
+    console.log('Document parsedContent exists:', !!document.parsedContent)
+    console.log('Document parsedContent type:', typeof document.parsedContent)
+    if (document.parsedContent) {
+      const pc = document.parsedContent as any
+      console.log('ParsedContent sections:', pc?.sections?.length || 0)
+      console.log('ParsedContent tables:', pc?.tables?.length || 0)
+      console.log('ParsedContent metadata:', pc?.metadata)
+    }
+
     // If just checking dependencies, return assignments info
     if (checkDependencies) {
-      const moduleId = doc[0].moduleId
+      const moduleId = document.moduleId
       const relatedAssignments = moduleId 
         ? await db.select().from(assignments).where(eq(assignments.moduleId, moduleId))
         : []
@@ -44,7 +55,7 @@ export async function GET(
     
     return NextResponse.json({
       success: true,
-      data: { document: doc[0] }
+      data: { document }
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',

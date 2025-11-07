@@ -175,9 +175,27 @@ export default function DocumentReaderPage() {
         
         let content = ''
         
-        // Handle sections (for docx files)
+        // Handle sections (for docx files) - include titles in content
         if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
-          content = document.parsedContent!.sections.map((s: { content: string }) => s.content).join('\n')
+          content = document.parsedContent!.sections
+            .map((s: { title?: string; level?: number; content: string }) => {
+              // Include section title as markdown heading if it exists
+              let sectionContent = ''
+              if (s.title && s.title.trim()) {
+                const level = s.level || 2
+                const headingPrefix = '#'.repeat(Math.min(level, 6))
+                sectionContent = `${headingPrefix} ${s.title}\n\n`
+              }
+              // Add section content
+              if (s.content && s.content.trim()) {
+                sectionContent += s.content
+              }
+              return sectionContent.trim()
+            })
+            .filter((c: string) => c && c.length > 0) // Filter out empty sections
+            .join('\n\n')
+          // Trim leading/trailing newlines but preserve internal structure
+          content = content.replace(/^\n+/, '').replace(/\n+$/, '')
         }
         
         // Extract tables separately (for xlsx files)

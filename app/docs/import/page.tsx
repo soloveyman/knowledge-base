@@ -234,6 +234,11 @@ function DocImportPageInner() {
     try {
       // Save each file to the database
       for (const file of readyFiles) {
+        console.log('Saving document:', file.name)
+        console.log('ParsedContent exists:', !!file.parsedContent)
+        console.log('ParsedContent sections:', file.parsedContent?.sections?.length || 0)
+        console.log('ParsedContent tables:', file.parsedContent?.tables?.length || 0)
+        
         const response = await fetch('/api/documents', {
           method: 'POST',
           headers: {
@@ -252,7 +257,11 @@ function DocImportPageInner() {
         })
 
         if (!response.ok) {
-          console.error('Failed to save document:', file.name)
+          const errorData = await response.json().catch(() => ({}))
+          console.error('Failed to save document:', file.name, errorData)
+        } else {
+          const result = await response.json()
+          console.log('Document saved successfully:', file.name, result)
         }
       }
 

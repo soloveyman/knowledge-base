@@ -199,10 +199,74 @@ export default function DocumentViewer() {
           console.log('Document tables:', document.parsedContent?.tables)
           console.log('Document images:', document.parsedContent?.images)
           
-          // Extract content from sections
+          // Extract content from sections - include titles in content
           let content = ''
           if (document.parsedContent?.sections && document.parsedContent.sections.length > 0) {
-            content = document.parsedContent.sections.map((s: { content: string }) => s.content).join('\n')
+            // Log all sections for debugging
+            console.log('All sections:', document.parsedContent.sections.map((s: any, idx: number) => ({
+              index: idx,
+              title: s.title,
+              titleLength: s.title?.length || 0,
+              contentLength: s.content?.length || 0,
+              contentPreview: s.content?.substring(0, 100) || ''
+            })))
+            
+            // Merge sections with empty titles into previous section
+            const mergedSections: Array<{ title?: string; level?: number; content: string }> = []
+            for (let i = 0; i < document.parsedContent.sections.length; i++) {
+              const s = document.parsedContent.sections[i]
+              const titleText = s.title?.trim() || ''
+              const contentText = s.content?.trim() || ''
+              
+              // If this section has an empty title (just formatting tag) and has content, merge with previous
+              if (titleText && /^\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]\s*\[\/\1\]$/i.test(titleText) && contentText) {
+                // Merge content with previous section
+                if (mergedSections.length > 0) {
+                  mergedSections[mergedSections.length - 1].content += '\n\n' + contentText
+                } else {
+                  // No previous section, just add the content
+                  mergedSections.push({ content: contentText })
+                }
+              } else {
+                // Normal section, add it
+                mergedSections.push(s)
+              }
+            }
+            
+            content = mergedSections
+              .map((s: { title?: string; level?: number; content: string }, idx: number) => {
+                const titleText = s.title?.trim() || ''
+                const contentText = s.content?.trim() || ''
+                
+                // If title is just an empty formatting tag, skip the title but keep the content
+                if (titleText && /^\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]\s*\[\/\1\]$/i.test(titleText)) {
+                  // Title is just an empty formatting tag, return only content
+                  return contentText
+                }
+                
+                // Include section title as markdown heading if it exists
+                let sectionContent = ''
+                if (titleText) {
+                  const level = s.level || 2
+                  const headingPrefix = '#'.repeat(Math.min(level, 6))
+                  sectionContent = `${headingPrefix} ${titleText}\n\n`
+                }
+                // Add section content
+                if (contentText) {
+                  sectionContent += contentText
+                }
+                
+                const result = sectionContent.trim()
+                console.log(`Section ${idx}: title="${titleText}", contentLength=${contentText.length}, resultLength=${result.length}`)
+                return result
+              })
+              .filter((c: string) => c && c.length > 0) // Filter out empty sections
+              .join('\n\n')
+            // Trim leading/trailing newlines but preserve internal structure
+            content = content.replace(/^\n+/, '').replace(/\n+$/, '')
+            
+            console.log('Combined content length:', content.length)
+            console.log('Combined content preview:', content.substring(0, 500))
           }
           
           // Extract tables from parsedContent  

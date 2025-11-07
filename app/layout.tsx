@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClientProviders } from "@/components/providers/client-providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+  preload: false, // Don't preload Inter since Graphik is primary
+});
 
 const graphik = localFont({
   src: [
@@ -29,7 +37,7 @@ const graphik = localFont({
     },
   ],
   variable: "--font-graphik",
-  fallback: ["system-ui", "arial"],
+  fallback: ["Inter", "system-ui", "arial"],
   display: "swap", // Improve FCP by showing fallback font immediately
   // preload is handled automatically by Next.js (only preloads first font file)
 });
@@ -44,6 +52,7 @@ const graphikMono = localFont({
   ],
   variable: "--font-graphik-mono",
   fallback: ["ui-monospace", "monospace"],
+  preload: false, // Disable preload since this is the same file as graphik (already preloaded)
 });
 
 export const metadata: Metadata = {
@@ -85,7 +94,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${graphik.variable} ${graphikMono.variable} antialiased overflow-x-hidden`}
+        className={`${graphik.variable} ${graphikMono.variable} ${inter.variable} antialiased overflow-x-hidden`}
         suppressHydrationWarning={true}
       >
         <ClientProviders>
