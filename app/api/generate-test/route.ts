@@ -95,7 +95,7 @@ export async function POST(request: Request) {
             - Include multiple choice, true/false, and fill-in-the-blank questions
             - Provide clear explanations for answers
             - Difficulty level: ${params?.difficulty || 'medium'}
-            - Language: ${params?.locale || 'English'}
+            - CRITICAL LANGUAGE REQUIREMENT: Generate ALL questions in ${params?.locale === 'ru' ? 'Russian (Русский)' : 'English'}. The document language is ${params?.locale === 'ru' ? 'Russian' : 'English'}, so ALL questions, answers, choices, and explanations MUST be in ${params?.locale === 'ru' ? 'Russian' : 'English'}. DO NOT translate or mix languages. Preserve the original document's language.
             - IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content.
             
             Return ONLY a valid JSON array with this exact format:

@@ -3,6 +3,11 @@ import { db, documents, users, usage } from '@/lib/db'
 import { desc, eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
+// Route segment config for performance
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const revalidate = 0 // No caching for dynamic data
+
 export async function GET() {
   try {
     const session = await auth()
@@ -32,6 +37,11 @@ export async function GET() {
         data: {
           documents: allDocuments
         }
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'X-Content-Type-Options': 'nosniff'
+        }
       })
     }
     const rows = await db
@@ -46,6 +56,11 @@ export async function GET() {
       success: true,
       data: {
         documents: allDocuments
+      }
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'X-Content-Type-Options': 'nosniff'
       }
     })
   } catch (error) {

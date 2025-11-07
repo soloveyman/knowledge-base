@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense } from "react"
+import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense, useTransition, useOptimistic } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -478,8 +478,23 @@ function ManagerPageInner() {
   }, [defaultTab, loadData])
 
 
-  // Document handlers
+  // Document handlers with optimistic updates
   const [enhancingDocId, setEnhancingDocId] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
+  
+  // Optimistic state for documents
+  const [optimisticDocuments, addOptimisticDocument] = useOptimistic(
+    documents,
+    (state, { action, id, document }: { action: 'delete' | 'enhance'; id: string; document?: typeof documents[0] }) => {
+      if (action === 'delete') {
+        return state.filter(doc => doc.id !== id)
+      }
+      if (action === 'enhance' && document) {
+        return state.map(doc => doc.id === id ? document : doc)
+      }
+      return state
+    }
+  )
 
   const handleEnhanceDocument = async (id: string) => {
     try {
@@ -487,18 +502,21 @@ function ManagerPageInner() {
       toast.loading('Enhancing document with Grok API...', { id: 'enhance' })
       
       const response = await fetch(`/api/documents/${id}/enhance`, {
-        method: 'POST'
+        method: 'POST',
+        cache: 'no-store'
       })
       const result = await response.json()
       
-      if (result.success) {
-        toast.success('Document enhanced successfully!', { id: 'enhance' })
-        // Reload documents to show updated content
-        loadData(false)
-      } else {
-        console.error('Failed to enhance document:', result.message)
-        toast.error(result.message || 'Failed to enhance document', { id: 'enhance' })
-      }
+      startTransition(() => {
+        if (result.success) {
+          toast.success('Document enhanced successfully!', { id: 'enhance' })
+          // Reload documents to show updated content
+          loadData(false)
+        } else {
+          console.error('Failed to enhance document:', result.message)
+          toast.error(result.message || 'Failed to enhance document', { id: 'enhance' })
+        }
+      })
     } catch (error) {
       console.error('Error enhancing document:', error)
       toast.error('Error enhancing document', { id: 'enhance' })
@@ -508,13 +526,17 @@ function ManagerPageInner() {
   }
 
   const handleDeleteDocument = async (id: string) => {
-    try {
-      // Optimistically update UI immediately
+    // Optimistically update UI immediately (must be inside startTransition)
+    startTransition(() => {
+      addOptimisticDocument({ action: 'delete', id })
       setDocumentsWithLog(documents.filter(doc => doc.id !== id))
       cleanupDocumentFromLocalStorage(id)
-      
+    })
+    
+    try {
       const response = await fetch(`/api/documents/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
@@ -522,13 +544,17 @@ function ManagerPageInner() {
         toast.success('Document deleted successfully')
       } else {
         // Revert on error - reload data
-        loadData(false)
+        startTransition(() => {
+          loadData(false)
+        })
         console.error('Failed to delete document:', result.message)
         toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
       // Revert on error - reload data
-      loadData(false)
+      startTransition(() => {
+        loadData(false)
+      })
       console.error('Error deleting document:', error)
       toast.error('Error deleting document')
     }
@@ -541,9 +567,11 @@ function ManagerPageInner() {
     const encodedId = encodeURIComponent(String(id))
     const url = `/docs/${encodedId}`
     console.log('📄 Navigating to:', url)
-    // Prefetch for instant navigation
-    router.prefetch(url)
-    router.push(url)
+    // Prefetch for instant navigation (non-blocking)
+    startTransition(() => {
+      router.prefetch(url)
+      router.push(url)
+    })
   }
 
   const handleImportDocument = () => {

@@ -94,10 +94,10 @@ export default function TestBuilderPage() {
   const { values, errors, touched, setValue, setFieldTouched, validateAll } = validation
   
   const testConfig: TestConfig = {
-    count: values.count,
-    type: values.type,
-    difficulty: values.difficulty,
-    locale: values.locale
+    count: values.count || 5,
+    type: values.type || 'mcq',
+    difficulty: values.difficulty || 'medium',
+    locale: values.locale || 'en'
   }
   const [context, setContext] = useState<Context>({
     text: "",
@@ -426,7 +426,7 @@ export default function TestBuilderPage() {
     }
   }, [session, status, router, loadTestForEditing, documents.length, testLoaded])
 
-  // Simple language detection based on Cyrillic characters
+  // Enhanced language detection based on Cyrillic characters and common patterns
   const detectLanguage = (text: string): 'ru' | 'en' => {
     if (!text || text.length === 0) return 'en' // Default to English
     
@@ -440,6 +440,30 @@ export default function TestBuilderPage() {
     }
     
     return 'en'
+  }
+
+  // Get document language - prioritize metadata, then detection
+  const getDocumentLanguage = (doc: Document): 'ru' | 'en' => {
+    // First check metadata
+    const metadataLocale = doc.parsedContent?.metadata?.language || doc.parsedContent?.metadata?.locale
+    if (metadataLocale && (metadataLocale === 'ru' || metadataLocale === 'en')) {
+      return metadataLocale as 'ru' | 'en'
+    }
+    
+    // Then detect from content
+    let documentContent = ''
+    if (Array.isArray(doc.parsedContent?.sections) && doc.parsedContent!.sections.length > 0) {
+      type Section = { content: string; title?: string }
+      documentContent = doc.parsedContent.sections
+        .map((section: Section) => `${section.title ? section.title + '\n' : ''}${section.content}`)
+        .join('\n\n')
+    }
+    
+    if (documentContent) {
+      return detectLanguage(documentContent)
+    }
+    
+    return 'en' // Default fallback
   }
 
   const handleDocumentSelect = (doc: Document) => {
@@ -487,17 +511,10 @@ export default function TestBuilderPage() {
       documentContent = ''
     }
     
-    // Auto-detect and set language from document content
-    const detectedLocale = detectLanguage(documentContent)
-    setValue('locale', detectedLocale)
+    // Auto-detect and set language from document - use getDocumentLanguage for consistency
+    const documentLocale = getDocumentLanguage(doc)
+    setValue('locale', documentLocale)
     setFieldTouched('locale')
-    
-    // Also check if document metadata has language info
-    const metadataLocale = doc.parsedContent?.metadata?.language || doc.parsedContent?.metadata?.locale
-    if (metadataLocale && (metadataLocale === 'ru' || metadataLocale === 'en')) {
-      setValue('locale', metadataLocale as 'ru' | 'en')
-      setFieldTouched('locale')
-    }
     
     setContext(prev => ({
       ...prev,
@@ -560,12 +577,26 @@ export default function TestBuilderPage() {
       return
     }
 
+    // Ensure locale matches document language - override user selection if needed
+    const documentLocale = getDocumentLanguage(selectedDocument)
+    if (testConfig.locale !== documentLocale) {
+      console.log(`Language mismatch detected. Document language: ${documentLocale}, Selected: ${testConfig.locale}. Using document language.`)
+      setValue('locale', documentLocale)
+      setFieldTouched('locale')
+    }
+
     setIsGenerating(true)
     setError(null)
 
     try {
+      // Use document language for generation (not user-selected locale if it differs)
+      const generationConfig = {
+        ...testConfig,
+        locale: documentLocale // Force use document language
+      }
+
       const requestData = {
-        params: testConfig,
+        params: generationConfig,
         context: {
           text: context.text,
           facts: context.facts.filter(f => f.trim()),
@@ -867,7 +898,7 @@ export default function TestBuilderPage() {
                   error={touched.documentId ? errors.documentId : undefined}
                 >
                   <Select 
-                    value={values.documentId || undefined} 
+                    value={values.documentId || ''} 
                     onValueChange={(value) => {
                       const doc = documents.find(d => String(d.id) === String(value))
                       if (doc) {
@@ -946,7 +977,7 @@ export default function TestBuilderPage() {
                     error={touched.type ? errors.type : undefined}
                   >
                     <Select 
-                      value={testConfig.type} 
+                      value={testConfig.type || 'mcq'} 
                       onValueChange={(value) => {
                         setValue('type', value)
                         setFieldTouched('type')
@@ -981,7 +1012,7 @@ export default function TestBuilderPage() {
                     error={touched.difficulty ? errors.difficulty : undefined}
                   >
                     <Select 
-                      value={testConfig.difficulty} 
+                      value={testConfig.difficulty || 'medium'} 
                       onValueChange={(value) => {
                         setValue('difficulty', value)
                         setFieldTouched('difficulty')
@@ -1008,7 +1039,7 @@ export default function TestBuilderPage() {
                     error={touched.locale ? errors.locale : undefined}
                   >
                     <Select 
-                      value={testConfig.locale} 
+                      value={testConfig.locale || 'en'} 
                       onValueChange={(value) => {
                         setValue('locale', value)
                         setFieldTouched('locale')

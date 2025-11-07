@@ -4,6 +4,11 @@ import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
 
+// Route segment config for performance
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 300 // 5 minutes for long-running Grok API calls
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

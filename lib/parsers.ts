@@ -132,34 +132,98 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
     const images: Array<{filename: string, data: string, type: string}> = []
     
     try {
+      // First, extract images using JSZip (more reliable than Mammoth messages)
+      const uint8Array = new Uint8Array(buffer)
+      const zip = await JSZip.loadAsync(uint8Array)
+      const mediaFolder = zip.folder('word/media')
+      
+      if (mediaFolder) {
+        console.log('Extracting images from word/media...')
+        // Get only files that are actually in word/media (not nested folders)
+        // and filter for image file extensions only
+        const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
+        const mediaFiles = Object.keys(mediaFolder.files)
+          .filter(filename => {
+            const file = mediaFolder.files[filename]
+            // Only process files (not directories) that are directly in word/media
+            if (file.dir) return false
+            // Check if it's an image file by extension
+            const extension = filename.split('.').pop()?.toLowerCase()
+            return extension && imageExtensions.includes(extension)
+          })
+        
+        console.log(`Found ${mediaFiles.length} image files in word/media folder:`, mediaFiles)
+        
+        for (const filename of mediaFiles) {
+          try {
+            const imageBuffer = await mediaFolder.file(filename)?.async('arraybuffer')
+            if (imageBuffer && imageBuffer.byteLength > 0) {
+              const base64 = Buffer.from(imageBuffer).toString('base64')
+              const extension = filename.split('.').pop()?.toLowerCase() || 'png'
+              // Map common extensions to MIME types
+              const mimeTypeMap: Record<string, string> = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'gif': 'image/gif',
+                'bmp': 'image/bmp',
+                'webp': 'image/webp',
+                'svg': 'image/svg+xml'
+              }
+              const mimeType = mimeTypeMap[extension] || `image/${extension}`
+              images.push({
+                filename: filename,
+                data: `data:${mimeType};base64,${base64}`,
+                type: mimeType
+              })
+              console.log(`✅ Extracted image: ${filename} (${mimeType}, ${(imageBuffer.byteLength / 1024).toFixed(2)}KB)`)
+            } else {
+              console.warn(`⚠️ Image buffer is null or empty for: ${filename}`)
+            }
+          } catch (error) {
+            console.warn(`❌ Failed to extract image ${filename}:`, error)
+          }
+        }
+        console.log(`📸 Total images extracted from word/media: ${images.length}`)
+      } else {
+        console.log('⚠️ word/media folder not found in DOCX file')
+      }
+      
       // Use Mammoth to convert DOCX to HTML
-      const result = await mammoth.convertToHtml({ arrayBuffer: buffer }, {
-        ignoreEmptyParagraphs: true,
-      })
+      const result = await mammoth.convertToHtml({ arrayBuffer: buffer })
       
       console.log('Mammoth conversion completed')
       console.log('Messages:', result.messages.length)
       result.messages.forEach(msg => console.log('Message:', msg.type, msg.message))
       
-      // Extract images from Mammoth messages
-      result.messages
-        .filter((msg: MammothMessage) => msg.type === 'image')
-        .forEach((msg: MammothMessage) => {
-          const image = msg.image
-          if (image) {
-            images.push({
-              filename: image.filename || 'unknown.png',
-              data: image.src, // Already base64
-              type: image.contentType || 'image/png'
-            })
-            console.log(`Extracted image: ${image.filename || 'unknown'}`)
-          }
-        })
-      
       // Get the HTML text - keep it as HTML for proper formatting
       const htmlText = result.value
       console.log('HTML text length:', htmlText.length)
       console.log('First 200 chars of HTML:', htmlText.substring(0, 200))
+      
+      // Also extract images from HTML img tags that Mammoth created
+      const imgTagRegex = /<img[^>]+src="data:([^;]+);base64,([^"]+)"[^>]*>/gi
+      let imgMatch
+      let htmlImageCount = 0
+      while ((imgMatch = imgTagRegex.exec(htmlText)) !== null) {
+        const mimeType = imgMatch[1]
+        const base64Data = imgMatch[2]
+        // Check if we already have this image (avoid duplicates)
+        const existingImage = images.find(img => img.data.includes(base64Data.substring(0, 50)))
+        if (!existingImage) {
+          images.push({
+            filename: `image_${images.length + 1}.${mimeType.split('/')[1] || 'png'}`,
+            data: `data:${mimeType};base64,${base64Data}`,
+            type: mimeType
+          })
+          htmlImageCount++
+          console.log(`✅ Extracted image from HTML: image_${images.length} (${mimeType})`)
+        }
+      }
+      if (htmlImageCount > 0) {
+        console.log(`📸 Extracted ${htmlImageCount} additional images from HTML`)
+      }
+      console.log(`📸 Total images after HTML extraction: ${images.length}`)
       
       // Convert HTML to plain text with formatting markers
       // Process in order: first extract formatting markers, then structure
@@ -728,6 +792,21 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
     structuredContent.tables = [...structuredContent.tables, ...parseResult.tables]
   }
   
+  // Merge images from DOCX parsing if they exist
+  if ('images' in parseResult && parseResult.images && Array.isArray(parseResult.images) && parseResult.images.length > 0) {
+    console.log('Found images in parseResult:', parseResult.images.length)
+    structuredContent.images = parseResult.images.map((img, index) => ({
+      filename: img.filename || `image_${index + 1}.png`,
+      data: img.data,
+      type: img.type || 'image/png',
+      position: index
+    }))
+    console.log('Images added to structured content:', structuredContent.images.length)
+  } else {
+    // Ensure images array exists even if empty
+    structuredContent.images = []
+  }
+  
   // Ensure line breaks are preserved in the content
   if (structuredContent.sections && structuredContent.sections.length > 0) {
     structuredContent.sections = structuredContent.sections.map(section => ({
@@ -738,13 +817,15 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   
   console.log('Structured content created:', structuredContent)
   console.log('Total tables in structured content:', structuredContent.tables.length)
+  console.log('Total images in structured content:', structuredContent.images.length)
   
   // Add parsing metadata to track improvements
   structuredContent.metadata = {
     ...structuredContent.metadata,
     parseTimestamp,
     parserVersion: '4.0.0', // Updated for Mammoth.js integration
-    cacheBusting: true
+    cacheBusting: true,
+    totalImages: structuredContent.images.length
   }
   return structuredContent
 }

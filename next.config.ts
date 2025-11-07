@@ -38,11 +38,7 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: [
           ...securityHeaders,
-          // Performance headers
-          {
-            key: 'Link',
-            value: '</fonts/Graphik-Regular.woff2>; rel=preload; as=font; type=font/woff2; crossorigin=anonymous',
-          },
+          // Font preloading is handled automatically by next/font in layout.tsx
         ],
       },
     ];
@@ -71,8 +67,17 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     // Optimized device sizes - removed 3840 (rarely needed, increases bundle)
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
-    // Optimized image sizes for icons/thumbnails
+    // Optimized image sizes for icons/thumbnails/small images
+    // Small images (≤256px): 16, 32, 48, 64, 96, 128, 256
+    // Medium images: 384
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // Quality levels used throughout the app:
+    // 75 - default Next.js quality
+    // 85 - regular images (document content)
+    // 90 - logos and important images
+    // 95 - small images (icons, thumbnails)
+    // 100 - QR codes (maximum quality for readability)
+    qualities: [75, 85, 90, 95, 100],
     // 1 year cache TTL for better performance (images rarely change)
     minimumCacheTTL: 31536000,
     // Allow SVG with security
@@ -80,6 +85,11 @@ const nextConfig: NextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     // Remote patterns for external images (add domains as needed)
     remotePatterns: [],
+    // Small image optimization rules:
+    // - Small images (≤256px) use higher quality (95-100) since file size is negligible
+    // - QR codes and icons get priority loading and maximum quality
+    // - Small images skip blur placeholders (load too fast to be useful)
+    // - Exact sizes for small images to avoid unnecessary resizing
   },
   // Compiler optimizations
   compiler: {

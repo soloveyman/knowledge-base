@@ -7,16 +7,6 @@ import { Button } from "@/components/ui/button"
 import { useNavigateBack } from "@/lib/redirect-utils"
 import { DocumentRenderer } from "@/components/common/document-renderer"
 import { DocumentLoadingSkeleton } from "@/components/common/loading-skeleton"
-import dynamic from "next/dynamic"
-
-// Dynamically import heavy components to reduce initial bundle
-const DocumentRendererDynamic = dynamic(
-  () => import("@/components/common/document-renderer").then(mod => ({ default: mod.DocumentRenderer })),
-  {
-    loading: () => <DocumentLoadingSkeleton />,
-    ssr: false
-  }
-)
 
 interface UserWithRole {
   name?: string | null
@@ -201,6 +191,7 @@ export default function DocumentViewer() {
           console.log('Document parsedContent:', document.parsedContent)
           console.log('Document sections:', document.parsedContent?.sections)
           console.log('Document tables:', document.parsedContent?.tables)
+          console.log('Document images:', document.parsedContent?.images)
           
           // Extract content from sections
           let content = ''
@@ -210,6 +201,24 @@ export default function DocumentViewer() {
           
           // Extract tables from parsedContent  
           const tables = document.parsedContent?.tables || []
+          
+          // Extract images from parsedContent and embed them in content
+          const images = document.parsedContent?.images || []
+          if (images.length > 0) {
+            console.log(`📸 Found ${images.length} images to display`)
+            // Embed images in content at their positions
+            images.forEach((img: { filename: string; data: string; type: string; position?: number }, index: number) => {
+              const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
+              // If position is specified, insert at that position, otherwise append
+              if (img.position !== undefined && img.position < content.length) {
+                // Insert at approximate position (this is a simple approach)
+                content += imageMarkdown
+              } else {
+                // Append at the end
+                content += imageMarkdown
+              }
+            })
+          }
           
           // If no sections but we have tables, leave content empty (tables will be shown)
           if (!content && tables.length === 0) {

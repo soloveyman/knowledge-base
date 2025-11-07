@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { db, documents, assignments } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 
+// Route segment config for performance
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const revalidate = 0 // No caching for dynamic data
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -40,6 +45,11 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: { document: doc[0] }
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'X-Content-Type-Options': 'nosniff'
+      }
     })
   } catch (error) {
     console.error('Get document API error:', error)

@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import Image from 'next/image'
+import { getImageSizeCategory, getOptimizedImageProps, isLikelyQRCode, isLikelyIcon } from '@/lib/image-utils'
 
 interface DocumentRendererProps {
   content: string
@@ -168,7 +169,7 @@ function DocumentContent({ content }: { content: string }) {
             {children}
           </td>
         ),
-        img: ({ src, alt }) => {
+        img: ({ src, alt, width, height }) => {
           if (!src) return null
           
           // Convert src to string if it's a Blob
@@ -187,26 +188,54 @@ function DocumentContent({ content }: { content: string }) {
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
-          // For data URLs or external images, use unoptimized
-          // Otherwise Next.js Image will handle optimization
-          const isOptimized = !isDataUrl && !isExternal
+          // Determine image dimensions
+          // Try to extract from props, or use defaults based on image type
+          let imgWidth = typeof width === 'number' ? width : typeof width === 'string' ? parseInt(width) : 1200
+          let imgHeight = typeof height === 'number' ? height : typeof height === 'string' ? parseInt(height) : 800
+          
+          // For data URLs, try to detect dimensions from the image
+          // For now, use defaults but detect small images
+          const isSmallImage = imgWidth <= 256 || imgHeight <= 256
+          const isQRCode = isLikelyQRCode(imgWidth, imgHeight)
+          const isIcon = isLikelyIcon(imgWidth, imgHeight)
+          
+          // Get size category and optimized props
+          const category = getImageSizeCategory(imgWidth, imgHeight)
+          const optimizedProps = getOptimizedImageProps(category, {
+            width: imgWidth,
+            height: imgHeight,
+            src: srcString,
+            alt: alt || '',
+            isDataUrl,
+            isExternal,
+            priority: false, // Documents are lazy-loaded
+          })
+          
+          // Special handling for small images (icons, QR codes, thumbnails)
+          const containerClass = isSmallImage || isQRCode || isIcon
+            ? "my-3 relative inline-flex justify-center" // Inline for small images
+            : "my-6 relative w-full flex justify-center" // Full width for large images
+          
+          const imageClass = isSmallImage || isQRCode || isIcon
+            ? "rounded border border-border" // Simpler styling for small images
+            : "rounded-lg border border-border w-full h-auto" // Full styling for large images
           
           return (
-            <div className="my-6 relative w-full flex justify-center">
-              <div className="relative w-full max-w-4xl">
+            <div className={containerClass}>
+              <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
                 <Image
-                  src={srcString}
-                  alt={alt || ''}
-                  width={1200}
-                  height={800}
-                  className="rounded-lg border border-border w-full h-auto"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1200px"
-                  unoptimized={!isOptimized}
-                  loading="lazy"
-                  quality={85}
-                  {...(isOptimized && {
-                    placeholder: "blur" as const,
-                    blurDataURL: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+                  {...optimizedProps}
+                  className={imageClass}
+                  // Override for small images: higher quality, no blur
+                  {...(isSmallImage && {
+                    quality: 95,
+                    loading: 'eager' as const,
+                  })}
+                  // Special handling for QR codes
+                  {...(isQRCode && {
+                    quality: 100, // Maximum quality for QR codes (readability is critical)
+                    loading: 'eager' as const,
+                    priority: true, // QR codes should load immediately
                   })}
                 />
               </div>
@@ -531,10 +560,10 @@ function convertToMarkdown(content: string): string {
     return match
   })
   
-  // Добавляем эмодзи к спискам и убираем оригинальные буллеты
-  md = md.replace(/^(\s*[-•*·–—]|\s*\d+\.)\s+(.+)$/gm, (match, marker, text) => {
+  // Обрабатываем списки: разделяем нумерованные и маркированные
+  // Сначала обрабатываем маркированные списки (не трогаем нумерованные)
+  md = md.replace(/^(\s*)([-•*·–—])\s+(.+)$/gm, (match, indent, marker, text) => {
     const trimmedText = text.trim()
-    const indent = match.match(/^(\s*)/)?.[1] || ''
     
     // Проверяем, есть ли уже эмодзи в начале текста
     const hasEmoji = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓]/u.test(trimmedText)
@@ -545,23 +574,14 @@ function convertToMarkdown(content: string): string {
         // Если нашли эмодзи, заменяем оригинальный буллет на стандартный маркер с эмодзи
         return `${indent}- ${emoji} ${trimmedText}`
       }
-      // Если эмодзи нет, нормализуем маркер но оставляем стандартный формат
-      // Определяем тип маркера
-      const isNumbered = /^\d+\./.test(marker.trim())
-      if (isNumbered) {
-        // Нумерованный список - оставляем как есть (будут нормализованы позже)
-        return match
-      }
-      // Маркированный список - нормализуем на стандартный
-      return `${indent}- ${trimmedText}`
     }
-    // Если эмодзи уже есть, убираем оригинальный буллет и используем стандартный маркер
+    // Маркированный список - нормализуем на стандартный
     return `${indent}- ${trimmedText}`
   })
   
-  // Нормализуем нумерованные списки - просто преобразуем все в стандартный формат
-  // Не пытаемся проверять эмодзи в lookahead, так как это может вызвать проблемы
-  md = md.replace(/^(\s*)\d+\.\s+/gm, '$11. ')
+  // Нормализуем нумерованные списки - сохраняем оригинальную нумерацию
+  // Не заменяем числа, только нормализуем формат (убираем лишние пробелы)
+  md = md.replace(/^(\s*)(\d+)\.\s+/gm, '$1$2. ')
   
   return md
 }

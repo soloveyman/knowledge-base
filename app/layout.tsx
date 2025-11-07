@@ -31,7 +31,7 @@ const graphik = localFont({
   variable: "--font-graphik",
   fallback: ["system-ui", "arial"],
   display: "swap", // Improve FCP by showing fallback font immediately
-  preload: true, // Preload critical font
+  // preload is handled automatically by Next.js (only preloads first font file)
 });
 
 const graphikMono = localFont({
@@ -62,14 +62,7 @@ export default function RootLayout({
         {/* Preconnect to external domains for faster resource loading */}
         <link rel="preconnect" href="https://api.x.ai" />
         <link rel="dns-prefetch" href="https://api.x.ai" />
-        {/* Preload critical font */}
-        <link
-          rel="preload"
-          href="/fonts/Graphik-Regular.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
+        {/* Font preloading is handled automatically by next/font */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
