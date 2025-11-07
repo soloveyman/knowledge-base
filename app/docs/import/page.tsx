@@ -241,31 +241,41 @@ function DocImportPageInner() {
         console.log('ParsedContent sections:', file.parsedContent?.sections?.length || 0)
         console.log('ParsedContent tables:', file.parsedContent?.tables?.length || 0)
         
-        const response = await fetch('/api/documents', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title: file.name,
-            originalFileName: file.name,
-            fileType: file.type.split('/')[1],
-            fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
-            fileSize: file.size,
-            parsedContent: file.parsedContent || null,
-            parsingLog: file.parsingLog || null,
-            uploadedBy: session?.user?.id || 'unknown'
-          }),
-        })
+        try {
+          const response = await fetch('/api/documents', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              title: file.name,
+              originalFileName: file.name,
+              fileType: file.type.split('/')[1],
+              fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
+              fileSize: file.size,
+              parsedContent: file.parsedContent || null,
+              parsingLog: file.parsingLog || null,
+              uploadedBy: session?.user?.id || 'unknown'
+            }),
+          })
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error('Failed to save document:', file.name, errorData)
-          throw new Error(`Failed to save ${file.name}`)
-        } else {
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            console.error('Failed to save document:', file.name, errorData)
+            throw new Error(`Failed to save ${file.name}: ${errorData.message || response.statusText}`)
+          }
+          
           const result = await response.json()
+          if (!result.success) {
+            console.error('Document save returned success=false:', file.name, result)
+            throw new Error(`Failed to save ${file.name}: ${result.message || 'Unknown error'}`)
+          }
+          
           console.log('Document saved successfully:', file.name, result)
           return result
+        } catch (error) {
+          console.error('Error saving document:', file.name, error)
+          throw error
         }
       })
 
@@ -273,6 +283,9 @@ function DocImportPageInner() {
       await Promise.all(savePromises)
       
       console.log('All documents saved successfully, redirecting...')
+      
+      // Reset loading state before redirect
+      setIsUploading(false)
       
       // Add a small delay to ensure database transaction is committed
       // This prevents race condition where redirect happens before DB commit
@@ -284,7 +297,8 @@ function DocImportPageInner() {
         ? `${safeReturnTo}&_t=${Date.now()}`
         : `${safeReturnTo}?_t=${Date.now()}`
       
-      router.push(redirectUrl)
+      // Use replace instead of push to avoid back button issues
+      router.replace(redirectUrl)
     } catch (error) {
       console.error('Error saving documents:', error)
       setError('Failed to save some documents. Please try again.')
