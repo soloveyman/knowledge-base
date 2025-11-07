@@ -139,6 +139,7 @@ export default function SubscriptionManager({
         setUsage(data.usage)
         setIsStripeEnabled(data.isStripeEnabled)
         setPaymentHistory(data.paymentHistory)
+        console.log('[Subscription] Stripe configured:', data.isStripeEnabled)
       } else {
         console.error('Failed to load subscription data:', result.message)
         setPlans([])
