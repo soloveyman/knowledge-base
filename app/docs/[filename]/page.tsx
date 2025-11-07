@@ -38,7 +38,12 @@ interface ApiDocument {
   uploadedBy?: string
   fileSize?: number
   parsedContent?: {
-    sections?: Array<{ content: string }>
+    sections?: Array<{ 
+      title?: string
+      level?: number
+      content: string
+      order?: number
+    }>
     tables?: Array<{
       title: string
       headers: string[]
@@ -299,7 +304,7 @@ export default function DocumentViewer() {
                 const afterHeading = content.substring(startPos)
                 
                 // Find the next heading or end of section
-                const nextHeadingMatch = afterHeading.match(/^(.*?)(?=\n\n(?:###|##|\[BOLD\]|$))/s)
+                const nextHeadingMatch = afterHeading.match(/^([\s\S]*?)(?=\n\n(?:###|##|\[BOLD\]|$))/)
                 if (nextHeadingMatch) {
                   // Insert after the section content
                   insertPosition = startPos + nextHeadingMatch[1].length
