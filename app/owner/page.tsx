@@ -585,8 +585,24 @@ function OwnerPageInner() {
       toast.loading('Enhancing document with Grok API...', { id: 'enhance' })
       
       const response = await fetch(`/api/documents/${id}/enhance`, {
-        method: 'POST'
+        method: 'POST',
+        cache: 'no-store'
       })
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error')
+        let errorMessage = 'Failed to enhance document'
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.message || errorMessage
+        } catch {
+          errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`
+        }
+        console.error('Failed to enhance document:', errorMessage)
+        toast.error(errorMessage, { id: 'enhance' })
+        return
+      }
+      
       const result = await response.json()
       
       if (result.success) {
@@ -599,7 +615,8 @@ function OwnerPageInner() {
       }
     } catch (error) {
       console.error('Error enhancing document:', error)
-      toast.error('Error enhancing document', { id: 'enhance' })
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      toast.error(`Error enhancing document: ${errorMessage}`, { id: 'enhance' })
     } finally {
       setEnhancingDocId(null)
     }
