@@ -201,6 +201,47 @@ export default function DocumentReaderPage() {
         // Extract tables separately (for xlsx files)
         const tables = document.parsedContent?.tables || []
         
+        // Extract images from parsedContent and embed them in content
+        const images = document.parsedContent?.images || []
+        if (images.length > 0) {
+          console.log(`📸 Found ${images.length} images to display`)
+          
+          // Sort images by position (if available) to insert them in order
+          const sortedImages = [...images].sort((a, b) => {
+            const posA = a.position ?? Infinity
+            const posB = b.position ?? Infinity
+            return posA - posB
+          })
+          
+          // Insert images at their positions or append at the end
+          let contentWithImages = content
+          let offset = 0
+          
+          sortedImages.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
+            const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
+            
+            if (img.position !== undefined && img.position >= 0 && img.position < content.length) {
+              // Insert at the specified position
+              const insertPos = img.position + offset
+              contentWithImages = 
+                contentWithImages.slice(0, insertPos) + 
+                imageMarkdown + 
+                contentWithImages.slice(insertPos)
+              offset += imageMarkdown.length
+            } else {
+              // Append at the end
+              contentWithImages += imageMarkdown
+            }
+          })
+          
+          content = contentWithImages
+          
+          // Debug: Check if images are in content
+          const imageCount = (content.match(/!\[.*?\]\(data:image/gi) || []).length
+          console.log(`📸 Images in content string: ${imageCount}`)
+          console.log(`📸 Content includes image markdown: ${content.includes('![image')}`)
+        }
+        
         // Fallback if no content
         if (!content && tables.length === 0) {
           content = 'Document content will be displayed here...'

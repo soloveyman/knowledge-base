@@ -307,11 +307,12 @@ function OwnerPageInner() {
   // Load data from APIs - parallel fetching for faster loading
   const loadData = useCallback(async (preserveDocuments = false) => {
     try {
-      // Set loading states if we're refreshing
+      // Set loading states if we're refreshing (but don't show loading for docs to avoid flicker)
       if (preserveDocuments) {
-        setIsLoadingDocuments(true)
+        // Only show loading for tests and assignments, not documents
         setIsLoadingTests(true)
         setIsLoadingAssignments(true)
+        // Don't set isLoadingDocuments to true to avoid showing empty state
       }
 
       // Fetch all data in parallel for instant loading
@@ -435,10 +436,13 @@ function OwnerPageInner() {
           console.log('Owner: Transformed documents:', transformedDocs)
           setDocumentsWithLog(transformedDocs)
         } else {
-          console.log('Owner: No documents in API response, keeping existing documents if any')
-          // Don't clear documents if preserveDocuments is true
-          if (!preserveDocuments) {
+          console.log('Owner: No documents in API response')
+          // Only clear documents if preserveDocuments is false AND we're not on docs tab
+          // This prevents clearing documents when returning from import
+          if (!preserveDocuments && defaultTab !== 'docs') {
             setDocumentsWithLog([])
+          } else {
+            console.log('Owner: Keeping existing documents to avoid empty state flicker')
           }
         }
         
@@ -485,10 +489,11 @@ function OwnerPageInner() {
   // Only reload data when tab changes if data is missing or stale
   // This prevents unnecessary delays when switching tabs
   useEffect(() => {
-    // Skip reload if data already exists (instant render like overview/users tabs)
-    if (defaultTab === 'docs' && documents.length === 0) {
+    // Always reload docs tab when activated (especially after import)
+    // This ensures fresh data after returning from import page
+    if (defaultTab === 'docs') {
       console.log('Owner: Docs tab activated, loading documents...')
-      loadData(false)
+      loadData(true) // Use preserveDocuments=true to avoid flickering
     } else if (defaultTab === 'tests' && savedTests.length === 0) {
       console.log('Owner: Tests tab activated, loading tests...')
       loadData(false)

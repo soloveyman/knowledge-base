@@ -335,9 +335,15 @@ function ManagerPageInner() {
         
         // Sync localStorage with database to remove stale data
         syncLocalStorageWithDatabase(transformedDocs)
-      } else if (!preserveDocuments) {
-        // Only clear documents if we're not preserving them and the API call failed
-        setDocumentsWithLog([])
+      } else {
+        console.log('Manager: No documents in API response')
+        // Only clear documents if preserveDocuments is false AND we're not on docs tab
+        // This prevents clearing documents when returning from import
+        if (!preserveDocuments && defaultTab !== 'docs') {
+          setDocumentsWithLog([])
+        } else {
+          console.log('Manager: Keeping existing documents to avoid empty state flicker')
+        }
       }
 
       // Process tests (use document map instead of individual fetches)
@@ -409,9 +415,9 @@ function ManagerPageInner() {
   // This prevents unnecessary delays when switching tabs
   useEffect(() => {
     // Skip reload if data already exists (instant render like overview tab)
-    if (defaultTab === 'docs' && documents.length === 0) {
+    if (defaultTab === 'docs') {
       console.log('Manager: Docs tab activated, loading documents...')
-      loadData(false)
+      loadData(true) // Use preserveDocuments=true to avoid flickering
     } else if (defaultTab === 'tests' && savedTests.length === 0) {
       console.log('Manager: Tests tab activated, loading tests...')
       loadData(false)
@@ -441,9 +447,9 @@ function ManagerPageInner() {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         // Only reload if data is missing for the current tab
-        if (defaultTab === 'docs' && documents.length === 0) {
+        if (defaultTab === 'docs') {
           console.log('Manager: Page became visible, loading documents...')
-          loadData(false)
+          loadData(true) // Use preserveDocuments=true to avoid flickering
         } else if (defaultTab === 'tests' && savedTests.length === 0) {
           console.log('Manager: Page became visible, loading tests...')
           loadData(false)
@@ -456,9 +462,9 @@ function ManagerPageInner() {
 
     const handleFocus = () => {
       // Only reload if data is missing for the current tab
-      if (defaultTab === 'docs' && documents.length === 0) {
+      if (defaultTab === 'docs') {
         console.log('Manager: Window focused, loading documents...')
-        loadData(false)
+        loadData(true) // Use preserveDocuments=true to avoid flickering
       } else if (defaultTab === 'tests' && savedTests.length === 0) {
         console.log('Manager: Window focused, loading tests...')
         loadData(false)

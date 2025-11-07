@@ -63,6 +63,10 @@ function DocumentContent({ content }: { content: string }) {
   // Преобразуем форматирование в markdown
   const markdown = convertToMarkdown(content)
   
+  // Debug: Log markdown preview
+  console.log('📄 Markdown preview (first 500 chars):', markdown.substring(0, 500))
+  console.log('📄 Markdown contains image markdown:', /!\[.*?\]\(data:/gi.test(markdown))
+  
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -206,6 +210,14 @@ function DocumentContent({ content }: { content: string }) {
           </td>
         ),
         img: ({ src, alt, width, height }) => {
+          console.log('Image component called:', { 
+            hasSrc: !!src, 
+            srcType: typeof src, 
+            srcLength: typeof src === 'string' ? src.length : 0,
+            srcPreview: typeof src === 'string' ? src.substring(0, 50) : 'N/A',
+            alt 
+          })
+          
           if (!src) {
             console.log('Image component: No src provided')
             return null
@@ -604,12 +616,45 @@ function convertToMarkdown(content: string): string {
   let md = content
   
   // Preserve images before processing - extract and restore them
+  // Use a more robust approach that handles very long data URLs
   const imagePlaceholders: string[] = []
-  md = md.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+  
+  // Extract all images (both data URLs and regular URLs) in one pass
+  // Match: ![alt](src) - handle both data: URLs and regular URLs
+  // For data URLs, match everything until the closing parenthesis
+  // Use a more specific pattern for data URLs that handles very long base64 strings
+  const imagePattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
+  const images: Array<{ match: string; placeholder: string }> = []
+  
+  let match
+  while ((match = imagePattern.exec(md)) !== null) {
+    const fullMatch = match[0]
     const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
-    imagePlaceholders.push(match)
-    return placeholder
-  })
+    imagePlaceholders.push(fullMatch)
+    images.push({ match: fullMatch, placeholder })
+    console.log(`📸 Preserved image in markdown: ${fullMatch.substring(0, 100)}...`)
+  }
+  
+  // Also handle regular URLs (non-data URLs)
+  const regularImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
+  let regularMatch
+  while ((regularMatch = regularImagePattern.exec(md)) !== null) {
+    const fullMatch = regularMatch[0]
+    // Skip if already processed as data URL
+    if (!fullMatch.includes('data:')) {
+      const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
+      imagePlaceholders.push(fullMatch)
+      images.push({ match: fullMatch, placeholder })
+      console.log(`📸 Preserved regular image in markdown: ${fullMatch}`)
+    }
+  }
+  
+  // Replace images in reverse order to preserve positions
+  for (let i = images.length - 1; i >= 0; i--) {
+    md = md.replace(images[i].match, images[i].placeholder)
+  }
+  
+  console.log(`📸 Total images preserved: ${imagePlaceholders.length}`)
   
   // Remove empty formatting tags first (e.g., [BOLD][/BOLD] or [BOLD] [/BOLD])
   md = md.replace(/\[BOLD\]\s*\[\/BOLD\]/gi, '')
@@ -688,7 +733,12 @@ function convertToMarkdown(content: string): string {
   // Restore images
   imagePlaceholders.forEach((image, index) => {
     md = md.replace(`__IMAGE_PLACEHOLDER_${index}__`, image)
+    console.log(`📸 Restored image ${index + 1}/${imagePlaceholders.length}: ${image.substring(0, 100)}...`)
   })
+  
+  // Debug: Check if images are in final markdown
+  const imageCount = (md.match(/!\[.*?\]\(data:/gi) || []).length
+  console.log(`📸 Images in final markdown: ${imageCount}`)
   
   return md
 }
