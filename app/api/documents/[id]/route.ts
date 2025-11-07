@@ -3,6 +3,10 @@ import { db, documents, documentImages, assignments, users, tableExists } from '
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
+import type { InferSelectModel } from 'drizzle-orm'
+
+type Document = InferSelectModel<typeof documents>
+type DocumentWithoutBusinessId = Omit<Document, 'businessId'>
 
 export async function GET(
   request: Request,
@@ -24,7 +28,7 @@ export async function GET(
     const userRole = session.user.role
     const tenantId = session.user.businessId
     
-    let doc: typeof documents.$inferSelect[] = []
+    let doc: Document[] | DocumentWithoutBusinessId[] = []
     
     if (userRole === 'super-admin') {
       // Super-admin can see all documents
@@ -51,8 +55,23 @@ export async function GET(
             fullErrorText.includes('businessid') && fullErrorText.includes('does not exist') ||
             fullErrorText.includes('column') && fullErrorText.includes('business') && fullErrorText.includes('not exist')) {
           // Suppressing warning - fallback is working correctly
+          // Explicitly select only columns that exist (excluding business_id)
           const rows = await db
-            .select({ document: documents })
+            .select({
+              id: documents.id,
+              moduleId: documents.moduleId,
+              title: documents.title,
+              originalFileName: documents.originalFileName,
+              fileType: documents.fileType,
+              fileUrl: documents.fileUrl,
+              fileSize: documents.fileSize,
+              parsedContent: documents.parsedContent,
+              parsingLog: documents.parsingLog,
+              status: documents.status,
+              uploadedBy: documents.uploadedBy,
+              createdAt: documents.createdAt,
+              updatedAt: documents.updatedAt
+            })
             .from(documents)
             .innerJoin(users, eq(documents.uploadedBy, users.id))
             .where(and(
@@ -60,7 +79,7 @@ export async function GET(
               eq(users.businessId, tenantId)
             ))
             .limit(1)
-          doc = rows.map(r => r.document)
+          doc = rows
         } else {
           throw error
         }
@@ -149,7 +168,7 @@ export async function DELETE(
     console.log('DELETE request for document ID:', id, 'userRole:', userRole, 'tenantId:', tenantId)
 
     // Check if document exists with access control
-    let existingDocument: typeof documents.$inferSelect[] = []
+    let existingDocument: Document[] | DocumentWithoutBusinessId[] = []
     
     if (userRole === 'super-admin') {
       // Super-admin can delete all documents
@@ -176,8 +195,23 @@ export async function DELETE(
             fullErrorText.includes('businessid') && fullErrorText.includes('does not exist') ||
             fullErrorText.includes('column') && fullErrorText.includes('business') && fullErrorText.includes('not exist')) {
           // Suppressing warning - fallback is working correctly
+          // Explicitly select only columns that exist (excluding business_id)
           const rows = await db
-            .select({ document: documents })
+            .select({
+              id: documents.id,
+              moduleId: documents.moduleId,
+              title: documents.title,
+              originalFileName: documents.originalFileName,
+              fileType: documents.fileType,
+              fileUrl: documents.fileUrl,
+              fileSize: documents.fileSize,
+              parsedContent: documents.parsedContent,
+              parsingLog: documents.parsingLog,
+              status: documents.status,
+              uploadedBy: documents.uploadedBy,
+              createdAt: documents.createdAt,
+              updatedAt: documents.updatedAt
+            })
             .from(documents)
             .innerJoin(users, eq(documents.uploadedBy, users.id))
             .where(and(
@@ -185,7 +219,7 @@ export async function DELETE(
               eq(users.businessId, tenantId)
             ))
             .limit(1)
-          existingDocument = rows.map(r => r.document)
+          existingDocument = rows
         } else {
           throw error
         }

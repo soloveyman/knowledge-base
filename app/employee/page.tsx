@@ -5,7 +5,8 @@ import { db, assignments, assignmentUsers, testAttempts, users } from "@/lib/db"
 import { eq, and, desc, inArray } from "drizzle-orm"
 import { EmployeePageClient, type Assignment, TestAttempt } from "./employee-page-client"
 
-async function fetchEmployeeData() {
+// Split data fetching into separate async components for streaming SSR
+async function fetchUserInfo() {
   const session = await auth()
   
   if (!session?.user) {
@@ -16,18 +17,18 @@ async function fetchEmployeeData() {
     redirect("/")
   }
   
-  const userId = session.user.id
-  const tenantId = session.user.businessId
-  
+  return {
+    userId: session.user.id,
+    userName: session.user.name,
+    userEmail: session.user.email,
+    userImage: session.user.image,
+    tenantId: session.user.businessId
+  }
+}
+
+async function fetchAssignments(userId: string, tenantId: string | null): Promise<Assignment[]> {
   if (!tenantId) {
-    return {
-      assignments: [],
-      testAttempts: [],
-      userId,
-      userName: session.user.name,
-      userEmail: session.user.email,
-      userImage: session.user.image
-    }
+    return []
   }
   
   // Fetch all assignments for the tenant
@@ -47,12 +48,6 @@ async function fetchEmployeeData() {
       .from(assignmentUsers)
       .where(inArray(assignmentUsers.assignmentId, assignmentIds))
   }
-  
-  // Fetch test attempts for the user
-  const attemptsData = await db
-    .select()
-    .from(testAttempts)
-    .where(eq(testAttempts.userId, userId))
   
   // Fetch test scores for assignments
   const assignmentsWithUsers = await Promise.all(
@@ -106,7 +101,7 @@ async function fetchEmployeeData() {
   })
   
   // Transform assignments
-  const transformedAssignments: Assignment[] = userAssignments.map(a => ({
+  return userAssignments.map(a => ({
     id: a.id,
     title: a.title || undefined,
     description: a.description || undefined,
@@ -118,9 +113,15 @@ async function fetchEmployeeData() {
     status: a.status,
     users: (a as any).users || []
   }))
+}
+
+async function fetchTestAttempts(userId: string): Promise<TestAttempt[]> {
+  const attemptsData = await db
+    .select()
+    .from(testAttempts)
+    .where(eq(testAttempts.userId, userId))
   
-  // Transform test attempts
-  const transformedTestAttempts: TestAttempt[] = attemptsData.map(attempt => ({
+  return attemptsData.map(attempt => ({
     id: attempt.id,
     testId: attempt.testId,
     userId: attempt.userId,
@@ -128,15 +129,6 @@ async function fetchEmployeeData() {
     status: attempt.status || 'completed',
     completedAt: attempt.completedAt?.toISOString() || null
   }))
-  
-  return {
-    assignments: transformedAssignments,
-    testAttempts: transformedTestAttempts,
-    userId,
-    userName: session.user.name,
-    userEmail: session.user.email,
-    userImage: session.user.image
-  }
 }
 
 function EmployeePageSkeleton() {
@@ -156,17 +148,24 @@ function EmployeePageSkeleton() {
 }
 
 export default async function EmployeePage() {
-  const data = await fetchEmployeeData()
+  // Fetch user info first (fast, no streaming needed)
+  const userInfo = await fetchUserInfo()
+  
+  // Stream assignments and test attempts independently
+  const [assignments, testAttempts] = await Promise.all([
+    fetchAssignments(userInfo.userId, userInfo.tenantId),
+    fetchTestAttempts(userInfo.userId)
+  ])
   
   return (
     <Suspense fallback={<EmployeePageSkeleton />}>
       <EmployeePageClient
-        initialAssignments={data.assignments}
-        initialTestAttempts={data.testAttempts}
-        userId={data.userId}
-        userName={data.userName}
-        userEmail={data.userEmail}
-        userImage={data.userImage}
+        initialAssignments={assignments}
+        initialTestAttempts={testAttempts}
+        userId={userInfo.userId}
+        userName={userInfo.userName}
+        userEmail={userInfo.userEmail}
+        userImage={userInfo.userImage}
       />
     </Suspense>
   )
