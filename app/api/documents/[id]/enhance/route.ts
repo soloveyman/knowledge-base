@@ -4,6 +4,27 @@ import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
 
+// Remove base64 image data from text to reduce token usage
+function removeImageData(text: string): string {
+  if (!text) return text
+  
+  // Remove data:image URLs (base64 encoded images)
+  // Matches: data:image/[type];base64,[base64data]
+  let cleaned = text.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/gi, '[Image removed]')
+  
+  // Remove any remaining long base64-like strings (likely embedded images)
+  // Matches sequences of base64 characters that are longer than 100 characters
+  cleaned = cleaned.replace(/[A-Za-z0-9+/=]{100,}/g, (match) => {
+    // Check if it looks like base64 (has padding or is very long)
+    if (match.length > 500 || /={1,2}$/.test(match)) {
+      return '[Image data removed]'
+    }
+    return match
+  })
+  
+  return cleaned
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -47,21 +68,27 @@ export async function POST(
     }
 
     // Prepare content for Grok enhancement
-    const sectionsText = parsedContent.sections
-      ?.map((s, idx) => `${s.title || `Section ${idx + 1}`}\n${s.content}`)
-      .join('\n\n') || ''
+    // Remove image data from content to reduce token usage
+    const sectionsText = removeImageData(
+      parsedContent.sections
+        ?.map((s, idx) => `${s.title || `Section ${idx + 1}`}\n${s.content}`)
+        .join('\n\n') || ''
+    )
 
-    const tablesText = parsedContent.tables
-      ?.map(t => {
-        const tableText = `Table: ${t.title || 'Untitled'}\nHeaders: ${t.headers.join(' | ')}\n${t.rows.map(r => r.join(' | ')).join('\n')}`
-        return tableText
-      })
-      .join('\n\n') || ''
+    const tablesText = removeImageData(
+      parsedContent.tables
+        ?.map(t => {
+          const tableText = `Table: ${t.title || 'Untitled'}\nHeaders: ${t.headers.join(' | ')}\n${t.rows.map(r => r.join(' | ')).join('\n')}`
+          return tableText
+        })
+        .join('\n\n') || ''
+    )
 
     const fullText = [sectionsText, tablesText].filter(Boolean).join('\n\n---\n\n')
 
     // Call Grok API to enhance the parsed content
-    const models = ['grok-4', 'grok-beta', 'grok-2']
+    // Note: grok-beta was deprecated on 2025-09-15
+    const models = ['grok-4', 'grok-2']
     let grokResponse: Response | null = null
     let lastError: string | null = null
 

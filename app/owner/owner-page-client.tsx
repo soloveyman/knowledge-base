@@ -260,15 +260,14 @@ export function OwnerPageClient({
           if (assignmentsResult.success) {
             setSavedAssignments(assignmentsResult.data.assignments)
           }
+          // Don't clear assignments on error - preserve existing data
         } catch (error) {
           console.error('Error parsing assignments response:', error)
-          // If assignments API fails, just continue without assignments
-          setSavedAssignments([])
+          // Don't clear assignments on error - preserve existing data
         }
       } else {
         console.warn('Assignments API returned error:', assignmentsResponse.status)
-        // If assignments API fails, just continue without assignments
-        setSavedAssignments([])
+        // Don't clear assignments on error - preserve existing data
       }
 
       // Handle tests response - check if it's valid JSON
@@ -383,14 +382,11 @@ export function OwnerPageClient({
         if (typeof window !== 'undefined') {
           syncLocalStorageWithDatabase(transformedDocs)
         }
-      } else if (!preserveDocuments) {
-        setDocuments([])
       }
+      // Don't clear documents on error - preserve existing data
     } catch (error) {
       console.error('Error loading data:', error)
-      if (!preserveDocuments) {
-        setDocuments([])
-      }
+      // Don't clear data on error - preserve existing state
     } finally {
       setIsLoadingDocuments(false)
       setIsLoadingTests(false)

@@ -276,14 +276,11 @@ export function ManagerPageClient({
         }))
         setDocuments(transformedDocs)
         syncLocalStorageWithDatabase(transformedDocs)
-      } else if (!preserveDocuments) {
-        setDocuments([])
       }
+      // Don't clear documents on error - preserve existing data
     } catch (error) {
       console.error('Error loading data:', error)
-      if (!preserveDocuments) {
-        setDocuments([])
-      }
+      // Don't clear data on error - preserve existing state
     } finally {
       setIsLoadingDocuments(false)
       setIsLoadingTests(false)
