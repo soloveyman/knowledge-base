@@ -620,16 +620,13 @@ export default function SubscriptionManager({
               return (
               <div
                 key={plan.id}
-                className={`relative p-6 border rounded-3xl flex flex-col cursor-pointer transition-all shadow-none ${
-                  selectedPlan === plan.id
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/50 dark:border-blue-400'
-                    : plan.isPopular
+                className={`relative p-6 border rounded-3xl flex flex-col transition-all shadow-none ${
+                  plan.isPopular
                     ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 dark:border-purple-400'
                     : isOptimal
                     ? 'border-primary hover:border-primary/80'
-                    : 'border-border hover:border-blue-300 dark:hover:border-blue-700'
+                    : 'border-border hover:border-border'
                 }`}
-                onClick={() => handlePlanSelect(plan.id)}
               >
                 {/* Popular Badge at top center border - for Standard plan */}
                 {isStandard && (
@@ -706,22 +703,6 @@ export default function SubscriptionManager({
             })}
           </div>
 
-          {selectedPlan && selectedPlan !== currentSubscription?.plan?.id && (
-            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-3xl border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">{t('readyToUpgrade')}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {t('upgradeDescription')}
-                  </p>
-                </div>
-                <Button onClick={handleUpgrade} disabled={!isStripeEnabled}>
-                  <Crown className="h-4 w-4 mr-2" />
-                  {t('upgradeNow')}
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 

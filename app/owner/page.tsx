@@ -307,11 +307,17 @@ function OwnerPageInner() {
   // Load data from APIs - parallel fetching for faster loading
   const loadData = useCallback(async (preserveData = false) => {
     try {
-      // Set loading states if we're refreshing
+      // Set loading states if we're refreshing (but not when preserving data to avoid flicker)
       if (!preserveData) {
         setIsLoadingDocuments(true)
         setIsLoadingTests(true)
         setIsLoadingAssignments(true)
+      } else {
+        // When preserving data, ensure loading states are cleared at the start
+        // This prevents stuck loading states from previous operations
+        setIsLoadingDocuments(false)
+        setIsLoadingTests(false)
+        setIsLoadingAssignments(false)
       }
 
       // Fetch all data in parallel for instant loading
@@ -609,9 +615,8 @@ function OwnerPageInner() {
       if (result.success) {
         toast.success('Document enhanced successfully!', { id: 'enhance' })
         // Reload documents to show updated content - use preserveData=true to avoid flicker
+        // loadData's finally block will clear loading states
         await loadData(true)
-        // Ensure loading state is cleared after reload
-        setIsLoadingDocuments(false)
       } else {
         console.error('Failed to enhance document:', result.message)
         toast.error(result.message || 'Failed to enhance document', { id: 'enhance' })
@@ -620,7 +625,7 @@ function OwnerPageInner() {
       console.error('Error enhancing document:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast.error(`Error enhancing document: ${errorMessage}`, { id: 'enhance' })
-      // Ensure loading state is cleared on error
+      // Ensure loading state is cleared on error (loadData might not have been called)
       setIsLoadingDocuments(false)
     } finally {
       setEnhancingDocId(null)
