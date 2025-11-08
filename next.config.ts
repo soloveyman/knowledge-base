@@ -46,7 +46,7 @@ const nextConfig: NextConfig = {
   // Request size limits
   experimental: {
     serverActions: {
-      bodySizeLimit: '1mb',
+      bodySizeLimit: '10mb', // Increased for documents with images
     },
     optimizePackageImports: [
       'lucide-react', 

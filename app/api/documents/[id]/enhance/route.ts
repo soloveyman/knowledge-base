@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { db, documents } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, documents, usage } from '@/lib/db'
+import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
 
@@ -276,6 +276,44 @@ Preserve all original sections and tables, but improve their titles and content 
       })
       .where(eq(documents.id, documentId))
       .returning()
+
+    // Update usage counter for enhancements (only for owners)
+    if (session.user.role === 'owner') {
+      const now = new Date()
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      
+      // Check if usage record exists for current month
+      const existingUsage = await db
+        .select()
+        .from(usage)
+        .where(
+          and(
+            eq(usage.userId, session.user.id),
+            eq(usage.month, currentMonth)
+          )
+        )
+        .limit(1)
+
+      if (existingUsage.length > 0) {
+        // Update existing usage record
+        await db
+          .update(usage)
+          .set({
+            enhancementsCount: (existingUsage[0].enhancementsCount || 0) + 1,
+            updatedAt: new Date()
+          })
+          .where(eq(usage.id, existingUsage[0].id))
+      } else {
+        // Create new usage record
+        await db.insert(usage).values({
+          userId: session.user.id,
+          month: currentMonth,
+          importsCount: 0,
+          generationsCount: 0,
+          enhancementsCount: 1
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,

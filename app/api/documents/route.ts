@@ -97,14 +97,38 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
-    const body = await request.json()
+    // Parse request body with error handling for large payloads
+    let body
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error('Failed to parse request body:', error)
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Request body too large or invalid. Documents with many images may exceed size limits.' 
+      }, { status: 413 })
+    }
+    
     const { title, originalFileName, fileType, fileUrl, fileSize, parsedContent, parsingLog } = body
 
     console.log('POST /api/documents - Saving document:', title)
     console.log('ParsedContent exists:', !!parsedContent)
     console.log('ParsedContent sections:', parsedContent?.sections?.length || 0)
     console.log('ParsedContent tables:', parsedContent?.tables?.length || 0)
+    console.log('ParsedContent images:', parsedContent?.images?.length || 0)
+    if (parsedContent?.images && parsedContent.images.length > 0) {
+      const totalImageSize = parsedContent.images.reduce((sum: number, img: any) => {
+        return sum + (img.data?.length || 0)
+      }, 0)
+      console.log('Total images size (bytes):', totalImageSize)
+      console.log('Total images size (MB):', (totalImageSize / 1024 / 1024).toFixed(2))
+    }
     console.log('ParsedContent metadata:', parsedContent?.metadata)
+    
+    // Calculate request body size for debugging
+    const requestBodySize = JSON.stringify(body).length
+    console.log('Request body size (bytes):', requestBodySize)
+    console.log('Request body size (MB):', (requestBodySize / 1024 / 1024).toFixed(2))
 
     // Validate required fields
     if (!title) {
@@ -162,6 +186,7 @@ export async function POST(request: Request) {
     console.log('Saved parsedContent exists:', !!savedDocument.parsedContent)
     console.log('Saved parsedContent sections:', (savedDocument.parsedContent as any)?.sections?.length || 0)
     console.log('Saved parsedContent tables:', (savedDocument.parsedContent as any)?.tables?.length || 0)
+    console.log('Saved parsedContent images:', (savedDocument.parsedContent as any)?.images?.length || 0)
 
     // Update usage counter for imports (only for owners and only when creating new document)
     if (session.user.role === 'owner' && existingDocument.length === 0) {
