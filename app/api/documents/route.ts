@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, documents, users, usage } from '@/lib/db'
-import { desc, eq, and } from 'drizzle-orm'
+import { desc, eq, and, or } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 // Route segment config for performance
@@ -44,13 +44,22 @@ export async function GET() {
         }
       })
     }
+    // Get documents where the uploader's businessId matches, or where uploadedBy matches current user
+    // This ensures documents are returned even if the user doesn't exist or doesn't have a businessId
     const rows = await db
       .select({ document: documents, uploaderBusinessId: users.businessId })
       .from(documents)
       .leftJoin(users, eq(documents.uploadedBy, users.id))
-      .where(tenantId ? eq(users.businessId, tenantId) : undefined as unknown as never)
+      .where(
+        tenantId 
+          ? or(
+              eq(users.businessId, tenantId),
+              eq(documents.uploadedBy, session.user.id)
+            )
+          : eq(documents.uploadedBy, session.user.id)
+      )
       .orderBy(desc(documents.createdAt))
-    const allDocuments = rows.map(r => r.document)
+    const allDocuments = rows.map(r => r.document).filter(doc => doc !== null)
 
     return NextResponse.json({
       success: true,
