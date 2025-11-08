@@ -24,13 +24,16 @@ import dynamic from "next/dynamic"
 
 // Lazy load heavy tab components to reduce initial bundle size
 const TestsPage = dynamic(() => import("@/components/pages/tests-page").then(mod => ({ default: mod.TestsPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false // Disable SSR for better performance on client-side only components
 })
 const AssignmentsPage = dynamic(() => import("@/components/pages/assignments-page").then(mod => ({ default: mod.AssignmentsPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 const UserProgressReport = dynamic(() => import("@/components/reports/user-progress-report"), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 import { cleanupDocumentFromLocalStorage, syncLocalStorageWithDatabase, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
 
@@ -274,8 +277,10 @@ function ManagerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
-      // Always use cache: 'no-store' to ensure fresh data on reload
-      const fetchOptions: RequestInit = { cache: 'no-store' }
+      // Use stale-while-revalidate for better UX: serve stale data immediately, revalidate in background
+      const fetchOptions: RequestInit = { 
+        next: { revalidate: 30 } // Revalidate every 30 seconds
+      }
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
         fetch('/api/users', fetchOptions),
         fetch('/api/assignments', fetchOptions),
@@ -283,21 +288,26 @@ function ManagerPageInner() {
         fetch('/api/documents', fetchOptions)
       ])
 
+      // Parse JSON in parallel after fetches complete for better performance
+      const [usersResult, assignmentsResult, testsResult, documentsResult] = await Promise.all([
+        usersResponse.json(),
+        assignmentsResponse.json(),
+        testsResponse.json(),
+        documentsResponse.json()
+      ])
+
       // Process users
-      const usersResult = await usersResponse.json()
       if (usersResult.success) {
         setSavedUsers(usersResult.data.users)
       }
 
       // Process assignments
-      const assignmentsResult = await assignmentsResponse.json()
       if (assignmentsResult.success) {
         console.log('Manager: Loaded assignments from API:', assignmentsResult.data.assignments)
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
       // Process documents first (needed for test sourceDocument lookup)
-      const documentsResult = await documentsResponse.json()
       
       // Create document lookup map for fast access (avoids individual fetches per test)
       const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
@@ -359,7 +369,6 @@ function ManagerPageInner() {
         }
 
       // Process tests (use document map instead of individual fetches)
-      const testsResult = await testsResponse.json()
       if (testsResult.success) {
         // Transform tests to match the expected format (no async needed now)
         const transformedTests = (testsResult.data.tests as Array<{
@@ -434,7 +443,9 @@ function ManagerPageInner() {
     try {
       if (tab === 'docs') {
         setIsLoadingDocuments(!preserveData)
-        const response = await fetch('/api/documents', fetchOptions)
+        const response = await fetch('/api/documents', { 
+          next: { revalidate: 30 } 
+        })
         const result = await response.json()
         if (result.success && result.data.documents) {
           const transformedDocs = result.data.documents.map((doc: {
@@ -465,20 +476,24 @@ function ManagerPageInner() {
       } else if (tab === 'tests') {
         setIsLoadingTests(!preserveData)
         // Tests need documents for sourceDocument lookup
+        const fetchOpts = { next: { revalidate: 30 } }
         const [testsResponse, documentsResponse] = await Promise.all([
-          fetch('/api/tests', fetchOptions),
-          fetch('/api/documents', fetchOptions)
+          fetch('/api/tests', fetchOpts),
+          fetch('/api/documents', fetchOpts)
         ])
         
-        const documentsResult = await documentsResponse.json()
+        // Parse JSON in parallel
+        const [documentsResult, testsResult] = await Promise.all([
+          documentsResponse.json(),
+          testsResponse.json()
+        ])
+        
         const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
         if (documentsResult.success && documentsResult.data.documents) {
           documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
             documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
           })
         }
-        
-        const testsResult = await testsResponse.json()
         if (testsResult.success) {
           const transformedTests = (testsResult.data.tests as Array<{
             id: string
@@ -675,11 +690,27 @@ function ManagerPageInner() {
     const url = `/docs/${encodedId}`
     console.log('📄 Navigating to:', url)
     // Prefetch for instant navigation (non-blocking)
+    router.prefetch(url)
     startTransition(() => {
-      router.prefetch(url)
       router.push(url)
     })
   }
+
+  // Prefetch common routes on hover for better UX
+  const handleDocumentHover = useCallback((id: string) => {
+    const url = `/docs/${encodeURIComponent(String(id))}`
+    router.prefetch(url)
+  }, [router])
+
+  const handleTestHover = useCallback((id: string) => {
+    const url = `/test-builder?edit=${id}&returnTo=/manager?tab=tests`
+    router.prefetch(url)
+  }, [router])
+
+  const handleAssignmentHover = useCallback((id: string) => {
+    const url = `/assignment-builder?edit=${id}&returnTo=/manager?tab=assignments`
+    router.prefetch(url)
+  }, [router])
 
   const handleImportDocument = () => {
     router.push('/docs/import?returnTo=/manager?tab=docs')
@@ -723,7 +754,9 @@ function ManagerPageInner() {
     // Redirect to test builder with edit parameter and returnTo
     const url = `/test-builder?edit=${id}&returnTo=/manager?tab=tests`
     router.prefetch(url)
-    router.push(url)
+    startTransition(() => {
+      router.push(url)
+    })
   }
 
   // Assignment handlers
@@ -762,7 +795,11 @@ function ManagerPageInner() {
 
   const handleEditAssignment = (id: string) => {
     // Redirect to assignment builder with edit parameter
-    router.push(`/assignment-builder?edit=${id}`)
+    const url = `/assignment-builder?edit=${id}&returnTo=/manager?tab=assignments`
+    router.prefetch(url)
+    startTransition(() => {
+      router.push(url)
+    })
   }
 
   // Don't block UI while session loads - show page immediately
@@ -796,10 +833,30 @@ function ManagerPageInner() {
         <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
           <div className="tabs-scroll-container">
             <TabsList className="grid w-full min-w-max grid-cols-4">
-            <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
-            <TabsTrigger value="docs">{t('documents')}</TabsTrigger>
-            <TabsTrigger value="tests">{t('tests')}</TabsTrigger>
-            <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
+            <TabsTrigger 
+              value="overview"
+              onMouseEnter={() => router.prefetch('/manager?tab=overview')}
+            >
+              {t('overview')}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="docs"
+              onMouseEnter={() => router.prefetch('/manager?tab=docs')}
+            >
+              {t('documents')}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="tests"
+              onMouseEnter={() => router.prefetch('/manager?tab=tests')}
+            >
+              {t('tests')}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="assignments"
+              onMouseEnter={() => router.prefetch('/manager?tab=assignments')}
+            >
+              {t('assignments')}
+            </TabsTrigger>
           </TabsList>
           </div>
 
@@ -986,6 +1043,7 @@ function ManagerPageInner() {
                         key={doc.id}
                         className="flex items-center justify-between p-4 border border-border rounded-3xl hover:bg-accent cursor-pointer gap-3"
                         onClick={() => handleViewDocument(doc.id, doc.name)}
+                        onMouseEnter={() => handleDocumentHover(doc.id)}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">

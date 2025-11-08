@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth'
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const revalidate = 0 // No caching for dynamic data
+export const revalidate = 30 // Revalidate every 30 seconds (stale-while-revalidate)
 export const maxDuration = 60 // 60 seconds for document uploads with images
 
 export async function GET() {
@@ -78,7 +78,7 @@ export async function GET() {
       }
     }, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
         'X-Content-Type-Options': 'nosniff'
       }
     })

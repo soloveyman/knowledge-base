@@ -6,6 +6,11 @@ import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { strictRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
 
+// Route segment config for performance
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const revalidate = 30 // Revalidate every 30 seconds (stale-while-revalidate)
+
 export async function GET() {
   try {
     const session = await auth()
@@ -23,6 +28,11 @@ export async function GET() {
       success: true,
       data: {
         users: allUsers
+      }
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        'X-Content-Type-Options': 'nosniff'
       }
     })
   } catch (error) {

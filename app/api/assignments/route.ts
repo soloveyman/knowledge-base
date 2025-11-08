@@ -4,6 +4,11 @@ import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { InferSelectModel } from 'drizzle-orm'
 
+// Route segment config for performance
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const revalidate = 30 // Revalidate every 30 seconds (stale-while-revalidate)
+
 export async function GET() {
   try {
     const session = await auth()
@@ -75,6 +80,11 @@ export async function GET() {
       success: true,
       data: {
         assignments: assignmentsWithUsers
+      }
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        'X-Content-Type-Options': 'nosniff'
       }
     })
   } catch (error) {

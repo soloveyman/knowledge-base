@@ -27,19 +27,24 @@ import dynamic from "next/dynamic"
 
 // Lazy load heavy tab components to reduce initial bundle size
 const UsersPage = dynamic(() => import("@/components/pages/users-page").then(mod => ({ default: mod.UsersPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 const TestsPage = dynamic(() => import("@/components/pages/tests-page").then(mod => ({ default: mod.TestsPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 const AssignmentsPage = dynamic(() => import("@/components/pages/assignments-page").then(mod => ({ default: mod.AssignmentsPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 const UserProgressReport = dynamic(() => import("@/components/reports/user-progress-report"), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 const SubscriptionManager = dynamic(() => import("@/components/subscription/subscription-manager"), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  ssr: false
 })
 
 // Component to handle tabs overflow detection
@@ -321,35 +326,38 @@ function OwnerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
-      // Use cache: 'no-store' to force fresh data when switching tabs
-      const fetchOptions: RequestInit = preserveData ? { cache: 'no-store' } : {}
-      // Always use cache-busting for tests, assignments, and users to ensure deleted items don't appear
-      const testsFetchOptions: RequestInit = { cache: 'no-store' }
-      const assignmentsFetchOptions: RequestInit = { cache: 'no-store' }
-      const usersFetchOptions: RequestInit = { cache: 'no-store' }
+      // Use stale-while-revalidate for better UX: serve stale data immediately, revalidate in background
+      const fetchOptions: RequestInit = { 
+        next: { revalidate: 30 } // Revalidate every 30 seconds
+      }
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
-        fetch('/api/users', usersFetchOptions),
-        fetch('/api/assignments', assignmentsFetchOptions),
-        fetch('/api/tests', testsFetchOptions),
+        fetch('/api/users', fetchOptions),
+        fetch('/api/assignments', fetchOptions),
+        fetch('/api/tests', fetchOptions),
         fetch('/api/documents', fetchOptions)
       ])
 
+      // Parse JSON in parallel after fetches complete for better performance
+      const [usersResult, assignmentsResult, testsResult, documentsResult] = await Promise.all([
+        usersResponse.json(),
+        assignmentsResponse.json(),
+        testsResponse.json(),
+        documentsResponse.json()
+      ])
+
       // Process users
-      const usersResult = await usersResponse.json()
       if (usersResult.success) {
         // Exclude the signed-in owner from the Users tab to reflect team members only
         setSavedUsers((usersResult.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
       }
 
       // Process assignments
-      const assignmentsResult = await assignmentsResponse.json()
       if (assignmentsResult.success) {
         console.log('Owner: Loaded assignments from API:', assignmentsResult.data.assignments)
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
       // Process documents first (needed for test sourceDocument lookup)
-      const documentsResult = await documentsResponse.json()
       console.log('Owner: Loading documents, session user:', session?.user)
       console.log('Owner: Session businessId:', session?.user?.businessId)
       console.log('Owner: Documents API response:', documentsResult)
@@ -426,7 +434,6 @@ function OwnerPageInner() {
       }
 
       // Process tests (use document map instead of individual fetches)
-      const testsResult = await testsResponse.json()
       if (testsResult.success) {
         // Transform tests to match the expected format (no async needed now)
         const transformedTests = (testsResult.data.tests as Array<{
@@ -504,12 +511,12 @@ function OwnerPageInner() {
 
   // Tab-specific loading functions - only load what's needed for each tab
   const loadTabData = useCallback(async (tab: string, preserveData = false) => {
-    const fetchOptions: RequestInit = { cache: 'no-store' }
-    
     try {
       if (tab === 'docs') {
         setIsLoadingDocuments(!preserveData)
-        const response = await fetch('/api/documents', fetchOptions)
+        const response = await fetch('/api/documents', { 
+          next: { revalidate: 30 } 
+        })
         const result = await response.json()
         if (result.success && result.data.documents) {
           const transformedDocs = result.data.documents.map((doc: {
@@ -541,20 +548,24 @@ function OwnerPageInner() {
       } else if (tab === 'tests') {
         setIsLoadingTests(!preserveData)
         // Tests need documents for sourceDocument lookup
+        const fetchOpts = { next: { revalidate: 30 } }
         const [testsResponse, documentsResponse] = await Promise.all([
-          fetch('/api/tests', fetchOptions),
-          fetch('/api/documents', fetchOptions)
+          fetch('/api/tests', fetchOpts),
+          fetch('/api/documents', fetchOpts)
         ])
         
-        const documentsResult = await documentsResponse.json()
+        // Parse JSON in parallel
+        const [documentsResult, testsResult] = await Promise.all([
+          documentsResponse.json(),
+          testsResponse.json()
+        ])
+        
         const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
         if (documentsResult.success && documentsResult.data.documents) {
           documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
             documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
           })
         }
-        
-        const testsResult = await testsResponse.json()
         if (testsResult.success) {
           const transformedTests = (testsResult.data.tests as Array<{
             id: string
@@ -596,7 +607,9 @@ function OwnerPageInner() {
         // Assignments need all data for mapping
         await loadData(preserveData)
       } else if (tab === 'users') {
-        const response = await fetch('/api/users', fetchOptions)
+        const response = await fetch('/api/users', { 
+          next: { revalidate: 30 } 
+        })
         const result = await response.json()
         if (result.success) {
           setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
@@ -762,6 +775,12 @@ function OwnerPageInner() {
     router.push(url)
   }
 
+  // Prefetch common routes on hover for better UX
+  const handleDocumentHover = useCallback((id: string) => {
+    const url = `/docs/${encodeURIComponent(id)}`
+    router.prefetch(url)
+  }, [router])
+
   const handleImportDocument = () => {
     router.push('/docs/import?returnTo=/owner?tab=docs')
   }
@@ -805,6 +824,7 @@ function OwnerPageInner() {
     router.prefetch(url)
     router.push(url)
   }
+
 
   // Assignment handlers
   const handleDeleteAssignment = async (id: string) => {
@@ -952,12 +972,42 @@ function OwnerPageInner() {
         }} className="space-y-3 md:space-y-6">
           <TabsContainer>
             <TabsList className="w-full min-w-max grid grid-cols-3 sm:grid-cols-6">
-              <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
-              <TabsTrigger value="users">{t('users')}</TabsTrigger>
-              <TabsTrigger value="docs">{t('documents')}</TabsTrigger>
-              <TabsTrigger value="tests">{t('tests')}</TabsTrigger>
-              <TabsTrigger value="assignments">{t('assignments')}</TabsTrigger>
-              <TabsTrigger value="settings">{t('subscriptions')}</TabsTrigger>
+              <TabsTrigger 
+                value="overview"
+                onMouseEnter={() => router.prefetch('/owner?tab=overview')}
+              >
+                {t('overview')}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="users"
+                onMouseEnter={() => router.prefetch('/owner?tab=users')}
+              >
+                {t('users')}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="docs"
+                onMouseEnter={() => router.prefetch('/owner?tab=docs')}
+              >
+                {t('documents')}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="tests"
+                onMouseEnter={() => router.prefetch('/owner?tab=tests')}
+              >
+                {t('tests')}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="assignments"
+                onMouseEnter={() => router.prefetch('/owner?tab=assignments')}
+              >
+                {t('assignments')}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="settings"
+                onMouseEnter={() => router.prefetch('/owner?tab=settings')}
+              >
+                {t('subscriptions')}
+              </TabsTrigger>
             </TabsList>
           </TabsContainer>
 
@@ -1119,6 +1169,7 @@ function OwnerPageInner() {
                         key={doc.id}
                         className="flex items-center justify-between p-4 border border-border rounded-3xl hover:bg-accent cursor-pointer gap-3"
                         onClick={() => handleViewDocument(doc.id, doc.name)}
+                        onMouseEnter={() => handleDocumentHover(doc.id)}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">

@@ -1000,7 +1000,8 @@ export default function TestBuilderPage() {
                       onChange={(e) => {
                         const value = e.target.value
                         if (value === '') {
-                          setValue('count', undefined)
+                          // Don't update when empty - validation will catch it
+                          return
                         } else {
                           const numValue = Number(value)
                           if (!isNaN(numValue) && numValue >= 1 && numValue <= 15) {

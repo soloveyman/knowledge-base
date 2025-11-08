@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth'
 // Route segment config
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const revalidate = 30 // Revalidate every 30 seconds (stale-while-revalidate)
 export const maxDuration = 60 // 60 seconds for test creation with many questions
 
 export async function GET() {
@@ -118,6 +119,11 @@ export async function GET() {
         success: true,
         data: {
           tests: allTests
+        }
+      }, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+          'X-Content-Type-Options': 'nosniff'
         }
       })
     } catch (selectError: unknown) {
@@ -235,6 +241,11 @@ export async function GET() {
           success: true,
           data: {
             tests: testsWithDefaults
+          }
+        }, {
+          headers: {
+            'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+            'X-Content-Type-Options': 'nosniff'
           }
         })
       }
