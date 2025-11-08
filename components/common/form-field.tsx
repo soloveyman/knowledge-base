@@ -33,9 +33,12 @@ export function FormField({
   // Helper to find and clone input element recursively
   const cloneWithProps = (element: React.ReactElement): React.ReactElement => {
     // If this is an input-like element, clone it with props
+    const props = element.props
+    const propsIsObject = props && typeof props === 'object' && !Array.isArray(props) && props !== null
+    const hasDataSlot = propsIsObject && 'data-slot' in props && (props as Record<string, unknown>)['data-slot'] === 'input'
     if (element.type === 'input' || 
         (typeof element.type === 'function' && element.type.name === 'Input') ||
-        (element.props && 'data-slot' in element.props && element.props['data-slot'] === 'input')) {
+        hasDataSlot) {
       const childProps = (element?.props || {}) as { className?: string } & Record<string, unknown>
       return React.cloneElement(element, {
         id,
@@ -53,8 +56,10 @@ export function FormField({
     }
     
     // If element has children, recursively process them
-    if (element.props && element.props.children) {
-      const children = React.Children.map(element.props.children, (child) => {
+    const elementProps = element.props
+    const elementPropsIsObject = elementProps && typeof elementProps === 'object' && !Array.isArray(elementProps) && elementProps !== null
+    if (elementPropsIsObject && 'children' in elementProps) {
+      const children = React.Children.map((elementProps as { children?: React.ReactNode }).children, (child) => {
         if (React.isValidElement(child)) {
           return cloneWithProps(child)
         }
@@ -69,14 +74,21 @@ export function FormField({
   // Handle fragments and multiple children
   const isFragment = React.isValidElement(children) && children.type === React.Fragment
   const childWithProps = isFragment 
-    ? React.cloneElement(children, {}, 
-        React.Children.map(children.props.children, (child) => {
-          if (React.isValidElement(child)) {
-            return cloneWithProps(child)
-          }
-          return child
-        })
-      )
+    ? (() => {
+        const fragmentProps = children.props
+        const fragmentPropsIsObject = fragmentProps && typeof fragmentProps === 'object' && !Array.isArray(fragmentProps) && fragmentProps !== null
+        const fragmentChildren = fragmentPropsIsObject && 'children' in fragmentProps 
+          ? (fragmentProps as { children?: React.ReactNode }).children 
+          : undefined
+        return React.cloneElement(children, {}, 
+          React.Children.map(fragmentChildren, (child) => {
+            if (React.isValidElement(child)) {
+              return cloneWithProps(child)
+            }
+            return child
+          })
+        )
+      })()
     : React.isValidElement(children) 
       ? cloneWithProps(children)
       : children

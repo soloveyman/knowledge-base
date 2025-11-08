@@ -10,6 +10,7 @@ declare module "next-auth" {
       role: UserRole
       businessId: string
       businessName: string
+      emailVerified: boolean
     }
   }
 
@@ -21,6 +22,7 @@ declare module "next-auth" {
     role: UserRole
     businessId: string
     businessName: string
+    emailVerified: boolean
   }
 }
 
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     role: UserRole
     businessId: string
     businessName: string
+    emailVerified: boolean
   }
 }
 

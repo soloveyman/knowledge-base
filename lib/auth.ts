@@ -71,7 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null
           }
 
-          const dbUser = dbUsers[0] as { id: string; email: string; name: string | null; role: UserRole | null; password: string | null; businessId?: string | null }
+          const dbUser = dbUsers[0] as { id: string; email: string; name: string | null; role: UserRole | null; password: string | null; businessId?: string | null; emailVerified: Date | null }
           
           // Check if user has a password (some users might not have one if created via OAuth)
           if (!dbUser.password) {
@@ -161,12 +161,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (user) {
           // Ensure token.sub is always the DB user id (important for OAuth providers)
           // so session.user.id matches our users.id UUID everywhere
-          const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string }
+          const u = user as { id?: string; role?: UserRole; businessId?: string; businessName?: string; emailVerified?: boolean }
           token.sub = u.id ?? token.sub
           token.role = ((u.role as string | undefined)?.toLowerCase() as UserRole) ?? (token.role as UserRole)
           token.businessId = u.businessId ?? token.businessId
           token.businessName = u.businessName ?? token.businessName
-          token.emailVerified = (u as { emailVerified?: boolean }).emailVerified ?? false
+          token.emailVerified = u.emailVerified ?? false
         } else {
           // Fallback: if role/businessId/businessName missing, hydrate from DB
           if ((!token.role || !token.businessId || !token.businessName) && token.sub) {
@@ -197,7 +197,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.role = (token.role as UserRole) ?? 'employee'
           session.user.businessId = token.businessId ?? token.sub
           session.user.businessName = token.businessName ?? 'Knowledge Base'
-          session.user.emailVerified = (token.emailVerified as boolean) ?? false
+          ;(session.user as { emailVerified: boolean }).emailVerified = Boolean(token.emailVerified ?? false)
         }
         return session
       } catch (error) {
