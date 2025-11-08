@@ -91,8 +91,13 @@ export default function SuperAdminPage() {
     }
 
     if (status === 'authenticated' && session?.user?.role === 'super-admin') {
-      loadOwnersData();
-      loadPlans();
+      // Load both in parallel for faster initial load
+      Promise.all([
+        loadOwnersData(),
+        loadPlans()
+      ]).catch(error => {
+        console.error('Error loading super-admin data:', error);
+      });
     }
   }, [session, status, router]);
 
@@ -103,7 +108,7 @@ export default function SuperAdminPage() {
 
   const loadPlans = async () => {
     try {
-      const response = await fetch('/api/subscription');
+      const response = await fetch('/api/subscription', { cache: 'no-store' });
       const result = await response.json();
       
       if (result.success && result.data.plans) {
@@ -127,7 +132,7 @@ export default function SuperAdminPage() {
   const loadOwnersData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/super-admin/subscriptions');
+      const response = await fetch('/api/super-admin/subscriptions', { cache: 'no-store' });
       const result = await response.json();
       
       if (result.success) {

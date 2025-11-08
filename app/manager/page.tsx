@@ -19,10 +19,19 @@ import {
   Sparkles,
   Loader2
 } from "lucide-react"
-import { TestsPage } from "@/components/pages/tests-page"
-import { AssignmentsPage } from "@/components/pages/assignments-page"
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
-import UserProgressReport from "@/components/reports/user-progress-report"
+import dynamic from "next/dynamic"
+
+// Lazy load heavy tab components to reduce initial bundle size
+const TestsPage = dynamic(() => import("@/components/pages/tests-page").then(mod => ({ default: mod.TestsPage })), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
+const AssignmentsPage = dynamic(() => import("@/components/pages/assignments-page").then(mod => ({ default: mod.AssignmentsPage })), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
+const UserProgressReport = dynamic(() => import("@/components/reports/user-progress-report"), {
+  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>
+})
 import { cleanupDocumentFromLocalStorage, syncLocalStorageWithDatabase, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
 
 const formatFileSize = (bytes: number): string => {
@@ -418,23 +427,124 @@ function ManagerPageInner() {
     fetchData()
   }, [loadData])
 
+  // Tab-specific loading functions - only load what's needed for each tab
+  const loadTabData = useCallback(async (tab: string, preserveData = false) => {
+    const fetchOptions: RequestInit = { cache: 'no-store' }
+    
+    try {
+      if (tab === 'docs') {
+        setIsLoadingDocuments(!preserveData)
+        const response = await fetch('/api/documents', fetchOptions)
+        const result = await response.json()
+        if (result.success && result.data.documents) {
+          const transformedDocs = result.data.documents.map((doc: {
+            id: string
+            originalFileName?: string
+            title: string
+            fileType?: string
+            createdAt: string
+            updatedAt?: string
+            fileSize?: number
+            status?: string
+            parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+          }) => ({
+            id: doc.id,
+            name: doc.originalFileName || doc.title,
+            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+            uploadedAt: formatDateShort(doc.createdAt),
+            size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+            status: doc.status || 'ready',
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+            parsedContent: doc.parsedContent || null
+          }))
+          setDocumentsWithLog(transformedDocs)
+          syncLocalStorageWithDatabase(transformedDocs)
+        }
+        setIsLoadingDocuments(false)
+      } else if (tab === 'tests') {
+        setIsLoadingTests(!preserveData)
+        // Tests need documents for sourceDocument lookup
+        const [testsResponse, documentsResponse] = await Promise.all([
+          fetch('/api/tests', fetchOptions),
+          fetch('/api/documents', fetchOptions)
+        ])
+        
+        const documentsResult = await documentsResponse.json()
+        const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+        if (documentsResult.success && documentsResult.data.documents) {
+          documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+            documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+          })
+        }
+        
+        const testsResult = await testsResponse.json()
+        if (testsResult.success) {
+          const transformedTests = (testsResult.data.tests as Array<{
+            id: string
+            title: string
+            type?: string | null
+            difficulty?: string | null
+            locale?: string | null
+            questionIds?: string[] | null
+            moduleId?: string | null
+            createdAt: string
+            createdBy: string
+          }>).map((test) => {
+            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+            let sourceDocument = 'Unknown'
+            if (test.moduleId) {
+              const doc = documentMap.get(test.moduleId)
+              if (doc) {
+                sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+              }
+            }
+            return {
+              id: test.id,
+              title: test.title,
+              type: test.type || 'mcq',
+              difficulty: test.difficulty || 'medium',
+              locale: test.locale || 'en',
+              questionCount,
+              questions: [],
+              sourceDocument,
+              createdAt: test.createdAt,
+              createdBy: test.createdBy
+            }
+          })
+          setSavedTestsWithLog(transformedTests)
+        }
+        setIsLoadingTests(false)
+      } else if (tab === 'assignments') {
+        setIsLoadingAssignments(!preserveData)
+        // Assignments need all data for mapping
+        await loadData(preserveData)
+      } else if (tab === 'overview') {
+        // Overview needs all data
+        await loadData(preserveData)
+      }
+    } catch (error) {
+      console.error(`Error loading ${tab} tab data:`, error)
+    }
+  }, [loadData])
+
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
     if (defaultTab === 'docs') {
       console.log('Manager: Docs tab activated, loading documents...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('docs', true)
     } else if (defaultTab === 'tests') {
       console.log('Manager: Tests tab activated, loading tests...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('tests', true)
     } else if (defaultTab === 'assignments') {
       console.log('Manager: Assignments tab activated, loading assignments...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('assignments', true)
     } else if (defaultTab === 'overview') {
       console.log('Manager: Overview tab activated, loading data...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('overview', true)
     }
-  }, [defaultTab, loadData])
+  }, [defaultTab, loadTabData])
 
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
@@ -443,53 +553,25 @@ function ManagerPageInner() {
     
     // If we have a timestamp parameter, it means we're returning from a create/edit page
     // Force reload the appropriate tab to show newly saved/updated data
-    if (hasTimestamp) {
-      if (tab === 'docs') {
-        console.log('Manager: Detected return from import, reloading documents...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'tests') {
-        console.log('Manager: Detected return from test-builder, reloading tests...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'assignments') {
-        console.log('Manager: Detected return from assignment-builder, reloading assignments...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'overview') {
-        console.log('Manager: Detected return to overview, reloading data...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      }
+    if (hasTimestamp && tab) {
+      console.log(`Manager: Detected return from edit/create, reloading ${tab} tab...`)
+      loadTabData(tab, true) // Use preserveData=true to avoid flickering
     }
-  }, [searchParams, loadData])
+  }, [searchParams, loadTabData])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer)
-  // Only reload if data is missing to avoid unnecessary delays
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Reload data for the current tab when page becomes visible
-        if (defaultTab === 'docs') {
-          console.log('Manager: Page became visible, loading documents...')
-          loadData(true) // Use preserveData=true to avoid flickering
-        } else if (defaultTab === 'tests') {
-          console.log('Manager: Page became visible, loading tests...')
-          loadData(true) // Use preserveData=true to avoid flickering
-        } else if (defaultTab === 'assignments') {
-          console.log('Manager: Page became visible, loading assignments...')
-          loadData(true) // Use preserveData=true to avoid flickering
-        }
+      if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
+        console.log(`Manager: Page became visible, reloading ${defaultTab} tab...`)
+        loadTabData(defaultTab, true)
       }
     }
 
     const handleFocus = () => {
-      // Reload data for the current tab when window is focused
-      if (defaultTab === 'docs') {
-        console.log('Manager: Window focused, loading documents...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (defaultTab === 'tests') {
-        console.log('Manager: Window focused, loading tests...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (defaultTab === 'assignments') {
-        console.log('Manager: Window focused, loading assignments...')
-        loadData(true) // Use preserveData=true to avoid flickering
+      if (defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
+        console.log(`Manager: Window focused, reloading ${defaultTab} tab...`)
+        loadTabData(defaultTab, true)
       }
     }
 
@@ -500,7 +582,7 @@ function ManagerPageInner() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [defaultTab, loadData])
+  }, [defaultTab, loadTabData])
 
 
   // Document handlers with optimistic updates

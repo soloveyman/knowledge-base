@@ -348,68 +348,28 @@ function OwnerPageInner() {
         setSavedAssignmentsWithLog(assignmentsResult.data.assignments)
       }
 
-      // Process tests
-      const testsResult = await testsResponse.json()
-      if (testsResult.success) {
-        // Transform tests to match the expected format
-        const transformedTests = await Promise.all(
-          (testsResult.data.tests as Array<{
-            id: string
-            title: string
-            type?: string | null
-            difficulty?: string | null
-            locale?: string | null
-            questionIds?: string[] | null
-            moduleId?: string | null
-            createdAt: string
-            createdBy: string
-          }>).map(async (test) => {
-            // Calculate questionCount from questionIds
-            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
-            
-            // Fetch document to get sourceDocument name
-            let sourceDocument = 'Unknown'
-            if (test.moduleId) {
-              try {
-                const docResponse = await fetch(`/api/documents/${test.moduleId}`, { cache: 'no-store' })
-                const docResult = await docResponse.json()
-                if (docResult.success && docResult.data.document) {
-                  sourceDocument = docResult.data.document.originalFileName || docResult.data.document.title || 'Unknown'
-                }
-              } catch (error) {
-                console.error('Error fetching document for test:', error)
-              }
-            }
-            
-            return {
-              id: test.id,
-              title: test.title,
-              type: test.type || 'mcq',
-              difficulty: test.difficulty || 'medium',
-              locale: test.locale || 'en',
-              questionCount,
-              questions: [], // Not needed for the card display
-              sourceDocument,
-              createdAt: test.createdAt,
-              createdBy: test.createdBy
-            }
-          })
-        )
-        setSavedTestsWithLog(transformedTests)
-      }
-
-      // Process documents (already fetched in parallel above)
+      // Process documents first (needed for test sourceDocument lookup)
+      const documentsResult = await documentsResponse.json()
       console.log('Owner: Loading documents, session user:', session?.user)
       console.log('Owner: Session businessId:', session?.user?.businessId)
-      const documentsResult = await documentsResponse.json()
       console.log('Owner: Documents API response:', documentsResult)
-      if (documentsResult.success) {
+      
+      // Create document lookup map for fast access (avoids individual fetches per test)
+      const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+      if (documentsResult.success && documentsResult.data.documents) {
+        documentsResult.data.documents.forEach((doc: {
+          id: string
+          originalFileName?: string
+          title: string
+        }) => {
+          documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+        })
+        
+        // Transform database documents to match the expected format
         console.log('Owner: Raw documents from API:', documentsResult.data.documents)
         console.log('Owner: Number of documents:', documentsResult.data.documents?.length || 0)
         
-        // Check if documents array exists and has items
         if (documentsResult.data.documents && Array.isArray(documentsResult.data.documents) && documentsResult.data.documents.length > 0) {
-          // Transform database documents to match the expected format
           const transformedDocs = documentsResult.data.documents.map((doc: {
             id: string
             originalFileName?: string
@@ -454,9 +414,6 @@ function OwnerPageInner() {
             })
           }
         }
-        
-        // Note: syncLocalStorageWithDatabase is manager-specific, so we handle it via setDocumentsWithLog
-        // which always saves to owner-documents localStorage key
       } else {
         console.error('Owner: Documents API failed:', documentsResult.message || documentsResult.error)
         // NEVER clear documents if preserveData is true - this prevents empty state flicker
@@ -466,6 +423,49 @@ function OwnerPageInner() {
         } else {
           console.log('Owner: Keeping existing documents after API error to avoid empty state flicker')
         }
+      }
+
+      // Process tests (use document map instead of individual fetches)
+      const testsResult = await testsResponse.json()
+      if (testsResult.success) {
+        // Transform tests to match the expected format (no async needed now)
+        const transformedTests = (testsResult.data.tests as Array<{
+          id: string
+          title: string
+          type?: string | null
+          difficulty?: string | null
+          locale?: string | null
+          questionIds?: string[] | null
+          moduleId?: string | null
+          createdAt: string
+          createdBy: string
+        }>).map((test) => {
+          // Calculate questionCount from questionIds
+          const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+          
+          // Get sourceDocument from map (much faster than individual fetch)
+          let sourceDocument = 'Unknown'
+          if (test.moduleId) {
+            const doc = documentMap.get(test.moduleId)
+            if (doc) {
+              sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+            }
+          }
+          
+          return {
+            id: test.id,
+            title: test.title,
+            type: test.type || 'mcq',
+            difficulty: test.difficulty || 'medium',
+            locale: test.locale || 'en',
+            questionCount,
+            questions: [], // Not needed for the card display
+            sourceDocument,
+            createdAt: test.createdAt,
+            createdBy: test.createdBy
+          }
+        })
+        setSavedTestsWithLog(transformedTests)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -502,26 +502,134 @@ function OwnerPageInner() {
     return () => clearTimeout(timeoutId)
   }, [loadData, status, session])
 
+  // Tab-specific loading functions - only load what's needed for each tab
+  const loadTabData = useCallback(async (tab: string, preserveData = false) => {
+    const fetchOptions: RequestInit = { cache: 'no-store' }
+    
+    try {
+      if (tab === 'docs') {
+        setIsLoadingDocuments(!preserveData)
+        const response = await fetch('/api/documents', fetchOptions)
+        const result = await response.json()
+        if (result.success && result.data.documents) {
+          const transformedDocs = result.data.documents.map((doc: {
+            id: string
+            originalFileName?: string
+            title: string
+            fileType?: string
+            createdAt: string
+            updatedAt?: string
+            fileSize?: number
+            status?: string
+            moduleId?: string | null
+            parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+          }) => ({
+            id: doc.id,
+            name: doc.originalFileName || doc.title,
+            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+            uploadedAt: formatDateShort(doc.createdAt),
+            size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+            status: doc.status || 'ready',
+            moduleId: doc.moduleId || null,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+            parsedContent: doc.parsedContent || null
+          }))
+          setDocumentsWithLog(transformedDocs)
+        }
+        setIsLoadingDocuments(false)
+      } else if (tab === 'tests') {
+        setIsLoadingTests(!preserveData)
+        // Tests need documents for sourceDocument lookup
+        const [testsResponse, documentsResponse] = await Promise.all([
+          fetch('/api/tests', fetchOptions),
+          fetch('/api/documents', fetchOptions)
+        ])
+        
+        const documentsResult = await documentsResponse.json()
+        const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+        if (documentsResult.success && documentsResult.data.documents) {
+          documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+            documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+          })
+        }
+        
+        const testsResult = await testsResponse.json()
+        if (testsResult.success) {
+          const transformedTests = (testsResult.data.tests as Array<{
+            id: string
+            title: string
+            type?: string | null
+            difficulty?: string | null
+            locale?: string | null
+            questionIds?: string[] | null
+            moduleId?: string | null
+            createdAt: string
+            createdBy: string
+          }>).map((test) => {
+            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+            let sourceDocument = 'Unknown'
+            if (test.moduleId) {
+              const doc = documentMap.get(test.moduleId)
+              if (doc) {
+                sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+              }
+            }
+            return {
+              id: test.id,
+              title: test.title,
+              type: test.type || 'mcq',
+              difficulty: test.difficulty || 'medium',
+              locale: test.locale || 'en',
+              questionCount,
+              questions: [],
+              sourceDocument,
+              createdAt: test.createdAt,
+              createdBy: test.createdBy
+            }
+          })
+          setSavedTestsWithLog(transformedTests)
+        }
+        setIsLoadingTests(false)
+      } else if (tab === 'assignments') {
+        setIsLoadingAssignments(!preserveData)
+        // Assignments need all data for mapping
+        await loadData(preserveData)
+      } else if (tab === 'users') {
+        const response = await fetch('/api/users', fetchOptions)
+        const result = await response.json()
+        if (result.success) {
+          setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
+        }
+      } else if (tab === 'overview') {
+        // Overview needs all data
+        await loadData(preserveData)
+      }
+    } catch (error) {
+      console.error(`Error loading ${tab} tab data:`, error)
+    }
+  }, [loadData, session?.user?.id])
+
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
     if (defaultTab === 'docs') {
       console.log('Owner: Docs tab activated, loading documents...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('docs', true)
     } else if (defaultTab === 'tests') {
       console.log('Owner: Tests tab activated, loading tests...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('tests', true)
     } else if (defaultTab === 'assignments') {
       console.log('Owner: Assignments tab activated, loading assignments...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('assignments', true)
     } else if (defaultTab === 'overview') {
       console.log('Owner: Overview tab activated, loading data...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('overview', true)
     } else if (defaultTab === 'users') {
       console.log('Owner: Users tab activated, loading users...')
-      loadData(true) // Use preserveData=true to avoid flickering
+      loadTabData('users', true)
     }
-  }, [defaultTab, loadData])
+  }, [defaultTab, loadTabData])
 
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
@@ -530,25 +638,11 @@ function OwnerPageInner() {
     
     // If we have a timestamp parameter, it means we're returning from a create/edit page
     // Force reload the appropriate tab to show newly saved/updated data
-    if (hasTimestamp) {
-      if (tab === 'docs') {
-        console.log('Owner: Detected return from import, reloading documents...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'tests') {
-        console.log('Owner: Detected return from test-builder, reloading tests...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'assignments') {
-        console.log('Owner: Detected return from assignment-builder, reloading assignments...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'users') {
-        console.log('Owner: Detected return from user-builder, reloading users...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      } else if (tab === 'overview') {
-        console.log('Owner: Detected return to overview, reloading data...')
-        loadData(true) // Use preserveData=true to avoid flickering
-      }
+    if (hasTimestamp && tab) {
+      console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
+      loadTabData(tab, true) // Use preserveData=true to avoid flickering
     }
-  }, [searchParams, loadData])
+  }, [searchParams, loadTabData])
 
   // Reload data when tab changes to settings
   useEffect(() => {
@@ -561,16 +655,16 @@ function OwnerPageInner() {
   // Reload data when page becomes visible (e.g., when returning from document viewer)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments' || defaultTab === 'overview')) {
-        console.log('Owner: Page became visible, reloading data...')
-        setTimeout(() => loadData(true), 0)
+      if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
+        console.log(`Owner: Page became visible, reloading ${defaultTab} tab...`)
+        setTimeout(() => loadTabData(defaultTab, true), 0)
       }
     }
 
     const handleFocus = () => {
-      if (defaultTab === 'docs' || defaultTab === 'tests' || defaultTab === 'assignments' || defaultTab === 'overview') {
-        console.log('Owner: Window focused, reloading data...')
-        setTimeout(() => loadData(true), 0)
+      if (defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
+        console.log(`Owner: Window focused, reloading ${defaultTab} tab...`)
+        setTimeout(() => loadTabData(defaultTab, true), 0)
       }
     }
 
@@ -581,7 +675,7 @@ function OwnerPageInner() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [defaultTab, loadData])
+  }, [defaultTab, loadTabData])
 
   // Document handlers
   const [enhancingDocId, setEnhancingDocId] = useState<string | null>(null)

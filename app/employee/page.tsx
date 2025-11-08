@@ -237,6 +237,31 @@ function EmployeePageInner() {
     }
   }, [currentTab])
 
+  // Tab-specific loading - only load what's needed for each tab
+  const loadTabData = useCallback(async (tab: string, preserveData = false) => {
+    try {
+      if (tab === 'overview' || tab === 'assignments') {
+        // Overview and assignments tabs only need assignments
+        await loadAssignments(preserveData)
+      } else if (tab === 'progress') {
+        // Progress tab needs both assignments and test attempts
+        await Promise.all([
+          loadAssignments(preserveData),
+          loadTestAttempts()
+        ])
+      }
+    } catch (error) {
+      console.error(`Error loading ${tab} tab data:`, error)
+    }
+  }, [loadAssignments, loadTestAttempts])
+
+  // Load data when tab changes
+  useEffect(() => {
+    if (currentTab && ['overview', 'assignments', 'progress'].includes(currentTab)) {
+      loadTabData(currentTab, true) // Use preserveData=true to avoid flickering
+    }
+  }, [currentTab, loadTabData])
+
   // Transform assignment data for display - MUST be before early returns
   const currentUserId = session?.user?.id
   const transformedAssignments = useMemo(() => userAssignments.map(assignment => {

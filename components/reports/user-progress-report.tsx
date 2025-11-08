@@ -93,10 +93,13 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   const { t } = useTranslation()
   const translateBadge = useBadgeTranslation()
 
-  // Load all test attempts for each user across all their assignments
+  // Load all test attempts for each user across all their assignments (parallelized)
   useEffect(() => {
     const loadAllAttemptScores = async () => {
       const scoresByUser: Record<string, number[]> = {}
+      
+      // Collect all fetch promises upfront for parallel execution
+      const fetchPromises: Array<{ userId: string; testId: string; promise: Promise<Response> }> = []
       
       for (const user of users) {
         if (user.role !== 'employee') continue
@@ -118,29 +121,45 @@ export default function UserProgressReport({ users, assignments, modules = [], t
         // Get all unique testIds from user's assignments
         const testIds = [...new Set(userAssignments.map(a => a.testId).filter(Boolean))]
         
-        // Fetch all attempts for all testIds
-        const allScores: number[] = []
-        for (const testId of testIds) {
+        // Create fetch promises for all testIds (parallel execution)
+        testIds.forEach(testId => {
+          fetchPromises.push({
+            userId: user.id,
+            testId,
+            promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${testId}`)
+          })
+        })
+      }
+      
+      // Execute all fetches in parallel
+      const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
+      
+      // Process results in parallel
+      await Promise.all(responses.map(async (result, index) => {
+        const { userId, testId } = fetchPromises[index]
+        
+        if (result.status === 'fulfilled') {
           try {
-            const response = await fetch(`/api/test-attempts?userId=${user.id}&testId=${testId}`)
-            const result = await response.json()
-            
-            if (result.success && result.data.attempts) {
-              const attempts = result.data.attempts
+            const apiResult = await result.value.json()
+            if (apiResult.success && apiResult.data.attempts) {
+              const attempts = apiResult.data.attempts
               const completedAttempts = attempts.filter((a: any) => 
                 a.status === 'completed' && a.score !== null && a.score !== undefined
               )
+              if (!scoresByUser[userId]) {
+                scoresByUser[userId] = []
+              }
               completedAttempts.forEach((a: any) => {
-                allScores.push(a.score ?? 0)
+                scoresByUser[userId].push(a.score ?? 0)
               })
             }
           } catch (error) {
-            console.error(`Error loading attempts for user ${user.id}, test ${testId}:`, error)
+            console.error(`Error processing attempts for user ${userId}, test ${testId}:`, error)
           }
+        } else {
+          console.error(`Error loading attempts for user ${userId}, test ${testId}:`, result.reason)
         }
-        
-        scoresByUser[user.id] = allScores
-      }
+      }))
       
       setUserAttemptScores(scoresByUser)
     }
@@ -148,10 +167,13 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     loadAllAttemptScores()
   }, [assignments, users])
 
-  // Load test attempt statistics for each assignment
+  // Load test attempt statistics for each assignment (parallelized)
   useEffect(() => {
     const loadAttemptStats = async () => {
       const stats: Record<string, Record<string, AttemptStats>> = {}
+      
+      // Collect all fetch promises upfront for parallel execution
+      const fetchPromises: Array<{ assignmentId: string; userId: string; testId: string; promise: Promise<Response> }> = []
       
       for (const assignment of assignments) {
         if (!assignment.testId) continue
@@ -161,12 +183,28 @@ export default function UserProgressReport({ users, assignments, modules = [], t
         for (const user of users) {
           if (user.role !== 'employee') continue
           
+          fetchPromises.push({
+            assignmentId: assignment.id,
+            userId: user.id,
+            testId: assignment.testId,
+            promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${assignment.testId}`)
+          })
+        }
+      }
+      
+      // Execute all fetches in parallel
+      const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
+      
+      // Process results in parallel
+      await Promise.all(responses.map(async (result, index) => {
+        const { assignmentId, userId, testId } = fetchPromises[index]
+        
+        if (result.status === 'fulfilled') {
           try {
-            const response = await fetch(`/api/test-attempts?userId=${user.id}&testId=${assignment.testId}`)
-            const result = await response.json()
+            const apiResult = await result.value.json()
             
-            if (result.success && result.data.attempts) {
-              const attempts = result.data.attempts
+            if (apiResult.success && apiResult.data.attempts) {
+              const attempts = apiResult.data.attempts
               const completedAttempts = attempts.filter((a: any) => a.status === 'completed' && a.score !== null && a.score !== undefined)
               const totalAttempts = attempts.length
               const passedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) >= 70).length
@@ -178,7 +216,10 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                 ? Math.round(completedAttempts.reduce((acc: number, a: any) => acc + (a.score ?? 0), 0) / completedAttempts.length)
                 : null
               
-              stats[assignment.id][user.id] = {
+              if (!stats[assignmentId]) {
+                stats[assignmentId] = {}
+              }
+              stats[assignmentId][userId] = {
                 totalAttempts,
                 passedAttempts,
                 failedAttempts,
@@ -187,10 +228,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
               }
             }
           } catch (error) {
-            console.error(`Error loading attempts for assignment ${assignment.id}, user ${user.id}:`, error)
+            console.error(`Error processing attempts for assignment ${assignmentId}, user ${userId}:`, error)
           }
+        } else {
+          console.error(`Error loading attempts for assignment ${assignmentId}, user ${userId}:`, result.reason)
         }
-      }
+      }))
       
       setAttemptStats(stats)
     }
@@ -459,3 +502,4 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     </Card>
   )
 }
+

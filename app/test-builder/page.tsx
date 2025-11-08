@@ -84,7 +84,7 @@ export default function TestBuilderPage() {
       validationRules.required,
       validationRules.integer,
       validationRules.min(1),
-      validationRules.max(20)
+      validationRules.max(15)
     ],
     type: [validationRules.required],
     difficulty: [validationRules.required],
@@ -993,35 +993,34 @@ export default function TestBuilderPage() {
                     error={touched.count ? errors.count : undefined}
                   >
                     <Input
-                      type="text"
-                      inputMode="numeric"
-                      value={testConfig.count ? String(testConfig.count) : ''}
+                      type="number"
+                      min="1"
+                      max="15"
+                      value={testConfig.count ?? ''}
                       onChange={(e) => {
                         const value = e.target.value
-                        // Allow empty string for typing, or valid positive integers up to 20
-                        if (value === '' || /^\d+$/.test(value)) {
-                          if (value === '') {
-                            // Allow empty while typing - validation will catch it
-                            setValue('count', 0)
-                          } else {
-                            const numValue = parseInt(value, 10)
-                            if (!isNaN(numValue) && numValue > 0 && numValue <= 20) {
-                              setValue('count', numValue)
-                            }
+                        if (value === '') {
+                          setValue('count', undefined)
+                        } else {
+                          const numValue = Number(value)
+                          if (!isNaN(numValue) && numValue >= 1 && numValue <= 15) {
+                            setValue('count', numValue)
                           }
                         }
                       }}
                       onBlur={() => {
                         setFieldTouched('count')
-                        // Ensure we have a valid number on blur
-                        if (!testConfig.count || testConfig.count < 1) {
-                          setValue('count', 5) // Default to 5 if invalid
-                        } else if (testConfig.count > 20) {
-                          setValue('count', 20) // Cap at 20 if over limit
+                        // Ensure value is within valid range
+                        if (testConfig.count !== undefined) {
+                          if (testConfig.count < 1) {
+                            setValue('count', 1)
+                          } else if (testConfig.count > 15) {
+                            setValue('count', 15)
+                          }
                         }
                       }}
                       className="w-full"
-                      placeholder={t('enterNumberOfQuestions')}
+                      placeholder="10"
                     />
                   </FormField>
                   <FormField
