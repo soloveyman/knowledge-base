@@ -672,22 +672,7 @@ function ManagerPageInner() {
     setTimeout(() => {
       startTransition(() => {
         addOptimisticDocument({ action: 'delete', id })
-        setDocumentsWithLog((prev: Array<{
-          id: string
-          name: string
-          type: string
-          uploadedAt: string
-          size?: string
-          status?: string
-          createdAt?: string
-          updatedAt?: string
-          parsedContent?: {
-            metadata?: {
-              enhancedBy?: string
-              enhancementTimestamp?: number
-            }
-          } | null
-        }>) => prev.filter(doc => doc.id !== id))
+        setDocumentsWithLog(documents.filter(doc => doc.id !== id))
         cleanupDocumentFromLocalStorage(id)
       })
     }, 100) // Fast fade-out: 100ms
@@ -758,7 +743,7 @@ function ManagerPageInner() {
     try {
       // Fast fade-out animation (100ms), then remove from state
       setTimeout(() => {
-        setSavedTestsWithLog(prev => prev.filter(test => test.id !== id))
+        setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
       }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/tests/${id}`, {
@@ -803,7 +788,7 @@ function ManagerPageInner() {
     try {
       // Fast fade-out animation (100ms), then remove from state
       setTimeout(() => {
-        setSavedAssignmentsWithLog(prev => prev.filter(a => a.id !== id))
+        setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
       }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/assignments/${id}`, {

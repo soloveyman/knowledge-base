@@ -758,7 +758,7 @@ function OwnerPageInner() {
     try {
       // Fast fade-out animation (100ms), then remove from state
       setTimeout(() => {
-        setDocumentsWithLog(prev => prev.filter(doc => doc.id !== id))
+        setDocumentsWithLog(documents.filter(doc => doc.id !== id))
         cleanupDocumentFromLocalStorage(id)
       }, 100) // Fast fade-out: 100ms
       
@@ -807,7 +807,7 @@ function OwnerPageInner() {
     try {
       // Fast fade-out animation (100ms), then remove from state
       setTimeout(() => {
-        setSavedTestsWithLog(prev => prev.filter(test => test.id !== id))
+        setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
       }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/tests/${id}`, {
@@ -850,7 +850,7 @@ function OwnerPageInner() {
     try {
       // Fast fade-out animation (100ms), then remove from state
       setTimeout(() => {
-        setSavedAssignmentsWithLog(prev => prev.filter(a => a.id !== id))
+        setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
       }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/assignments/${id}`, {
@@ -892,7 +892,7 @@ function OwnerPageInner() {
     try {
       // Fast fade-out animation (100ms), then remove from state
       setTimeout(() => {
-        setSavedUsers(prev => prev.filter(u => u.id !== id))
+        setSavedUsers(savedUsers.filter(u => u.id !== id))
       }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/users/${id}`, {
