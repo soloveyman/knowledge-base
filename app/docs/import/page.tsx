@@ -200,9 +200,9 @@ function DocImportPageInner() {
             const warningMessages: string[] = []
             
             if (largeImageCount > 0) {
-              warningMessages.push(`⚠️ This document contains ${largeImageCount} large high-resolution image(s) (${totalImageSizeMB.toFixed(2)}MB total). Large images can cause upload failures. Consider compressing images before uploading.`)
+              warningMessages.push(`This document contains ${largeImageCount} large high-resolution image(s) (${totalImageSizeMB.toFixed(2)}MB total). Large images can cause upload failures. Consider compressing images before uploading.`)
             } else if (imageCount > 0 && totalImageSizeMB > 1) {
-              warningMessages.push(`⚠️ This document contains ${imageCount} image(s) totaling ${totalImageSizeMB.toFixed(2)}MB. Large images may cause upload issues.`)
+              warningMessages.push(`This document contains ${imageCount} image(s) totaling ${totalImageSizeMB.toFixed(2)}MB. Large images may cause upload issues.`)
             }
             
             setFiles(prev => prev.map(f => 
@@ -509,41 +509,43 @@ function DocImportPageInner() {
             <CardContent>
               <div className="space-y-4">
                 {files.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between p-4 border rounded-3xl">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{file.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </p>
-                      {file.status === 'uploading' && (
-                        <Progress value={file.progress} className="mt-2 h-2" />
-                      )}
-                      {file.error && (
-                        <p className="text-sm text-destructive mt-1">{file.error}</p>
-                      )}
-                      {file.warning && (
-                        <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                          <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>{file.warning}</span>
-                          </p>
-                        </div>
-                      )}
+                  <div key={file.id} className="p-4 border rounded-3xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </p>
+                        {file.status === 'uploading' && (
+                          <Progress value={file.progress} className="mt-2 h-2" />
+                        )}
+                        {file.error && (
+                          <p className="text-sm text-destructive mt-1">{file.error}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        {getStatusIcon(file.status)}
+                        <span className="text-sm text-muted-foreground">
+                          {getStatusText(file.status)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(file.id)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(file.status)}
-                      <span className="text-sm text-muted-foreground">
-                        {getStatusText(file.status)}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(file.id)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {file.warning && (
+                      <div className="w-full p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <span>{file.warning}</span>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
