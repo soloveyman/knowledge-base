@@ -1029,6 +1029,9 @@ function OwnerPageInner() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium text-foreground dark:text-white truncate">{doc.name}</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                             {doc.parsedContent?.metadata?.enhancedBy ? (
                               <Badge variant="secondary" className="text-xs">
                                 {translateBadge('enhance')}
@@ -1039,7 +1042,6 @@ function OwnerPageInner() {
                               </Badge>
                             ) : null}
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">Uploaded {doc.uploadedAt}</p>
                         </div>
                         <div className="shrink-0 flex items-center gap-1">
                           {!doc.parsedContent?.metadata?.enhancedBy && (
