@@ -31,6 +31,7 @@ interface UploadedFile {
   status: 'uploading' | 'processing' | 'ready' | 'error'
   progress: number
   error?: string
+  warning?: string // Warning message about large images
   parsedContent?: ParsedContent
   parsingLog?: Array<{
     level?: string
@@ -180,6 +181,30 @@ function DocImportPageInner() {
             const endTime = Date.now()
             console.log(`Parsing completed in ${endTime - startTime}ms for file: ${fileObj.name}`)
             
+            // Check for large images and warn user
+            const imageCount = parsedContent.images?.length || 0
+            let totalImageSize = 0
+            let largeImageCount = 0
+            if (parsedContent.images && parsedContent.images.length > 0) {
+              parsedContent.images.forEach((img: any) => {
+                const imgSize = img.data?.length || 0
+                totalImageSize += imgSize
+                // Check if image is > 200KB (warning threshold)
+                if (imgSize > 200 * 1024) {
+                  largeImageCount++
+                }
+              })
+            }
+            
+            const totalImageSizeMB = totalImageSize / (1024 * 1024)
+            const warningMessages: string[] = []
+            
+            if (largeImageCount > 0) {
+              warningMessages.push(`⚠️ This document contains ${largeImageCount} large high-resolution image(s) (${totalImageSizeMB.toFixed(2)}MB total). Large images can cause upload failures. Consider compressing images before uploading.`)
+            } else if (imageCount > 0 && totalImageSizeMB > 1) {
+              warningMessages.push(`⚠️ This document contains ${imageCount} image(s) totaling ${totalImageSizeMB.toFixed(2)}MB. Large images may cause upload issues.`)
+            }
+            
             setFiles(prev => prev.map(f => 
               f.id === file.id 
                 ? { 
@@ -187,10 +212,16 @@ function DocImportPageInner() {
                     status: 'ready',
                     progress: 100,
                     parsedContent: parsedContent,
-                    parsingLog: []
+                    parsingLog: warningMessages.length > 0 ? warningMessages.map(msg => ({ level: 'warning', message: msg })) : [],
+                    warning: warningMessages.length > 0 ? warningMessages.join(' ') : undefined
                   }
                 : f
             ))
+            
+            // Show warning toast if large images detected
+            if (warningMessages.length > 0) {
+              console.warn(`⚠️ Warning for ${fileObj.name}:`, warningMessages.join(' '))
+            }
           } catch (parseError) {
             console.error('Parse error:', parseError)
             setFiles(prev => prev.map(f => 
@@ -259,10 +290,24 @@ function DocImportPageInner() {
           const payloadSizeMB = payloadString.length / (1024 * 1024)
           const VERCEL_LIMIT_MB = 4.5
           
-          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB`)
+          // Calculate image size separately for better error messages
+          const imageCount = file.parsedContent?.images?.length || 0
+          let totalImageSizeMB = 0
+          if (imageCount > 0 && file.parsedContent?.images) {
+            const totalImageSize = file.parsedContent.images.reduce((sum: number, img: any) => {
+              return sum + (img.data?.length || 0)
+            }, 0)
+            totalImageSizeMB = totalImageSize / (1024 * 1024)
+          }
+          
+          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images: ${imageCount}, image data: ${totalImageSizeMB.toFixed(2)}MB)`)
           
           if (payloadSizeMB > VERCEL_LIMIT_MB) {
-            const errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB). Maximum payload size is ${VERCEL_LIMIT_MB}MB. Documents with many images may exceed this limit.`
+            let errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB payload). Maximum payload size is ${VERCEL_LIMIT_MB}MB.`
+            if (imageCount > 0) {
+              errorMsg += ` This document contains ${imageCount} image(s) (${totalImageSizeMB.toFixed(2)}MB), which increases the payload size due to base64 encoding.`
+            }
+            errorMsg += ` Try reducing the number of images or file size.`
             console.error(errorMsg)
             throw new Error(errorMsg)
           }
@@ -291,12 +336,49 @@ function DocImportPageInner() {
           return result
         } catch (error) {
           console.error('Error saving document:', file.name, error)
+          // Update file status to show error
+          setFiles(prev => prev.map(f => 
+            f.id === file.id 
+              ? { 
+                  ...f, 
+                  status: 'error', 
+                  error: error instanceof Error ? error.message : 'Failed to save document'
+                }
+              : f
+          ))
           throw error
         }
       })
 
-      // Wait for all saves to complete
-      await Promise.all(savePromises)
+      // Wait for all saves to complete - use allSettled to handle partial failures
+      const results = await Promise.allSettled(savePromises)
+      
+      // Check if all succeeded
+      const failed = results.filter(r => r.status === 'rejected')
+      const succeeded = results.filter(r => r.status === 'fulfilled')
+      
+      console.log(`Save results: ${succeeded.length} succeeded, ${failed.length} failed`)
+      
+      if (failed.length > 0) {
+        // Some files failed - show specific error messages
+        const errorMessages = failed.map((r, idx) => {
+          if (r.status === 'rejected') {
+            const errorMsg = r.reason instanceof Error ? r.reason.message : 'Unknown error'
+            const file = readyFiles[idx]
+            return file ? `${file.name}: ${errorMsg}` : errorMsg
+          }
+          return ''
+        }).filter(Boolean)
+        
+        const errorMsg = failed.length === readyFiles.length
+          ? `Failed to save all documents:\n${errorMessages.join('\n')}`
+          : `Failed to save ${failed.length} of ${readyFiles.length} documents:\n${errorMessages.join('\n')}`
+        
+        console.error('Document save errors:', errorMessages)
+        setError(errorMsg)
+        setIsUploading(false)
+        return // Don't redirect if there are failures
+      }
       
       console.log('All documents saved successfully, redirecting...')
       
@@ -317,7 +399,10 @@ function DocImportPageInner() {
       router.replace(redirectUrl)
     } catch (error) {
       console.error('Error saving documents:', error)
-      setError('Failed to save some documents. Please try again.')
+      const errorMsg = error instanceof Error 
+        ? `Failed to save documents: ${error.message}` 
+        : 'Failed to save some documents. Please try again.'
+      setError(errorMsg)
       setIsUploading(false)
     }
   }
@@ -435,6 +520,14 @@ function DocImportPageInner() {
                       )}
                       {file.error && (
                         <p className="text-sm text-destructive mt-1">{file.error}</p>
+                      )}
+                      {file.warning && (
+                        <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>{file.warning}</span>
+                          </p>
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center space-x-2">

@@ -16,7 +16,7 @@ export function GreetingCard({ name, className }: GreetingCardProps) {
     )}>
       <CardContent className="flex flex-col justify-center">
         <h2 className="text-2xl font-bold text-foreground dark:text-white mb-2 whitespace-nowrap">
-          👋 Welcome back, {name || 'User'}!
+          👋 Welcome back<span className="hidden md:inline">, {name || 'User'}</span>!
         </h2>
       </CardContent>
     </Card>

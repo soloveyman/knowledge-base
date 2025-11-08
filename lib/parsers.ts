@@ -162,10 +162,36 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         
         console.log(`Found ${mediaFiles.length} image files in word/media folder:`, mediaFiles)
         
+        // Image size limits (warn about large high-res images)
+        const MAX_IMAGE_SIZE = 500 * 1024 // 500KB per image (recommended)
+        const WARNING_IMAGE_SIZE = 200 * 1024 // 200KB per image (warning threshold)
+        const MAX_TOTAL_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB total for all images
+        let totalImageSize = 0
+        const largeImages: string[] = []
+        
         for (const filename of mediaFiles) {
           try {
             const imageBuffer = await mediaFolder.file(filename)?.async('arraybuffer')
             if (imageBuffer && imageBuffer.byteLength > 0) {
+              const imageSizeKB = imageBuffer.byteLength / 1024
+              const imageSizeMB = imageBuffer.byteLength / (1024 * 1024)
+              
+              // Check for large high-resolution images
+              if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
+                largeImages.push(`${filename} (${imageSizeMB.toFixed(2)}MB)`)
+                console.warn(`⚠️ Large high-resolution image detected: ${filename} (${imageSizeMB.toFixed(2)}MB)`)
+              } else if (imageBuffer.byteLength > WARNING_IMAGE_SIZE) {
+                console.warn(`⚠️ Large image detected: ${filename} (${imageSizeKB.toFixed(2)}KB) - consider compressing`)
+              }
+              
+              totalImageSize += imageBuffer.byteLength
+              
+              // Skip images that are too large to prevent payload size issues
+              if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
+                console.warn(`⚠️ Skipping image ${filename} - too large (${imageSizeMB.toFixed(2)}MB). Maximum recommended size is ${(MAX_IMAGE_SIZE / (1024 * 1024)).toFixed(2)}MB per image.`)
+                continue
+              }
+              
               const base64 = Buffer.from(imageBuffer).toString('base64')
               const extension = filename.split('.').pop()?.toLowerCase() || 'png'
               // Map common extensions to MIME types
@@ -184,13 +210,24 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
                 data: `data:${mimeType};base64,${base64}`,
                 type: mimeType
               })
-              console.log(`✅ Extracted image: ${filename} (${mimeType}, ${(imageBuffer.byteLength / 1024).toFixed(2)}KB)`)
+              console.log(`✅ Extracted image: ${filename} (${mimeType}, ${imageSizeKB.toFixed(2)}KB)`)
             } else {
               console.warn(`⚠️ Image buffer is null or empty for: ${filename}`)
             }
           } catch (error) {
             console.warn(`❌ Failed to extract image ${filename}:`, error)
           }
+        }
+        
+        // Warn about total image size
+        const totalImageSizeMB = totalImageSize / (1024 * 1024)
+        if (totalImageSize > MAX_TOTAL_IMAGE_SIZE) {
+          console.warn(`⚠️ Total image size (${totalImageSizeMB.toFixed(2)}MB) exceeds recommended limit (${(MAX_TOTAL_IMAGE_SIZE / (1024 * 1024)).toFixed(2)}MB). This may cause upload issues.`)
+        }
+        
+        if (largeImages.length > 0) {
+          console.warn(`⚠️ Found ${largeImages.length} large high-resolution image(s):`, largeImages)
+          console.warn(`⚠️ Large images can cause upload failures due to Vercel's 4.5MB payload limit. Consider compressing images before adding to documents.`)
         }
         console.log(`📸 Total images extracted from word/media: ${images.length}`)
       } else {

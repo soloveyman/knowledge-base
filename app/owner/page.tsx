@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense, useRef } from "react"
+import { useEffect, useState, useMemo, useCallback, Suspense, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -21,7 +21,7 @@ import {
   Loader2
 } from "lucide-react"
 import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
-import { cleanupDocumentFromLocalStorage, fixCorruptedLocalStorage } from "@/lib/localStorage-utils"
+import { cleanupDocumentFromLocalStorage } from "@/lib/localStorage-utils"
 import { formatDateShort } from "@/lib/date-format"
 import dynamic from "next/dynamic"
 
