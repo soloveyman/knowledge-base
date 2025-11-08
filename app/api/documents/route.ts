@@ -46,6 +46,15 @@ export async function GET() {
     }
     // Get documents where the uploader's businessId matches, or where uploadedBy matches current user
     // This ensures documents are returned even if the user doesn't exist or doesn't have a businessId
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          documents: []
+        }
+      })
+    }
+    
     const rows = await db
       .select({ document: documents, uploaderBusinessId: users.businessId })
       .from(documents)
