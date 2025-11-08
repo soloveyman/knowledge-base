@@ -823,10 +823,10 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   const parseTimestamp = Date.now()
   console.log('Parse timestamp (cache-busting):', parseTimestamp)
   
-  // Validate file size (15MB limit)
-  const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
+  // Validate file size (4MB limit - Vercel API route limit is 4.5MB)
+  const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4MB
   if (file.size > MAX_FILE_SIZE) {
-    throw new ParseError(`File size exceeds 15MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
+    throw new ParseError(`File size exceeds 4MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
   }
   
   const buffer = await file.arrayBuffer()

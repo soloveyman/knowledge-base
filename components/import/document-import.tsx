@@ -52,9 +52,9 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
       return
     }
 
-    // Validate file size (15MB limit)
-    if (file.size > 15 * 1024 * 1024) {
-      setError('File size must be less than 15MB')
+    // Validate file size (4MB limit - Vercel API route limit is 4.5MB)
+    if (file.size > 4 * 1024 * 1024) {
+      setError('File size must be less than 4MB')
       return
     }
 

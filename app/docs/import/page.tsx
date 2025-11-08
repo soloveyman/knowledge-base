@@ -46,7 +46,7 @@ const ACCEPTED_FILE_TYPES = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx'
 }
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
+const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4MB (Vercel API route limit is 4.5MB)
 
 function DocImportPageInner() {
   const { data: session, status } = useSession()
@@ -130,7 +130,7 @@ function DocImportPageInner() {
 
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File ${file.name} is too large. Maximum size is 15MB`)
+        setError(`File ${file.name} is too large. Maximum size is 4MB`)
         return
       }
 
