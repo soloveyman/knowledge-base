@@ -95,7 +95,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
 
   // Load all test attempts for each user across all their assignments (parallelized)
   // Use cache-busting to ensure fresh data
-  const loadAllAttemptScores = async () => {
+  const loadAllAttemptScores = useCallback(async () => {
     const scoresByUser: Record<string, number[]> = {}
     
     // Collect all fetch promises upfront for parallel execution

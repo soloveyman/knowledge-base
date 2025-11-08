@@ -178,6 +178,8 @@ export const translations = {
     timeRemaining: "Time remaining",
     testCompleted: "Test completed",
     yourScore: "Your score",
+    yourAnswer: "Your Answer",
+    enterYourAnswer: "Enter your answer here...",
     correctAnswers: "Correct Answers",
     totalQuestions: "Total Questions",
     
@@ -780,6 +782,8 @@ export const translations = {
     timeRemaining: "Осталось времени",
     testCompleted: "Тест завершён",
     yourScore: "Ваш результат",
+    yourAnswer: "Ваш ответ",
+    enterYourAnswer: "Введите ваш ответ здесь...",
     correctAnswers: "Правильные ответы",
     totalQuestions: "Всего вопросов",
     
