@@ -56,6 +56,12 @@ const nextConfig: NextConfig = {
       '@radix-ui/react-select',
       '@radix-ui/react-tabs',
     ],
+    // Exclude Node.js packages from server component bundling
+    serverComponentsExternalPackages: [
+      'pg',
+      'pg-connection-string',
+      'drizzle-orm',
+    ],
   },
   // Performance optimizations
   compress: true,
@@ -96,6 +102,31 @@ const nextConfig: NextConfig = {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
     } : false,
+  },
+  // Webpack configuration to exclude Node.js modules from client-side bundling
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Exclude Node.js modules from client-side bundling
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+        dns: false,
+        child_process: false,
+        os: false,
+        path: false,
+        stream: false,
+        util: false,
+        buffer: false,
+        url: false,
+        http: false,
+        https: false,
+        zlib: false,
+      };
+    }
+    return config;
   },
 };
 

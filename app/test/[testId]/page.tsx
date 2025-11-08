@@ -70,6 +70,7 @@ export default function TestPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
+  const [correctAnswersCount, setCorrectAnswersCount] = useState(0)
   const [timeLeft, setTimeLeft] = useState(15 * 60) // 15 minutes in seconds
   const [showExitConfirm, setShowExitConfirm] = useState(false)
 
@@ -231,6 +232,7 @@ export default function TestPage() {
       ? Math.round((correctAnswers / testData.questions.length) * 100)
       : 0
     setScore(percentage)
+    setCorrectAnswersCount(correctAnswers)
     setShowResults(true)
 
     // Save test attempt to database
@@ -362,7 +364,7 @@ export default function TestPage() {
         <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
           <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-center">
+              <CardTitle className="text-2xl text-center justify-center">
                 {score >= 70 ? t('congratulations') : t('testCompleted')}
               </CardTitle>
               <CardDescription>
@@ -370,7 +372,7 @@ export default function TestPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
-              <div className="text-6xl font-bold text-blue-600">
+              <div className={`text-6xl font-bold ${score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
                 {score}%
               </div>
               <div className="text-lg text-muted-foreground">
@@ -379,9 +381,9 @@ export default function TestPage() {
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                 <div className="bg-muted p-4 rounded-3xl">
                   <div className="text-2xl font-bold text-foreground">
-                    {Object.keys(answers).length}
+                    {correctAnswersCount}
                   </div>
-                  <div className="text-sm text-muted-foreground">{t('questionsAnswered')}</div>
+                  <div className="text-sm text-muted-foreground">{t('correctAnswers')}</div>
                 </div>
                 <div className="bg-muted p-4 rounded-3xl">
                   <div className="text-2xl font-bold text-foreground">
