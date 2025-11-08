@@ -5,6 +5,8 @@ import { auth } from '@/lib/auth'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { strictRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
+import { emailExists, normalizeEmail, isNotDisposableEmail, isValidEmailFormat } from '@/lib/email-validation'
+import { createEmailVerificationToken, sendVerificationEmail } from '@/lib/email-verification'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -92,10 +94,28 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Check if user already exists
-    const normalizedEmail = String(email).toLowerCase().trim()
-    const existingUser = await tenantDb.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
-    if (existingUser.length > 0) {
+    // Normalize and validate email
+    const normalizedEmail = normalizeEmail(String(email))
+    
+    // Validate email format
+    if (!isValidEmailFormat(normalizedEmail)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Invalid email format'
+      }, { status: 400 })
+    }
+
+    // Check if email is disposable/temporary
+    if (!isNotDisposableEmail(normalizedEmail)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Disposable/temporary email addresses are not allowed. Please use a real email address.'
+      }, { status: 400 })
+    }
+
+    // Check if user already exists globally (emails must be unique across all tenants)
+    const exists = await emailExists(normalizedEmail)
+    if (exists) {
       return NextResponse.json({
         success: false,
         message: 'User with this email already exists'
@@ -115,12 +135,25 @@ export async function POST(request: Request) {
       businessId: tenantId,
     }).returning()
 
+    // Send email verification (non-blocking)
+    try {
+      const token = await createEmailVerificationToken(newUser[0].id, normalizedEmail)
+      const baseUrl = process.env.NEXTAUTH_URL || 
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+        'http://localhost:3000'
+      const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`
+      await sendVerificationEmail(normalizedEmail, verificationUrl)
+    } catch (error) {
+      console.error('Create user: failed to send verification email, proceeding anyway:', error)
+      // Don't fail user creation if email sending fails
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         user: newUser[0]
       },
-      message: 'User created successfully'
+      message: 'User created successfully. Verification email has been sent to the user.'
     })
   } catch (error) {
     console.error('Create user API error:', error)

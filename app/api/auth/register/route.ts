@@ -7,6 +7,8 @@ import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { assignFreeTrialToOwner } from '@/lib/subscription/trial'
+import { emailExists, normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
+import { createEmailVerificationToken, sendVerificationEmail } from '@/lib/email-verification'
 
 const schema = z.object({
   email: z.string().email(),
@@ -46,17 +48,28 @@ export async function POST(req: Request) {
     // Normalize email before validation
     const normalizedBody = {
       ...body,
-      email: typeof body.email === 'string' ? body.email.toLowerCase().trim() : body.email
+      email: typeof body.email === 'string' ? normalizeEmail(body.email) : body.email
     }
     const { email, password, name } = schema.parse(normalizedBody)
-    const normalizedEmail = email.toLowerCase().trim()
+    const normalizedEmail = normalizeEmail(email)
 
-    const existing = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
-    if (existing.length > 0) {
+    // Check if email is disposable/temporary
+    if (!isNotDisposableEmail(normalizedEmail)) {
+      return NextResponse.json({ 
+        error: 'Disposable/temporary email addresses are not allowed. Please use a real email address.' 
+      }, { status: 400 })
+    }
+
+    // Check if email exists globally
+    const exists = await emailExists(normalizedEmail)
+    if (exists) {
+      // Get existing user to check password
+      const existing = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
+      const existingUser = existing[0] as { id: string; password: string | null } | undefined
+      
       // If the user already exists and has a password, allow seamless sign-in by
       // validating the provided password and returning success instead of 409.
-      const existingUser = existing[0] as { id: string; password: string | null }
-      if (existingUser.password) {
+      if (existingUser?.password) {
         const ok = await bcrypt.compare(password, existingUser.password)
         if (ok) {
           return NextResponse.json({ success: true, id: existingUser.id, existing: true })
@@ -88,7 +101,25 @@ export async function POST(req: Request) {
       console.error('Register: failed to assign free trial, proceeding anyway:', error)
     }
 
-    return NextResponse.json({ success: true, id: created.id, businessId: created.id })
+    // Send email verification (non-blocking)
+    try {
+      const token = await createEmailVerificationToken(created.id, normalizedEmail)
+      const baseUrl = process.env.NEXTAUTH_URL || 
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+        'http://localhost:3000'
+      const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`
+      await sendVerificationEmail(normalizedEmail, verificationUrl)
+    } catch (error) {
+      console.error('Register: failed to send verification email, proceeding anyway:', error)
+      // Don't fail registration if email sending fails
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      id: created.id, 
+      businessId: created.id,
+      message: 'Registration successful. Please check your email to verify your account.'
+    })
   } catch (err) {
     // Handle Zod validation errors
     if (err && typeof err === 'object' && 'issues' in err) {

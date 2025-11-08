@@ -90,6 +90,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           console.log("[Auth] Authentication successful for user:", normalizedEmail)
           
+          // Check if email is verified (allow sign-in but mark as unverified)
+          const isEmailVerified = dbUser.emailVerified !== null
+          
           // Return user object for NextAuth
           const resolvedRole = ((dbUser.role ?? 'owner') as string).toLowerCase() as UserRole
           const resolvedBusinessId: string = dbUser.businessId ?? dbUser.id
@@ -100,6 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: resolvedRole,
             businessId: resolvedBusinessId,
             businessName: 'Knowledge Base',
+            emailVerified: isEmailVerified,
           }
         } catch (error) {
           console.error("[Auth] Authorize error:", error)
@@ -162,6 +166,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.role = ((u.role as string | undefined)?.toLowerCase() as UserRole) ?? (token.role as UserRole)
           token.businessId = u.businessId ?? token.businessId
           token.businessName = u.businessName ?? token.businessName
+          token.emailVerified = (u as { emailVerified?: boolean }).emailVerified ?? false
         } else {
           // Fallback: if role/businessId/businessName missing, hydrate from DB
           if ((!token.role || !token.businessId || !token.businessName) && token.sub) {
@@ -192,6 +197,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.role = (token.role as UserRole) ?? 'employee'
           session.user.businessId = token.businessId ?? token.sub
           session.user.businessName = token.businessName ?? 'Knowledge Base'
+          session.user.emailVerified = (token.emailVerified as boolean) ?? false
         }
         return session
       } catch (error) {

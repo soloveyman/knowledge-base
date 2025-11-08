@@ -12,7 +12,9 @@ import { ErrorMessage } from "@/components/common/error-message"
 import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
-import { validationRules } from "@/lib/validation"
+import { validationRules, validateField } from "@/lib/validation"
+import { useEmailValidation } from "@/lib/hooks/use-email-validation"
+import { isDisposableEmail } from "@/lib/disposable-email"
 import { toast } from "sonner"
 import { 
   Users, 
@@ -76,7 +78,10 @@ export default function UserBuilderPage() {
     role: [validationRules.required]
   }, initialFormData)
   
-  const { values, errors, touched, setValue, setFieldTouched, validateAll } = validation
+  const { values, errors, touched, setValue, setFieldTouched, validateAll, validateField } = validation
+  
+  // Email validation hook (only for new users, not editing)
+  const emailValidation = useEmailValidation(values.email, 500, isEditMode)
   
   // Sync validation values with userConfig for backwards compatibility
   const userConfig: UserConfig = {
@@ -86,7 +91,7 @@ export default function UserBuilderPage() {
     password: values.password,
     role: values.role
   }
-
+  
   useEffect(() => {
     if (status === "loading") return
     
@@ -183,7 +188,9 @@ export default function UserBuilderPage() {
           throw new Error(result.message || 'Failed to create user')
         }
 
-        toast.success('User created successfully!')
+        // Show success message with verification info
+        const successMsg = result.message || 'User created successfully!'
+        toast.success(successMsg)
       }
       
       // Redirect to owner users tab with timestamp to trigger refresh
@@ -298,18 +305,46 @@ export default function UserBuilderPage() {
                   <FormField
                     label={t('emailAddress')}
                     required
-                    error={touched.email ? errors.email : undefined}
+                    error={
+                      touched.email 
+                        ? errors.email || 
+                          (isDisposableEmail(userConfig.email) 
+                            ? 'Disposable/temporary email addresses are not allowed. Please use a real email address.' 
+                            : undefined) ||
+                          (emailValidation.isAvailable === false && !isEditMode
+                            ? 'This email is already registered'
+                            : undefined) ||
+                          (emailValidation.error && !isEditMode ? emailValidation.error : undefined)
+                        : undefined
+                    }
                   >
-                    <Input
-                      type="email"
-                      value={userConfig.email}
-                      onChange={(e) => {
-                        setValue('email', e.target.value)
-                      }}
-                      onBlur={() => setFieldTouched('email')}
-                      placeholder={t('enterEmailAddress')}
-                    />
+                    <div className="relative">
+                      <Input
+                        type="email"
+                        value={userConfig.email}
+                        onChange={(e) => {
+                          setValue('email', e.target.value)
+                          setFieldTouched('email')
+                        }}
+                        onBlur={() => setFieldTouched('email')}
+                        placeholder={t('enterEmailAddress')}
+                        className={
+                          touched.email && 
+                          (errors.email || isDisposableEmail(userConfig.email) || emailValidation.isAvailable === false)
+                            ? "border-destructive" 
+                            : touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && !isEditMode
+                            ? "border-green-500"
+                            : ""
+                        }
+                      />
+                      {!isEditMode && touched.email && emailValidation.isChecking && (
+                        <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
                   </FormField>
+                  {!isEditMode && touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && (
+                    <p className="text-xs text-green-600 mt-1">Email is available</p>
+                  )}
 
                   <FormField
                     label={t('password')}

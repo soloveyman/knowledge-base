@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn, getSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
+import { useEmailValidation } from "@/lib/hooks/use-email-validation"
+import { validationRules, validateField } from "@/lib/validation"
 
 export default function SignInPage() {
   const [email, setEmail] = useState("")
@@ -23,8 +25,69 @@ export default function SignInPage() {
   const [name, setName] = useState("")
   const [honeypot, setHoneypot] = useState("") // Honeypot field for bot detection
   const [hasFailedAttempt, setHasFailedAttempt] = useState(false) // Track if login failed
+  const [successMessage, setSuccessMessage] = useState("") // Success message for registration
+  
+  // Validation state
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  
   const router = useRouter()
   const { t } = useTranslation()
+  
+  // Email validation hook (only for registration)
+  const emailValidation = useEmailValidation(email, 500, !isRegister)
+  
+  // Reset validation state when switching modes
+  useEffect(() => {
+    if (!isRegister) {
+      setTouched({})
+      setFieldErrors({})
+      setError('')
+      setSuccessMessage('')
+    }
+  }, [isRegister])
+  
+  // Validate fields in real-time
+  useEffect(() => {
+    if (!isRegister) return
+    
+    const errors: Record<string, string> = {}
+    
+    // Validate email
+    if (touched.email || email.length > 0) {
+      const emailError = validateField(email, [validationRules.required, validationRules.email])
+      if (emailError) {
+        errors.email = emailError
+      } else if (isDisposableEmail(email)) {
+        errors.email = 'Disposable/temporary email addresses are not allowed. Please use a real email address.'
+      } else if (emailValidation.error) {
+        errors.email = emailValidation.error
+      } else if (emailValidation.isAvailable === false) {
+        errors.email = 'This email is already registered'
+      }
+    }
+    
+    // Validate password
+    if (touched.password || password.length > 0) {
+      const passwordError = validateField(password, [
+        validationRules.required,
+        validationRules.minLength(8)
+      ])
+      if (passwordError) {
+        errors.password = passwordError
+      }
+    }
+    
+    // Validate name (optional but if provided, should be valid)
+    if (touched.name && name.trim().length > 0) {
+      const nameError = validateField(name, [validationRules.maxLength(100)])
+      if (nameError) {
+        errors.name = nameError
+      }
+    }
+    
+    setFieldErrors(errors)
+  }, [email, password, name, touched, isRegister, emailValidation])
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
@@ -82,14 +145,33 @@ export default function SignInPage() {
 
     try {
       if (isRegister) {
-        // Validate required fields
-        if (!email.trim()) {
-          setError('Email is required')
+        // Mark all fields as touched
+        setTouched({ email: true, password: true, name: true })
+        
+        // Validate all fields
+        const emailError = validateField(email, [validationRules.required, validationRules.email])
+        const passwordError = validateField(password, [validationRules.required, validationRules.minLength(8)])
+        const nameError = name.trim() ? validateField(name, [validationRules.maxLength(100)]) : null
+        
+        if (emailError || passwordError || nameError) {
+          setFieldErrors({
+            email: emailError || '',
+            password: passwordError || '',
+            name: nameError || ''
+          })
           setIsLoading(false)
           return
         }
-        if (!password || password.length < 8) {
-          setError('Password must be at least 8 characters')
+        
+        // Check email availability
+        if (emailValidation.isAvailable === false) {
+          setError('This email is already registered')
+          setIsLoading(false)
+          return
+        }
+        
+        if (emailValidation.isChecking) {
+          setError('Please wait while we check email availability...')
           setIsLoading(false)
           return
         }
@@ -105,7 +187,14 @@ export default function SignInPage() {
           setIsLoading(false)
           return
         }
-        // Immediately sign in after successful registration
+        
+        // Show success message about email verification
+        if (body.message) {
+          setError('') // Clear any errors
+          setSuccessMessage(body.message || 'Registration successful! Please check your email to verify your account.')
+        }
+        
+        // Immediately sign in after successful registration (user can still sign in but needs to verify)
         const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
         if (result?.error) {
           setError(result.error || t('errorOccurred'))
@@ -122,9 +211,24 @@ export default function SignInPage() {
         return
       }
 
-      const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
+      // Check if email exists before attempting sign-in
+      const normalizedEmail = email.toLowerCase().trim()
+      const emailCheckResponse = await fetch(`/api/auth/check-email?email=${encodeURIComponent(normalizedEmail)}`)
+      const emailCheckData = await emailCheckResponse.json()
+      
+      if (!emailCheckData.exists) {
+        // Email doesn't exist - suggest registration
+        setError('Email not found. Would you like to create an account?')
+        setIsRegister(true) // Switch to registration mode
+        setIsLoading(false)
+        return
+      }
+
+      // Email exists, attempt sign-in
+      const result = await signIn("credentials", { email: normalizedEmail, password, redirect: false })
       if (result?.error) {
-        setError('Invalid email or password')
+        // Email exists but password is wrong
+        setError('Incorrect password. Please try again or use "Forgot Password"')
         setHasFailedAttempt(true) // Show forgot password link after failed attempt
         setIsLoading(false)
         return
@@ -169,11 +273,36 @@ export default function SignInPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pb-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+            {successMessage && (
+              <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-950">
+                <AlertDescription className="text-green-800 dark:text-green-200">
+                  {successMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+            {error && (
+              <Alert variant={error.includes('not found') || error.includes('create an account') ? "default" : "destructive"}>
+                <AlertDescription>
+                  {error}
+                  {error.includes('not found') && (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsRegister(true)
+                          setError('')
+                        }}
+                        className="w-full"
+                      >
+                        Create Account
+                      </Button>
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
           
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Honeypot field - hidden from users but visible to bots */}
@@ -189,14 +318,27 @@ export default function SignInPage() {
             />
             {isRegister && (
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <Label htmlFor="name">Name (optional)</Label>
+                <div className="relative">
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
+                    className={touched.name && fieldErrors.name ? "border-destructive" : ""}
+                  />
+                  {touched.name && name.trim().length > 0 && !fieldErrors.name && (
+                    <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                  )}
+                  {touched.name && fieldErrors.name && (
+                    <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" />
+                  )}
+                </div>
+                {touched.name && fieldErrors.name && (
+                  <p className="text-xs text-destructive">{fieldErrors.name}</p>
+                )}
               </div>
             )}
             <div className="space-y-2">
@@ -208,11 +350,34 @@ export default function SignInPage() {
                   type="email"
                   placeholder={t('enterYourEmail')}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setTouched(prev => ({ ...prev, email: true }))
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
+                  className={`pl-10 ${touched.email && fieldErrors.email ? "border-destructive" : ""} ${isRegister && touched.email && !fieldErrors.email && emailValidation.isAvailable === true ? "border-green-500" : ""}`}
                   required
                 />
+                {isRegister && touched.email && (
+                  <>
+                    {emailValidation.isChecking && (
+                      <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                    {!emailValidation.isChecking && emailValidation.isAvailable === true && !fieldErrors.email && (
+                      <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                    )}
+                    {!emailValidation.isChecking && (fieldErrors.email || emailValidation.isAvailable === false) && (
+                      <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" />
+                    )}
+                  </>
+                )}
               </div>
+              {touched.email && fieldErrors.email && (
+                <p className="text-xs text-destructive">{fieldErrors.email}</p>
+              )}
+              {isRegister && touched.email && !fieldErrors.email && emailValidation.isAvailable === true && (
+                <p className="text-xs text-green-600">Email is available</p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -234,36 +399,48 @@ export default function SignInPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder={t('enterYourPassword')}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setTouched(prev => ({ ...prev, password: true }))
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
+                  className={`pl-10 pr-10 ${touched.password && fieldErrors.password ? "border-destructive" : ""} ${isRegister && touched.password && !fieldErrors.password && password.length >= 8 ? "border-green-500" : ""}`}
                   minLength={isRegister ? 8 : undefined}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-10 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+                {isRegister && touched.password && !fieldErrors.password && password.length >= 8 && (
+                  <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                )}
+                {isRegister && touched.password && fieldErrors.password && (
+                  <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" />
+                )}
               </div>
-              {isRegister && (
+              {touched.password && fieldErrors.password && (
+                <p className="text-xs text-destructive">{fieldErrors.password}</p>
+              )}
+              {isRegister && touched.password && !fieldErrors.password && password.length >= 8 && (
+                <p className="text-xs text-green-600">Password is valid</p>
+              )}
+              {isRegister && password.length > 0 && password.length < 8 && (
                 <p className="text-xs text-muted-foreground">
-                  {password.length > 0 && password.length < 8 && (
-                    <span className="text-destructive">
-                      Password must be at least 8 characters ({password.length}/8)
-                    </span>
-                  )}
-                  {password.length >= 8 && (
-                    <span className="text-green-600">Password length is valid</span>
-                  )}
-                  {password.length === 0 && 'Password must be at least 8 characters'}
+                  Password must be at least 8 characters ({password.length}/8)
                 </p>
               )}
             </div>
             
-            <Button type="submit" className="w-full min-w-[96px]" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full min-w-[96px]" 
+              disabled={isLoading || (isRegister && (Object.keys(fieldErrors).length > 0 || emailValidation.isChecking || emailValidation.isAvailable === false))}
+            >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isRegister ? t('signUp') : t('signIn')}
             </Button>
@@ -304,7 +481,13 @@ export default function SignInPage() {
           <div className="text-center text-sm mt-6">
             <button
               type="button"
-              onClick={() => { setIsRegister(!isRegister); setError("") }}
+              onClick={() => { 
+                setIsRegister(!isRegister)
+                setError("")
+                setSuccessMessage("")
+                setTouched({})
+                setFieldErrors({})
+              }}
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
             >
               {isRegister ? t('haveAccountSignIn') : t('noAccountSignUp')}
