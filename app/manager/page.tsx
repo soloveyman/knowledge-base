@@ -672,7 +672,22 @@ function ManagerPageInner() {
     setTimeout(() => {
       startTransition(() => {
         addOptimisticDocument({ action: 'delete', id })
-        setDocumentsWithLog(prev => prev.filter(doc => doc.id !== id))
+        setDocumentsWithLog((prev: Array<{
+          id: string
+          name: string
+          type: string
+          uploadedAt: string
+          size?: string
+          status?: string
+          createdAt?: string
+          updatedAt?: string
+          parsedContent?: {
+            metadata?: {
+              enhancedBy?: string
+              enhancementTimestamp?: number
+            }
+          } | null
+        }>) => prev.filter(doc => doc.id !== id))
         cleanupDocumentFromLocalStorage(id)
       })
     }, 100) // Fast fade-out: 100ms
