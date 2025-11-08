@@ -668,12 +668,14 @@ function ManagerPageInner() {
   }
 
   const handleDeleteDocument = async (id: string) => {
-    // Optimistically update UI immediately (must be inside startTransition)
-    startTransition(() => {
-      addOptimisticDocument({ action: 'delete', id })
-      setDocumentsWithLog(documents.filter(doc => doc.id !== id))
-      cleanupDocumentFromLocalStorage(id)
-    })
+    // Fast fade-out animation (100ms), then remove from state
+    setTimeout(() => {
+      startTransition(() => {
+        addOptimisticDocument({ action: 'delete', id })
+        setDocumentsWithLog(prev => prev.filter(doc => doc.id !== id))
+        cleanupDocumentFromLocalStorage(id)
+      })
+    }, 100) // Fast fade-out: 100ms
     
     try {
       const response = await fetch(`/api/documents/${id}`, {
@@ -739,8 +741,10 @@ function ManagerPageInner() {
   // Test handlers
   const handleDeleteTest = async (id: string) => {
     try {
-      // Optimistically update UI immediately
-      setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
+      // Fast fade-out animation (100ms), then remove from state
+      setTimeout(() => {
+        setSavedTestsWithLog(prev => prev.filter(test => test.id !== id))
+      }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/tests/${id}`, {
         method: 'DELETE',
@@ -782,8 +786,10 @@ function ManagerPageInner() {
   // Assignment handlers
   const handleDeleteAssignment = async (id: string) => {
     try {
-      // Optimistically update UI immediately
-      setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
+      // Fast fade-out animation (100ms), then remove from state
+      setTimeout(() => {
+        setSavedAssignmentsWithLog(prev => prev.filter(a => a.id !== id))
+      }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/assignments/${id}`, {
         method: 'DELETE',

@@ -756,9 +756,11 @@ function OwnerPageInner() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      // Optimistically update UI immediately
-      setDocumentsWithLog(documents.filter(doc => doc.id !== id))
-      cleanupDocumentFromLocalStorage(id)
+      // Fast fade-out animation (100ms), then remove from state
+      setTimeout(() => {
+        setDocumentsWithLog(prev => prev.filter(doc => doc.id !== id))
+        cleanupDocumentFromLocalStorage(id)
+      }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/documents/${id}`, {
         method: 'DELETE'
@@ -803,8 +805,10 @@ function OwnerPageInner() {
   // Test handlers
   const handleDeleteTest = async (id: string) => {
     try {
-      // Optimistically update UI immediately
-      setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
+      // Fast fade-out animation (100ms), then remove from state
+      setTimeout(() => {
+        setSavedTestsWithLog(prev => prev.filter(test => test.id !== id))
+      }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/tests/${id}`, {
         method: 'DELETE',
@@ -844,8 +848,10 @@ function OwnerPageInner() {
   // Assignment handlers
   const handleDeleteAssignment = async (id: string) => {
     try {
-      // Optimistically update UI immediately
-      setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
+      // Fast fade-out animation (100ms), then remove from state
+      setTimeout(() => {
+        setSavedAssignmentsWithLog(prev => prev.filter(a => a.id !== id))
+      }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/assignments/${id}`, {
         method: 'DELETE',
@@ -884,8 +890,10 @@ function OwnerPageInner() {
   // User handlers
   const handleDeleteUser = async (id: string) => {
     try {
-      // Optimistically update UI immediately
-      setSavedUsers(prev => prev.filter(u => u.id !== id))
+      // Fast fade-out animation (100ms), then remove from state
+      setTimeout(() => {
+        setSavedUsers(prev => prev.filter(u => u.id !== id))
+      }, 100) // Fast fade-out: 100ms
       
       const response = await fetch(`/api/users/${id}`, {
         method: 'DELETE',
@@ -1182,7 +1190,7 @@ function OwnerPageInner() {
                     {documents.map((doc) => (
                       <div 
                         key={doc.id}
-                        className="flex items-center justify-between p-4 border border-border rounded-3xl hover:bg-accent cursor-pointer gap-3"
+                        className="flex items-center justify-between p-4 border border-border rounded-3xl hover:bg-accent cursor-pointer gap-3 transition-opacity duration-100"
                         onClick={() => handleViewDocument(doc.id, doc.name)}
                         onMouseEnter={() => handleDocumentHover(doc.id)}
                       >

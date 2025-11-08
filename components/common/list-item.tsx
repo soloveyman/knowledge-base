@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getStatusBadge, getRoleBadge, getCountBadge, getDifficultyBadge, getLocaleBadge } from "@/lib/badge-utils"
@@ -36,9 +37,21 @@ export function ListItem({
   deleteDataLossWarning
 }: ListItemProps) {
   const translateBadge = useBadgeTranslation()
+  const [isDeleting, setIsDeleting] = useState(false)
+  
+  const handleDelete = () => {
+    setIsDeleting(true)
+    // Fast fade-out animation (100ms), then call onDelete
+    setTimeout(() => {
+      onDelete?.()
+    }, 100) // Fast fade-out: 100ms
+  }
+  
   return (
     <div 
-      className="p-4 border border-border rounded-3xl hover:bg-accent"
+      className={`p-4 border border-border rounded-3xl hover:bg-accent transition-all duration-100 ${
+        isDeleting ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'
+      }`}
       onClick={onClick}
     >
       <div className="flex items-start md:items-center justify-between gap-3">
@@ -119,7 +132,7 @@ export function ListItem({
         )}
         {showDeleteButton && onDelete && (
           <DeleteConfirmation
-            onConfirm={onDelete}
+            onConfirm={handleDelete}
             itemName={title}
             dataLossWarning={deleteDataLossWarning}
             trigger={
