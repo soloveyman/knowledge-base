@@ -185,7 +185,9 @@ export default function SubscriptionManager({
     if (price === 0) return t('free')
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(price / 100)
   }
 
@@ -653,17 +655,30 @@ export default function SubscriptionManager({
                   </div>
 
                   <div className="text-center mb-6">
-                    <div className="text-3xl font-bold">
-                      {formatPrice(plan.price, plan.currency)}
-                    </div>
-                    {plan.price > 0 ? (
-                      <div className="text-sm text-muted-foreground">
-                        {t('per')} {t(plan.interval === 'month' ? 'month' : 'year')}
-                      </div>
+                    {plan.interval === 'month' && plan.price > 0 ? (
+                      <>
+                        <div className="text-3xl font-bold">
+                          {formatPrice(plan.price, plan.currency)} / {formatPrice(Math.round(plan.price * 12 * 0.75), plan.currency)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {t('per')} {t('month')} / {t('per')} {t('year')}
+                        </div>
+                      </>
                     ) : (
-                      <p className="text-sm text-muted-foreground invisible">
-                        {t('per')} {t('month')}
-                      </p>
+                      <>
+                        <div className="text-3xl font-bold">
+                          {formatPrice(plan.price, plan.currency)}
+                        </div>
+                        {plan.price > 0 ? (
+                          <div className="text-sm text-muted-foreground">
+                            {t('per')} {t(plan.interval === 'month' ? 'month' : 'year')}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground invisible">
+                            {t('per')} {t('month')}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -753,14 +768,15 @@ export default function SubscriptionManager({
               </div>
             </div>
 
-            {/* Payment History */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <CreditCard className="h-4 w-4" />
-                <div className="font-medium">{t('paymentHistory')}</div>
-              </div>
-              <div className="space-y-3">
-                {(paymentHistory && paymentHistory.length > 0 ? paymentHistory : [
+            {/* Payment History - Only show for users with paid subscriptions */}
+            {currentSubscription?.plan?.price && currentSubscription.plan.price > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <CreditCard className="h-4 w-4" />
+                  <div className="font-medium">{t('paymentHistory')}</div>
+                </div>
+                <div className="space-y-3">
+                  {(paymentHistory && paymentHistory.length > 0 ? paymentHistory : [
                   // Fallback data - will be replaced with real API data when available
                   {
                     id: '1',
@@ -815,8 +831,9 @@ export default function SubscriptionManager({
                     </div>
                   )
                 })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
