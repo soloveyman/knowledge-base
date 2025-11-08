@@ -1,8 +1,23 @@
 import { NextResponse } from 'next/server'
 
+// Route segment config
+export const maxDuration = 60 // 60 seconds for Grok API calls
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    // Parse request body with error handling for large payloads
+    let body
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error('Failed to parse request body:', error)
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Request body too large. Maximum payload size is 4.5MB (Vercel limit).' 
+      }, { status: 413 })
+    }
     const { params, context } = body
     console.log('Generate test request:', { 
       params, 

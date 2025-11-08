@@ -46,7 +46,7 @@ const ACCEPTED_FILE_TYPES = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx'
 }
 
-const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4MB (Vercel API route limit is 4.5MB)
+const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB (accounts for base64 encoding overhead - Vercel API route limit is 4.5MB)
 
 function DocImportPageInner() {
   const { data: session, status } = useSession()
@@ -130,7 +130,7 @@ function DocImportPageInner() {
 
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File ${file.name} is too large. Maximum size is 4MB`)
+        setError(`File ${file.name} is too large. Maximum size is 3MB`)
         return
       }
 
@@ -242,21 +242,37 @@ function DocImportPageInner() {
         console.log('ParsedContent tables:', file.parsedContent?.tables?.length || 0)
         
         try {
+          // Prepare request body
+          const requestBody = {
+            title: file.name,
+            originalFileName: file.name,
+            fileType: file.type.split('/')[1],
+            fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
+            fileSize: file.size,
+            parsedContent: file.parsedContent || null,
+            parsingLog: file.parsingLog || null,
+            uploadedBy: session?.user?.id || 'unknown'
+          }
+          
+          // Check payload size before sending (Vercel limit is 4.5MB)
+          const payloadString = JSON.stringify(requestBody)
+          const payloadSizeMB = payloadString.length / (1024 * 1024)
+          const VERCEL_LIMIT_MB = 4.5
+          
+          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB`)
+          
+          if (payloadSizeMB > VERCEL_LIMIT_MB) {
+            const errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB). Maximum payload size is ${VERCEL_LIMIT_MB}MB. Documents with many images may exceed this limit.`
+            console.error(errorMsg)
+            throw new Error(errorMsg)
+          }
+          
           const response = await fetch('/api/documents', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              title: file.name,
-              originalFileName: file.name,
-              fileType: file.type.split('/')[1],
-              fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
-              fileSize: file.size,
-              parsedContent: file.parsedContent || null,
-              parsingLog: file.parsingLog || null,
-              uploadedBy: session?.user?.id || 'unknown'
-            }),
+            body: payloadString,
           })
 
           if (!response.ok) {

@@ -3,6 +3,11 @@ import { db, tests, questions as questionsTable, users, usage } from '@/lib/db'
 import { eq, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
+// Route segment config
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 60 // 60 seconds for test creation with many questions
+
 export async function GET() {
   try {
     const session = await auth()
@@ -257,7 +262,17 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
-    const body = await request.json()
+    // Parse request body with error handling for large payloads
+    let body
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error('Failed to parse request body:', error)
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Request body too large. Maximum payload size is 4.5MB (Vercel limit).' 
+      }, { status: 413 })
+    }
     const { 
       title, 
       description, 

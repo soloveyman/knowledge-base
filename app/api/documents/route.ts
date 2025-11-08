@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const revalidate = 0 // No caching for dynamic data
+export const maxDuration = 60 // 60 seconds for document uploads with images
 
 export async function GET() {
   try {
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
       console.error('Failed to parse request body:', error)
       return NextResponse.json({ 
         success: false, 
-        message: 'Request body too large. Maximum file size is 4MB (Vercel API route limit is 4.5MB). Documents with many images may exceed this limit.' 
+        message: 'Request body too large. Maximum file size is 3MB (Vercel API route limit is 4.5MB). Documents with many images may exceed this limit.' 
       }, { status: 413 })
     }
     
