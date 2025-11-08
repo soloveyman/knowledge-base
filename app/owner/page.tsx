@@ -310,7 +310,7 @@ function OwnerPageInner() {
   }, [session, status, router])
 
   // Load data from APIs - parallel fetching for faster loading
-  const loadData = useCallback(async (preserveData = false) => {
+  const loadData = useCallback(async (preserveData = false, forceRefresh = false) => {
     try {
       // Set loading states if we're refreshing (but not when preserving data to avoid flicker)
       if (!preserveData) {
@@ -326,10 +326,11 @@ function OwnerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
-      // Use stale-while-revalidate for better UX: serve stale data immediately, revalidate in background
-      const fetchOptions: RequestInit = { 
-        next: { revalidate: 30 } // Revalidate every 30 seconds
-      }
+      // Use cache-busting if forceRefresh is true (e.g., after test completion)
+      // Otherwise use stale-while-revalidate for better UX
+      const fetchOptions: RequestInit = forceRefresh
+        ? { cache: 'no-store' } // Force fresh data when refreshing after test completion
+        : { next: { revalidate: 30 } } // Revalidate every 30 seconds
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
         fetch('/api/users', fetchOptions),
         fetch('/api/assignments', fetchOptions),
@@ -511,10 +512,6 @@ function OwnerPageInner() {
 
   // Tab-specific loading functions - only load what's needed for each tab
   const loadTabData = useCallback(async (tab: string, preserveData = false) => {
-    // Get current search params for cache-busting detection
-    const currentTab = getTabFromUrl(searchParams)
-    const hasTimestamp = searchParams.has('_t')
-    
     try {
       if (tab === 'docs') {
         setIsLoadingDocuments(!preserveData)
@@ -673,19 +670,29 @@ function OwnerPageInner() {
     }
   }, [defaultTab])
 
-  // Reload data when page becomes visible (e.g., when returning from document viewer)
+  // Reload data when page becomes visible (e.g., when returning from document viewer or test page)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
         console.log(`Owner: Page became visible, reloading ${defaultTab} tab...`)
-        setTimeout(() => loadTabData(defaultTab, true), 0)
+        // Use cache-busting for overview tab to ensure fresh test attempt data
+        if (defaultTab === 'overview') {
+          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
+        } else {
+          setTimeout(() => loadTabData(defaultTab, true), 0)
+        }
       }
     }
 
     const handleFocus = () => {
       if (defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
         console.log(`Owner: Window focused, reloading ${defaultTab} tab...`)
-        setTimeout(() => loadTabData(defaultTab, true), 0)
+        // Use cache-busting for overview tab to ensure fresh test attempt data
+        if (defaultTab === 'overview') {
+          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
+        } else {
+          setTimeout(() => loadTabData(defaultTab, true), 0)
+        }
       }
     }
 
@@ -696,7 +703,7 @@ function OwnerPageInner() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [defaultTab, loadTabData])
+  }, [defaultTab, loadTabData, loadData])
 
   // Document handlers
   const [enhancingDocId, setEnhancingDocId] = useState<string | null>(null)

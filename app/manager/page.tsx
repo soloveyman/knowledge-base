@@ -268,7 +268,7 @@ function ManagerPageInner() {
   }, [session, status, router])
 
   // Load data from APIs - parallel fetching for faster loading
-  const loadData = useCallback(async (preserveData = false) => {
+  const loadData = useCallback(async (preserveData = false, forceRefresh = false) => {
     try {
       // Set loading states if we're refreshing (but don't show loading to avoid flicker)
       if (preserveData) {
@@ -277,10 +277,11 @@ function ManagerPageInner() {
       }
 
       // Fetch all data in parallel for instant loading
-      // Use stale-while-revalidate for better UX: serve stale data immediately, revalidate in background
-      const fetchOptions: RequestInit = { 
-        next: { revalidate: 30 } // Revalidate every 30 seconds
-      }
+      // Use cache-busting if forceRefresh is true (e.g., after test completion)
+      // Otherwise use stale-while-revalidate for better UX
+      const fetchOptions: RequestInit = forceRefresh
+        ? { cache: 'no-store' } // Force fresh data when refreshing after test completion
+        : { next: { revalidate: 30 } } // Revalidate every 30 seconds
       const [usersResponse, assignmentsResponse, testsResponse, documentsResponse] = await Promise.all([
         fetch('/api/users', fetchOptions),
         fetch('/api/assignments', fetchOptions),
@@ -583,19 +584,29 @@ function ManagerPageInner() {
     }
   }, [searchParams, loadTabData])
 
-  // Reload data when page becomes visible (e.g., when returning from document viewer)
+  // Reload data when page becomes visible (e.g., when returning from document viewer or test page)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
         console.log(`Manager: Page became visible, reloading ${defaultTab} tab...`)
-        loadTabData(defaultTab, true)
+        // Use cache-busting for overview tab to ensure fresh test attempt data
+        if (defaultTab === 'overview') {
+          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
+        } else {
+          loadTabData(defaultTab, true)
+        }
       }
     }
 
     const handleFocus = () => {
       if (defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
         console.log(`Manager: Window focused, reloading ${defaultTab} tab...`)
-        loadTabData(defaultTab, true)
+        // Use cache-busting for overview tab to ensure fresh test attempt data
+        if (defaultTab === 'overview') {
+          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
+        } else {
+          loadTabData(defaultTab, true)
+        }
       }
     }
 
@@ -606,7 +617,7 @@ function ManagerPageInner() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [defaultTab, loadTabData])
+  }, [defaultTab, loadTabData, loadData])
 
 
   // Document handlers with optimistic updates

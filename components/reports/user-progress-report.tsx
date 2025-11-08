@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -94,152 +94,204 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   const translateBadge = useBadgeTranslation()
 
   // Load all test attempts for each user across all their assignments (parallelized)
-  useEffect(() => {
-    const loadAllAttemptScores = async () => {
-      const scoresByUser: Record<string, number[]> = {}
+  // Use cache-busting to ensure fresh data
+  const loadAllAttemptScores = async () => {
+    const scoresByUser: Record<string, number[]> = {}
+    
+    // Collect all fetch promises upfront for parallel execution
+    const fetchPromises: Array<{ userId: string; testId: string; promise: Promise<Response> }> = []
+    
+    for (const user of users) {
+      if (user.role !== 'employee') continue
       
-      // Collect all fetch promises upfront for parallel execution
-      const fetchPromises: Array<{ userId: string; testId: string; promise: Promise<Response> }> = []
+      // Get all assignments for this user that have a testId
+      const userAssignments = assignments.filter(assignment => {
+        if (!assignment.testId) return false
+        if (assignment.users && Array.isArray(assignment.users)) {
+          return assignment.users.some((au: AssignedUser) => au.userId === user.id)
+        }
+        return false
+      })
+      
+      if (userAssignments.length === 0) {
+        scoresByUser[user.id] = []
+        continue
+      }
+      
+      // Get all unique testIds from user's assignments
+      const testIds = [...new Set(userAssignments.map(a => a.testId).filter(Boolean))]
+      
+      // Create fetch promises for all testIds (parallel execution) with cache-busting
+      testIds.forEach(testId => {
+        fetchPromises.push({
+          userId: user.id,
+          testId,
+          promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${testId}&_t=${Date.now()}`, {
+            cache: 'no-store'
+          })
+        })
+      })
+    }
+    
+    // Execute all fetches in parallel
+    const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
+    
+    // Process results in parallel
+    await Promise.all(responses.map(async (result, index) => {
+      const { userId, testId } = fetchPromises[index]
+      
+      if (result.status === 'fulfilled') {
+        try {
+          const apiResult = await result.value.json()
+          if (apiResult.success && apiResult.data.attempts) {
+            const attempts = apiResult.data.attempts
+            const completedAttempts = attempts.filter((a: any) => 
+              a.status === 'completed' && a.score !== null && a.score !== undefined
+            )
+            if (!scoresByUser[userId]) {
+              scoresByUser[userId] = []
+            }
+            completedAttempts.forEach((a: any) => {
+              scoresByUser[userId].push(a.score ?? 0)
+            })
+          }
+        } catch (error) {
+          console.error(`Error processing attempts for user ${userId}, test ${testId}:`, error)
+        }
+      } else {
+        console.error(`Error loading attempts for user ${userId}, test ${testId}:`, result.reason)
+      }
+    }))
+    
+    setUserAttemptScores(scoresByUser)
+  }, [assignments, users])
+
+  useEffect(() => {
+    loadAllAttemptScores()
+  }, [loadAllAttemptScores])
+
+  // Reload data when page becomes visible (e.g., when returning from test page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Reload attempt scores when page becomes visible
+        loadAllAttemptScores()
+      }
+    }
+
+    const handleFocus = () => {
+      // Reload attempt scores when window gains focus
+      loadAllAttemptScores()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loadAllAttemptScores])
+
+  // Load test attempt statistics for each assignment (parallelized)
+  // Use cache-busting to ensure fresh data
+  const loadAttemptStats = useCallback(async () => {
+    const stats: Record<string, Record<string, AttemptStats>> = {}
+    
+    // Collect all fetch promises upfront for parallel execution
+    const fetchPromises: Array<{ assignmentId: string; userId: string; testId: string; promise: Promise<Response> }> = []
+    
+    for (const assignment of assignments) {
+      if (!assignment.testId) continue
+      
+      stats[assignment.id] = {}
       
       for (const user of users) {
         if (user.role !== 'employee') continue
         
-        // Get all assignments for this user that have a testId
-        const userAssignments = assignments.filter(assignment => {
-          if (!assignment.testId) return false
-          if (assignment.users && Array.isArray(assignment.users)) {
-            return assignment.users.some((au: AssignedUser) => au.userId === user.id)
-          }
-          return false
-        })
-        
-        if (userAssignments.length === 0) {
-          scoresByUser[user.id] = []
-          continue
-        }
-        
-        // Get all unique testIds from user's assignments
-        const testIds = [...new Set(userAssignments.map(a => a.testId).filter(Boolean))]
-        
-        // Create fetch promises for all testIds (parallel execution)
-        testIds.forEach(testId => {
-          fetchPromises.push({
-            userId: user.id,
-            testId,
-            promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${testId}`)
+        fetchPromises.push({
+          assignmentId: assignment.id,
+          userId: user.id,
+          testId: assignment.testId,
+          promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${assignment.testId}&_t=${Date.now()}`, {
+            cache: 'no-store'
           })
         })
       }
-      
-      // Execute all fetches in parallel
-      const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
-      
-      // Process results in parallel
-      await Promise.all(responses.map(async (result, index) => {
-        const { userId, testId } = fetchPromises[index]
-        
-        if (result.status === 'fulfilled') {
-          try {
-            const apiResult = await result.value.json()
-            if (apiResult.success && apiResult.data.attempts) {
-              const attempts = apiResult.data.attempts
-              const completedAttempts = attempts.filter((a: any) => 
-                a.status === 'completed' && a.score !== null && a.score !== undefined
-              )
-              if (!scoresByUser[userId]) {
-                scoresByUser[userId] = []
-              }
-              completedAttempts.forEach((a: any) => {
-                scoresByUser[userId].push(a.score ?? 0)
-              })
-            }
-          } catch (error) {
-            console.error(`Error processing attempts for user ${userId}, test ${testId}:`, error)
-          }
-        } else {
-          console.error(`Error loading attempts for user ${userId}, test ${testId}:`, result.reason)
-        }
-      }))
-      
-      setUserAttemptScores(scoresByUser)
     }
     
-    loadAllAttemptScores()
+    // Execute all fetches in parallel
+    const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
+    
+    // Process results in parallel
+    await Promise.all(responses.map(async (result, index) => {
+      const { assignmentId, userId, testId } = fetchPromises[index]
+      
+      if (result.status === 'fulfilled') {
+        try {
+          const apiResult = await result.value.json()
+          
+          if (apiResult.success && apiResult.data.attempts) {
+            const attempts = apiResult.data.attempts
+            const completedAttempts = attempts.filter((a: any) => a.status === 'completed' && a.score !== null && a.score !== undefined)
+            const totalAttempts = attempts.length
+            const passedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) >= 70).length
+            const failedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) < 70).length
+            const bestScore = completedAttempts.length > 0 
+              ? Math.max(...completedAttempts.map((a: any) => a.score ?? 0))
+              : null
+            const averageScore = completedAttempts.length > 0
+              ? Math.round(completedAttempts.reduce((acc: number, a: any) => acc + (a.score ?? 0), 0) / completedAttempts.length)
+              : null
+            
+            if (!stats[assignmentId]) {
+              stats[assignmentId] = {}
+            }
+            stats[assignmentId][userId] = {
+              totalAttempts,
+              passedAttempts,
+              failedAttempts,
+              bestScore,
+              averageScore
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing attempts for assignment ${assignmentId}, user ${userId}:`, error)
+        }
+      } else {
+        console.error(`Error loading attempts for assignment ${assignmentId}, user ${userId}:`, result.reason)
+      }
+    }))
+    
+    setAttemptStats(stats)
   }, [assignments, users])
 
-  // Load test attempt statistics for each assignment (parallelized)
   useEffect(() => {
-    const loadAttemptStats = async () => {
-      const stats: Record<string, Record<string, AttemptStats>> = {}
-      
-      // Collect all fetch promises upfront for parallel execution
-      const fetchPromises: Array<{ assignmentId: string; userId: string; testId: string; promise: Promise<Response> }> = []
-      
-      for (const assignment of assignments) {
-        if (!assignment.testId) continue
-        
-        stats[assignment.id] = {}
-        
-        for (const user of users) {
-          if (user.role !== 'employee') continue
-          
-          fetchPromises.push({
-            assignmentId: assignment.id,
-            userId: user.id,
-            testId: assignment.testId,
-            promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${assignment.testId}`)
-          })
-        }
-      }
-      
-      // Execute all fetches in parallel
-      const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
-      
-      // Process results in parallel
-      await Promise.all(responses.map(async (result, index) => {
-        const { assignmentId, userId, testId } = fetchPromises[index]
-        
-        if (result.status === 'fulfilled') {
-          try {
-            const apiResult = await result.value.json()
-            
-            if (apiResult.success && apiResult.data.attempts) {
-              const attempts = apiResult.data.attempts
-              const completedAttempts = attempts.filter((a: any) => a.status === 'completed' && a.score !== null && a.score !== undefined)
-              const totalAttempts = attempts.length
-              const passedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) >= 70).length
-              const failedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) < 70).length
-              const bestScore = completedAttempts.length > 0 
-                ? Math.max(...completedAttempts.map((a: any) => a.score ?? 0))
-                : null
-              const averageScore = completedAttempts.length > 0
-                ? Math.round(completedAttempts.reduce((acc: number, a: any) => acc + (a.score ?? 0), 0) / completedAttempts.length)
-                : null
-              
-              if (!stats[assignmentId]) {
-                stats[assignmentId] = {}
-              }
-              stats[assignmentId][userId] = {
-                totalAttempts,
-                passedAttempts,
-                failedAttempts,
-                bestScore,
-                averageScore
-              }
-            }
-          } catch (error) {
-            console.error(`Error processing attempts for assignment ${assignmentId}, user ${userId}:`, error)
-          }
-        } else {
-          console.error(`Error loading attempts for assignment ${assignmentId}, user ${userId}:`, result.reason)
-        }
-      }))
-      
-      setAttemptStats(stats)
-    }
-    
     loadAttemptStats()
-  }, [assignments, users])
+  }, [loadAttemptStats])
+
+  // Reload stats when page becomes visible (e.g., when returning from test page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Reload attempt stats when page becomes visible
+        loadAttemptStats()
+      }
+    }
+
+    const handleFocus = () => {
+      // Reload attempt stats when window gains focus
+      loadAttemptStats()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loadAttemptStats])
 
   useEffect(() => {
     console.log('UserProgressReport: useEffect triggered')

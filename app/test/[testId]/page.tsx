@@ -6,6 +6,8 @@ import { useEffect, useState, useCallback, useLayoutEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -146,6 +148,13 @@ export default function TestPage() {
     }))
   }
 
+  const handleTextAnswerChange = (questionId: string, answer: string) => {
+    setAnswers(prev => ({
+      ...prev,
+      [questionId]: answer
+    }))
+  }
+
   const handleNextQuestion = () => {
     if (testData && currentQuestion < testData.questions.length - 1) {
       setCurrentQuestion(prev => prev + 1)
@@ -166,34 +175,55 @@ export default function TestPage() {
       const userAnswer = answers[question.id]
       if (!userAnswer || !question.correct_answer) return
       
-      // Normalize correct answer to letter format (A, B, C, D)
-      let correctAnswerLetter: string | null = null
-      
-      // If correct_answer is already a letter (A, B, C, D)
-      if (/^[A-Z]$/.test(question.correct_answer)) {
-        correctAnswerLetter = question.correct_answer.toUpperCase()
+      // Handle text/complete questions differently
+      if (question.type === 'complete' || question.type === 'text') {
+        // For text questions, compare answers case-insensitively after trimming
+        const normalizedUserAnswer = userAnswer.trim().toLowerCase()
+        const normalizedCorrectAnswer = question.correct_answer.trim().toLowerCase()
+        
+        if (normalizedUserAnswer === normalizedCorrectAnswer) {
+          correctAnswers++
+        }
       } 
-      // If correct_answer is a numeric index (0, 1, 2, 3)
-      else if (/^\d+$/.test(question.correct_answer)) {
-        const index = parseInt(question.correct_answer, 10)
-        if (question.choices && index >= 0 && index < question.choices.length) {
-          correctAnswerLetter = String.fromCharCode(65 + index)
+      // Handle multiple choice and true/false questions
+      else {
+        // Normalize correct answer to letter format (A, B, C, D) or true/false
+        let correctAnswerLetter: string | null = null
+        
+        // If correct_answer is already a letter (A, B, C, D)
+        if (/^[A-Z]$/.test(question.correct_answer)) {
+          correctAnswerLetter = question.correct_answer.toUpperCase()
+        } 
+        // If correct_answer is a numeric index (0, 1, 2, 3)
+        else if (/^\d+$/.test(question.correct_answer)) {
+          const index = parseInt(question.correct_answer, 10)
+          if (question.choices && index >= 0 && index < question.choices.length) {
+            correctAnswerLetter = String.fromCharCode(65 + index)
+          }
         }
-      }
-      // If correct_answer matches one of the choice texts, find its index
-      else if (question.choices && question.correct_answer) {
-        const correctAnswerText = question.correct_answer
-        const choiceIndex = question.choices.findIndex(
-          choice => choice.trim().toLowerCase() === correctAnswerText.trim().toLowerCase()
-        )
-        if (choiceIndex >= 0) {
-          correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+        // If correct_answer matches one of the choice texts, find its index
+        else if (question.choices && question.correct_answer) {
+          const correctAnswerText = question.correct_answer
+          const choiceIndex = question.choices.findIndex(
+            choice => choice.trim().toLowerCase() === correctAnswerText.trim().toLowerCase()
+          )
+          if (choiceIndex >= 0) {
+            correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+          }
         }
-      }
-      
-      // Compare normalized answers
-      if (correctAnswerLetter && userAnswer.toUpperCase() === correctAnswerLetter) {
-        correctAnswers++
+        // Handle true/false questions
+        else if (question.type === 'tf') {
+          // Normalize true/false values
+          const normalizedCorrect = question.correct_answer.trim().toLowerCase()
+          if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
+            correctAnswerLetter = normalizedCorrect
+          }
+        }
+        
+        // Compare normalized answers
+        if (correctAnswerLetter && userAnswer.toLowerCase() === correctAnswerLetter.toLowerCase()) {
+          correctAnswers++
+        }
       }
     })
 
@@ -332,7 +362,7 @@ export default function TestPage() {
         <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
           <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl text-center">
                 {score >= 70 ? t('congratulations') : t('testCompleted')}
               </CardTitle>
               <CardDescription>
@@ -433,7 +463,8 @@ export default function TestPage() {
               }}
             />
 
-            {currentQ.choices && (
+            {/* Multiple choice questions */}
+            {currentQ.type === 'mcq' && currentQ.choices && currentQ.choices.length > 0 && (
               <div className="space-y-3">
                 {currentQ.choices.map((choice, index) => {
                   const letter = String.fromCharCode(65 + index)
@@ -462,6 +493,54 @@ export default function TestPage() {
                     </button>
                   )
                 })}
+              </div>
+            )}
+
+            {/* True/False questions */}
+            {currentQ.type === 'tf' && (
+              <div className="space-y-3">
+                {['True', 'False'].map((option, index) => {
+                  const value = index === 0 ? 'true' : 'false'
+                  const isSelected = answers[currentQ.id] === value
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleAnswerSelect(currentQ.id, value)}
+                      className={`w-full p-4 text-left border rounded-3xl transition-colors ${
+                        isSelected
+                          ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300'
+                          : 'border-border hover:border-accent hover:bg-accent'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-medium shrink-0 ${
+                          isSelected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border'
+                        }`}>
+                          {index === 0 ? 'T' : 'F'}
+                        </div>
+                        <span className="flex-1 break-word leading-relaxed">{option}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Text input questions (complete/fill in the blank) */}
+            {(currentQ.type === 'complete' || currentQ.type === 'text') && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  {t('yourAnswer') || 'Your Answer'}
+                </label>
+                <Textarea
+                  value={answers[currentQ.id] || ''}
+                  onChange={(e) => handleTextAnswerChange(currentQ.id, e.target.value)}
+                  placeholder={t('enterYourAnswer') || 'Enter your answer here...'}
+                  className="min-h-[120px] resize-none"
+                />
               </div>
             )}
 
