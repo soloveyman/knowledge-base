@@ -56,13 +56,13 @@ const nextConfig: NextConfig = {
       '@radix-ui/react-select',
       '@radix-ui/react-tabs',
     ],
-    // Exclude Node.js packages from server component bundling
-    serverComponentsExternalPackages: [
-      'pg',
-      'pg-connection-string',
-      'drizzle-orm',
-    ],
   },
+  // Exclude Node.js packages from server component bundling
+  serverExternalPackages: [
+    'pg',
+    'pg-connection-string',
+    'drizzle-orm',
+  ],
   // Performance optimizations
   compress: true,
   poweredByHeader: false,
@@ -124,6 +124,11 @@ const nextConfig: NextConfig = {
         http: false,
         https: false,
         zlib: false,
+      };
+      // Exclude optional native dependencies
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'pg-native': false,
       };
     }
     return config;

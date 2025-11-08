@@ -50,6 +50,17 @@ export function useFormValidation<T extends Record<string, unknown>>(
   }, [])
 
   /**
+   * Clear error for a single field
+   */
+  const clearFieldError = useCallback((field: keyof T) => {
+    setErrors((prev) => {
+      const newErrors = { ...prev }
+      delete newErrors[field]
+      return newErrors
+    })
+  }, [])
+
+  /**
    * Validate a single field
    */
   const validateFieldValue = useCallback(
@@ -101,6 +112,8 @@ export function useFormValidation<T extends Record<string, unknown>>(
       allTouched[key as keyof T] = true
     })
     setTouched(allTouched)
+    // Set errors in state so they display under fields
+    setErrors(validationResult.errors)
 
     return validationResult.isValid
   }, [schema])
@@ -143,6 +156,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
     isTouched,
     setValue,
     setFieldTouched,
+    clearFieldError,
     validateField: validateFieldValue,
     validateAll,
     reset,

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { getStatusBadge, getRoleBadge, getCountBadge, getDifficultyBadge, getLocaleBadge } from "@/lib/badges"
+import { getStatusBadge, getRoleBadge, getCountBadge, getDifficultyBadge, getLocaleBadge } from "@/lib/badge-utils"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { DeleteConfirmation } from "./delete-confirmation"
 import { X, Edit } from "lucide-react"

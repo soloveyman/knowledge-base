@@ -13,6 +13,7 @@ import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-
 import { useTranslation } from "@/lib/translation-context"
 import { useEmailValidation } from "@/lib/hooks/use-email-validation"
 import { validationRules, validateField } from "@/lib/validation"
+import { isDisposableEmail } from "@/lib/disposable-email"
 
 export default function SignInPage() {
   const [email, setEmail] = useState("")
@@ -165,13 +166,13 @@ export default function SignInPage() {
         
         // Check email availability
         if (emailValidation.isAvailable === false) {
-          setError('This email is already registered')
+          setFieldErrors(prev => ({ ...prev, email: 'This email is already registered' }))
           setIsLoading(false)
           return
         }
         
         if (emailValidation.isChecking) {
-          setError('Please wait while we check email availability...')
+          setFieldErrors(prev => ({ ...prev, email: 'Please wait while we check email availability...' }))
           setIsLoading(false)
           return
         }
@@ -183,7 +184,13 @@ export default function SignInPage() {
         })
         const body = await res.json().catch(() => ({}))
         if (!res.ok) {
-          setError(body?.error || `Registration failed: ${res.status} ${res.statusText}`)
+          // Show API errors in the email field if it's an email-related error
+          const errorMessage = body?.error || `Registration failed: ${res.status} ${res.statusText}`
+          if (errorMessage.toLowerCase().includes('email')) {
+            setFieldErrors(prev => ({ ...prev, email: errorMessage }))
+          } else {
+            setError(errorMessage)
+          }
           setIsLoading(false)
           return
         }
@@ -280,7 +287,7 @@ export default function SignInPage() {
                 </AlertDescription>
               </Alert>
             )}
-            {error && (
+            {error && !isRegister && (
               <Alert variant={error.includes('not found') || error.includes('create an account') ? "default" : "destructive"}>
                 <AlertDescription>
                   {error}

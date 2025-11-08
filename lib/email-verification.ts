@@ -75,9 +75,21 @@ export async function verifyEmailToken(token: string): Promise<{ success: boolea
 
 /**
  * Send email verification email
+ * @param email - Email address to send verification to
+ * @param verificationUrl - Verification link URL
+ * @param isAdminCreated - Whether the account was created by an admin (default: false)
  */
-export async function sendVerificationEmail(email: string, verificationUrl: string): Promise<void> {
+export async function sendVerificationEmail(
+  email: string, 
+  verificationUrl: string,
+  isAdminCreated: boolean = false
+): Promise<void> {
   const subject = 'Verify Your Email Address'
+  
+  const introText = isAdminCreated
+    ? 'An account has been created for you! Please verify your email address by clicking the button below:'
+    : 'Thank you for registering! Please verify your email address by clicking the button below:'
+  
   const html = `
     <!DOCTYPE html>
     <html>
@@ -90,27 +102,32 @@ export async function sendVerificationEmail(email: string, verificationUrl: stri
           <h1 style="color: #fff; margin: 0;">Verify Your Email</h1>
         </div>
         <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-          <p>Thank you for registering! Please verify your email address by clicking the button below:</p>
+          <p>${introText}</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${verificationUrl}" style="background-color: #3b82f6; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Verify Email</a>
           </div>
           <p style="font-size: 14px; color: #666;">Or copy and paste this link into your browser:</p>
           <p style="font-size: 12px; color: #999; word-break: break-all;">${verificationUrl}</p>
           <p style="font-size: 14px; color: #666; margin-top: 30px;">This link will expire in 24 hours.</p>
-          <p style="font-size: 14px; color: #666;">If you didn't create an account, please ignore this email.</p>
+          <p style="font-size: 14px; color: #666;">If you didn't expect this email, please ignore it.</p>
         </div>
       </body>
     </html>
   `
+  
+  const textIntro = isAdminCreated
+    ? 'An account has been created for you! Please verify your email address by clicking the link below:'
+    : 'Thank you for registering! Please verify your email address by clicking the link below:'
+  
   const text = `Verify Your Email Address
 
-Thank you for registering! Please verify your email address by clicking the link below:
+${textIntro}
 
 ${verificationUrl}
 
 This link will expire in 24 hours.
 
-If you didn't create an account, please ignore this email.`
+If you didn't expect this email, please ignore it.`
 
   await sendEmail({
     to: email,

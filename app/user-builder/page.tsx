@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ErrorMessage } from "@/components/common/error-message"
 import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
@@ -78,7 +77,7 @@ export default function UserBuilderPage() {
     role: [validationRules.required]
   }, initialFormData)
   
-  const { values, errors, touched, setValue, setFieldTouched, validateAll, validateField } = validation
+  const { values, errors, touched, setValue, setFieldTouched, clearFieldError, validateAll, validateField } = validation
   
   // Email validation hook (only for new users, not editing)
   const emailValidation = useEmailValidation(values.email, 500, isEditMode)
@@ -113,6 +112,16 @@ export default function UserBuilderPage() {
   const loadUserForEditing = async (userId: string) => {
     try {
       const response = await fetch(`/api/users/${userId}`)
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Non-JSON response:', text.substring(0, 200))
+        setError('Server returned an invalid response. Please try again.')
+        return
+      }
+      
       const result = await response.json()
       
       if (result.success && result.data.user) {
@@ -135,7 +144,6 @@ export default function UserBuilderPage() {
   const handleCreateUser = async () => {
     // Validate all fields
     if (!validateAll()) {
-      setError("Please fix the errors below")
       return
     }
 
@@ -159,6 +167,14 @@ export default function UserBuilderPage() {
           }),
         })
 
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type')
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text()
+          console.error('Non-JSON response:', text.substring(0, 200))
+          throw new Error('Server returned an invalid response. Please try again.')
+        }
+
         const result = await response.json()
 
         if (!response.ok) {
@@ -181,6 +197,14 @@ export default function UserBuilderPage() {
             role: userConfig.role,
           }),
         })
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type')
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text()
+          console.error('Non-JSON response:', text.substring(0, 200))
+          throw new Error('Server returned an invalid response. Please try again.')
+        }
 
         const result = await response.json()
 
@@ -239,8 +263,6 @@ export default function UserBuilderPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
         <div className="space-y-3 md:space-y-6">
-          <ErrorMessage error={error} />
-
           <Card>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -281,7 +303,9 @@ export default function UserBuilderPage() {
                       value={userConfig.name}
                       onChange={(e) => {
                         setValue('name', e.target.value)
+                        clearFieldError('name')
                       }}
+                      onFocus={() => clearFieldError('name')}
                       onBlur={() => setFieldTouched('name')}
                       placeholder={t('enterFullName')}
                     />
@@ -296,7 +320,9 @@ export default function UserBuilderPage() {
                       value={userConfig.job}
                       onChange={(e) => {
                         setValue('job', e.target.value)
+                        clearFieldError('job')
                       }}
+                      onFocus={() => clearFieldError('job')}
                       onBlur={() => setFieldTouched('job')}
                       placeholder={t('enterJobTitle')}
                     />
@@ -318,33 +344,39 @@ export default function UserBuilderPage() {
                         : undefined
                     }
                   >
-                    <div className="relative">
-                      <Input
-                        type="email"
-                        value={userConfig.email}
-                        onChange={(e) => {
-                          setValue('email', e.target.value)
-                          setFieldTouched('email')
-                        }}
-                        onBlur={() => setFieldTouched('email')}
-                        placeholder={t('enterEmailAddress')}
-                        className={
-                          touched.email && 
-                          (errors.email || isDisposableEmail(userConfig.email) || emailValidation.isAvailable === false)
-                            ? "border-destructive" 
-                            : touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && !isEditMode
-                            ? "border-green-500"
-                            : ""
-                        }
-                      />
-                      {!isEditMode && touched.email && emailValidation.isChecking && (
-                        <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                    <>
+                      <div className="relative">
+                        <Input
+                          type="email"
+                          value={userConfig.email}
+                          onChange={(e) => {
+                            setValue('email', e.target.value)
+                            setFieldTouched('email')
+                            clearFieldError('email')
+                          }}
+                          onFocus={() => clearFieldError('email')}
+                          onBlur={() => setFieldTouched('email')}
+                          placeholder={t('enterEmailAddress')}
+                          autoComplete="off"
+                          name="new-user-email"
+                          className={
+                            touched.email && 
+                            (errors.email || isDisposableEmail(userConfig.email) || emailValidation.isAvailable === false)
+                              ? "border-destructive" 
+                              : touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && !isEditMode
+                              ? "border-green-500"
+                              : ""
+                          }
+                        />
+                        {!isEditMode && touched.email && emailValidation.isChecking && (
+                          <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                      {!isEditMode && touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && (
+                        <p className="text-xs text-green-600 mt-1">Email is available</p>
                       )}
-                    </div>
+                    </>
                   </FormField>
-                  {!isEditMode && touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && (
-                    <p className="text-xs text-green-600 mt-1">Email is available</p>
-                  )}
 
                   <FormField
                     label={t('password')}
@@ -358,7 +390,9 @@ export default function UserBuilderPage() {
                         value={userConfig.password}
                         onChange={(e) => {
                           setValue('password', e.target.value)
+                          clearFieldError('password')
                         }}
+                        onFocus={() => clearFieldError('password')}
                         onBlur={() => setFieldTouched('password')}
                         placeholder={isEditMode ? "Enter new password (optional)" : t('enterPassword')}
                         className="pr-10"
@@ -384,6 +418,12 @@ export default function UserBuilderPage() {
                       onValueChange={(value) => {
                         setValue('role', value)
                         setFieldTouched('role')
+                        clearFieldError('role')
+                      }}
+                      onOpenChange={(open) => {
+                        if (open) {
+                          clearFieldError('role')
+                        }
                       }}
                     >
                       <SelectTrigger className="w-full">

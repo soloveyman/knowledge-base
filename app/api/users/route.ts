@@ -142,7 +142,9 @@ export async function POST(request: Request) {
         process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
         'http://localhost:3000'
       const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`
-      await sendVerificationEmail(normalizedEmail, verificationUrl)
+      // Pass isAdminCreated=true since this is an admin-created user
+      await sendVerificationEmail(normalizedEmail, verificationUrl, true)
+      console.log('[User Creation] Verification email sent to:', normalizedEmail)
     } catch (error) {
       console.error('Create user: failed to send verification email, proceeding anyway:', error)
       // Don't fail user creation if email sending fails

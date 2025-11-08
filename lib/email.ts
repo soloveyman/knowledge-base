@@ -17,7 +17,7 @@ type MailOptions = {
 }
 
 const createTransporter = (): Transporter | { sendMail: (options: MailOptions) => Promise<{ messageId: string }> } => {
-  // If SMTP is configured, use it
+  // If SMTP is configured, use it (works in both development and production)
   if (
     process.env.SMTP_HOST &&
     process.env.SMTP_PORT &&
@@ -26,6 +26,8 @@ const createTransporter = (): Transporter | { sendMail: (options: MailOptions) =
   ) {
     const port = parseInt(process.env.SMTP_PORT, 10)
     const secure = process.env.SMTP_SECURE === 'true' || port === 465
+    
+    console.log('[Email Service] Using SMTP:', process.env.SMTP_HOST, 'Port:', port)
     
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -38,15 +40,16 @@ const createTransporter = (): Transporter | { sendMail: (options: MailOptions) =
     })
   }
 
-  // For development, use a test account (ethereal.email) or console logging
+  // For development without SMTP, log to console
   if (process.env.NODE_ENV === 'development') {
-    // In development, log to console
+    console.warn('[Email Service] SMTP not configured. Emails will be logged to console only.')
+    console.warn('[Email Service] To send real emails, set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASSWORD in .env.local')
     return {
       sendMail: async (options: MailOptions) => {
         console.log('\n📧 [Email Service] Would send email:')
         console.log('To:', options.to)
         console.log('Subject:', options.subject)
-        console.log('Body:', options.text || options.html)
+        console.log('Verification URL:', options.html.match(/https?:\/\/[^\s"<>]+/)?.[0] || 'Not found')
         console.log('---\n')
         return { messageId: 'dev-' + Date.now() }
       },
@@ -62,15 +65,26 @@ const createTransporter = (): Transporter | { sendMail: (options: MailOptions) =
 export async function sendEmail(options: EmailOptions): Promise<void> {
   try {
     const transporter = createTransporter()
-    await transporter.sendMail({
+    const result = await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@example.com',
       to: options.to,
       subject: options.subject,
       html: options.html,
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
     })
+    console.log('[Email Service] Email sent successfully:', {
+      to: options.to,
+      subject: options.subject,
+      messageId: result.messageId
+    })
   } catch (error) {
     console.error('[Email Service] Error sending email:', error)
+    if (error instanceof Error) {
+      console.error('[Email Service] Error details:', error.message)
+      if (error.message.includes('Invalid login')) {
+        console.error('[Email Service] Check your SMTP_USER and SMTP_PASSWORD (use App Password for Gmail)')
+      }
+    }
     throw error
   }
 }
