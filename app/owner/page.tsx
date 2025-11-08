@@ -511,6 +511,10 @@ function OwnerPageInner() {
 
   // Tab-specific loading functions - only load what's needed for each tab
   const loadTabData = useCallback(async (tab: string, preserveData = false) => {
+    // Get current search params for cache-busting detection
+    const currentTab = getTabFromUrl(searchParams)
+    const hasTimestamp = searchParams.has('_t')
+    
     try {
       if (tab === 'docs') {
         setIsLoadingDocuments(!preserveData)
@@ -607,9 +611,13 @@ function OwnerPageInner() {
         // Assignments need all data for mapping
         await loadData(preserveData)
       } else if (tab === 'users') {
-        const response = await fetch('/api/users', { 
-          next: { revalidate: 30 } 
-        })
+        // Check if returning from user-builder (has timestamp) - use cache-busting
+        const hasTimestamp = searchParams.has('_t')
+        const fetchOptions: RequestInit = hasTimestamp 
+          ? { cache: 'no-store' } // Force fresh data when returning from create/edit
+          : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+        
+        const response = await fetch('/api/users', fetchOptions)
         const result = await response.json()
         if (result.success) {
           setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
@@ -621,7 +629,7 @@ function OwnerPageInner() {
     } catch (error) {
       console.error(`Error loading ${tab} tab data:`, error)
     }
-  }, [loadData, session?.user?.id])
+  }, [loadData, session?.user?.id, searchParams])
 
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages

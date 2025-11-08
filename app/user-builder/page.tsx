@@ -186,8 +186,8 @@ export default function UserBuilderPage() {
         toast.success('User created successfully!')
       }
       
-      // Redirect to owner users tab
-      router.push('/owner?tab=users')
+      // Redirect to owner users tab with timestamp to trigger refresh
+      router.push(`/owner?tab=users&_t=${Date.now()}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {
@@ -196,7 +196,7 @@ export default function UserBuilderPage() {
   }
 
   const handleClose = () => {
-    router.push('/owner?tab=users')
+    router.push(`/owner?tab=users&_t=${Date.now()}`)
   }
 
   if (status === "loading") {

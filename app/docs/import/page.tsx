@@ -449,7 +449,13 @@ function DocImportPageInner() {
     <PageLayout
       title={t('importDocuments')}
       icon={<FileText className="h-6 w-6" />}
-      onClose={() => router.push(safeReturnTo)}
+      onClose={() => {
+        // Add timestamp to force data reload when closing
+        const redirectUrl = safeReturnTo.includes('?') 
+          ? `${safeReturnTo}&_t=${Date.now()}`
+          : `${safeReturnTo}?_t=${Date.now()}`
+        router.push(redirectUrl)
+      }}
     >
       <div className="max-w-4xl mx-auto space-y-3 md:space-y-6">
         {/* Upload Area */}

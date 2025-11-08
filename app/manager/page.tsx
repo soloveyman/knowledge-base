@@ -438,14 +438,19 @@ function ManagerPageInner() {
 
   // Tab-specific loading functions - only load what's needed for each tab
   const loadTabData = useCallback(async (tab: string, preserveData = false) => {
-    const fetchOptions: RequestInit = { cache: 'no-store' }
+    // Get current search params for cache-busting detection
+    const currentTab = getTabFromUrl(searchParams)
+    const hasTimestamp = searchParams.has('_t')
     
     try {
       if (tab === 'docs') {
         setIsLoadingDocuments(!preserveData)
-        const response = await fetch('/api/documents', { 
-          next: { revalidate: 30 } 
-        })
+        // Check if returning from import (has timestamp) - use cache-busting
+        const fetchOptions: RequestInit = hasTimestamp 
+          ? { cache: 'no-store' } // Force fresh data when returning from create/edit
+          : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+        
+        const response = await fetch('/api/documents', fetchOptions)
         const result = await response.json()
         if (result.success && result.data.documents) {
           const transformedDocs = result.data.documents.map((doc: {
@@ -476,7 +481,11 @@ function ManagerPageInner() {
       } else if (tab === 'tests') {
         setIsLoadingTests(!preserveData)
         // Tests need documents for sourceDocument lookup
-        const fetchOpts = { next: { revalidate: 30 } }
+        // Check if returning from test-builder (has timestamp) - use cache-busting
+        const fetchOpts: RequestInit = hasTimestamp 
+          ? { cache: 'no-store' } // Force fresh data when returning from create/edit
+          : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+        
         const [testsResponse, documentsResponse] = await Promise.all([
           fetch('/api/tests', fetchOpts),
           fetch('/api/documents', fetchOpts)
@@ -541,7 +550,7 @@ function ManagerPageInner() {
     } catch (error) {
       console.error(`Error loading ${tab} tab data:`, error)
     }
-  }, [loadData])
+  }, [loadData, searchParams])
 
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
