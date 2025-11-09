@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { resendVerificationEmail } from '@/lib/email-verification'
+import { resendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
 import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { registrationRateLimiter } from '@/lib/rate-limit'
 
@@ -39,10 +39,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || 
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-      'http://localhost:3000'
-
+    const baseUrl = getBaseUrl()
     const result = await resendVerificationEmail(email, baseUrl)
 
     if (!result.success) {

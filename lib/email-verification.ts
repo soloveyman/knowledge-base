@@ -4,6 +4,26 @@ import { randomBytes } from 'crypto'
 import { sendEmail } from './email'
 
 /**
+ * Get the base URL for the application
+ * Prioritizes NEXTAUTH_URL (should be set to custom domain in production)
+ * Falls back to VERCEL_URL only if NEXTAUTH_URL is not set
+ */
+export function getBaseUrl(): string {
+  // NEXTAUTH_URL should be set to the custom domain (e.g., https://uppstaff.vercel.app)
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL
+  }
+  
+  // Fallback to VERCEL_URL (auto-generated deployment URL)
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  
+  // Development fallback
+  return 'http://localhost:3000'
+}
+
+/**
  * Generate a secure verification token
  */
 export function generateVerificationToken(): string {

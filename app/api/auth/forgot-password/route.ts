@@ -3,6 +3,7 @@ import { db, users, passwordResetTokens } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import crypto from 'crypto'
 import { sendPasswordResetEmail } from '@/lib/email'
+import { getBaseUrl } from '@/lib/email-verification'
 
 export async function POST(req: Request) {
   try {
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
       used: false,
     })
 
-    const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+    const baseUrl = getBaseUrl()
     const resetUrl = `${baseUrl}/auth/reset-password?token=${token}`
     
     // Send email with reset link

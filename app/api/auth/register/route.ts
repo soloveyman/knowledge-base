@@ -7,7 +7,7 @@ import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { emailExists, normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
-import { createEmailVerificationToken, sendVerificationEmail } from '@/lib/email-verification'
+import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
 
 const schema = z.object({
   email: z.string().email(),
@@ -98,9 +98,7 @@ export async function POST(req: Request) {
     // Send email verification (non-blocking)
     try {
       const token = await createEmailVerificationToken(created.id, normalizedEmail)
-      const baseUrl = process.env.NEXTAUTH_URL || 
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-        'http://localhost:3000'
+      const baseUrl = getBaseUrl()
       const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`
       await sendVerificationEmail(normalizedEmail, verificationUrl)
     } catch (error) {

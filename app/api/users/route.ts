@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { strictRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { emailExists, normalizeEmail, isNotDisposableEmail, isValidEmailFormat } from '@/lib/email-validation'
-import { createEmailVerificationToken, sendVerificationEmail } from '@/lib/email-verification'
+import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -138,9 +138,7 @@ export async function POST(request: Request) {
     // Send email verification (non-blocking)
     try {
       const token = await createEmailVerificationToken(newUser[0].id, normalizedEmail)
-      const baseUrl = process.env.NEXTAUTH_URL || 
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-        'http://localhost:3000'
+      const baseUrl = getBaseUrl()
       const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`
       // Pass isAdminCreated=true since this is an admin-created user
       await sendVerificationEmail(normalizedEmail, verificationUrl, true)
