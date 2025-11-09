@@ -876,15 +876,18 @@ export default function TestBuilderPage() {
         return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
       }
       
+      // Add a small delay to ensure database transaction is committed
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
       if (returnTo) {
-        router.push(addTimestamp(returnTo))
+        router.replace(addTimestamp(returnTo))
       } else {
         // Fallback: redirect based on user role
         const userRole = session?.user?.role
         if (userRole === 'owner') {
-          router.push(addTimestamp('/owner?tab=tests'))
+          router.replace(addTimestamp('/owner?tab=tests'))
         } else {
-          router.push(addTimestamp('/manager?tab=tests'))
+          router.replace(addTimestamp('/manager?tab=tests'))
         }
       }
     } catch (err) {

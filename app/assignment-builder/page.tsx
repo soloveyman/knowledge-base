@@ -441,15 +441,18 @@ function AssignmentBuilderPageContent() {
         return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
       }
       
+      // Add a small delay to ensure database transaction is committed
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
       if (returnTo) {
-        router.push(addTimestamp(returnTo))
+        router.replace(addTimestamp(returnTo))
       } else {
         // Fallback: redirect based on user role
         const userRole = session?.user?.role
         if (userRole === 'owner') {
-          router.push(addTimestamp('/owner?tab=assignments'))
+          router.replace(addTimestamp('/owner?tab=assignments'))
         } else {
-          router.push(addTimestamp('/manager?tab=assignments'))
+          router.replace(addTimestamp('/manager?tab=assignments'))
         }
       }
     } catch (err) {
@@ -470,14 +473,14 @@ function AssignmentBuilderPageContent() {
     }
     
     if (returnTo) {
-      router.push(addTimestamp(returnTo))
+      router.replace(addTimestamp(returnTo))
     } else {
       // Fallback: redirect based on user role
       const userRole = session?.user?.role
       if (userRole === 'owner') {
-        router.push(addTimestamp('/owner?tab=assignments'))
+        router.replace(addTimestamp('/owner?tab=assignments'))
       } else {
-        router.push(addTimestamp('/manager?tab=assignments'))
+        router.replace(addTimestamp('/manager?tab=assignments'))
       }
     }
   }

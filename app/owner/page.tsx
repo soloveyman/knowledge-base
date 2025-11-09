@@ -21,7 +21,7 @@ import {
   Loader2
 } from "lucide-react"
 import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
-import { cleanupDocumentFromLocalStorage } from "@/lib/localStorage-utils"
+import { cleanupDocumentFromLocalStorage, syncLocalStorageWithDatabase } from "@/lib/localStorage-utils"
 import { formatDateShort } from "@/lib/date-format"
 import dynamic from "next/dynamic"
 
@@ -233,6 +233,9 @@ function OwnerPageInner() {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('owner-documents', JSON.stringify(newDocuments))
+        // Also sync to localStorage using the utility function for consistency
+        // Cast to Document[] type to match the utility function signature
+        syncLocalStorageWithDatabase(newDocuments as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
       } catch (error) {
         console.error('Error saving documents to localStorage:', error)
       }
@@ -549,6 +552,9 @@ function OwnerPageInner() {
               parsedContent: doc.parsedContent || null
             }))
             setDocumentsWithLog(transformedDocs)
+            // Ensure localStorage is synced immediately
+            // Cast to Document[] type to match the utility function signature
+            syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
           }
         } finally {
           setIsLoadingDocuments(false)
@@ -719,6 +725,9 @@ function OwnerPageInner() {
                 parsedContent: doc.parsedContent || null
               }))
               setDocumentsWithLog(transformedDocs)
+              // Ensure localStorage is synced immediately
+              // Cast to Document[] type to match the utility function signature
+              syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
               lastLoadedTabRef.current = tab
             }
           })
