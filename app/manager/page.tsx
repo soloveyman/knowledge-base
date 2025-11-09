@@ -629,18 +629,24 @@ function ManagerPageInner() {
     loadTab()
   }, [defaultTab, loadTabData])
 
+  // Track if we've already processed the timestamp to prevent duplicate calls
+  const processedTimestampRef = useRef<string | null>(null)
+  
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
     const checkAndReload = () => {
       // Check window.location.search first for immediate detection (works before searchParams updates)
       const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : searchParams
       const tab = urlParams.get('tab') || getTabFromUrl(searchParams) || defaultTab
-      const hasTimestamp = urlParams.has('_t') || searchParams.has('_t')
+      const timestamp = urlParams.get('_t') || searchParams.get('_t')
+      const hasTimestamp = !!timestamp
       
       // If we have a timestamp parameter, it means we're returning from a create/edit page
       // Force reload the appropriate tab to show newly saved/updated data
-      if (hasTimestamp && tab) {
+      if (hasTimestamp && tab && timestamp !== processedTimestampRef.current) {
         console.log(`Manager: Detected return from edit/create, reloading ${tab} tab...`)
+        // Mark this timestamp as processed to prevent duplicate calls
+        processedTimestampRef.current = timestamp
         // Reset last loaded tab ref to force reload even if same tab
         lastLoadedTabRef.current = null
         isLoadingRef.current = false
