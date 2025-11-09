@@ -278,17 +278,18 @@ function OwnerPageInner() {
     return "overview"
   }, [searchParams])
 
-  // Restore tab from sessionStorage on mount if not in URL
+  // Restore tab from sessionStorage on mount if not in URL (only once on mount)
   useEffect(() => {
     const tabFromUrl = getTabFromUrl(searchParams)
     if (!tabFromUrl) {
       const previousTab = getPreviousTab('owner')
       if (previousTab && previousTab !== 'overview' && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(previousTab)) {
-        // Update URL to include the restored tab
+        // Update URL to include the restored tab (only if not already in URL)
         router.replace(`/owner?tab=${previousTab}`, { scroll: false })
       }
     }
-  }, [searchParams, router]) // Run when searchParams change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount to prevent refresh loops
 
   // Save current tab when it changes
   useEffect(() => {
@@ -640,9 +641,19 @@ function OwnerPageInner() {
     }
   }, [loadData, session?.user?.id, searchParams])
 
+  // Track last loaded tab to prevent duplicate loads
+  const lastLoadedTabRef = useRef<string | null>(null)
+  
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
+    // Skip if this tab was already loaded (prevent duplicate loads)
+    if (lastLoadedTabRef.current === defaultTab) {
+      return
+    }
+    
+    lastLoadedTabRef.current = defaultTab
+    
     if (defaultTab === 'docs') {
       console.log('Owner: Docs tab activated, loading documents...')
       loadTabData('docs', true)
@@ -683,27 +694,63 @@ function OwnerPageInner() {
   }, [defaultTab])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer or test page)
+  // Only reload if we've been away for more than 30 seconds to avoid unnecessary refreshes
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
-        console.log(`Owner: Page became visible, reloading ${defaultTab} tab...`)
-        // Use cache-busting for overview tab to ensure fresh test attempt data
-        if (defaultTab === 'overview') {
-          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
-        } else {
-          setTimeout(() => loadTabData(defaultTab, true), 0)
+        const lastFocusTime = sessionStorage.getItem('ownerLastFocusTime')
+        const now = Date.now()
+        // Only reload if away for more than 30 seconds
+        if (!lastFocusTime || (now - parseInt(lastFocusTime)) > 30000) {
+          console.log(`Owner: Page became visible after ${now - (lastFocusTime ? parseInt(lastFocusTime) : 0)}ms, reloading ${defaultTab} tab...`)
+          // Use requestIdleCallback to avoid blocking UI
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true).catch(console.error)
+              }
+            })
+          } else {
+            setTimeout(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true).catch(console.error)
+              }
+            }, 100)
+          }
+          sessionStorage.setItem('ownerLastFocusTime', now.toString())
         }
       }
     }
 
     const handleFocus = () => {
       if (defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
-        console.log(`Owner: Window focused, reloading ${defaultTab} tab...`)
-        // Use cache-busting for overview tab to ensure fresh test attempt data
-        if (defaultTab === 'overview') {
-          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
-        } else {
-          setTimeout(() => loadTabData(defaultTab, true), 0)
+        const lastFocusTime = sessionStorage.getItem('ownerLastFocusTime')
+        const now = Date.now()
+        // Only reload if away for more than 30 seconds
+        if (!lastFocusTime || (now - parseInt(lastFocusTime)) > 30000) {
+          console.log(`Owner: Window focused after ${now - (lastFocusTime ? parseInt(lastFocusTime) : 0)}ms, reloading ${defaultTab} tab...`)
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true).catch(console.error)
+              }
+            })
+          } else {
+            setTimeout(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true).catch(console.error)
+              }
+            }, 100)
+          }
+          sessionStorage.setItem('ownerLastFocusTime', now.toString())
         }
       }
     }
@@ -1001,8 +1048,13 @@ function OwnerPageInner() {
         {/* Main Tabs */}
         <Tabs value={defaultTab} onValueChange={(value) => {
           if (value && ['overview', 'users', 'docs', 'tests', 'assignments', 'settings'].includes(value)) {
-            router.replace(`/owner?tab=${value}`, { scroll: false })
-            saveCurrentTab('owner', value)
+            // Only update if tab actually changed to prevent unnecessary router calls
+            if (value !== defaultTab) {
+              router.replace(`/owner?tab=${value}`, { scroll: false })
+              saveCurrentTab('owner', value)
+              // Reset last loaded tab ref when switching tabs to allow reload
+              lastLoadedTabRef.current = null
+            }
           }
         }} className="space-y-3 md:space-y-6">
           <TabsContainer>
