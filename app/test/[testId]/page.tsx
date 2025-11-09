@@ -501,7 +501,7 @@ export default function TestPage() {
             {/* True/False questions */}
             {currentQ.type === 'tf' && (
               <div className="space-y-3">
-                {['True', 'False'].map((option, index) => {
+                {[t('true'), t('false')].map((option, index) => {
                   const value = index === 0 ? 'true' : 'false'
                   const isSelected = answers[currentQ.id] === value
                   

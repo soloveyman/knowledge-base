@@ -17,16 +17,24 @@ function detectBrowserLanguage(): Language {
     return 'en' // Default for SSR
   }
 
-  // Get browser language/locale
-  const browserLang = navigator.language || (navigator as any).userLanguage || 'en'
+  // Get browser language preferences (prioritize navigator.languages for better detection)
+  const languages = navigator.languages || [navigator.language || (navigator as any).userLanguage || 'en']
   
-  // Extract language code (e.g., 'ru' from 'ru-RU' or 'ru')
-  const langCode = browserLang.split('-')[0].toLowerCase()
-  
-  // Map language codes to our supported languages
-  // Russian/CIS countries -> 'ru'
-  if (langCode === 'ru' || langCode === 'uk' || langCode === 'be' || langCode === 'kk') {
-    return 'ru'
+  // Check all language preferences in order
+  for (const browserLang of languages) {
+    // Extract language code (e.g., 'ru' from 'ru-RU' or 'ru')
+    const langCode = browserLang.split('-')[0].toLowerCase()
+    
+    // Map language codes to our supported languages
+    // Russian/CIS countries -> 'ru'
+    if (langCode === 'ru' || langCode === 'uk' || langCode === 'be' || langCode === 'kk') {
+      return 'ru'
+    }
+    
+    // If we find English explicitly, use it
+    if (langCode === 'en') {
+      return 'en'
+    }
   }
   
   // Default to English for all other languages
@@ -59,6 +67,13 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     if (!isMounted || typeof window === 'undefined') return
     localStorage.setItem('language', language)
   }, [language, isMounted])
+
+  // Update HTML lang attribute when language changes
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language
+    }
+  }, [language])
 
   const t = (key: TranslationKey): string => {
     return translations[language][key] || translations.en[key] || key

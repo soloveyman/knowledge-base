@@ -250,14 +250,14 @@ export default function TestGenerator({
           <div className="space-y-1">
             <div className="flex items-center space-x-2 text-sm">
               <input type="radio" disabled className="w-4 h-4" />
-              <span>True</span>
+              <span>{t('true')}</span>
               {question.correctAnswer === 'true' && (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               )}
             </div>
             <div className="flex items-center space-x-2 text-sm">
               <input type="radio" disabled className="w-4 h-4" />
-              <span>False</span>
+              <span>{t('false')}</span>
               {question.correctAnswer === 'false' && (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               )}
