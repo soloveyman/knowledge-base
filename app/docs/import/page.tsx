@@ -380,19 +380,26 @@ function DocImportPageInner() {
         return // Don't redirect if there are failures
       }
       
-      console.log('All documents saved successfully, fetching documents...')
+      console.log('All documents saved successfully, waiting for DB commit...')
+      
+      // Small delay to ensure database transaction is committed
+      await new Promise(resolve => setTimeout(resolve, 200))
       
       // Fetch documents immediately after save to ensure they're in the database
       // Store in sessionStorage so owner/manager page can use it immediately
       try {
+        console.log('Fetching documents after save...')
         const documentsResponse = await fetch('/api/documents', { cache: 'no-store' })
         const documentsResult = await documentsResponse.json()
         if (documentsResult.success && typeof window !== 'undefined') {
+          console.log('Storing documents in sessionStorage:', documentsResult.data.documents.length)
           // Store in sessionStorage for immediate use by owner/manager page
           sessionStorage.setItem('pendingDocumentsRefresh', JSON.stringify({
             data: documentsResult.data.documents,
             timestamp: Date.now()
           }))
+        } else {
+          console.error('Failed to fetch documents - result not successful:', documentsResult)
         }
       } catch (error) {
         console.error('Failed to fetch documents after save:', error)

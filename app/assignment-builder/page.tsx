@@ -431,17 +431,24 @@ function AssignmentBuilderPageContent() {
           toast.success(`Successfully created ${assignmentCount} assignment(s)!`)
         }
         
+        // Small delay to ensure database transaction is committed
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
         // Fetch assignments immediately after save to ensure they're in the database
         // Store in sessionStorage so owner/manager page can use it immediately
         try {
+          console.log('Fetching assignments after save...')
           const assignmentsResponse = await fetch('/api/assignments', { cache: 'no-store' })
           const assignmentsResult = await assignmentsResponse.json()
           if (assignmentsResult.success && typeof window !== 'undefined') {
+            console.log('Storing assignments in sessionStorage:', assignmentsResult.data.assignments?.length || 0)
             // Store in sessionStorage for immediate use by owner/manager page
             sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
               data: assignmentsResult.data.assignments,
               timestamp: Date.now()
             }))
+          } else {
+            console.error('Failed to fetch assignments - result not successful:', assignmentsResult)
           }
         } catch (error) {
           console.error('Failed to fetch assignments after save:', error)

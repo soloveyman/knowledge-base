@@ -661,8 +661,8 @@ function ManagerPageInner() {
                 try {
                   const { data, timestamp: storedTimestamp } = JSON.parse(pendingDocs)
                   // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data) {
-                    console.log('Manager: Using pre-fetched documents from sessionStorage')
+                  if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                    console.log('Manager: Using pre-fetched documents from sessionStorage, count:', data.length)
                     const transformedDocs = data.map((doc: {
                       id: string
                       originalFileName?: string
@@ -753,16 +753,24 @@ function ManagerPageInner() {
                 try {
                   const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
                   // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data) {
-                    console.log('Manager: Using pre-fetched assignments from sessionStorage')
+                  if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                    console.log('Manager: Using pre-fetched assignments from sessionStorage, count:', data.length)
                     setSavedAssignmentsWithLog(data)
                     sessionStorage.removeItem('pendingAssignmentsRefresh')
                     lastLoadedTabRef.current = tab
                     return // Skip API call since we have the data
+                  } else {
+                    console.log('Manager: Pending assignments data invalid or expired:', { 
+                      hasData: !!data, 
+                      isArray: Array.isArray(data),
+                      age: Date.now() - storedTimestamp 
+                    })
                   }
                 } catch (error) {
                   console.error('Failed to parse pending assignments:', error)
                 }
+              } else {
+                console.log('Manager: No pending assignments found in sessionStorage')
               }
             }
           }
