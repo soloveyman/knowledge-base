@@ -685,8 +685,78 @@ function ManagerPageInner() {
               }
             })
             .catch(console.error)
+        } else if (tab === 'tests') {
+          // Direct fetch for tests with cache-busting - fetch tests and documents in parallel
+          Promise.all([
+            fetch('/api/tests', { cache: 'no-store' }),
+            fetch('/api/documents', { cache: 'no-store' })
+          ])
+            .then(async ([testsResponse, documentsResponse]) => {
+              const [testsResult, documentsResult] = await Promise.all([
+                testsResponse.json(),
+                documentsResponse.json()
+              ])
+              
+              // Build document map for sourceDocument lookup
+              const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+              if (documentsResult.success && documentsResult.data.documents) {
+                documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+                  documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+                })
+              }
+              
+              if (testsResult.success) {
+                const transformedTests = (testsResult.data.tests as Array<{
+                  id: string
+                  title: string
+                  type?: string | null
+                  difficulty?: string | null
+                  locale?: string | null
+                  questionIds?: string[] | null
+                  moduleId?: string | null
+                  createdAt: string
+                  createdBy: string
+                }>).map((test) => {
+                  const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+                  let sourceDocument = 'Unknown'
+                  if (test.moduleId) {
+                    const doc = documentMap.get(test.moduleId)
+                    if (doc) {
+                      sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+                    }
+                  }
+                  return {
+                    id: test.id,
+                    title: test.title,
+                    type: test.type || 'mcq',
+                    difficulty: test.difficulty || 'medium',
+                    locale: test.locale || 'en',
+                    questionCount,
+                    questions: [],
+                    sourceDocument,
+                    createdAt: test.createdAt,
+                    createdBy: test.createdBy
+                  }
+                })
+                setSavedTestsWithLog(transformedTests)
+                lastLoadedTabRef.current = tab
+              }
+            })
+            .catch(console.error)
+        } else if (tab === 'assignments') {
+          // Direct fetch for assignments with cache-busting
+          fetch('/api/assignments', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(result => {
+              if (result.success) {
+                console.log('Manager: Loaded assignments from API:', result.data.assignments)
+                setSavedAssignmentsWithLog(result.data.assignments)
+                lastLoadedTabRef.current = tab
+              }
+            })
+            .catch(console.error)
         } else {
-          // For tests and assignments, use loadTabData with forceRefresh=true
+          // For other tabs (overview), use loadTabData with forceRefresh=true
           loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
           lastLoadedTabRef.current = tab
         }
