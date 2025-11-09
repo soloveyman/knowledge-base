@@ -143,14 +143,14 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
         <DropdownMenuSeparator />
         
         {/* Customer Support */}
-        <DropdownMenuItem asChild>
-          <a 
-            href="mailto:uppstaffknowledge@gmail.com?subject=Support Request"
-            className="flex items-center cursor-pointer"
-          >
-            <HelpCircle className="h-4 w-4 mr-2" />
-            {t('customerSupport')}
-          </a>
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.preventDefault()
+            window.location.href = 'mailto:uppstaffknowledge@gmail.com?subject=Support Request'
+          }}
+        >
+          <HelpCircle className="h-4 w-4 mr-2" />
+          {t('customerSupport')}
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
