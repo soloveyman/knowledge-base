@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth'
 // Route segment config
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const revalidate = 30 // Revalidate every 30 seconds (stale-while-revalidate)
+// Removed revalidate to ensure fresh data after mutations (no cache delay)
 export const maxDuration = 60 // 60 seconds for test creation with many questions
 
 export async function GET() {

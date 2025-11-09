@@ -5,7 +5,7 @@ import { eq, and, inArray } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const revalidate = 30
+// Removed revalidate to ensure fresh data after mutations (no cache delay)
 
 export async function GET() {
   try {

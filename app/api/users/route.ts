@@ -11,7 +11,7 @@ import { createEmailVerificationToken, sendVerificationEmail } from '@/lib/email
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const revalidate = 30 // Revalidate every 30 seconds (stale-while-revalidate)
+// Removed revalidate to ensure fresh data after mutations (no cache delay)
 
 export async function GET() {
   try {

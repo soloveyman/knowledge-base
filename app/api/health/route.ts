@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Health check can be cached briefly
+export const revalidate = 60; // Revalidate every minute
 
 interface HealthStatus {
   status: 'healthy' | 'unhealthy';

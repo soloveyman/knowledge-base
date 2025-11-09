@@ -1,5 +1,5 @@
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+// Dynamic by default - no need for force-dynamic
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
