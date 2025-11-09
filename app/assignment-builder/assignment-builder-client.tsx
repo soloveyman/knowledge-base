@@ -365,7 +365,7 @@ export default function AssignmentBuilderClient({
                 priority
               />
               <h1 className="text-lg sm:text-xl font-semibold text-foreground dark:text-white truncate">
-                {isEditMode ? t('edit') + ' ' + t('assignmentManagement') : t('assignmentBuilder')}
+                {isEditMode ? t('editAssignment') : t('assignmentBuilder')}
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -532,7 +532,7 @@ export default function AssignmentBuilderClient({
                     ) : (
                       <>
                         <ClipboardList className="h-4 w-4 mr-2" />
-                        {isEditMode ? t('edit') + ' ' + t('assignmentManagement') : t('createAssignment')}
+                        {isEditMode ? t('editAssignment') : t('createAssignment')}
                       </>
                     )}
                   </Button>
