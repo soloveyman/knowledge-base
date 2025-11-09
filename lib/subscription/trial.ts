@@ -1,4 +1,4 @@
-import { db, subscriptionPlans, subscriptions } from '@/lib/db';
+import { db, subscriptionPlans, subscriptions, payments } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -111,7 +111,7 @@ export async function getOrCreateTrialPlan() {
  */
 export async function assignFreeTrialToOwner(ownerId: string) {
   try {
-    // Check if user already has a subscription
+    // Check if user already has a subscription (paid or trial)
     const existing = await db
       .select()
       .from(subscriptions)
@@ -120,6 +120,18 @@ export async function assignFreeTrialToOwner(ownerId: string) {
 
     if (existing.length > 0) {
       console.log(`[Trial] Owner ${ownerId} already has a subscription, skipping trial assignment`);
+      return null;
+    }
+
+    // Also check if user has any payment records (indicates they've paid via Stripe)
+    const existingPayments = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.ownerId as any, ownerId))
+      .limit(1);
+
+    if (existingPayments.length > 0) {
+      console.log(`[Trial] Owner ${ownerId} has payment records (paid subscription), skipping trial assignment`);
       return null;
     }
 

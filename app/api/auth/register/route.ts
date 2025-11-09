@@ -6,7 +6,6 @@ import bcrypt from 'bcryptjs'
 import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
-import { assignFreeTrialToOwner } from '@/lib/subscription/trial'
 import { emailExists, normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
 import { createEmailVerificationToken, sendVerificationEmail } from '@/lib/email-verification'
 
@@ -94,12 +93,7 @@ export async function POST(req: Request) {
       console.warn('Register: failed to set businessId, proceeding anyway')
     }
 
-    // Assign free trial subscription to new owner (non-blocking)
-    try {
-      await assignFreeTrialToOwner(created.id)
-    } catch (error) {
-      console.error('Register: failed to assign free trial, proceeding anyway:', error)
-    }
+    // Note: Free trial will be assigned after email verification (see /api/auth/verify-email)
 
     // Send email verification (non-blocking)
     try {
