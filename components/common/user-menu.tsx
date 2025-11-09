@@ -143,15 +143,14 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
         <DropdownMenuSeparator />
         
         {/* Customer Support */}
-        <DropdownMenuItem 
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.open('mailto:uppstaffknowledge@gmail.com?subject=Support Request', '_blank')
-            }
-          }}
-        >
-          <HelpCircle className="h-4 w-4 mr-2" />
-          {t('customerSupport')}
+        <DropdownMenuItem asChild>
+          <a 
+            href="mailto:uppstaffknowledge@gmail.com?subject=Support Request"
+            className="flex items-center cursor-pointer"
+          >
+            <HelpCircle className="h-4 w-4 mr-2" />
+            {t('customerSupport')}
+          </a>
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
