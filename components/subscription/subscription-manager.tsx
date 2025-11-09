@@ -25,8 +25,19 @@ import {
   TrendingUp,
   Lock,
   Unlock,
-  Wallet
+  Wallet,
+  Trash2,
+  Loader2
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { signOut } from "next-auth/react"
 
 interface SubscriptionPlan {
   id: string
@@ -114,6 +125,8 @@ export default function SubscriptionManager({
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[] | null>(null)
   const [isStripeEnabled, setIsStripeEnabled] = useState<boolean>(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Use module-level cache (persists across component remounts)
   const dataCache = useRef(subscriptionDataCache)
@@ -440,6 +453,35 @@ export default function SubscriptionManager({
 
   const isNearLimit = (current: number, max: number) => {
     return (current / max) >= 0.8
+  }
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Sign out and redirect to home
+        await signOut({ redirect: true, callbackUrl: '/' })
+      } else {
+        console.error('Failed to delete account:', result.message)
+        alert(result.message || 'Failed to delete account. Please try again.')
+        setIsDeleting(false)
+        setIsDeleteDialogOpen(false)
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error)
+      alert('An error occurred while deleting your account. Please try again.')
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+    }
   }
 
   return (
@@ -837,6 +879,86 @@ export default function SubscriptionManager({
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Account */}
+      <Card className="shadow-none border-destructive/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <span className="text-2xl leading-none inline-flex items-center justify-center w-fit self-center">🗑️</span>
+            <span className="leading-none self-center">{t('deleteAccount')}</span>
+          </CardTitle>
+          <CardDescription>
+            {t('deleteAccountDesc')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div>
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={isDeleting}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {t('deleteAccountButton')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              {t('confirmDeleteAccount')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('confirmDeleteAccountDesc')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+              <li>{t('deleteAccountItem1')}</li>
+              <li>{t('deleteAccountItem2')}</li>
+              <li>{t('deleteAccountItem3')}</li>
+              <li>{t('deleteAccountItem4')}</li>
+              <li>{t('deleteAccountItem5')}</li>
+            </ul>
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {t('deleteAccountFinalWarning')}
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t('deleting')}
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t('deleteAccountConfirm')}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

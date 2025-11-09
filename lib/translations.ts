@@ -603,6 +603,21 @@ export const translations = {
     freeTrialDescription: "7 days of full access",
     starterDescription: "For small teams and startups",
     proDescription: "For growing companies and networks",
+    
+    // Delete Account
+    deleteAccount: "Delete my account",
+    deleteAccountButton: "Delete",
+    deleteAccountDesc: "Permanently delete your account and all associated data. This action cannot be undone.",
+    confirmDeleteAccount: "Confirm Account Deletion",
+    confirmDeleteAccountDesc: "Are you absolutely sure? This will permanently delete:",
+    deleteAccountItem1: "Your account and all users in your business",
+    deleteAccountItem2: "All modules, documents, and content",
+    deleteAccountItem3: "All tests, questions, and assignments",
+    deleteAccountItem4: "All subscription and payment data",
+    deleteAccountItem5: "All progress and test attempts",
+    deleteAccountFinalWarning: "This action cannot be undone. Please type \"DELETE\" to confirm.",
+    deleteAccountConfirm: "Delete Account",
+    deleting: "Deleting...",
   },
   ru: {
     // User Menu
@@ -1191,6 +1206,21 @@ export const translations = {
     freeTrialDescription: "7 дней полного доступа",
     starterDescription: "Для малых команд и стартапов",
     proDescription: "Для растущих компаний и сетей",
+    
+    // Delete Account
+    deleteAccount: "Удалить мой аккаунт",
+    deleteAccountButton: "Удалить",
+    deleteAccountDesc: "Навсегда удалить ваш аккаунт и все связанные данные. Это действие нельзя отменить.",
+    confirmDeleteAccount: "Подтвердить удаление аккаунта",
+    confirmDeleteAccountDesc: "Вы абсолютно уверены? Это навсегда удалит:",
+    deleteAccountItem1: "Ваш аккаунт и всех пользователей в вашем бизнесе",
+    deleteAccountItem2: "Все модули, документы и контент",
+    deleteAccountItem3: "Все тесты, вопросы и задания",
+    deleteAccountItem4: "Все данные подписки и платежей",
+    deleteAccountItem5: "Весь прогресс и попытки тестов",
+    deleteAccountFinalWarning: "Это действие нельзя отменить. Пожалуйста, введите \"DELETE\" для подтверждения.",
+    deleteAccountConfirm: "Удалить аккаунт",
+    deleting: "Удаление...",
     
     // Test Results
     congratulations: "Поздравляем!",
