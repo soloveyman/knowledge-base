@@ -430,6 +430,23 @@ function AssignmentBuilderPageContent() {
         } else {
           toast.success(`Successfully created ${assignmentCount} assignment(s)!`)
         }
+        
+        // Fetch assignments immediately after save to ensure they're in the database
+        // Store in sessionStorage so owner/manager page can use it immediately
+        try {
+          const assignmentsResponse = await fetch('/api/assignments', { cache: 'no-store' })
+          const assignmentsResult = await assignmentsResponse.json()
+          if (assignmentsResult.success && typeof window !== 'undefined') {
+            // Store in sessionStorage for immediate use by owner/manager page
+            sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
+              data: assignmentsResult.data.assignments,
+              timestamp: Date.now()
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to fetch assignments after save:', error)
+          // Continue anyway - owner/manager page will fetch on load
+        }
       }
       
       // Redirect based on returnTo parameter or user role
@@ -448,20 +465,9 @@ function AssignmentBuilderPageContent() {
             : addTimestamp('/manager?tab=assignments'))
       
       router.replace(redirectUrl)
-      // Wait for navigation, then refresh
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Small delay to ensure navigation starts
+      await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
-      // Trigger location change event immediately to force data reload
-      if (typeof window !== 'undefined') {
-        // Dispatch both popstate and custom locationchange event for immediate detection
-        window.dispatchEvent(new Event('popstate'))
-        window.dispatchEvent(new Event('locationchange'))
-        // Also check window.location.search directly for immediate detection
-        setTimeout(() => {
-          // Force a re-check after a tiny delay to ensure URL has updated
-          window.dispatchEvent(new Event('popstate'))
-        }, 50)
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create assignment')
     } finally {

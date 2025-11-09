@@ -215,25 +215,30 @@ export default function UserBuilderPage() {
         // Show success message with verification info
         const successMsg = result.message || 'User created successfully!'
         toast.success(successMsg)
+        
+        // Fetch users immediately after save to ensure they're in the database
+        // Store in sessionStorage so owner page can use it immediately
+        try {
+          const usersResponse = await fetch('/api/users', { cache: 'no-store' })
+          const usersResult = await usersResponse.json()
+          if (usersResult.success && typeof window !== 'undefined') {
+            // Store in sessionStorage for immediate use by owner page
+            sessionStorage.setItem('pendingUsersRefresh', JSON.stringify({
+              data: usersResult.data.users,
+              timestamp: Date.now()
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to fetch users after save:', error)
+          // Continue anyway - owner page will fetch on load
+        }
       }
       
-      // Redirect to owner users tab with timestamp to trigger refresh
-      const timestamp = Date.now()
-      router.replace(`/owner?tab=users&_t=${timestamp}`)
-      // Wait for navigation, then refresh
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Redirect to owner users tab - data is already fetched and stored
+      router.replace(`/owner?tab=users&_t=${Date.now()}`)
+      // Small delay to ensure navigation starts
+      await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
-      // Trigger location change event immediately to force data reload
-      if (typeof window !== 'undefined') {
-        // Dispatch both popstate and custom locationchange event for immediate detection
-        window.dispatchEvent(new Event('popstate'))
-        window.dispatchEvent(new Event('locationchange'))
-        // Also check window.location.search directly for immediate detection
-        setTimeout(() => {
-          // Force a re-check after a tiny delay to ensure URL has updated
-          window.dispatchEvent(new Event('popstate'))
-        }, 50)
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {

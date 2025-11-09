@@ -380,13 +380,28 @@ function DocImportPageInner() {
         return // Don't redirect if there are failures
       }
       
-      console.log('All documents saved successfully, redirecting...')
+      console.log('All documents saved successfully, fetching documents...')
+      
+      // Fetch documents immediately after save to ensure they're in the database
+      // Store in sessionStorage so owner/manager page can use it immediately
+      try {
+        const documentsResponse = await fetch('/api/documents', { cache: 'no-store' })
+        const documentsResult = await documentsResponse.json()
+        if (documentsResult.success && typeof window !== 'undefined') {
+          // Store in sessionStorage for immediate use by owner/manager page
+          sessionStorage.setItem('pendingDocumentsRefresh', JSON.stringify({
+            data: documentsResult.data.documents,
+            timestamp: Date.now()
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch documents after save:', error)
+        // Continue anyway - owner/manager page will fetch on load
+      }
       
       // Reset loading state before redirect
       setIsUploading(false)
       
-      // Add a small delay to ensure database transaction is committed
-      // This prevents race condition where redirect happens before DB commit
       // Redirect to the specified return URL with cache-busting
       // Add a timestamp to force fresh data load
       const redirectUrl = safeReturnTo.includes('?') 
@@ -395,20 +410,9 @@ function DocImportPageInner() {
       
       // Use replace instead of push to avoid back button issues
       router.replace(redirectUrl)
-      // Wait for navigation, then refresh
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Small delay to ensure navigation starts
+      await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
-      // Trigger location change event immediately to force data reload
-      if (typeof window !== 'undefined') {
-        // Dispatch both popstate and custom locationchange event for immediate detection
-        window.dispatchEvent(new Event('popstate'))
-        window.dispatchEvent(new Event('locationchange'))
-        // Also check window.location.search directly for immediate detection
-        setTimeout(() => {
-          // Force a re-check after a tiny delay to ensure URL has updated
-          window.dispatchEvent(new Event('popstate'))
-        }, 50)
-      }
     } catch (error) {
       console.error('Error saving documents:', error)
       const errorMsg = error instanceof Error 

@@ -865,6 +865,30 @@ export default function TestBuilderPage() {
         }
 
         toast.success(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
+        
+        // Fetch tests and documents immediately after save to ensure they're in the database
+        // Store in sessionStorage so owner/manager page can use it immediately
+        try {
+          const [testsResponse, documentsResponse] = await Promise.all([
+            fetch('/api/tests', { cache: 'no-store' }),
+            fetch('/api/documents', { cache: 'no-store' })
+          ])
+          const [testsResult, documentsResult] = await Promise.all([
+            testsResponse.json(),
+            documentsResponse.json()
+          ])
+          if (testsResult.success && documentsResult.success && typeof window !== 'undefined') {
+            // Store in sessionStorage for immediate use by owner/manager page
+            sessionStorage.setItem('pendingTestsRefresh', JSON.stringify({
+              tests: testsResult.data.tests,
+              documents: documentsResult.data.documents,
+              timestamp: Date.now()
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to fetch tests after save:', error)
+          // Continue anyway - owner/manager page will fetch on load
+        }
       }
       
       // Redirect based on returnTo parameter or user role
@@ -883,20 +907,9 @@ export default function TestBuilderPage() {
             : addTimestamp('/manager?tab=tests'))
       
       router.replace(redirectUrl)
-      // Wait for navigation, then refresh
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Small delay to ensure navigation starts
+      await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
-      // Trigger location change event immediately to force data reload
-      if (typeof window !== 'undefined') {
-        // Dispatch both popstate and custom locationchange event for immediate detection
-        window.dispatchEvent(new Event('popstate'))
-        window.dispatchEvent(new Event('locationchange'))
-        // Also check window.location.search directly for immediate detection
-        setTimeout(() => {
-          // Force a re-check after a tiny delay to ensure URL has updated
-          window.dispatchEvent(new Event('popstate'))
-        }, 50)
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('failedToSaveTest'))
     } finally {

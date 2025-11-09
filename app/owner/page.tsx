@@ -734,6 +734,145 @@ function OwnerPageInner() {
           console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
           // Mark this timestamp as processed to prevent duplicate calls
           processedTimestampRef.current = timestamp
+          
+          // First, check sessionStorage for pre-fetched data (faster than API call)
+          if (typeof window !== 'undefined') {
+            if (tab === 'docs') {
+              const pendingDocs = sessionStorage.getItem('pendingDocumentsRefresh')
+              if (pendingDocs) {
+                try {
+                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingDocs)
+                  // Only use if timestamp is recent (within last 10 seconds)
+                  if (Date.now() - storedTimestamp < 10000 && data) {
+                    console.log('Owner: Using pre-fetched documents from sessionStorage')
+                    const transformedDocs = data.map((doc: {
+                      id: string
+                      originalFileName?: string
+                      title: string
+                      fileType?: string
+                      createdAt: string
+                      updatedAt?: string
+                      fileSize?: number
+                      status?: string
+                      moduleId?: string | null
+                      parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                    }) => ({
+                      id: doc.id,
+                      name: doc.originalFileName || doc.title,
+                      type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                      uploadedAt: formatDateShort(doc.createdAt),
+                      size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                      status: doc.status || 'ready',
+                      moduleId: doc.moduleId || null,
+                      createdAt: doc.createdAt,
+                      updatedAt: doc.updatedAt,
+                      parsedContent: doc.parsedContent || null
+                    }))
+                    setDocumentsWithLog(transformedDocs)
+                    syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                    sessionStorage.removeItem('pendingDocumentsRefresh')
+                    lastLoadedTabRef.current = tab
+                    return // Skip API call since we have the data
+                  }
+                } catch (error) {
+                  console.error('Failed to parse pending documents:', error)
+                }
+              }
+            } else if (tab === 'users') {
+              const pendingUsers = sessionStorage.getItem('pendingUsersRefresh')
+              if (pendingUsers) {
+                try {
+                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingUsers)
+                  // Only use if timestamp is recent (within last 10 seconds)
+                  if (Date.now() - storedTimestamp < 10000 && data) {
+                    console.log('Owner: Using pre-fetched users from sessionStorage')
+                    const currentUserId = session?.user?.id || ''
+                    const filteredUsers = (data as SavedUser[]).filter(u => {
+                      if (currentUserId && u.id === currentUserId) return false
+                      if (u.role === 'owner') return false
+                      return true
+                    })
+                    setSavedUsers(filteredUsers)
+                    sessionStorage.removeItem('pendingUsersRefresh')
+                    lastLoadedTabRef.current = tab
+                    return // Skip API call since we have the data
+                  }
+                } catch (error) {
+                  console.error('Failed to parse pending users:', error)
+                }
+              }
+            } else if (tab === 'tests') {
+              const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
+              if (pendingTests) {
+                try {
+                  const { tests, documents, timestamp: storedTimestamp } = JSON.parse(pendingTests)
+                  // Only use if timestamp is recent (within last 10 seconds)
+                  if (Date.now() - storedTimestamp < 10000 && tests && documents) {
+                    console.log('Owner: Using pre-fetched tests from sessionStorage')
+                    const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+                    documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+                      documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+                    })
+                    const transformedTests = (tests as Array<{
+                      id: string
+                      title: string
+                      type?: string | null
+                      difficulty?: string | null
+                      locale?: string | null
+                      questionIds?: string[] | null
+                      moduleId?: string | null
+                      createdAt: string
+                      createdBy: string
+                    }>).map((test) => {
+                      const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+                      let sourceDocument = 'Unknown'
+                      if (test.moduleId) {
+                        const doc = documentMap.get(test.moduleId)
+                        if (doc) {
+                          sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+                        }
+                      }
+                      return {
+                        id: test.id,
+                        title: test.title,
+                        type: test.type || 'mcq',
+                        difficulty: test.difficulty || 'medium',
+                        locale: test.locale || 'en',
+                        questionCount,
+                        questions: [],
+                        sourceDocument,
+                        createdAt: test.createdAt,
+                        createdBy: test.createdBy
+                      }
+                    })
+                    setSavedTestsWithLog(transformedTests)
+                    sessionStorage.removeItem('pendingTestsRefresh')
+                    lastLoadedTabRef.current = tab
+                    return // Skip API call since we have the data
+                  }
+                } catch (error) {
+                  console.error('Failed to parse pending tests:', error)
+                }
+              }
+            } else if (tab === 'assignments') {
+              const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
+              if (pendingAssignments) {
+                try {
+                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
+                  // Only use if timestamp is recent (within last 10 seconds)
+                  if (Date.now() - storedTimestamp < 10000 && data) {
+                    console.log('Owner: Using pre-fetched assignments from sessionStorage')
+                    setSavedAssignmentsWithLog(data)
+                    sessionStorage.removeItem('pendingAssignmentsRefresh')
+                    lastLoadedTabRef.current = tab
+                    return // Skip API call since we have the data
+                  }
+                } catch (error) {
+                  console.error('Failed to parse pending assignments:', error)
+                }
+              }
+            }
+          }
         } else {
           console.log(`Owner: Tab changed to ${tab}, loading data...`)
         }
