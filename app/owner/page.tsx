@@ -497,22 +497,16 @@ function OwnerPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id])
 
-  // Defer data loading until after initial render to improve FCP
+  // Preload subscription data only (tab data is loaded by tab-specific useEffect)
   useEffect(() => {
     // Only run on client side and after session is ready
     if (typeof window === 'undefined' || status === 'loading' || !session) return
     
-    // Use requestIdleCallback or setTimeout to defer heavy data loading
-    const timeoutId = setTimeout(() => {
-      loadData().catch(console.error)
-      // Preload subscription data in parallel (non-blocking) for instant tab switch
-      fetch('/api/subscription', { cache: 'no-store' }).catch(() => {
-        // Silently fail - SubscriptionManager will load it if needed
-      })
-    }, 0)
-    
-    return () => clearTimeout(timeoutId)
-  }, [loadData, status, session])
+    // Preload subscription data in parallel (non-blocking) for instant tab switch
+    fetch('/api/subscription', { cache: 'no-store' }).catch(() => {
+      // Silently fail - SubscriptionManager will load it if needed
+    })
+  }, [status, session])
 
   // Tab-specific loading functions - only load what's needed for each tab
   const loadTabData = useCallback(async (tab: string, preserveData = false, forceRefresh = false) => {
@@ -653,35 +647,50 @@ function OwnerPageInner() {
     }
   }, [loadData, session?.user?.id, searchParams])
 
-  // Track last loaded tab to prevent duplicate loads
+  // Track last loaded tab and loading state to prevent duplicate loads
   const lastLoadedTabRef = useRef<string | null>(null)
+  const isLoadingRef = useRef<boolean>(false)
   
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
-    // Skip if this tab was already loaded (prevent duplicate loads)
-    if (lastLoadedTabRef.current === defaultTab) {
+    // Skip if this tab was already loaded and not forced (prevent duplicate loads)
+    if (lastLoadedTabRef.current === defaultTab && !isLoadingRef.current) {
       return
     }
     
+    // Skip if already loading
+    if (isLoadingRef.current) {
+      return
+    }
+    
+    isLoadingRef.current = true
     lastLoadedTabRef.current = defaultTab
     
-    if (defaultTab === 'docs') {
-      console.log('Owner: Docs tab activated, loading documents...')
-      loadTabData('docs', true)
-    } else if (defaultTab === 'tests') {
-      console.log('Owner: Tests tab activated, loading tests...')
-      loadTabData('tests', true)
-    } else if (defaultTab === 'assignments') {
-      console.log('Owner: Assignments tab activated, loading assignments...')
-      loadTabData('assignments', true)
-    } else if (defaultTab === 'overview') {
-      console.log('Owner: Overview tab activated, loading data...')
-      loadTabData('overview', true)
-    } else if (defaultTab === 'users') {
-      console.log('Owner: Users tab activated, loading users...')
-      loadTabData('users', true)
+    const loadTab = async () => {
+      try {
+        if (defaultTab === 'docs') {
+          console.log('Owner: Docs tab activated, loading documents...')
+          await loadTabData('docs', true)
+        } else if (defaultTab === 'tests') {
+          console.log('Owner: Tests tab activated, loading tests...')
+          await loadTabData('tests', true)
+        } else if (defaultTab === 'assignments') {
+          console.log('Owner: Assignments tab activated, loading assignments...')
+          await loadTabData('assignments', true)
+        } else if (defaultTab === 'overview') {
+          console.log('Owner: Overview tab activated, loading data...')
+          await loadTabData('overview', true)
+        } else if (defaultTab === 'users') {
+          console.log('Owner: Users tab activated, loading users...')
+          await loadTabData('users', true)
+        }
+      } finally {
+        isLoadingRef.current = false
+      }
     }
+    
+    loadTab()
   }, [defaultTab, loadTabData])
 
   // Reload data when returning from edit/create pages (detected via URL parameters)
@@ -697,6 +706,8 @@ function OwnerPageInner() {
         console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
         // Reset last loaded tab ref to force reload even if same tab
         lastLoadedTabRef.current = null
+        isLoadingRef.current = false
+        
         // Use cache-busting to ensure fresh data
         if (tab === 'docs') {
           fetch('/api/documents', { cache: 'no-store' })
@@ -734,23 +745,23 @@ function OwnerPageInner() {
               }
             })
             .catch(console.error)
-      } else if (tab === 'users') {
-        // Direct fetch for users with cache-busting
-        fetch('/api/users', { cache: 'no-store' })
-          .then(res => res.json())
-          .then(result => {
-            if (result.success) {
-              setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
-              lastLoadedTabRef.current = tab
-            }
-          })
-          .catch(console.error)
-      } else {
-        // For tests and assignments, use loadTabData with forceRefresh=true
-        loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
-        lastLoadedTabRef.current = tab
+        } else if (tab === 'users') {
+          // Direct fetch for users with cache-busting
+          fetch('/api/users', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(result => {
+              if (result.success) {
+                setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
+                lastLoadedTabRef.current = tab
+              }
+            })
+            .catch(console.error)
+        } else {
+          // For tests and assignments, use loadTabData with forceRefresh=true
+          loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
+          lastLoadedTabRef.current = tab
+        }
       }
-    }
     } // Close checkAndReload function
     
     checkAndReload()
@@ -758,8 +769,8 @@ function OwnerPageInner() {
     // On mobile, also listen for popstate events to catch navigation changes
     if (typeof window !== 'undefined') {
       const handlePopState = () => {
-        // Small delay to ensure searchParams has updated
-        setTimeout(checkAndReload, 50)
+        // Immediate check without delay for faster updates
+        checkAndReload()
       }
       
       window.addEventListener('popstate', handlePopState)
@@ -767,7 +778,7 @@ function OwnerPageInner() {
         window.removeEventListener('popstate', handlePopState)
       }
     }
-  }, [searchParams, loadTabData])
+  }, [searchParams, loadTabData, session?.user?.id])
 
   // Reload data when tab changes to settings
   useEffect(() => {

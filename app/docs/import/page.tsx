@@ -387,8 +387,6 @@ function DocImportPageInner() {
       
       // Add a small delay to ensure database transaction is committed
       // This prevents race condition where redirect happens before DB commit
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
       // Redirect to the specified return URL with cache-busting
       // Add a timestamp to force fresh data load
       const redirectUrl = safeReturnTo.includes('?') 
@@ -397,18 +395,21 @@ function DocImportPageInner() {
       
       // Use replace instead of push to avoid back button issues
       router.replace(redirectUrl)
-      // Wait for navigation to complete, then refresh to ensure data reloads
-      // Use longer delay on mobile devices for better reliability
-      const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-      const delay = isMobile ? 300 : 100
-      setTimeout(() => {
-        router.refresh()
-        // On mobile, also force a location check to ensure useEffect hooks trigger
-        if (isMobile && typeof window !== 'undefined') {
-          // Trigger a custom event to force re-check of searchParams
+      // Immediately refresh to ensure data reloads (no delay for instant updates)
+      router.refresh()
+      // On mobile, also force a location check to ensure useEffect hooks trigger
+      if (typeof window !== 'undefined') {
+        // Small delay only for mobile to ensure searchParams updates
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+        if (isMobile) {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('popstate'))
+          }, 50)
+        } else {
+          // Desktop: trigger immediately
           window.dispatchEvent(new Event('popstate'))
         }
-      }, delay)
+      }
     } catch (error) {
       console.error('Error saving documents:', error)
       const errorMsg = error instanceof Error 

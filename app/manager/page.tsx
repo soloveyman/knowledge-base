@@ -586,32 +586,47 @@ function ManagerPageInner() {
     }
   }, [loadData, isLoadingDocuments, isLoadingTests, isLoadingAssignments, setDocumentsWithLog, setSavedTestsWithLog])
 
-  // Track last loaded tab to prevent duplicate loads
+  // Track last loaded tab and loading state to prevent duplicate loads
   const lastLoadedTabRef = useRef<string | null>(null)
+  const isLoadingRef = useRef<boolean>(false)
   
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
-    // Skip if this tab was already loaded (prevent duplicate loads)
-    if (lastLoadedTabRef.current === defaultTab) {
+    // Skip if this tab was already loaded and not forced (prevent duplicate loads)
+    if (lastLoadedTabRef.current === defaultTab && !isLoadingRef.current) {
       return
     }
     
+    // Skip if already loading
+    if (isLoadingRef.current) {
+      return
+    }
+    
+    isLoadingRef.current = true
     lastLoadedTabRef.current = defaultTab
     
-    if (defaultTab === 'docs') {
-      console.log('Manager: Docs tab activated, loading documents...')
-      loadTabData('docs', true, false)
-    } else if (defaultTab === 'tests') {
-      console.log('Manager: Tests tab activated, loading tests...')
-      loadTabData('tests', true, false)
-    } else if (defaultTab === 'assignments') {
-      console.log('Manager: Assignments tab activated, loading assignments...')
-      loadTabData('assignments', true, false)
-    } else if (defaultTab === 'overview') {
-      console.log('Manager: Overview tab activated, loading data...')
-      loadTabData('overview', true, false)
+    const loadTab = async () => {
+      try {
+        if (defaultTab === 'docs') {
+          console.log('Manager: Docs tab activated, loading documents...')
+          await loadTabData('docs', true, false)
+        } else if (defaultTab === 'tests') {
+          console.log('Manager: Tests tab activated, loading tests...')
+          await loadTabData('tests', true, false)
+        } else if (defaultTab === 'assignments') {
+          console.log('Manager: Assignments tab activated, loading assignments...')
+          await loadTabData('assignments', true, false)
+        } else if (defaultTab === 'overview') {
+          console.log('Manager: Overview tab activated, loading data...')
+          await loadTabData('overview', true, false)
+        }
+      } finally {
+        isLoadingRef.current = false
+      }
     }
+    
+    loadTab()
   }, [defaultTab, loadTabData])
 
   // Reload data when returning from edit/create pages (detected via URL parameters)
@@ -627,6 +642,8 @@ function ManagerPageInner() {
         console.log(`Manager: Detected return from edit/create, reloading ${tab} tab...`)
         // Reset last loaded tab ref to force reload even if same tab
         lastLoadedTabRef.current = null
+        isLoadingRef.current = false
+        
         // Use cache-busting to ensure fresh data for all tabs
         if (tab === 'docs') {
           // Direct fetch for documents with cache-busting
@@ -661,12 +678,12 @@ function ManagerPageInner() {
               }
             })
             .catch(console.error)
-      } else {
-        // For tests and assignments, use loadTabData with forceRefresh=true
-        loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
-        lastLoadedTabRef.current = tab
+        } else {
+          // For tests and assignments, use loadTabData with forceRefresh=true
+          loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
+          lastLoadedTabRef.current = tab
+        }
       }
-    }
     } // Close checkAndReload function
     
     checkAndReload()
@@ -674,8 +691,8 @@ function ManagerPageInner() {
     // On mobile, also listen for popstate events to catch navigation changes
     if (typeof window !== 'undefined') {
       const handlePopState = () => {
-        // Small delay to ensure searchParams has updated
-        setTimeout(checkAndReload, 50)
+        // Immediate check without delay for faster updates
+        checkAndReload()
       }
       
       window.addEventListener('popstate', handlePopState)
