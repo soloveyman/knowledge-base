@@ -255,8 +255,12 @@ function AssignmentBuilderPageContent() {
         hasLoadedAssignmentRef.current = true
         setIsEditMode(true)
         setEditingAssignmentId(editingId)
+        // Load immediately - try ref first, then direct call
         if (loadAssignmentForEditingRef.current) {
           loadAssignmentForEditingRef.current(editingId)
+        } else {
+          // If ref not ready, load directly without delay
+          loadAssignmentForEditing(editingId)
         }
       }
     } else if (previousEditingId) {
@@ -431,9 +435,6 @@ function AssignmentBuilderPageContent() {
           toast.success(`Successfully created ${assignmentCount} assignment(s)!`)
         }
         
-        // Small delay to ensure database transaction is committed
-        await new Promise(resolve => setTimeout(resolve, 200))
-        
         // Fetch assignments immediately after save to ensure they're in the database
         // Store in sessionStorage so owner/manager page can use it immediately
         try {
@@ -472,8 +473,6 @@ function AssignmentBuilderPageContent() {
             : addTimestamp('/manager?tab=assignments'))
       
       router.replace(redirectUrl)
-      // Small delay to ensure navigation starts
-      await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create assignment')
@@ -510,11 +509,6 @@ function AssignmentBuilderPageContent() {
       // Dispatch both popstate and custom locationchange event for immediate detection
       window.dispatchEvent(new Event('popstate'))
       window.dispatchEvent(new Event('locationchange'))
-      // Also check window.location.search directly for immediate detection
-      setTimeout(() => {
-        // Force a re-check after a tiny delay to ensure URL has updated
-        window.dispatchEvent(new Event('popstate'))
-      }, 10)
     }
   }
 
