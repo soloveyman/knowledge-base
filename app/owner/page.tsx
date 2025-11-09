@@ -512,15 +512,17 @@ function OwnerPageInner() {
   }, [loadData, status, session])
 
   // Tab-specific loading functions - only load what's needed for each tab
-  const loadTabData = useCallback(async (tab: string, preserveData = false) => {
+  const loadTabData = useCallback(async (tab: string, preserveData = false, forceRefresh = false) => {
     try {
       if (tab === 'docs') {
         // Always show loading when fetching, but preserve existing data if preserveData is true
         setIsLoadingDocuments(true)
         try {
-          const response = await fetch('/api/documents', { 
-            next: { revalidate: 30 } 
-          })
+          // Use cache-busting if forceRefresh is true (e.g., returning from import)
+          const fetchOptions = forceRefresh 
+            ? { cache: 'no-store' as RequestCache }
+            : { next: { revalidate: 30 } }
+          const response = await fetch('/api/documents', fetchOptions)
           const result = await response.json()
           if (result.success && result.data.documents) {
             const transformedDocs = result.data.documents.map((doc: {
@@ -554,7 +556,10 @@ function OwnerPageInner() {
       } else if (tab === 'tests') {
         setIsLoadingTests(!preserveData)
         // Tests need documents for sourceDocument lookup
-        const fetchOpts = { next: { revalidate: 30 } }
+        // Use cache-busting if forceRefresh is true (e.g., returning from test-builder)
+        const fetchOpts = forceRefresh 
+          ? { cache: 'no-store' as RequestCache }
+          : { next: { revalidate: 30 } }
         const [testsResponse, documentsResponse] = await Promise.all([
           fetch('/api/tests', fetchOpts),
           fetch('/api/documents', fetchOpts)
@@ -611,7 +616,8 @@ function OwnerPageInner() {
       } else if (tab === 'assignments') {
         setIsLoadingAssignments(!preserveData)
         // Assignments need all data for mapping
-        await loadData(preserveData)
+        // Use forceRefresh to ensure fresh data when returning from assignment-builder
+        await loadData(preserveData, forceRefresh)
       } else if (tab === 'users') {
         // Check if returning from user-builder (has timestamp) - use cache-busting
         const hasTimestamp = searchParams.has('_t')
@@ -681,7 +687,58 @@ function OwnerPageInner() {
     // Force reload the appropriate tab to show newly saved/updated data
     if (hasTimestamp && tab) {
       console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
-      loadTabData(tab, true) // Use preserveData=true to avoid flickering
+      // Reset last loaded tab ref to force reload even if same tab
+      lastLoadedTabRef.current = null
+      // Use cache-busting to ensure fresh data
+      if (tab === 'docs') {
+        fetch('/api/documents', { cache: 'no-store' })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success && result.data.documents) {
+              const transformedDocs = result.data.documents.map((doc: {
+                id: string
+                originalFileName?: string
+                title: string
+                fileType?: string
+                createdAt: string
+                updatedAt?: string
+                fileSize?: number
+                status?: string
+                moduleId?: string | null
+                parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+              }) => ({
+                id: doc.id,
+                name: doc.originalFileName || doc.title,
+                type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                uploadedAt: formatDateShort(doc.createdAt),
+                size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                status: doc.status || 'ready',
+                moduleId: doc.moduleId || null,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+                parsedContent: doc.parsedContent || null
+              }))
+              setDocumentsWithLog(transformedDocs)
+              lastLoadedTabRef.current = tab
+            }
+          })
+          .catch(console.error)
+      } else if (tab === 'users') {
+        // Direct fetch for users with cache-busting
+        fetch('/api/users', { cache: 'no-store' })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success) {
+              setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
+              lastLoadedTabRef.current = tab
+            }
+          })
+          .catch(console.error)
+      } else {
+        // For tests and assignments, use loadTabData with forceRefresh=true
+        loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
+        lastLoadedTabRef.current = tab
+      }
     }
   }, [searchParams, loadTabData])
 

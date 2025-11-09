@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense, useTransition, useOptimistic } from "react"
+import { useEffect, useState, useMemo, useLayoutEffect, useCallback, Suspense, useTransition, useOptimistic, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -44,7 +44,7 @@ const formatFileSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
-import { saveCurrentTab, getTabFromUrl } from "@/lib/redirect-utils"
+import { saveCurrentTab, getTabFromUrl, getPreviousTab } from "@/lib/redirect-utils"
 import { formatDateShort } from "@/lib/date-format"
 
 interface SavedTest {
@@ -249,6 +249,19 @@ function ManagerPageInner() {
     return tab && ['overview', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
   }, [searchParams])
 
+  // Restore tab from sessionStorage on mount if not in URL (only once on mount)
+  useEffect(() => {
+    const tabFromUrl = getTabFromUrl(searchParams)
+    if (!tabFromUrl) {
+      const previousTab = getPreviousTab('manager')
+      if (previousTab && previousTab !== 'overview' && ['overview', 'docs', 'tests', 'assignments'].includes(previousTab)) {
+        // Update URL to include the restored tab (only if not already in URL)
+        router.replace(`/manager?tab=${previousTab}`, { scroll: false })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount to prevent refresh loops
+
   // Save current tab when it changes
   useEffect(() => {
     if (defaultTab) {
@@ -438,20 +451,23 @@ function ManagerPageInner() {
   }, [loadData])
 
   // Tab-specific loading functions - only load what's needed for each tab
-  const loadTabData = useCallback(async (tab: string, preserveData = false) => {
-    // Get current search params for cache-busting detection
-    const currentTab = getTabFromUrl(searchParams)
-    const hasTimestamp = searchParams.has('_t')
+  const loadTabData = useCallback(async (tab: string, preserveData = false, forceRefresh = false) => {
+    // Prevent loading if already loading to avoid duplicate requests
+    if ((tab === 'docs' && isLoadingDocuments) || 
+        (tab === 'tests' && isLoadingTests) || 
+        (tab === 'assignments' && isLoadingAssignments)) {
+      return
+    }
     
     try {
       if (tab === 'docs') {
         // Always show loading when fetching, but preserve existing data if preserveData is true
         setIsLoadingDocuments(true)
         try {
-          // Check if returning from import (has timestamp) - use cache-busting
-          const fetchOptions: RequestInit = hasTimestamp 
-            ? { cache: 'no-store' } // Force fresh data when returning from create/edit
-            : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+          // Use cache-busting if forceRefresh is true (e.g., returning from import)
+          const fetchOptions: RequestInit = forceRefresh 
+            ? { cache: 'no-store' as RequestCache }
+            : { next: { revalidate: 30 } }
           
           const response = await fetch('/api/documents', fetchOptions)
           const result = await response.json()
@@ -488,10 +504,10 @@ function ManagerPageInner() {
         setIsLoadingTests(true)
         try {
           // Tests need documents for sourceDocument lookup
-          // Check if returning from test-builder (has timestamp) - use cache-busting
-          const fetchOpts: RequestInit = hasTimestamp 
-            ? { cache: 'no-store' } // Force fresh data when returning from create/edit
-            : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+          // Use cache-busting if forceRefresh is true (e.g., returning from test-builder)
+          const fetchOpts: RequestInit = forceRefresh 
+            ? { cache: 'no-store' as RequestCache }
+            : { next: { revalidate: 30 } }
           
           const [testsResponse, documentsResponse] = await Promise.all([
             fetch('/api/tests', fetchOpts),
@@ -551,7 +567,8 @@ function ManagerPageInner() {
       } else if (tab === 'assignments') {
         setIsLoadingAssignments(!preserveData)
         // Assignments need all data for mapping
-        await loadData(preserveData)
+        // Use forceRefresh to ensure fresh data when returning from assignment-builder
+        await loadData(preserveData, forceRefresh)
       } else if (tab === 'overview') {
         // Overview needs all data
         await loadData(preserveData)
@@ -567,23 +584,33 @@ function ManagerPageInner() {
         setIsLoadingAssignments(false)
       }
     }
-  }, [loadData, searchParams])
+  }, [loadData, isLoadingDocuments, isLoadingTests, isLoadingAssignments, setDocumentsWithLog, setSavedTestsWithLog])
 
+  // Track last loaded tab to prevent duplicate loads
+  const lastLoadedTabRef = useRef<string | null>(null)
+  
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
+    // Skip if this tab was already loaded (prevent duplicate loads)
+    if (lastLoadedTabRef.current === defaultTab) {
+      return
+    }
+    
+    lastLoadedTabRef.current = defaultTab
+    
     if (defaultTab === 'docs') {
       console.log('Manager: Docs tab activated, loading documents...')
-      loadTabData('docs', true)
+      loadTabData('docs', true, false)
     } else if (defaultTab === 'tests') {
       console.log('Manager: Tests tab activated, loading tests...')
-      loadTabData('tests', true)
+      loadTabData('tests', true, false)
     } else if (defaultTab === 'assignments') {
       console.log('Manager: Assignments tab activated, loading assignments...')
-      loadTabData('assignments', true)
+      loadTabData('assignments', true, false)
     } else if (defaultTab === 'overview') {
       console.log('Manager: Overview tab activated, loading data...')
-      loadTabData('overview', true)
+      loadTabData('overview', true, false)
     }
   }, [defaultTab, loadTabData])
 
@@ -596,32 +623,108 @@ function ManagerPageInner() {
     // Force reload the appropriate tab to show newly saved/updated data
     if (hasTimestamp && tab) {
       console.log(`Manager: Detected return from edit/create, reloading ${tab} tab...`)
-      loadTabData(tab, true) // Use preserveData=true to avoid flickering
+      // Reset last loaded tab ref to force reload even if same tab
+      lastLoadedTabRef.current = null
+      // Use cache-busting to ensure fresh data for all tabs
+      if (tab === 'docs') {
+        // Direct fetch for documents with cache-busting
+        fetch('/api/documents', { cache: 'no-store' })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success && result.data.documents) {
+              const transformedDocs = result.data.documents.map((doc: {
+                id: string
+                originalFileName?: string
+                title: string
+                fileType?: string
+                createdAt: string
+                updatedAt?: string
+                fileSize?: number
+                status?: string
+                parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+              }) => ({
+                id: doc.id,
+                name: doc.originalFileName || doc.title,
+                type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                uploadedAt: formatDateShort(doc.createdAt),
+                size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                status: doc.status || 'ready',
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+                parsedContent: doc.parsedContent || null
+              }))
+              setDocumentsWithLog(transformedDocs)
+              syncLocalStorageWithDatabase(transformedDocs)
+              lastLoadedTabRef.current = tab
+            }
+          })
+          .catch(console.error)
+      } else {
+        // For tests and assignments, use loadTabData with forceRefresh=true
+        loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
+        lastLoadedTabRef.current = tab
+      }
     }
   }, [searchParams, loadTabData])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer or test page)
+  // Only reload if we've been away for more than 30 seconds to avoid unnecessary refreshes
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
-        console.log(`Manager: Page became visible, reloading ${defaultTab} tab...`)
-        // Use cache-busting for overview tab to ensure fresh test attempt data
-        if (defaultTab === 'overview') {
-          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
-        } else {
-          loadTabData(defaultTab, true)
+        const lastFocusTime = sessionStorage.getItem('managerLastFocusTime')
+        const now = Date.now()
+        // Only reload if away for more than 30 seconds
+        if (!lastFocusTime || (now - parseInt(lastFocusTime)) > 30000) {
+          console.log(`Manager: Page became visible after ${now - (lastFocusTime ? parseInt(lastFocusTime) : 0)}ms, reloading ${defaultTab} tab...`)
+          // Use requestIdleCallback to avoid blocking UI
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true, false).catch(console.error)
+              }
+            })
+          } else {
+            setTimeout(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true, false).catch(console.error)
+              }
+            }, 100)
+          }
+          sessionStorage.setItem('managerLastFocusTime', now.toString())
         }
       }
     }
 
     const handleFocus = () => {
       if (defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
-        console.log(`Manager: Window focused, reloading ${defaultTab} tab...`)
-        // Use cache-busting for overview tab to ensure fresh test attempt data
-        if (defaultTab === 'overview') {
-          setTimeout(() => loadData(true, true), 0) // forceRefresh=true to get fresh test attempt data
-        } else {
-          loadTabData(defaultTab, true)
+        const lastFocusTime = sessionStorage.getItem('managerLastFocusTime')
+        const now = Date.now()
+        // Only reload if away for more than 30 seconds
+        if (!lastFocusTime || (now - parseInt(lastFocusTime)) > 30000) {
+          console.log(`Manager: Window focused after ${now - (lastFocusTime ? parseInt(lastFocusTime) : 0)}ms, reloading ${defaultTab} tab...`)
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true, false).catch(console.error)
+              }
+            })
+          } else {
+            setTimeout(() => {
+              if (defaultTab === 'overview') {
+                loadData(true, true).catch(console.error)
+              } else {
+                loadTabData(defaultTab, true, false).catch(console.error)
+              }
+            }, 100)
+          }
+          sessionStorage.setItem('managerLastFocusTime', now.toString())
         }
       }
     }
@@ -872,7 +975,17 @@ function ManagerPageInner() {
 
 
         {/* Main Tabs */}
-        <Tabs defaultValue={defaultTab} className="space-y-3 md:space-y-6">
+        <Tabs value={defaultTab} onValueChange={(value) => {
+          if (value && ['overview', 'docs', 'tests', 'assignments'].includes(value)) {
+            // Only update if tab actually changed to prevent unnecessary router calls
+            if (value !== defaultTab) {
+              router.replace(`/manager?tab=${value}`, { scroll: false })
+              saveCurrentTab('manager', value)
+              // Reset last loaded tab ref to allow reload when switching tabs
+              lastLoadedTabRef.current = null
+            }
+          }
+        }} className="space-y-3 md:space-y-6">
           <div className="tabs-scroll-container">
             <TabsList className="grid w-full min-w-max grid-cols-4">
             <TabsTrigger 
