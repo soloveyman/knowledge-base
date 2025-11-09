@@ -637,7 +637,7 @@ export const translations = {
     deleteAccountItem3: "All tests, questions, and assignments",
     deleteAccountItem4: "All subscription and payment data",
     deleteAccountItem5: "All progress and test attempts",
-    deleteAccountFinalWarning: "This action cannot be undone. Please type \"DELETE\" to confirm.",
+    deleteAccountFinalWarning: "This action cannot be undone.",
     deleteAccountConfirm: "Delete Account",
     deleting: "Deleting...",
   },
@@ -1262,7 +1262,7 @@ export const translations = {
     deleteAccountItem3: "Все тесты, вопросы и задания",
     deleteAccountItem4: "Все данные подписки и платежей",
     deleteAccountItem5: "Весь прогресс и попытки тестов",
-    deleteAccountFinalWarning: "Это действие нельзя отменить. Пожалуйста, введите \"DELETE\" для подтверждения.",
+    deleteAccountFinalWarning: "Это действие нельзя отменить.",
     deleteAccountConfirm: "Удалить аккаунт",
     deleting: "Удаление...",
     
