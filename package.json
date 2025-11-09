@@ -24,6 +24,7 @@
     "docker:logs": "docker-compose logs -f",
     "docker:reset": "docker-compose down -v && docker-compose up -d",
     "db:setup": "npm run docker:up && npm run db:push",
+    "db:setup:docker": "tsx scripts/setup-docker-db.ts && npm run docker:up && npm run db:push",
     "db:seed:railway": "tsx scripts/seed-railway.ts",
     "test:smoke": "tsx scripts/smoke-test.ts",
     "test:security": "tsx scripts/test-security.ts",

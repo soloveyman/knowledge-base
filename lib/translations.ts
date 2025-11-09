@@ -6,6 +6,7 @@ export const translations = {
     light: "Light",
     dark: "Dark",
     signOut: "Sign out",
+    customerSupport: "Customer support",
     
     // App Bar
     ownerDashboard: "Owner dashboard",
@@ -610,6 +611,7 @@ export const translations = {
     light: "Светлая",
     dark: "Тёмная", 
     signOut: "Выйти",
+    customerSupport: "Поддержка клиентов",
     
     // App Bar
     ownerDashboard: "Панель владельца",

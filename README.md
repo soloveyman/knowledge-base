@@ -88,6 +88,9 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 - `npm run docker:logs` - View container logs
 - `npm run docker:reset` - Reset database (removes all data)
 - `npm run db:setup` - Start database and push schema
+- `npm run db:setup:docker` - Full Docker setup (config + start + push)
+
+**For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)**
 
 ### Database Management
 

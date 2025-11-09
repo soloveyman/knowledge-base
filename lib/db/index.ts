@@ -14,6 +14,10 @@ function getPool(): Pool {
       throw new Error('DATABASE_URL environment variable is required');
     }
 
+    // Check if this is a local Docker connection (no SSL needed)
+    const isLocalhost = process.env.DATABASE_URL?.includes('localhost') || 
+                       process.env.DATABASE_URL?.includes('127.0.0.1')
+
     // Railway-optimized connection pool configuration
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -26,9 +30,12 @@ function getPool(): Pool {
       connectionTimeoutMillis: 10000, // 10 seconds
       // SSL for production and Railway (Railway uses SSL)
       // Also enable SSL if connection string contains 'railway.app' (connecting to Railway from anywhere)
+      // Disable SSL for local Docker connections (localhost)
       ssl:
-        process.env.NODE_ENV === 'production' ||
-        process.env.DATABASE_URL?.includes('railway.app')
+        !isLocalhost && (
+          process.env.NODE_ENV === 'production' ||
+          process.env.DATABASE_URL?.includes('railway.app')
+        )
           ? { rejectUnauthorized: false }
           : false,
       // Log connections in development

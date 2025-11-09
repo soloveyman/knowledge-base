@@ -25,7 +25,8 @@ import {
   Globe,
   Sun,
   Moon,
-  ChevronRight
+  ChevronRight,
+  HelpCircle
 } from "lucide-react"
 
 interface UserMenuProps {
@@ -138,6 +139,20 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
             {t('dark')}
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        
+        <DropdownMenuSeparator />
+        
+        {/* Customer Support */}
+        <DropdownMenuItem 
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.open('mailto:uppstaffknowledge@gmail.com?subject=Support Request', '_blank')
+            }
+          }}
+        >
+          <HelpCircle className="h-4 w-4 mr-2" />
+          {t('customerSupport')}
+        </DropdownMenuItem>
         
         <DropdownMenuSeparator />
         
