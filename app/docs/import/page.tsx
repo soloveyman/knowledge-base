@@ -395,7 +395,8 @@ function DocImportPageInner() {
       
       // Use replace instead of push to avoid back button issues
       router.replace(redirectUrl)
-      // Immediately refresh to ensure data reloads (no delay for instant updates)
+      // Wait for navigation, then refresh
+      await new Promise(resolve => setTimeout(resolve, 100))
       router.refresh()
       // Trigger location change event immediately to force data reload
       if (typeof window !== 'undefined') {
@@ -406,7 +407,7 @@ function DocImportPageInner() {
         setTimeout(() => {
           // Force a re-check after a tiny delay to ensure URL has updated
           window.dispatchEvent(new Event('popstate'))
-        }, 10)
+        }, 50)
       }
     } catch (error) {
       console.error('Error saving documents:', error)

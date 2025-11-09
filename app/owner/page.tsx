@@ -725,10 +725,18 @@ function OwnerPageInner() {
       
       // If we have a timestamp parameter, it means we're returning from a create/edit page
       // Force reload the appropriate tab to show newly saved/updated data
-      if (hasTimestamp && tab && timestamp !== processedTimestampRef.current) {
-        console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
-        // Mark this timestamp as processed to prevent duplicate calls
-        processedTimestampRef.current = timestamp
+      // Also reload if tab changed and we haven't loaded it yet
+      const shouldReload = (hasTimestamp && tab && timestamp !== processedTimestampRef.current) || 
+                          (tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current)
+      
+      if (shouldReload) {
+        if (hasTimestamp && timestamp !== processedTimestampRef.current) {
+          console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
+          // Mark this timestamp as processed to prevent duplicate calls
+          processedTimestampRef.current = timestamp
+        } else {
+          console.log(`Owner: Tab changed to ${tab}, loading data...`)
+        }
         // Reset last loaded tab ref to force reload even if same tab
         lastLoadedTabRef.current = null
         isLoadingRef.current = false
@@ -875,16 +883,34 @@ function OwnerPageInner() {
     if (typeof window !== 'undefined') {
       const handlePopState = () => {
         // Immediate check without delay for faster updates
-        checkAndReload()
+        // Use a small delay to ensure URL has updated
+        setTimeout(checkAndReload, 50)
       }
       
       // Listen for both popstate and custom navigation events
       window.addEventListener('popstate', handlePopState)
       window.addEventListener('locationchange', handlePopState)
       
+      // Also check periodically when we have a timestamp (fallback for mobile)
+      let intervalId: NodeJS.Timeout | null = null
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : searchParams
+      if (urlParams.has('_t') || searchParams.has('_t')) {
+        // Check every 100ms for up to 2 seconds to catch URL updates
+        let checks = 0
+        intervalId = setInterval(() => {
+          checks++
+          if (checks > 20) {
+            if (intervalId) clearInterval(intervalId)
+            return
+          }
+          checkAndReload()
+        }, 100)
+      }
+      
       return () => {
         window.removeEventListener('popstate', handlePopState)
         window.removeEventListener('locationchange', handlePopState)
+        if (intervalId) clearInterval(intervalId)
       }
     }
   }, [searchParams, loadTabData, session?.user?.id, defaultTab])

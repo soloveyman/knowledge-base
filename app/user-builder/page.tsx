@@ -218,8 +218,10 @@ export default function UserBuilderPage() {
       }
       
       // Redirect to owner users tab with timestamp to trigger refresh
-      router.push(`/owner?tab=users&_t=${Date.now()}`)
-      // Immediately refresh to ensure data reloads (no delay for instant updates)
+      const timestamp = Date.now()
+      router.replace(`/owner?tab=users&_t=${timestamp}`)
+      // Wait for navigation, then refresh
+      await new Promise(resolve => setTimeout(resolve, 100))
       router.refresh()
       // Trigger location change event immediately to force data reload
       if (typeof window !== 'undefined') {
@@ -230,7 +232,7 @@ export default function UserBuilderPage() {
         setTimeout(() => {
           // Force a re-check after a tiny delay to ensure URL has updated
           window.dispatchEvent(new Event('popstate'))
-        }, 10)
+        }, 50)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user')

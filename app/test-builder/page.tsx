@@ -876,18 +876,15 @@ export default function TestBuilderPage() {
         return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
       }
       
-      if (returnTo) {
-        router.replace(addTimestamp(returnTo))
-      } else {
-        // Fallback: redirect based on user role
-        const userRole = session?.user?.role
-        if (userRole === 'owner') {
-          router.replace(addTimestamp('/owner?tab=tests'))
-        } else {
-          router.replace(addTimestamp('/manager?tab=tests'))
-        }
-      }
-      // Immediately refresh to ensure data reloads (no delay for instant updates)
+      const redirectUrl = returnTo 
+        ? addTimestamp(returnTo)
+        : (session?.user?.role === 'owner' 
+            ? addTimestamp('/owner?tab=tests')
+            : addTimestamp('/manager?tab=tests'))
+      
+      router.replace(redirectUrl)
+      // Wait for navigation, then refresh
+      await new Promise(resolve => setTimeout(resolve, 100))
       router.refresh()
       // Trigger location change event immediately to force data reload
       if (typeof window !== 'undefined') {
@@ -898,7 +895,7 @@ export default function TestBuilderPage() {
         setTimeout(() => {
           // Force a re-check after a tiny delay to ensure URL has updated
           window.dispatchEvent(new Event('popstate'))
-        }, 10)
+        }, 50)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('failedToSaveTest'))
