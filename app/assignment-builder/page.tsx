@@ -166,9 +166,43 @@ export default async function AssignmentBuilderPage({ searchParams }: Assignment
     description: assignmentData.assignment.description || ''
   } : null
 
-  const testsData = testsResult.success ? testsResult.data.tests : []
-  const usersData = usersResult.success ? usersResult.data.users : []
-  const documentsData = documentsResult.success ? documentsResult.data.documents : []
+  // Transform tests to match SavedTest interface
+  const testsData = testsResult.success ? testsResult.data.tests.map((test: any) => {
+    const questionIds = Array.isArray(test.questionIds) ? test.questionIds : []
+    return {
+      id: test.id,
+      title: test.title || '',
+      type: test.type || '',
+      difficulty: test.difficulty || '',
+      locale: test.locale || '',
+      questionCount: questionIds.length,
+      questions: [], // Not needed for the dropdown, but required by interface
+      sourceDocument: test.moduleId || '',
+      createdAt: test.createdAt ? new Date(test.createdAt).toISOString() : new Date().toISOString(),
+      createdBy: test.createdBy || ''
+    }
+  }) : []
+  
+  // Transform users to match User interface (add department if missing)
+  const usersData = usersResult.success ? usersResult.data.users.map((user: any) => ({
+    id: user.id,
+    name: user.name || '',
+    email: user.email || '',
+    role: user.role || 'employee',
+    job: user.job || '',
+    department: user.department || '' // Add department field
+  })) : []
+  
+  // Transform documents to match Document interface (convert null to undefined)
+  const documentsData = documentsResult.success ? documentsResult.data.documents.map((doc: any) => ({
+    id: doc.id,
+    originalFileName: doc.originalFileName ?? undefined,
+    title: doc.title || '',
+    fileType: doc.fileType ?? undefined,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+    fileSize: doc.fileSize ?? undefined,
+    status: doc.status || 'ready'
+  })) : []
 
   return (
     <AssignmentBuilderClient
