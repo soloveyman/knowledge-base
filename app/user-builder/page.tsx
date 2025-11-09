@@ -22,7 +22,8 @@ import {
   Save,
   UserPlus,
   Eye,
-  EyeOff
+  EyeOff,
+  RefreshCw
 } from "lucide-react"
 
 interface User {
@@ -55,6 +56,21 @@ export default function UserBuilderPage() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+
+  // Generate random password
+  const generateRandomPassword = () => {
+    const length = 12
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+    let password = ""
+    const values = new Uint32Array(length)
+    crypto.getRandomValues(values)
+    for (let i = 0; i < length; i++) {
+      password += charset[values[i] % charset.length]
+    }
+    setValue('password', password)
+    setFieldTouched('password')
+    clearFieldError('password')
+  }
   
   // Validation setup
   const initialFormData = {
@@ -428,8 +444,19 @@ export default function UserBuilderPage() {
                         onFocus={() => clearFieldError('password')}
                         onBlur={() => setFieldTouched('password')}
                         placeholder={isEditMode ? "Enter new password (optional)" : t('enterPassword')}
-                        className="pr-10"
+                        className={!isEditMode ? "pr-20" : "pr-10"}
                       />
+                      {!isEditMode && (
+                        <button
+                          type="button"
+                          onClick={generateRandomPassword}
+                          className="absolute right-10 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Generate random password"
+                          title="Generate random password"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
