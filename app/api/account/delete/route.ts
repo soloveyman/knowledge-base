@@ -188,9 +188,14 @@ export async function POST() {
       console.log('[Delete Account] Deleted modules')
     }
 
-    // 14. Delete password reset tokens
-    await db.delete(passwordResetTokens).where(inArray(passwordResetTokens.userId, userIds))
-    console.log('[Delete Account] Deleted password reset tokens')
+    // 14. Delete password reset tokens (optional - table may not exist)
+    try {
+      await db.delete(passwordResetTokens).where(inArray(passwordResetTokens.userId, userIds))
+      console.log('[Delete Account] Deleted password reset tokens')
+    } catch (error) {
+      // Table may not exist in all database setups, continue with deletion
+      console.log('[Delete Account] Skipped password reset tokens (table may not exist)')
+    }
 
     // 15. Delete sessions
     await db.delete(sessions).where(inArray(sessions.userId, userIds))
