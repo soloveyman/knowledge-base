@@ -667,16 +667,17 @@ function ManagerPageInner() {
         lastLoadedTabRef.current = tab
       }
     }
+    } // Close checkAndReload function
     
     checkAndReload()
     
     // On mobile, also listen for popstate events to catch navigation changes
-    const handlePopState = () => {
-      // Small delay to ensure searchParams has updated
-      setTimeout(checkAndReload, 50)
-    }
-    
     if (typeof window !== 'undefined') {
+      const handlePopState = () => {
+        // Small delay to ensure searchParams has updated
+        setTimeout(checkAndReload, 50)
+      }
+      
       window.addEventListener('popstate', handlePopState)
       return () => {
         window.removeEventListener('popstate', handlePopState)

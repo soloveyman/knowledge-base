@@ -732,35 +732,36 @@ function OwnerPageInner() {
                 syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
                 lastLoadedTabRef.current = tab
               }
-          })
-          .catch(console.error)
-      } else if (tab === 'users') {
-          // Direct fetch for users with cache-busting
-          fetch('/api/users', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success) {
-                setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
-                lastLoadedTabRef.current = tab
-              }
             })
             .catch(console.error)
+      } else if (tab === 'users') {
+        // Direct fetch for users with cache-busting
+        fetch('/api/users', { cache: 'no-store' })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success) {
+              setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
+              lastLoadedTabRef.current = tab
+            }
+          })
+          .catch(console.error)
       } else {
         // For tests and assignments, use loadTabData with forceRefresh=true
         loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
         lastLoadedTabRef.current = tab
       }
     }
+    } // Close checkAndReload function
     
     checkAndReload()
     
     // On mobile, also listen for popstate events to catch navigation changes
-    const handlePopState = () => {
-      // Small delay to ensure searchParams has updated
-      setTimeout(checkAndReload, 50)
-    }
-    
     if (typeof window !== 'undefined') {
+      const handlePopState = () => {
+        // Small delay to ensure searchParams has updated
+        setTimeout(checkAndReload, 50)
+      }
+      
       window.addEventListener('popstate', handlePopState)
       return () => {
         window.removeEventListener('popstate', handlePopState)
