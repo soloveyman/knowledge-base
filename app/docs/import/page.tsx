@@ -397,6 +397,7 @@ function DocImportPageInner() {
       
       // Use replace instead of push to avoid back button issues
       router.replace(redirectUrl)
+      router.refresh() // Force refresh on mobile to ensure data reloads
     } catch (error) {
       console.error('Error saving documents:', error)
       const errorMsg = error instanceof Error 

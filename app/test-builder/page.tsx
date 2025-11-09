@@ -881,6 +881,7 @@ export default function TestBuilderPage() {
       
       if (returnTo) {
         router.replace(addTimestamp(returnTo))
+        router.refresh() // Force refresh on mobile to ensure data reloads
       } else {
         // Fallback: redirect based on user role
         const userRole = session?.user?.role
@@ -889,6 +890,7 @@ export default function TestBuilderPage() {
         } else {
           router.replace(addTimestamp('/manager?tab=tests'))
         }
+        router.refresh() // Force refresh on mobile to ensure data reloads
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('failedToSaveTest'))

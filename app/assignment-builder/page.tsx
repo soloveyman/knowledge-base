@@ -446,6 +446,7 @@ function AssignmentBuilderPageContent() {
       
       if (returnTo) {
         router.replace(addTimestamp(returnTo))
+        router.refresh() // Force refresh on mobile to ensure data reloads
       } else {
         // Fallback: redirect based on user role
         const userRole = session?.user?.role
@@ -454,6 +455,7 @@ function AssignmentBuilderPageContent() {
         } else {
           router.replace(addTimestamp('/manager?tab=assignments'))
         }
+        router.refresh() // Force refresh on mobile to ensure data reloads
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create assignment')
@@ -474,6 +476,7 @@ function AssignmentBuilderPageContent() {
     
     if (returnTo) {
       router.replace(addTimestamp(returnTo))
+      router.refresh() // Force refresh on mobile to ensure data reloads
     } else {
       // Fallback: redirect based on user role
       const userRole = session?.user?.role
@@ -482,6 +485,7 @@ function AssignmentBuilderPageContent() {
       } else {
         router.replace(addTimestamp('/manager?tab=assignments'))
       }
+      router.refresh() // Force refresh on mobile to ensure data reloads
     }
   }
 

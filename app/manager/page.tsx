@@ -617,7 +617,8 @@ function ManagerPageInner() {
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
     const tab = getTabFromUrl(searchParams)
-    const hasTimestamp = searchParams.has('_t')
+    // Check both searchParams and window.location for mobile compatibility
+    const hasTimestamp = searchParams.has('_t') || (typeof window !== 'undefined' && window.location.search.includes('_t='))
     
     // If we have a timestamp parameter, it means we're returning from a create/edit page
     // Force reload the appropriate tab to show newly saved/updated data

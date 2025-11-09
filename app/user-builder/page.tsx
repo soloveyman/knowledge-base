@@ -219,6 +219,7 @@ export default function UserBuilderPage() {
       
       // Redirect to owner users tab with timestamp to trigger refresh
       router.push(`/owner?tab=users&_t=${Date.now()}`)
+      router.refresh() // Force refresh on mobile to ensure data reloads
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {
@@ -228,6 +229,7 @@ export default function UserBuilderPage() {
 
   const handleClose = () => {
     router.push(`/owner?tab=users&_t=${Date.now()}`)
+    router.refresh() // Force refresh on mobile to ensure data reloads
   }
 
   if (status === "loading") {
