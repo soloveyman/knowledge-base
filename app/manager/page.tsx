@@ -445,101 +445,109 @@ function ManagerPageInner() {
     
     try {
       if (tab === 'docs') {
-        setIsLoadingDocuments(!preserveData)
-        // Check if returning from import (has timestamp) - use cache-busting
-        const fetchOptions: RequestInit = hasTimestamp 
-          ? { cache: 'no-store' } // Force fresh data when returning from create/edit
-          : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
-        
-        const response = await fetch('/api/documents', fetchOptions)
-        const result = await response.json()
-        if (result.success && result.data.documents) {
-          const transformedDocs = result.data.documents.map((doc: {
-            id: string
-            originalFileName?: string
-            title: string
-            fileType?: string
-            createdAt: string
-            updatedAt?: string
-            fileSize?: number
-            status?: string
-            parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-          }) => ({
-            id: doc.id,
-            name: doc.originalFileName || doc.title,
-            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-            uploadedAt: formatDateShort(doc.createdAt),
-            size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-            status: doc.status || 'ready',
-            createdAt: doc.createdAt,
-            updatedAt: doc.updatedAt,
-            parsedContent: doc.parsedContent || null
-          }))
-          setDocumentsWithLog(transformedDocs)
-          syncLocalStorageWithDatabase(transformedDocs)
+        // Always show loading when fetching, but preserve existing data if preserveData is true
+        setIsLoadingDocuments(true)
+        try {
+          // Check if returning from import (has timestamp) - use cache-busting
+          const fetchOptions: RequestInit = hasTimestamp 
+            ? { cache: 'no-store' } // Force fresh data when returning from create/edit
+            : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+          
+          const response = await fetch('/api/documents', fetchOptions)
+          const result = await response.json()
+          if (result.success && result.data.documents) {
+            const transformedDocs = result.data.documents.map((doc: {
+              id: string
+              originalFileName?: string
+              title: string
+              fileType?: string
+              createdAt: string
+              updatedAt?: string
+              fileSize?: number
+              status?: string
+              parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+            }) => ({
+              id: doc.id,
+              name: doc.originalFileName || doc.title,
+              type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+              uploadedAt: formatDateShort(doc.createdAt),
+              size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+              status: doc.status || 'ready',
+              createdAt: doc.createdAt,
+              updatedAt: doc.updatedAt,
+              parsedContent: doc.parsedContent || null
+            }))
+            setDocumentsWithLog(transformedDocs)
+            syncLocalStorageWithDatabase(transformedDocs)
+          }
+        } finally {
+          setIsLoadingDocuments(false)
         }
-        setIsLoadingDocuments(false)
       } else if (tab === 'tests') {
-        setIsLoadingTests(!preserveData)
-        // Tests need documents for sourceDocument lookup
-        // Check if returning from test-builder (has timestamp) - use cache-busting
-        const fetchOpts: RequestInit = hasTimestamp 
-          ? { cache: 'no-store' } // Force fresh data when returning from create/edit
-          : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
-        
-        const [testsResponse, documentsResponse] = await Promise.all([
-          fetch('/api/tests', fetchOpts),
-          fetch('/api/documents', fetchOpts)
-        ])
-        
-        // Parse JSON in parallel
-        const [documentsResult, testsResult] = await Promise.all([
-          documentsResponse.json(),
-          testsResponse.json()
-        ])
-        
-        const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-        if (documentsResult.success && documentsResult.data.documents) {
-          documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
-            documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
-          })
-        }
-        if (testsResult.success) {
-          const transformedTests = (testsResult.data.tests as Array<{
-            id: string
-            title: string
-            type?: string | null
-            difficulty?: string | null
-            locale?: string | null
-            questionIds?: string[] | null
-            moduleId?: string | null
-            createdAt: string
-            createdBy: string
-          }>).map((test) => {
-            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
-            let sourceDocument = 'Unknown'
-            if (test.moduleId) {
-              const doc = documentMap.get(test.moduleId)
-              if (doc) {
-                sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+        // Always show loading when fetching, but preserve existing data if preserveData is true
+        setIsLoadingTests(true)
+        try {
+          // Tests need documents for sourceDocument lookup
+          // Check if returning from test-builder (has timestamp) - use cache-busting
+          const fetchOpts: RequestInit = hasTimestamp 
+            ? { cache: 'no-store' } // Force fresh data when returning from create/edit
+            : { next: { revalidate: 30 } } // Otherwise use stale-while-revalidate
+          
+          const [testsResponse, documentsResponse] = await Promise.all([
+            fetch('/api/tests', fetchOpts),
+            fetch('/api/documents', fetchOpts)
+          ])
+          
+          // Parse JSON in parallel
+          const [documentsResult, testsResult] = await Promise.all([
+            documentsResponse.json(),
+            testsResponse.json()
+          ])
+          
+          const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+          if (documentsResult.success && documentsResult.data.documents) {
+            documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+              documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+            })
+          }
+          if (testsResult.success) {
+            const transformedTests = (testsResult.data.tests as Array<{
+              id: string
+              title: string
+              type?: string | null
+              difficulty?: string | null
+              locale?: string | null
+              questionIds?: string[] | null
+              moduleId?: string | null
+              createdAt: string
+              createdBy: string
+            }>).map((test) => {
+              const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+              let sourceDocument = 'Unknown'
+              if (test.moduleId) {
+                const doc = documentMap.get(test.moduleId)
+                if (doc) {
+                  sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+                }
               }
-            }
-            return {
-              id: test.id,
-              title: test.title,
-              type: test.type || 'mcq',
-              difficulty: test.difficulty || 'medium',
-              locale: test.locale || 'en',
-              questionCount,
-              questions: [],
-              sourceDocument,
-              createdAt: test.createdAt,
-              createdBy: test.createdBy
-            }
-          })
-          setSavedTestsWithLog(transformedTests)
+              return {
+                id: test.id,
+                title: test.title,
+                type: test.type || 'mcq',
+                difficulty: test.difficulty || 'medium',
+                locale: test.locale || 'en',
+                questionCount,
+                questions: [],
+                sourceDocument,
+                createdAt: test.createdAt,
+                createdBy: test.createdBy
+              }
+            })
+            setSavedTestsWithLog(transformedTests)
+          }
+        } finally {
+          setIsLoadingTests(false)
         }
-        setIsLoadingTests(false)
       } else if (tab === 'assignments') {
         setIsLoadingAssignments(!preserveData)
         // Assignments need all data for mapping
@@ -550,6 +558,14 @@ function ManagerPageInner() {
       }
     } catch (error) {
       console.error(`Error loading ${tab} tab data:`, error)
+      // Ensure loading states are cleared on error
+      if (tab === 'docs') {
+        setIsLoadingDocuments(false)
+      } else if (tab === 'tests') {
+        setIsLoadingTests(false)
+      } else if (tab === 'assignments') {
+        setIsLoadingAssignments(false)
+      }
     }
   }, [loadData, searchParams])
 
@@ -1036,10 +1052,9 @@ function ManagerPageInner() {
                     )
                   }
                   
-                  // Only show empty state if:
-                  // 1. No documents AND
-                  // 2. NOT returning from import (to prevent flicker after saving)
-                  if (documents.length === 0 && !isReturningFromImport) {
+                  // Show empty state if no documents (regardless of returning from import)
+                  // hideEmptyState only prevents flicker during loading, not after loading completes
+                  if (documents.length === 0) {
                     return (
                       <EmptyState
                         icon={<span className="text-5xl">📄</span>}
@@ -1048,16 +1063,6 @@ function ManagerPageInner() {
                         actionLabel={t('importDocument')}
                         onAction={handleImportDocument}
                       />
-                    )
-                  }
-                  
-                  // If returning from import but no documents yet, show loading
-                  if (isReturningFromImport && documents.length === 0) {
-                    return (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-                        <span className="ml-3 text-muted-foreground">{t('refreshingDocuments')}</span>
-                      </div>
                     )
                   }
                   

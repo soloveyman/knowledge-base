@@ -64,14 +64,9 @@ export function ManagementPage({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             <span className="ml-2 text-gray-600">Loading...</span>
           </div>
-        ) : items.length === 0 && !hideEmptyState ? (
+        ) : items.length === 0 ? (
+          // Show empty state if no items (hideEmptyState only prevents flicker during loading)
           <EmptyState {...emptyState} />
-        ) : items.length === 0 && hideEmptyState ? (
-          // Show loading when returning from edit but no items yet
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            <span className="ml-2 text-gray-600">Loading...</span>
-          </div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (

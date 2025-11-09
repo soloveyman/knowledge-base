@@ -514,38 +514,42 @@ function OwnerPageInner() {
   const loadTabData = useCallback(async (tab: string, preserveData = false) => {
     try {
       if (tab === 'docs') {
-        setIsLoadingDocuments(!preserveData)
-        const response = await fetch('/api/documents', { 
-          next: { revalidate: 30 } 
-        })
-        const result = await response.json()
-        if (result.success && result.data.documents) {
-          const transformedDocs = result.data.documents.map((doc: {
-            id: string
-            originalFileName?: string
-            title: string
-            fileType?: string
-            createdAt: string
-            updatedAt?: string
-            fileSize?: number
-            status?: string
-            moduleId?: string | null
-            parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-          }) => ({
-            id: doc.id,
-            name: doc.originalFileName || doc.title,
-            type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-            uploadedAt: formatDateShort(doc.createdAt),
-            size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-            status: doc.status || 'ready',
-            moduleId: doc.moduleId || null,
-            createdAt: doc.createdAt,
-            updatedAt: doc.updatedAt,
-            parsedContent: doc.parsedContent || null
-          }))
-          setDocumentsWithLog(transformedDocs)
+        // Always show loading when fetching, but preserve existing data if preserveData is true
+        setIsLoadingDocuments(true)
+        try {
+          const response = await fetch('/api/documents', { 
+            next: { revalidate: 30 } 
+          })
+          const result = await response.json()
+          if (result.success && result.data.documents) {
+            const transformedDocs = result.data.documents.map((doc: {
+              id: string
+              originalFileName?: string
+              title: string
+              fileType?: string
+              createdAt: string
+              updatedAt?: string
+              fileSize?: number
+              status?: string
+              moduleId?: string | null
+              parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+            }) => ({
+              id: doc.id,
+              name: doc.originalFileName || doc.title,
+              type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+              uploadedAt: formatDateShort(doc.createdAt),
+              size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+              status: doc.status || 'ready',
+              moduleId: doc.moduleId || null,
+              createdAt: doc.createdAt,
+              updatedAt: doc.updatedAt,
+              parsedContent: doc.parsedContent || null
+            }))
+            setDocumentsWithLog(transformedDocs)
+          }
+        } finally {
+          setIsLoadingDocuments(false)
         }
-        setIsLoadingDocuments(false)
       } else if (tab === 'tests') {
         setIsLoadingTests(!preserveData)
         // Tests need documents for sourceDocument lookup
@@ -625,6 +629,14 @@ function OwnerPageInner() {
       }
     } catch (error) {
       console.error(`Error loading ${tab} tab data:`, error)
+      // Ensure loading states are cleared on error
+      if (tab === 'docs') {
+        setIsLoadingDocuments(false)
+      } else if (tab === 'tests') {
+        setIsLoadingTests(false)
+      } else if (tab === 'assignments') {
+        setIsLoadingAssignments(false)
+      }
     }
   }, [loadData, session?.user?.id, searchParams])
 
@@ -1159,10 +1171,9 @@ function OwnerPageInner() {
                     )
                   }
                   
-                  // Only show empty state if:
-                  // 1. No documents AND
-                  // 2. NOT returning from import (to prevent flicker after saving)
-                  if (documents.length === 0 && !isReturningFromImport) {
+                  // Show empty state if no documents (regardless of returning from import)
+                  // hideEmptyState only prevents flicker during loading, not after loading completes
+                  if (documents.length === 0) {
                     return (
                       <EmptyState
                         icon={<span className="text-5xl">📄</span>}
@@ -1171,16 +1182,6 @@ function OwnerPageInner() {
                         actionLabel={t('importDocument')}
                         onAction={handleImportDocument}
                       />
-                    )
-                  }
-                  
-                  // If returning from import but no documents yet, show loading
-                  if (isReturningFromImport && documents.length === 0) {
-                    return (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-                        <span className="ml-3 text-muted-foreground">{t('refreshingDocuments')}</span>
-                      </div>
                     )
                   }
                   

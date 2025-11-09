@@ -9,7 +9,7 @@ import { DeleteConfirmation } from "./delete-confirmation"
 import { X, Edit } from "lucide-react"
 
 interface ListItemProps {
-  title: string
+  title: string | null | undefined
   subtitle?: string
   metadata?: string[]
   badges?: Array<{
@@ -58,7 +58,7 @@ export function ListItem({
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-medium text-foreground truncate">
-              {title.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()}
+              {title ? title.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim() : 'Untitled'}
             </h3>
             {badges.length > 0 && (
               <div className="flex items-center space-x-2 shrink-0">
@@ -133,7 +133,7 @@ export function ListItem({
         {showDeleteButton && onDelete && (
           <DeleteConfirmation
             onConfirm={handleDelete}
-            itemName={title}
+            itemName={title || 'Untitled'}
             dataLossWarning={deleteDataLossWarning}
             trigger={
               <Button 

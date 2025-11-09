@@ -10,7 +10,7 @@ import { formatDateShort } from "@/lib/date-format"
 
 interface Test {
   id: string
-  title: string
+  title: string | null | undefined
   type: string
   difficulty: string
   locale: string
@@ -44,7 +44,7 @@ export function TestsPage({
   // Memoize testItems to avoid recalculating on every render
   const testItems = useMemo(() => tests.map((test) => ({
     id: test.id,
-    title: test.title,
+    title: test.title || `Test ${test.id.slice(0, 8)}`,
     subtitle: `${test.type} • ${test.questionCount} ${t('questions')} • ${t('created')} ${formatDateShort(test.createdAt)}`,
     metadata: [],
     badges: [
