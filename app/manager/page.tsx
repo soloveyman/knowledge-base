@@ -632,9 +632,10 @@ function ManagerPageInner() {
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
     const checkAndReload = () => {
-      const tab = getTabFromUrl(searchParams)
-      // Check both searchParams and window.location for mobile compatibility
-      const hasTimestamp = searchParams.has('_t') || (typeof window !== 'undefined' && window.location.search.includes('_t='))
+      // Check window.location.search first for immediate detection (works before searchParams updates)
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : searchParams
+      const tab = urlParams.get('tab') || getTabFromUrl(searchParams) || defaultTab
+      const hasTimestamp = urlParams.has('_t') || searchParams.has('_t')
       
       // If we have a timestamp parameter, it means we're returning from a create/edit page
       // Force reload the appropriate tab to show newly saved/updated data
@@ -644,7 +645,7 @@ function ManagerPageInner() {
         lastLoadedTabRef.current = null
         isLoadingRef.current = false
         
-        // Use cache-busting to ensure fresh data for all tabs
+        // Use cache-busting to ensure fresh data - fetch immediately
         if (tab === 'docs') {
           // Direct fetch for documents with cache-busting
           fetch('/api/documents', { cache: 'no-store' })
@@ -686,21 +687,26 @@ function ManagerPageInner() {
       }
     } // Close checkAndReload function
     
+    // Check immediately on mount and when searchParams change
     checkAndReload()
     
-    // On mobile, also listen for popstate events to catch navigation changes
+    // Also listen for navigation events to catch immediate changes
     if (typeof window !== 'undefined') {
       const handlePopState = () => {
         // Immediate check without delay for faster updates
         checkAndReload()
       }
       
+      // Listen for both popstate and custom navigation events
       window.addEventListener('popstate', handlePopState)
+      window.addEventListener('locationchange', handlePopState)
+      
       return () => {
         window.removeEventListener('popstate', handlePopState)
+        window.removeEventListener('locationchange', handlePopState)
       }
     }
-  }, [searchParams, loadTabData])
+  }, [searchParams, loadTabData, defaultTab])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer or test page)
   // Only reload if we've been away for more than 30 seconds to avoid unnecessary refreshes

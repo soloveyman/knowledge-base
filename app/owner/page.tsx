@@ -696,9 +696,10 @@ function OwnerPageInner() {
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
     const checkAndReload = () => {
-      const tab = getTabFromUrl(searchParams)
-      // Check both searchParams and window.location for mobile compatibility
-      const hasTimestamp = searchParams.has('_t') || (typeof window !== 'undefined' && window.location.search.includes('_t='))
+      // Check window.location.search first for immediate detection (works before searchParams updates)
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : searchParams
+      const tab = urlParams.get('tab') || getTabFromUrl(searchParams) || defaultTab
+      const hasTimestamp = urlParams.has('_t') || searchParams.has('_t')
       
       // If we have a timestamp parameter, it means we're returning from a create/edit page
       // Force reload the appropriate tab to show newly saved/updated data
@@ -708,7 +709,7 @@ function OwnerPageInner() {
         lastLoadedTabRef.current = null
         isLoadingRef.current = false
         
-        // Use cache-busting to ensure fresh data
+        // Use cache-busting to ensure fresh data - fetch immediately
         if (tab === 'docs') {
           fetch('/api/documents', { cache: 'no-store' })
             .then(res => res.json())
@@ -764,21 +765,26 @@ function OwnerPageInner() {
       }
     } // Close checkAndReload function
     
+    // Check immediately on mount and when searchParams change
     checkAndReload()
     
-    // On mobile, also listen for popstate events to catch navigation changes
+    // Also listen for navigation events to catch immediate changes
     if (typeof window !== 'undefined') {
       const handlePopState = () => {
         // Immediate check without delay for faster updates
         checkAndReload()
       }
       
+      // Listen for both popstate and custom navigation events
       window.addEventListener('popstate', handlePopState)
+      window.addEventListener('locationchange', handlePopState)
+      
       return () => {
         window.removeEventListener('popstate', handlePopState)
+        window.removeEventListener('locationchange', handlePopState)
       }
     }
-  }, [searchParams, loadTabData, session?.user?.id])
+  }, [searchParams, loadTabData, session?.user?.id, defaultTab])
 
   // Reload data when tab changes to settings
   useEffect(() => {

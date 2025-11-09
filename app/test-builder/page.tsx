@@ -889,18 +889,16 @@ export default function TestBuilderPage() {
       }
       // Immediately refresh to ensure data reloads (no delay for instant updates)
       router.refresh()
-      // On mobile, also force a location check to ensure useEffect hooks trigger
+      // Trigger location change event immediately to force data reload
       if (typeof window !== 'undefined') {
-        // Small delay only for mobile to ensure searchParams updates
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-        if (isMobile) {
-          setTimeout(() => {
-            window.dispatchEvent(new Event('popstate'))
-          }, 50)
-        } else {
-          // Desktop: trigger immediately
+        // Dispatch both popstate and custom locationchange event for immediate detection
+        window.dispatchEvent(new Event('popstate'))
+        window.dispatchEvent(new Event('locationchange'))
+        // Also check window.location.search directly for immediate detection
+        setTimeout(() => {
+          // Force a re-check after a tiny delay to ensure URL has updated
           window.dispatchEvent(new Event('popstate'))
-        }
+        }, 10)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('failedToSaveTest'))
