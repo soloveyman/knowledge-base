@@ -446,7 +446,6 @@ function AssignmentBuilderPageContent() {
       
       if (returnTo) {
         router.replace(addTimestamp(returnTo))
-        router.refresh() // Force refresh on mobile to ensure data reloads
       } else {
         // Fallback: redirect based on user role
         const userRole = session?.user?.role
@@ -455,8 +454,18 @@ function AssignmentBuilderPageContent() {
         } else {
           router.replace(addTimestamp('/manager?tab=assignments'))
         }
-        router.refresh() // Force refresh on mobile to ensure data reloads
       }
+      // Wait for navigation to complete, then refresh to ensure data reloads
+      // Use longer delay on mobile devices for better reliability
+      const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const delay = isMobile ? 300 : 100
+      setTimeout(() => {
+        router.refresh()
+        // On mobile, also force a location check to ensure useEffect hooks trigger
+        if (isMobile && typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('popstate'))
+        }
+      }, delay)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create assignment')
     } finally {
@@ -476,7 +485,6 @@ function AssignmentBuilderPageContent() {
     
     if (returnTo) {
       router.replace(addTimestamp(returnTo))
-      router.refresh() // Force refresh on mobile to ensure data reloads
     } else {
       // Fallback: redirect based on user role
       const userRole = session?.user?.role
@@ -485,8 +493,11 @@ function AssignmentBuilderPageContent() {
       } else {
         router.replace(addTimestamp('/manager?tab=assignments'))
       }
-      router.refresh() // Force refresh on mobile to ensure data reloads
     }
+    // Wait for navigation to complete, then refresh to ensure data reloads
+    setTimeout(() => {
+      router.refresh()
+    }, 100)
   }
 
   // Don't block UI while session loads - show page immediately

@@ -397,7 +397,18 @@ function DocImportPageInner() {
       
       // Use replace instead of push to avoid back button issues
       router.replace(redirectUrl)
-      router.refresh() // Force refresh on mobile to ensure data reloads
+      // Wait for navigation to complete, then refresh to ensure data reloads
+      // Use longer delay on mobile devices for better reliability
+      const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const delay = isMobile ? 300 : 100
+      setTimeout(() => {
+        router.refresh()
+        // On mobile, also force a location check to ensure useEffect hooks trigger
+        if (isMobile && typeof window !== 'undefined') {
+          // Trigger a custom event to force re-check of searchParams
+          window.dispatchEvent(new Event('popstate'))
+        }
+      }, delay)
     } catch (error) {
       console.error('Error saving documents:', error)
       const errorMsg = error instanceof Error 

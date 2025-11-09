@@ -686,68 +686,84 @@ function OwnerPageInner() {
 
   // Reload data when returning from edit/create pages (detected via URL parameters)
   useEffect(() => {
-    const tab = getTabFromUrl(searchParams)
-    // Check both searchParams and window.location for mobile compatibility
-    const hasTimestamp = searchParams.has('_t') || (typeof window !== 'undefined' && window.location.search.includes('_t='))
-    
-    // If we have a timestamp parameter, it means we're returning from a create/edit page
-    // Force reload the appropriate tab to show newly saved/updated data
-    if (hasTimestamp && tab) {
-      console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
-      // Reset last loaded tab ref to force reload even if same tab
-      lastLoadedTabRef.current = null
-      // Use cache-busting to ensure fresh data
-      if (tab === 'docs') {
-        fetch('/api/documents', { cache: 'no-store' })
-          .then(res => res.json())
-          .then(result => {
-            if (result.success && result.data.documents) {
-              const transformedDocs = result.data.documents.map((doc: {
-                id: string
-                originalFileName?: string
-                title: string
-                fileType?: string
-                createdAt: string
-                updatedAt?: string
-                fileSize?: number
-                status?: string
-                moduleId?: string | null
-                parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-              }) => ({
-                id: doc.id,
-                name: doc.originalFileName || doc.title,
-                type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-                uploadedAt: formatDateShort(doc.createdAt),
-                size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-                status: doc.status || 'ready',
-                moduleId: doc.moduleId || null,
-                createdAt: doc.createdAt,
-                updatedAt: doc.updatedAt,
-                parsedContent: doc.parsedContent || null
-              }))
-              setDocumentsWithLog(transformedDocs)
-              // Ensure localStorage is synced immediately
-              // Cast to Document[] type to match the utility function signature
-              syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
-              lastLoadedTabRef.current = tab
-            }
+    const checkAndReload = () => {
+      const tab = getTabFromUrl(searchParams)
+      // Check both searchParams and window.location for mobile compatibility
+      const hasTimestamp = searchParams.has('_t') || (typeof window !== 'undefined' && window.location.search.includes('_t='))
+      
+      // If we have a timestamp parameter, it means we're returning from a create/edit page
+      // Force reload the appropriate tab to show newly saved/updated data
+      if (hasTimestamp && tab) {
+        console.log(`Owner: Detected return from edit/create, reloading ${tab} tab...`)
+        // Reset last loaded tab ref to force reload even if same tab
+        lastLoadedTabRef.current = null
+        // Use cache-busting to ensure fresh data
+        if (tab === 'docs') {
+          fetch('/api/documents', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(result => {
+              if (result.success && result.data.documents) {
+                const transformedDocs = result.data.documents.map((doc: {
+                  id: string
+                  originalFileName?: string
+                  title: string
+                  fileType?: string
+                  createdAt: string
+                  updatedAt?: string
+                  fileSize?: number
+                  status?: string
+                  moduleId?: string | null
+                  parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                }) => ({
+                  id: doc.id,
+                  name: doc.originalFileName || doc.title,
+                  type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                  uploadedAt: formatDateShort(doc.createdAt),
+                  size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                  status: doc.status || 'ready',
+                  moduleId: doc.moduleId || null,
+                  createdAt: doc.createdAt,
+                  updatedAt: doc.updatedAt,
+                  parsedContent: doc.parsedContent || null
+                }))
+                setDocumentsWithLog(transformedDocs)
+                // Ensure localStorage is synced immediately
+                // Cast to Document[] type to match the utility function signature
+                syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                lastLoadedTabRef.current = tab
+              }
           })
           .catch(console.error)
       } else if (tab === 'users') {
-        // Direct fetch for users with cache-busting
-        fetch('/api/users', { cache: 'no-store' })
-          .then(res => res.json())
-          .then(result => {
-            if (result.success) {
-              setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
-              lastLoadedTabRef.current = tab
-            }
-          })
-          .catch(console.error)
+          // Direct fetch for users with cache-busting
+          fetch('/api/users', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(result => {
+              if (result.success) {
+                setSavedUsers((result.data.users as SavedUser[]).filter(u => u.id !== (session?.user?.id || '')))
+                lastLoadedTabRef.current = tab
+              }
+            })
+            .catch(console.error)
       } else {
         // For tests and assignments, use loadTabData with forceRefresh=true
         loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
         lastLoadedTabRef.current = tab
+      }
+    }
+    
+    checkAndReload()
+    
+    // On mobile, also listen for popstate events to catch navigation changes
+    const handlePopState = () => {
+      // Small delay to ensure searchParams has updated
+      setTimeout(checkAndReload, 50)
+    }
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', handlePopState)
+      return () => {
+        window.removeEventListener('popstate', handlePopState)
       }
     }
   }, [searchParams, loadTabData])
@@ -881,29 +897,30 @@ function OwnerPageInner() {
   }
 
   const handleDeleteDocument = async (id: string) => {
+    // Optimistically remove from state immediately for instant UI update
+    const previousDocuments = documents
+    setDocumentsWithLog(documents.filter(doc => doc.id !== id))
+    cleanupDocumentFromLocalStorage(id)
+    
     try {
-      // Fast fade-out animation (100ms), then remove from state
-      setTimeout(() => {
-        setDocumentsWithLog(documents.filter(doc => doc.id !== id))
-        cleanupDocumentFromLocalStorage(id)
-      }, 100) // Fast fade-out: 100ms
-      
       const response = await fetch(`/api/documents/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        cache: 'no-store'
       })
       const result = await response.json()
       
       if (result.success) {
         toast.success('Document deleted successfully')
+        // No need to reload - state already updated
       } else {
-        // Revert on error - reload data
-        loadData(false)
+        // Revert on error - restore previous state
+        setDocumentsWithLog(previousDocuments)
         console.error('Failed to delete document:', result.message)
         toast.error(result.message || 'Failed to delete document')
       }
     } catch (error) {
-      // Revert on error - reload data
-      loadData(false)
+      // Revert on error - restore previous state
+      setDocumentsWithLog(previousDocuments)
       console.error('Error deleting document:', error)
       toast.error('Error deleting document')
     }
@@ -930,12 +947,11 @@ function OwnerPageInner() {
 
   // Test handlers
   const handleDeleteTest = async (id: string) => {
+    // Optimistically remove from state immediately for instant UI update
+    const previousTests = savedTests
+    setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
+    
     try {
-      // Fast fade-out animation (100ms), then remove from state
-      setTimeout(() => {
-        setSavedTestsWithLog(savedTests.filter(test => test.id !== id))
-      }, 100) // Fast fade-out: 100ms
-      
       const response = await fetch(`/api/tests/${id}`, {
         method: 'DELETE',
         cache: 'no-store'
@@ -944,17 +960,16 @@ function OwnerPageInner() {
       
       if (result.success) {
         toast.success('Test deleted successfully')
-        // Refresh data to ensure UI is in sync with database
-        await loadData(false)
+        // No need to reload - state already updated
       } else {
-        // Revert on error - reload data
-        await loadData(false)
+        // Revert on error - restore previous state
+        setSavedTestsWithLog(previousTests)
         console.error('Failed to delete test:', result.message)
         toast.error(result.message || 'Failed to delete test')
       }
     } catch (error) {
-      // Revert on error - reload data
-      await loadData(false)
+      // Revert on error - restore previous state
+      setSavedTestsWithLog(previousTests)
       console.error('Error deleting test:', error)
       toast.error('Error deleting test')
     }
@@ -973,12 +988,11 @@ function OwnerPageInner() {
 
   // Assignment handlers
   const handleDeleteAssignment = async (id: string) => {
+    // Optimistically remove from state immediately for instant UI update
+    const previousAssignments = savedAssignments
+    setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
+    
     try {
-      // Fast fade-out animation (100ms), then remove from state
-      setTimeout(() => {
-        setSavedAssignmentsWithLog(savedAssignments.filter(a => a.id !== id))
-      }, 100) // Fast fade-out: 100ms
-      
       const response = await fetch(`/api/assignments/${id}`, {
         method: 'DELETE',
         cache: 'no-store'
@@ -987,17 +1001,16 @@ function OwnerPageInner() {
       
       if (result.success) {
         toast.success('Assignment deleted successfully')
-        // Refresh data to ensure UI is in sync with database
-        await loadData(false)
+        // No need to reload - state already updated
       } else {
-        // Revert on error - reload data
-        await loadData(false)
+        // Revert on error - restore previous state
+        setSavedAssignmentsWithLog(previousAssignments)
         console.error('Failed to delete assignment:', result.message)
         toast.error(result.message || 'Failed to delete assignment')
       }
     } catch (error) {
-      // Revert on error - reload data
-      await loadData(false)
+      // Revert on error - restore previous state
+      setSavedAssignmentsWithLog(previousAssignments)
       console.error('Error deleting assignment:', error)
       toast.error('Error deleting assignment')
     }
@@ -1015,12 +1028,11 @@ function OwnerPageInner() {
 
   // User handlers
   const handleDeleteUser = async (id: string) => {
+    // Optimistically remove from state immediately for instant UI update
+    const previousUsers = savedUsers
+    setSavedUsers(savedUsers.filter(u => u.id !== id))
+    
     try {
-      // Fast fade-out animation (100ms), then remove from state
-      setTimeout(() => {
-        setSavedUsers(savedUsers.filter(u => u.id !== id))
-      }, 100) // Fast fade-out: 100ms
-      
       const response = await fetch(`/api/users/${id}`, {
         method: 'DELETE',
         cache: 'no-store'
@@ -1029,17 +1041,16 @@ function OwnerPageInner() {
       
       if (result.success) {
         toast.success('User deleted successfully')
-        // Refresh data to ensure UI is in sync with database
-        await loadData(false)
+        // No need to reload - state already updated
       } else {
-        // Revert on error - reload data
-        await loadData(false)
+        // Revert on error - restore previous state
+        setSavedUsers(previousUsers)
         console.error('Failed to delete user:', result.message)
         toast.error(result.message || 'Failed to delete user')
       }
     } catch (error) {
-      // Revert on error - reload data
-      await loadData(false)
+      // Revert on error - restore previous state
+      setSavedUsers(previousUsers)
       console.error('Error deleting user:', error)
       toast.error('Error deleting user')
     }

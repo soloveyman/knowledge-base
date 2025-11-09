@@ -219,7 +219,17 @@ export default function UserBuilderPage() {
       
       // Redirect to owner users tab with timestamp to trigger refresh
       router.push(`/owner?tab=users&_t=${Date.now()}`)
-      router.refresh() // Force refresh on mobile to ensure data reloads
+      // Wait for navigation to complete, then refresh to ensure data reloads
+      // Use longer delay on mobile devices for better reliability
+      const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const delay = isMobile ? 300 : 100
+      setTimeout(() => {
+        router.refresh()
+        // On mobile, also force a location check to ensure useEffect hooks trigger
+        if (isMobile && typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('popstate'))
+        }
+      }, delay)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {
@@ -229,7 +239,17 @@ export default function UserBuilderPage() {
 
   const handleClose = () => {
     router.push(`/owner?tab=users&_t=${Date.now()}`)
-    router.refresh() // Force refresh on mobile to ensure data reloads
+    // Wait for navigation to complete, then refresh to ensure data reloads
+    // Use longer delay on mobile devices for better reliability
+    const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    const delay = isMobile ? 300 : 100
+    setTimeout(() => {
+      router.refresh()
+      // On mobile, also force a location check to ensure useEffect hooks trigger
+      if (isMobile && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('popstate'))
+      }
+    }, delay)
   }
 
   if (status === "loading") {
