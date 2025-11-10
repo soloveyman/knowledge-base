@@ -1,3 +1,25 @@
+// IMPORTANT: Load environment variables using require() to ensure it runs before imports
+const dotenv = require('dotenv');
+const { resolve } = require('path');
+
+// Load environment variables from .env.local (primary) and .env (fallback)
+const envLocalPath = resolve(process.cwd(), '.env.local');
+const envPath = resolve(process.cwd(), '.env');
+
+// Load .env.local first, then .env as fallback
+dotenv.config({ path: envLocalPath });
+dotenv.config({ path: envPath });
+
+// Verify DATABASE_URL is loaded
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is not set');
+  console.error(`   Checked: ${envLocalPath}`);
+  console.error(`   Checked: ${envPath}`);
+  console.error('   Please ensure .env.local exists with DATABASE_URL set');
+  process.exit(1);
+}
+
+// Use dynamic imports AFTER env vars are loaded
 import { db, users } from '../lib/db'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'

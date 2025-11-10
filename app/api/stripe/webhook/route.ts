@@ -379,14 +379,16 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
 
     // Map Stripe status to our status
+    // Stripe uses 'canceled' (not 'cancelled'), and status can be: 'incomplete' | 'incomplete_expired' | 'past_due' | 'paused' | 'trialing' | 'unpaid' | 'active' | 'canceled'
     let status: 'active' | 'cancelled' | 'expired' = 'active';
     if (subscription.status === 'active') {
       status = 'active';
-    } else if (subscription.status === 'canceled' || subscription.status === 'cancelled') {
+    } else if (subscription.status === 'canceled') {
       status = 'cancelled';
-    } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+    } else if (subscription.status === 'past_due' || subscription.status === 'unpaid' || subscription.status === 'incomplete_expired') {
       status = 'expired';
     } else {
+      // For 'incomplete', 'paused', 'trialing' - treat as expired for now
       status = 'expired';
     }
 

@@ -224,7 +224,7 @@ export default function SubscriptionManager({
         
         // Show success message if returning from checkout
         if (data.currentSubscription && checkoutSuccess === 'success') {
-          toast.success(t('subscriptionActivated') || 'Subscription activated successfully!')
+          toast.success('Subscription activated successfully!')
           // Clear checkout parameter from URL after a delay to allow user to see the update
           setTimeout(() => {
             const params = new URLSearchParams(searchParams.toString())
@@ -648,10 +648,10 @@ export default function SubscriptionManager({
                       </div>
                       {currentSubscription.plan?.price !== null && currentSubscription.plan?.price !== undefined && (
                         <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">{t('price') || 'Price'}:</span>
-                          <span className="text-sm font-medium">
+                          <span className="text-sm text-muted-foreground">Price:</span>
+                          <span className="text-sm font-medium">        
                             {formatPrice(currentSubscription.plan.price, currentSubscription.plan.currency || 'USD')}
-                            {currentSubscription.plan.interval && ` / ${currentSubscription.plan.interval === 'month' ? t('month') || 'month' : t('year') || 'year'}`}
+                            {currentSubscription.plan.interval && ` / ${currentSubscription.plan.interval === 'month' ? 'month' : 'year'}`}
                           </span>
                         </div>
                       )}
@@ -954,10 +954,10 @@ export default function SubscriptionManager({
                       }}
                     >
                       {isCurrentPlan 
-                        ? t('currentPlan') 
+                        ? 'Current Plan'
                         : !isStripeEnabled
-                        ? t('paymentUnavailable') || 'Payment Unavailable'
-                        : t('selectPlan')}
+                        ? 'Payment Unavailable'
+                        : 'Select Plan'}
                     </Button>
                       )
                     })()}
