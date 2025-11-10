@@ -133,3 +133,59 @@ If you didn't request this, please ignore this email.`
   })
 }
 
+export async function sendWelcomeEmail(email: string, name: string | null, password: string, loginUrl: string): Promise<void> {
+  const subject = 'Welcome! Your Account Has Been Created'
+  const userName = name || 'there'
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #1A1D29; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #fff; margin: 0;">Welcome to Knowledge Base!</h1>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hi ${userName},</p>
+          <p>Your account has been successfully created! Here are your login credentials:</p>
+          <div style="background-color: #fff; border: 2px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 0;"><strong>Password:</strong> <code style="background-color: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${password}</code></p>
+          </div>
+          <p style="color: #dc2626; font-weight: bold;">⚠️ Please save this password securely. You can change it after logging in.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${loginUrl}" style="background-color: #3b82f6; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Sign In</a>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-top: 30px;">You can also sign in using Google if you have a Gmail account.</p>
+          <p style="font-size: 14px; color: #666;">If you have any questions, please contact support.</p>
+        </div>
+      </body>
+    </html>
+  `
+  const text = `Welcome to Knowledge Base!
+
+Hi ${userName},
+
+Your account has been successfully created! Here are your login credentials:
+
+Email: ${email}
+Password: ${password}
+
+⚠️ Please save this password securely. You can change it after logging in.
+
+Sign in at: ${loginUrl}
+
+You can also sign in using Google if you have a Gmail account.
+
+If you have any questions, please contact support.`
+
+  await sendEmail({
+    to: email,
+    subject,
+    html,
+    text,
+  })
+}
+

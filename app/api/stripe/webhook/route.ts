@@ -4,6 +4,10 @@ import { requireStripe, isStripeConfigured } from '@/lib/stripe/client';
 import { db, subscriptions, payments, users } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { sendWelcomeEmail } from '@/lib/email';
+import { getBaseUrl } from '@/lib/email-verification';
 
 // Disable body parsing for webhook route - we need raw body for signature verification
 export const runtime = 'nodejs';
@@ -62,10 +66,16 @@ async function getOrCreateUserFromCheckout(session: Stripe.Checkout.Session): Pr
 
   // Create new user for guest checkout
   try {
+    // Generate secure random password
+    const generatedPassword = crypto.randomBytes(16).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(generatedPassword, 12);
+
     const [created] = await db.insert(users).values({
       email: normalizedEmail,
       name: customerName || null,
       role: 'owner',
+      password: hashedPassword,
       businessId: undefined, // Will be set below
       country: 'US',
     }).returning();
@@ -77,6 +87,23 @@ async function getOrCreateUserFromCheckout(session: Stripe.Checkout.Session): Pr
       .where(eq(users.id, created.id));
 
     console.log('[Stripe Webhook] Created new user from guest checkout:', created.id, normalizedEmail);
+
+    // Send welcome email with password (non-blocking)
+    try {
+      const baseUrl = getBaseUrl();
+      const loginUrl = `${baseUrl}/auth/signin`;
+      await sendWelcomeEmail(normalizedEmail, customerName || null, generatedPassword, loginUrl);
+      console.log('[Stripe Webhook] Welcome email sent to:', normalizedEmail);
+    } catch (emailError) {
+      const errorMessage = emailError instanceof Error ? emailError.message : String(emailError);
+      console.error('[Stripe Webhook] Failed to send welcome email:', errorMessage);
+      // Don't fail user creation if email fails
+      // In development, log the password
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Stripe Webhook] Generated password for', normalizedEmail, ':', generatedPassword);
+      }
+    }
+
     return created.id;
   } catch (error) {
     console.error('[Stripe Webhook] Failed to create user from checkout:', error);
