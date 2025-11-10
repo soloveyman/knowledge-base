@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslation } from "@/lib/translation-context"
 import { formatDateShort } from "@/lib/date-format"
@@ -38,6 +39,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { signOut } from "next-auth/react"
+import { toast } from "sonner"
 
 interface SubscriptionPlan {
   id: string
@@ -118,7 +120,9 @@ export default function SubscriptionManager({
   onCancel, 
   onBilling 
 }: SubscriptionManagerProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
@@ -127,13 +131,71 @@ export default function SubscriptionManager({
   const [isStripeEnabled, setIsStripeEnabled] = useState<boolean>(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('year')
 
   // Use module-level cache (persists across component remounts)
   const dataCache = useRef(subscriptionDataCache)
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Map language to locale for date formatting
+  const dateLocale = language === 'ru' ? 'ru-RU' : 'en-US'
+
+  const verifyCheckoutSession = useCallback(async (sessionId: string) => {
+    try {
+      const response = await fetch('/api/stripe/verify-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sessionId }),
+      })
+      const result = await response.json()
+      if (!result.success) {
+        console.error('[Subscription] Verify checkout failed:', result.message, result.error)
+        if (result.details) {
+          console.error('[Subscription] Error details:', result.details)
+        }
+      }
+      return result.success
+    } catch (error) {
+      console.error('[Subscription] Error verifying checkout session:', error)
+      return false
+    }
+  }, [])
 
   const loadSubscriptionData = useCallback(async () => {
     try {
-      const response = await fetch('/api/subscription', { cache: 'no-store' })
+      setIsLoading(true)
+      
+      // If returning from checkout, verify the session first
+      const checkoutSuccess = searchParams.get('checkout')
+      const sessionId = searchParams.get('session_id')
+      if (checkoutSuccess === 'success' && sessionId) {
+        console.log('[Subscription] Verifying checkout session:', sessionId)
+        // Clear cache before verifying to ensure fresh data
+        subscriptionDataCache = {
+          plans: [],
+          currentSubscription: null,
+          usage: null,
+          paymentHistory: null,
+          isStripeEnabled: false
+        }
+        dataCache.current = subscriptionDataCache
+        
+        await verifyCheckoutSession(sessionId)
+        // Wait a bit for database to update
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+      
+      // Force fresh fetch with timestamp to bypass cache
+      const response = await fetch(`/api/subscription?t=${Date.now()}`, { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
       const result = await response.json()
       
       if (result.success) {
@@ -152,7 +214,30 @@ export default function SubscriptionManager({
         setUsage(data.usage)
         setIsStripeEnabled(data.isStripeEnabled)
         setPaymentHistory(data.paymentHistory)
-        console.log('[Subscription] Stripe configured:', data.isStripeEnabled)
+        console.log('[Subscription] Data loaded:', {
+          hasSubscription: !!data.currentSubscription,
+          subscription: data.currentSubscription,
+          planId: data.currentSubscription?.planId,
+          planName: data.currentSubscription?.plan?.name,
+          stripeEnabled: data.isStripeEnabled
+        })
+        
+        // Show success message if returning from checkout
+        if (data.currentSubscription && checkoutSuccess === 'success') {
+          toast.success(t('subscriptionActivated') || 'Subscription activated successfully!')
+          // Clear checkout parameter from URL after a delay to allow user to see the update
+          setTimeout(() => {
+            const params = new URLSearchParams(searchParams.toString())
+            params.delete('checkout')
+            params.delete('session_id')
+            const newSearch = params.toString()
+            const newUrl = newSearch ? `?${newSearch}` : window.location.pathname
+            router.replace(newUrl, { scroll: false })
+          }, 2000)
+        } else if (checkoutSuccess === 'success' && !data.currentSubscription) {
+          // If still no subscription after verification, poll a few more times
+          console.log('[Subscription] No subscription found after verification, will poll...')
+        }
       } else {
         console.error('Failed to load subscription data:', result.message)
         setPlans([])
@@ -168,21 +253,28 @@ export default function SubscriptionManager({
         setUsage(null)
         setIsStripeEnabled(false)
         setPaymentHistory(null)
+      } finally {
+        setIsLoading(false)
       }
-  }, [])
+  }, [searchParams, router, t, verifyCheckoutSession])
 
   useEffect(() => {
     // Sync ref with module-level cache (persists across remounts)
     dataCache.current = subscriptionDataCache
     
+    // Check if returning from checkout - always refresh in this case
+    const checkoutSuccess = searchParams.get('checkout')
+    const shouldForceRefresh = checkoutSuccess === 'success'
+    
     // Restore from cache if available (instant render on tab switch)
-    if (subscriptionDataCache) {
+    if (subscriptionDataCache && !shouldForceRefresh) {
       const cached = subscriptionDataCache
       setPlans(cached.plans)
       setCurrentSubscription(cached.currentSubscription)
       setUsage(cached.usage)
       setIsStripeEnabled(cached.isStripeEnabled)
       setPaymentHistory(cached.paymentHistory)
+      setIsLoading(false)
       // Refresh in background after a delay to avoid blocking render
       setTimeout(() => {
         loadSubscriptionData()
@@ -190,9 +282,49 @@ export default function SubscriptionManager({
     } else if (plans.length === 0 && !currentSubscription && !usage) {
       // Only load if no cached data and state is empty
       loadSubscriptionData()
+    } else if (shouldForceRefresh) {
+      // Force refresh when returning from checkout
+      setIsLoading(true)
+      loadSubscriptionData()
+      
+      // Clean up any existing polling interval
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+      
+      // Poll for subscription if not found after initial load
+      pollIntervalRef.current = setInterval(async () => {
+        const response = await fetch('/api/subscription', { cache: 'no-store' })
+        const result = await response.json()
+        if (result.success && result.data.currentSubscription) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+          }
+          loadSubscriptionData()
+        }
+      }, 2000) // Poll every 2 seconds
+      
+      // Stop polling after 30 seconds
+      setTimeout(() => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current)
+          pollIntervalRef.current = null
+        }
+      }, 30000)
+    } else {
+      setIsLoading(false)
+    }
+    
+    // Cleanup polling interval on unmount
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
   const formatPrice = (price: number, currency: string) => {
     if (price === 0) return t('free')
@@ -497,7 +629,12 @@ export default function SubscriptionManager({
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-6 md:pb-8">
-            {currentSubscription ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                <span className="text-sm text-muted-foreground">{t('loading') || 'Loading...'}</span>
+              </div>
+            ) : currentSubscription ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -507,14 +644,29 @@ export default function SubscriptionManager({
                         <span className="text-sm text-muted-foreground">{t('plan')}:</span>
                         <PlanBadge plan={currentSubscription.plan?.name || 'unknown'} />
                       </div>
+                      {currentSubscription.plan?.price !== null && currentSubscription.plan?.price !== undefined && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">{t('price') || 'Price'}:</span>
+                          <span className="text-sm font-medium">
+                            {formatPrice(currentSubscription.plan.price, currentSubscription.plan.currency || 'USD')}
+                            {currentSubscription.plan.interval && ` / ${currentSubscription.plan.interval === 'month' ? t('month') || 'month' : t('year') || 'year'}`}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">{t('status')}:</span>
                         <StatusBadge status={currentSubscription.status} />
                       </div>
                       <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">{t('currentPeriodStart')}:</span>
+                        <span className="text-sm">
+                          {formatDateShort(currentSubscription.currentPeriodStart, dateLocale)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">{t('nextBilling')}:</span>
                         <span className="text-sm">
-                          {formatDateShort(currentSubscription.currentPeriodEnd)}
+                          {formatDateShort(currentSubscription.currentPeriodEnd, dateLocale)}
                         </span>
                       </div>
                       {currentSubscription.cancelAtPeriodEnd && (
@@ -657,69 +809,73 @@ export default function SubscriptionManager({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Interval Switcher */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-3xl">
+              <button
+                type="button"
+                onClick={() => setSelectedInterval('year')}
+                className={`px-4 py-2 rounded-2xl text-sm font-medium transition-colors ${
+                  selectedInterval === 'year'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('yearly')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedInterval('month')}
+                className={`px-4 py-2 rounded-2xl text-sm font-medium transition-colors ${
+                  selectedInterval === 'month'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('monthly')}
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((plan) => {
+            {plans.filter(plan => plan.interval === selectedInterval || plan.name === 'free-trial').map((plan) => {
               const isOptimal = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Optimal'
               const isStandard = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Standard'
               return (
               <div
                 key={plan.id}
-                className={`relative p-6 border rounded-3xl flex flex-col transition-all shadow-none ${
-                  plan.isPopular
-                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 dark:border-purple-400'
-                    : isOptimal
-                    ? 'border-primary hover:border-primary/80'
-                    : 'border-border hover:border-border'
-                }`}
+                className="relative p-6 border border-border rounded-3xl flex flex-col transition-all shadow-none hover:border-primary/50"
               >
-                {/* Popular Badge at top center border - for Standard plan */}
-                {isStandard && (
-                  <div className="absolute -top-[14px] left-1/2 -translate-x-1/2 z-10">
-                    <Badge className="bg-primary text-primary-foreground px-2 py-0.5 text-xs">
-                      {t('mostPopular')}
-                    </Badge>
-                  </div>
-                )}
-
                 {/* Header */}
                 <div>
-                  {plan.isPopular && !isStandard && (
-                    <div className="text-center mb-4">
-                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                        {t('mostPopular')}
-                      </Badge>
-                    </div>
-                  )}
-
                   <div className="text-center mb-4">
                     <h3 className="text-xl font-bold mb-2">{translatePlanName(plan.displayName)}</h3>
                     <p className="text-muted-foreground text-sm">{translatePlanDescription(plan.description)}</p>
                   </div>
 
                   <div className="text-center mb-6">
-                    {plan.interval === 'month' && plan.price > 0 ? (
+                    {plan.price > 0 ? (
                       <>
                         <div className="text-3xl font-bold">
-                          {formatPrice(plan.price, plan.currency)} / {formatPrice(Math.round(plan.price * 12 * 0.75), plan.currency)}
+                          {formatPrice(plan.price, plan.currency)}
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {t('per')} {t('month')} / {t('per')} {t('year')}
-                        </div>
+                        {plan.interval === 'year' ? (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {formatPrice(Math.round(plan.price / 12), plan.currency)} {t('per')} {t('month')}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            {t('per')} {t('month')}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <>
                         <div className="text-3xl font-bold">
                           {formatPrice(plan.price, plan.currency)}
                         </div>
-                        {plan.price > 0 ? (
-                          <div className="text-sm text-muted-foreground">
-                            {t('per')} {t(plan.interval === 'month' ? 'month' : 'year')}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground invisible">
-                            {t('per')} {t('month')}
-                          </p>
-                        )}
+                        <p className="text-sm text-muted-foreground invisible">
+                          {t('per')} {t('month')}
+                        </p>
                       </>
                     )}
                   </div>
@@ -740,20 +896,34 @@ export default function SubscriptionManager({
                 {/* Button */}
                 <div className="mt-auto">
                   <div className="text-center">
-                    <Button
-                      className={isOptimal ? "w-full" : "w-full text-primary border-primary hover:bg-primary hover:text-primary-foreground"}
-                      variant={selectedPlan === plan.id || isOptimal ? 'default' : 'outline'}
-                      disabled={plan.id === currentSubscription?.plan?.id || !isStripeEnabled}
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (plan.id === currentSubscription?.plan?.id) {
-                          return
-                        }
-                        
-                        if (!isStripeEnabled) {
-                          alert('Payment processing is not available at this time. Please contact support.')
-                          return
-                        }
+                    {(() => {
+                      const isCurrentPlan = plan.id === currentSubscription?.plan?.id
+                      const hasPaidPlan = currentSubscription?.plan?.price && currentSubscription.plan.price > 0
+                      const isFreeTrial = plan.name === 'free-trial' || plan.price === 0
+                      const isDowngradeToTrial = hasPaidPlan && isFreeTrial && !isCurrentPlan
+                      
+                      // Hide button if downgrading to trial from paid plan
+                      if (isDowngradeToTrial) {
+                        return null
+                      }
+                      
+                      const isDisabled = isCurrentPlan || !isStripeEnabled
+                      
+                      return (
+                        <Button
+                          className={`w-full ${isCurrentPlan ? 'border border-primary' : ''}`}
+                          variant={isCurrentPlan ? 'secondary' : 'default'}
+                          disabled={isDisabled}
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            if (isCurrentPlan) {
+                              return
+                            }
+                            
+                            if (!isStripeEnabled) {
+                              alert('Payment processing is not available at this time. Please contact support.')
+                              return
+                            }
                         
                         try {
                           const response = await fetch('/api/stripe/create-checkout', {
@@ -781,12 +951,14 @@ export default function SubscriptionManager({
                         }
                       }}
                     >
-                      {plan.id === currentSubscription?.plan?.id 
+                      {isCurrentPlan 
                         ? t('currentPlan') 
                         : !isStripeEnabled
                         ? t('paymentUnavailable') || 'Payment Unavailable'
                         : t('selectPlan')}
                     </Button>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
@@ -852,36 +1024,8 @@ export default function SubscriptionManager({
                   <div className="font-medium">{t('paymentHistory')}</div>
                 </div>
                 <div className="space-y-3">
-                  {(paymentHistory && paymentHistory.length > 0 ? paymentHistory : [
-                  // Fallback data - will be replaced with real API data when available
-                  {
-                    id: '1',
-                    startDate: '2024-01-01',
-                    endDate: '2024-01-31',
-                    planName: 'pro',
-                    amount: 9900, // in cents
-                    currency: 'usd',
-                    status: 'completed' as const
-                  },
-                  {
-                    id: '2',
-                    startDate: '2023-12-01',
-                    endDate: '2023-12-31',
-                    planName: 'starter',
-                    amount: 3900, // in cents
-                    currency: 'usd',
-                    status: 'completed' as const
-                  },
-                  {
-                    id: '3',
-                    startDate: '2023-11-01',
-                    endDate: '2023-11-30',
-                    planName: 'pro',
-                    amount: 9900, // in cents
-                    currency: 'usd',
-                    status: 'completed' as const
-                  }
-                ]).map((invoice) => {
+                  {paymentHistory && paymentHistory.length > 0 ? (
+                    paymentHistory.map((invoice) => {
                   const plan = plans.find(p => p.name === invoice.planName)
                   const planDisplayName = plan ? translatePlanName(plan.displayName) : invoice.planName
                   // Format amount from cents to currency string
@@ -906,7 +1050,10 @@ export default function SubscriptionManager({
                       </div>
                     </div>
                   )
-                })}
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t('noPaymentHistory') || 'No payment history available'}</p>
+                  )}
                 </div>
               </div>
             )}

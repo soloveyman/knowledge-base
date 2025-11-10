@@ -5,6 +5,10 @@ import { db, subscriptions, payments, users } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
 
+// Disable body parsing for webhook route - we need raw body for signature verification
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
  * Create or get user from Stripe checkout session
  * For guest checkout, creates a new user account
@@ -97,6 +101,7 @@ export async function POST(request: Request) {
     const signature = headersList.get('stripe-signature');
 
     if (!signature) {
+      console.error('[Stripe Webhook] Missing stripe-signature header');
       return NextResponse.json(
         { received: false, error: 'Missing stripe-signature header' },
         { status: 400 }
@@ -116,6 +121,7 @@ export async function POST(request: Request) {
 
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      console.log(`[Stripe Webhook] Received event: ${event.type} (id: ${event.id})`);
     } catch (error) {
       console.error('[Stripe Webhook] Signature verification failed:', error);
       return NextResponse.json(
@@ -125,39 +131,55 @@ export async function POST(request: Request) {
     }
 
     // Handle different event types
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session);
-        break;
-      }
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          console.log(`[Stripe Webhook] Processing checkout.session.completed for session: ${session.id}`);
+          await handleCheckoutCompleted(session);
+          console.log(`[Stripe Webhook] Successfully processed checkout.session.completed for session: ${session.id}`);
+          break;
+        }
 
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdated(subscription);
-        break;
-      }
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as Stripe.Subscription;
+          console.log(`[Stripe Webhook] Processing customer.subscription.updated for subscription: ${subscription.id}`);
+          await handleSubscriptionUpdated(subscription);
+          console.log(`[Stripe Webhook] Successfully processed customer.subscription.updated for subscription: ${subscription.id}`);
+          break;
+        }
 
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionDeleted(subscription);
-        break;
-      }
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          console.log(`[Stripe Webhook] Processing customer.subscription.deleted for subscription: ${subscription.id}`);
+          await handleSubscriptionDeleted(subscription);
+          console.log(`[Stripe Webhook] Successfully processed customer.subscription.deleted for subscription: ${subscription.id}`);
+          break;
+        }
 
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
-        await handlePaymentSucceeded(invoice);
-        break;
-      }
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as Stripe.Invoice;
+          console.log(`[Stripe Webhook] Processing invoice.payment_succeeded for invoice: ${invoice.id}`);
+          await handlePaymentSucceeded(invoice);
+          console.log(`[Stripe Webhook] Successfully processed invoice.payment_succeeded for invoice: ${invoice.id}`);
+          break;
+        }
 
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        await handlePaymentFailed(invoice);
-        break;
-      }
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          console.log(`[Stripe Webhook] Processing invoice.payment_failed for invoice: ${invoice.id}`);
+          await handlePaymentFailed(invoice);
+          console.log(`[Stripe Webhook] Successfully processed invoice.payment_failed for invoice: ${invoice.id}`);
+          break;
+        }
 
-      default:
-        console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
+        default:
+          console.log(`[Stripe Webhook] Unhandled event type: ${event.type} (id: ${event.id})`);
+      }
+    } catch (handlerError) {
+      console.error(`[Stripe Webhook] Error handling event ${event.type}:`, handlerError);
+      // Don't return error - we want to acknowledge receipt to Stripe
+      // but log the error for debugging
     }
 
     return NextResponse.json({ received: true });
@@ -174,282 +196,439 @@ export async function POST(request: Request) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const planId = session.metadata?.planId;
+  try {
+    const planId = session.metadata?.planId;
 
-  if (!planId) {
-    console.error('[Stripe Webhook] Missing planId in checkout session:', session.id);
-    return;
-  }
+    if (!planId) {
+      console.error('[Stripe Webhook] Missing planId in checkout session:', session.id);
+      return;
+    }
 
-  // Get or create user from checkout session
-  const userId = await getOrCreateUserFromCheckout(session);
-  
-  if (!userId) {
-    console.error('[Stripe Webhook] Could not get or create user for checkout session:', session.id);
-    return;
-  }
+    // Get or create user from checkout session
+    const userId = await getOrCreateUserFromCheckout(session);
+    
+    if (!userId) {
+      console.error('[Stripe Webhook] Could not get or create user for checkout session:', session.id);
+      return;
+    }
 
-  const stripe = requireStripe();
-  const subscriptionId = session.subscription as string;
-  if (!subscriptionId) {
-    console.error('[Stripe Webhook] No subscription ID in checkout session:', session.id);
-    return;
-  }
+    console.log(`[Stripe Webhook] Processing checkout for user: ${userId}, plan: ${planId}`);
 
-  // Get Stripe subscription details
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const stripe = requireStripe();
+    const subscriptionId = session.subscription as string;
+    if (!subscriptionId) {
+      console.error('[Stripe Webhook] No subscription ID in checkout session:', session.id);
+      return;
+    }
 
-  // Create or update subscription in database
-  const now = new Date();
-  const currentPeriodStart = new Date((subscription as any).current_period_start * 1000);
-  const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+    // Get Stripe subscription details
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    console.log(`[Stripe Webhook] Retrieved subscription from Stripe: ${subscriptionId}, status: ${subscription.status}`);
 
-  // Check if subscription already exists
-  const existing = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.ownerId, userId))
-    .limit(1);
+    // Create or update subscription in database
+    const now = new Date();
+    const currentPeriodStart = new Date((subscription as any).current_period_start * 1000);
+    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
 
-  if (existing.length > 0) {
-    // Update existing subscription
-    await db
-      .update(subscriptions)
-      .set({
+    // Check if subscription already exists
+    const existing = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, userId))
+      .limit(1);
+
+    let subscriptionDbId: string;
+
+    if (existing.length > 0) {
+      // Update existing subscription
+      console.log(`[Stripe Webhook] Updating existing subscription: ${existing[0].id}`);
+      await db
+        .update(subscriptions)
+        .set({
+          planId,
+          status: subscription.status === 'active' ? 'active' : 'cancelled',
+          currentPeriodStart,
+          currentPeriodEnd,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, existing[0].id));
+      subscriptionDbId = existing[0].id;
+    } else {
+      // Create new subscription
+      console.log(`[Stripe Webhook] Creating new subscription for user: ${userId}`);
+      const [newSubscription] = await db.insert(subscriptions).values({
+        ownerId: userId,
         planId,
         status: subscription.status === 'active' ? 'active' : 'cancelled',
         currentPeriodStart,
         currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        updatedAt: now,
-      })
-      .where(eq(subscriptions.id, existing[0].id));
-  } else {
-    // Create new subscription
-    await db.insert(subscriptions).values({
-      ownerId: userId,
-      planId,
-      status: subscription.status === 'active' ? 'active' : 'cancelled',
-      currentPeriodStart,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    });
-  }
-
-  // Get subscription ID for payment record
-  let subscriptionDbId: string | undefined;
-  if (existing.length > 0) {
-    subscriptionDbId = existing[0].id;
-  } else {
-    // Find the subscription we just created
-    const newSubscription = await db
-      .select()
-      .from(subscriptions)
-      .where(eq(subscriptions.ownerId, userId))
-      .limit(1);
-    if (newSubscription.length > 0) {
-      subscriptionDbId = newSubscription[0].id;
+      }).returning();
+      subscriptionDbId = newSubscription.id;
+      console.log(`[Stripe Webhook] Created subscription: ${subscriptionDbId}`);
     }
-  }
 
-  // Create payment record
-  if (session.amount_total && session.amount_total > 0) {
-    await db.insert(payments).values({
-      ownerId: userId,
-      subscriptionId: subscriptionDbId,
-      provider: 'stripe',
-      providerPaymentId: session.id,
-      amount: session.amount_total,
-      currency: session.currency?.toUpperCase() || 'USD',
-      status: 'completed',
-      metadata: {
-        stripeSessionId: session.id,
-        stripeSubscriptionId: subscriptionId,
-      },
-    });
+    // Check if payment record already exists (idempotency)
+    const existingPayment = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.providerPaymentId, session.id))
+      .limit(1);
+
+    // Create payment record if it doesn't exist
+    if (session.amount_total && session.amount_total > 0 && existingPayment.length === 0) {
+      await db.insert(payments).values({
+        ownerId: userId,
+        subscriptionId: subscriptionDbId,
+        provider: 'stripe',
+        providerPaymentId: session.id,
+        amount: session.amount_total,
+        currency: session.currency?.toUpperCase() || 'USD',
+        status: 'completed',
+        metadata: {
+          stripeSessionId: session.id,
+          stripeSubscriptionId: subscriptionId,
+        },
+      });
+      console.log(`[Stripe Webhook] Created payment record for session: ${session.id}`);
+    } else if (existingPayment.length > 0) {
+      console.log(`[Stripe Webhook] Payment record already exists for session: ${session.id}`);
+    }
+  } catch (error) {
+    console.error('[Stripe Webhook] Error in handleCheckoutCompleted:', error);
+    throw error;
   }
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  let userId = subscription.metadata?.userId;
-  if (!userId) {
-    // Try to find by subscription customer
-    const customer = subscription.customer as string;
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, customer))
-      .limit(1);
+  try {
+    let userId = subscription.metadata?.userId;
+    
+    if (!userId) {
+      // Try to find by subscription customer email
+      const stripe = requireStripe();
+      const customerId = typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer?.id;
+      
+      if (customerId) {
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (customer && !customer.deleted && 'email' in customer && customer.email) {
+            const user = await db
+              .select()
+              .from(users)
+              .where(eq(users.email, customer.email.toLowerCase().trim()))
+              .limit(1);
 
-    if (user.length === 0) {
+            if (user.length > 0) {
+              userId = user[0].id;
+            }
+          }
+        } catch (error) {
+          console.error('[Stripe Webhook] Error retrieving customer:', error);
+        }
+      }
+    }
+
+    if (!userId) {
       console.error('[Stripe Webhook] Could not find user for subscription:', subscription.id);
       return;
     }
-    userId = user[0].id;
+
+    const existing = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, userId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      console.error('[Stripe Webhook] Subscription not found in database:', subscription.id);
+      return;
+    }
+
+    const currentPeriodStart = new Date((subscription as any).current_period_start * 1000);
+    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+
+    // Map Stripe status to our status
+    let status: 'active' | 'cancelled' | 'expired' = 'active';
+    if (subscription.status === 'active') {
+      status = 'active';
+    } else if (subscription.status === 'canceled' || subscription.status === 'cancelled') {
+      status = 'cancelled';
+    } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+      status = 'expired';
+    } else {
+      status = 'expired';
+    }
+
+    await db
+      .update(subscriptions)
+      .set({
+        status,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, existing[0].id));
+    
+    console.log(`[Stripe Webhook] Updated subscription ${existing[0].id} to status: ${status}`);
+  } catch (error) {
+    console.error('[Stripe Webhook] Error in handleSubscriptionUpdated:', error);
+    throw error;
   }
-
-  const existing = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.ownerId, userId))
-    .limit(1);
-
-  if (existing.length === 0) {
-    console.error('[Stripe Webhook] Subscription not found in database:', subscription.id);
-    return;
-  }
-
-  const currentPeriodStart = new Date((subscription as any).current_period_start * 1000);
-  const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
-
-  await db
-    .update(subscriptions)
-    .set({
-      status:
-        subscription.status === 'active'
-          ? 'active'
-          : (subscription.status as string) === 'canceled' || (subscription.status as string) === 'cancelled'
-          ? 'cancelled'
-          : 'expired',
-      currentPeriodStart,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      updatedAt: new Date(),
-    })
-    .where(eq(subscriptions.id, existing[0].id));
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  let userId = subscription.metadata?.userId;
-  if (!userId) {
-    const customer = subscription.customer as string;
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, customer))
-      .limit(1);
+  try {
+    let userId = subscription.metadata?.userId;
+    
+    if (!userId) {
+      // Try to find by subscription customer email
+      const stripe = requireStripe();
+      const customerId = typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer?.id;
+      
+      if (customerId) {
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (customer && !customer.deleted && 'email' in customer && customer.email) {
+            const user = await db
+              .select()
+              .from(users)
+              .where(eq(users.email, customer.email.toLowerCase().trim()))
+              .limit(1);
 
-    if (user.length === 0) {
+            if (user.length > 0) {
+              userId = user[0].id;
+            }
+          }
+        } catch (error) {
+          console.error('[Stripe Webhook] Error retrieving customer:', error);
+        }
+      }
+    }
+
+    if (!userId) {
       console.error('[Stripe Webhook] Could not find user for deleted subscription:', subscription.id);
       return;
     }
-    userId = user[0].id;
+
+    const existing = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, userId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      console.error('[Stripe Webhook] Subscription not found in database:', subscription.id);
+      return;
+    }
+
+    await db
+      .update(subscriptions)
+      .set({
+        status: 'expired',
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, existing[0].id));
+    
+    console.log(`[Stripe Webhook] Marked subscription ${existing[0].id} as expired`);
+  } catch (error) {
+    console.error('[Stripe Webhook] Error in handleSubscriptionDeleted:', error);
+    throw error;
   }
-
-  const existing = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.ownerId, userId))
-    .limit(1);
-
-  if (existing.length === 0) {
-    console.error('[Stripe Webhook] Subscription not found in database:', subscription.id);
-    return;
-  }
-
-  await db
-    .update(subscriptions)
-    .set({
-      status: 'expired',
-      updatedAt: new Date(),
-    })
-    .where(eq(subscriptions.id, existing[0].id));
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  const subscriptionId = typeof (invoice as any).subscription === 'string' 
-    ? (invoice as any).subscription 
-    : (invoice as any).subscription?.id || null;
-  if (!subscriptionId) {
-    return;
-  }
+  try {
+    const subscriptionId = typeof (invoice as any).subscription === 'string' 
+      ? (invoice as any).subscription 
+      : (invoice as any).subscription?.id || null;
+    if (!subscriptionId) {
+      console.error('[Stripe Webhook] No subscription ID in invoice:', invoice.id);
+      return;
+    }
 
-  const stripe = requireStripe();
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const userId = subscription.metadata?.userId;
+    const stripe = requireStripe();
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    let userId = subscription.metadata?.userId;
 
-  if (!userId) {
-    console.error('[Stripe Webhook] Missing userId in subscription metadata for invoice:', invoice.id);
-    return;
-  }
+    // If no userId in metadata, try to find by customer email
+    if (!userId) {
+      const customerId = typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer?.id;
+      
+      if (customerId) {
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (customer && !customer.deleted && 'email' in customer && customer.email) {
+            const user = await db
+              .select()
+              .from(users)
+              .where(eq(users.email, customer.email.toLowerCase().trim()))
+              .limit(1);
 
-  // Find subscription in database
-  const existing = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.ownerId, userId))
-    .limit(1);
+            if (user.length > 0) {
+              userId = user[0].id;
+            }
+          }
+        } catch (error) {
+          console.error('[Stripe Webhook] Error retrieving customer:', error);
+        }
+      }
+    }
 
-  if (existing.length === 0) {
-    console.error('[Stripe Webhook] Subscription not found for payment:', invoice.id);
-    return;
-  }
+    if (!userId) {
+      console.error('[Stripe Webhook] Missing userId in subscription metadata for invoice:', invoice.id);
+      return;
+    }
 
-  // Check if payment already recorded
-  const existingPayment = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.providerPaymentId, invoice.id))
-    .limit(1);
+    // Find subscription in database
+    const existing = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.ownerId, userId))
+      .limit(1);
 
-  if (existingPayment.length > 0) {
-    // Update existing payment
-    await db
-      .update(payments)
-      .set({
+    if (existing.length === 0) {
+      console.error('[Stripe Webhook] Subscription not found for payment:', invoice.id);
+      return;
+    }
+
+    // Check if payment already recorded (idempotency)
+    const existingPayment = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.providerPaymentId, invoice.id))
+      .limit(1);
+
+    if (existingPayment.length > 0) {
+      // Update existing payment
+      await db
+        .update(payments)
+        .set({
+          status: 'completed',
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.id, existingPayment[0].id));
+      console.log(`[Stripe Webhook] Updated payment record for invoice: ${invoice.id}`);
+    } else {
+      // Create new payment record
+      await db.insert(payments).values({
+        ownerId: userId,
+        subscriptionId: existing[0].id,
+        provider: 'stripe',
+        providerPaymentId: invoice.id,
+        amount: invoice.amount_paid || 0,
+        currency: invoice.currency.toUpperCase() || 'USD',
         status: 'completed',
-        updatedAt: new Date(),
-      })
-      .where(eq(payments.id, existingPayment[0].id));
-  } else {
-    // Create new payment record
-    await db.insert(payments).values({
-      ownerId: userId,
-      subscriptionId: existing[0].id,
-      provider: 'stripe',
-      providerPaymentId: invoice.id,
-      amount: invoice.amount_paid || 0,
-      currency: invoice.currency.toUpperCase() || 'USD',
-      status: 'completed',
-      metadata: {
-        stripeInvoiceId: invoice.id,
-        stripeSubscriptionId: subscriptionId,
-      },
-    });
+        metadata: {
+          stripeInvoiceId: invoice.id,
+          stripeSubscriptionId: subscriptionId,
+        },
+      });
+      console.log(`[Stripe Webhook] Created payment record for invoice: ${invoice.id}`);
+    }
+  } catch (error) {
+    console.error('[Stripe Webhook] Error in handlePaymentSucceeded:', error);
+    throw error;
   }
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = typeof (invoice as any).subscription === 'string' 
-    ? (invoice as any).subscription 
-    : (invoice as any).subscription?.id || null;
-  if (!subscriptionId) {
-    return;
-  }
+  try {
+    const subscriptionId = typeof (invoice as any).subscription === 'string' 
+      ? (invoice as any).subscription 
+      : (invoice as any).subscription?.id || null;
+    if (!subscriptionId) {
+      console.error('[Stripe Webhook] No subscription ID in failed invoice:', invoice.id);
+      return;
+    }
 
-  const stripe = requireStripe();
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const userId = subscription.metadata?.userId;
+    const stripe = requireStripe();
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    let userId = subscription.metadata?.userId;
 
-  if (!userId) {
-    return;
-  }
+    // If no userId in metadata, try to find by customer email
+    if (!userId) {
+      const customerId = typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer?.id;
+      
+      if (customerId) {
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (customer && !customer.deleted && 'email' in customer && customer.email) {
+            const user = await db
+              .select()
+              .from(users)
+              .where(eq(users.email, customer.email.toLowerCase().trim()))
+              .limit(1);
 
-  // Create or update payment record with failed status
-  const existingPayment = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.providerPaymentId, invoice.id))
-    .limit(1);
+            if (user.length > 0) {
+              userId = user[0].id;
+            }
+          }
+        } catch (error) {
+          console.error('[Stripe Webhook] Error retrieving customer:', error);
+        }
+      }
+    }
 
-  if (existingPayment.length > 0) {
-    await db
-      .update(payments)
-      .set({
-        status: 'failed',
-        updatedAt: new Date(),
-      })
-      .where(eq(payments.id, existingPayment[0].id));
+    if (!userId) {
+      console.error('[Stripe Webhook] Missing userId for failed payment:', invoice.id);
+      return;
+    }
+
+    // Create or update payment record with failed status
+    const existingPayment = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.providerPaymentId, invoice.id))
+      .limit(1);
+
+    if (existingPayment.length > 0) {
+      await db
+        .update(payments)
+        .set({
+          status: 'failed',
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.id, existingPayment[0].id));
+      console.log(`[Stripe Webhook] Updated payment record to failed for invoice: ${invoice.id}`);
+    } else {
+      // Create new payment record with failed status
+      const existingSubscription = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.ownerId, userId))
+        .limit(1);
+
+      if (existingSubscription.length > 0) {
+        await db.insert(payments).values({
+          ownerId: userId,
+          subscriptionId: existingSubscription[0].id,
+          provider: 'stripe',
+          providerPaymentId: invoice.id,
+          amount: invoice.amount_due || 0,
+          currency: invoice.currency.toUpperCase() || 'USD',
+          status: 'failed',
+          metadata: {
+            stripeInvoiceId: invoice.id,
+            stripeSubscriptionId: subscriptionId,
+          },
+        });
+        console.log(`[Stripe Webhook] Created failed payment record for invoice: ${invoice.id}`);
+      }
+    }
+  } catch (error) {
+    console.error('[Stripe Webhook] Error in handlePaymentFailed:', error);
+    throw error;
   }
 }
 

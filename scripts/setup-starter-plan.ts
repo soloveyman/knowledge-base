@@ -28,7 +28,8 @@ if (!process.env.DATABASE_URL) {
 
 async function setupStarterPlan() {
   // Use dynamic imports AFTER env vars are loaded to avoid hoisting issues
-  const { db, subscriptionPlans } = await import('@/lib/db');
+  // Use relative path since scripts are excluded from tsconfig path aliases
+  const { db, subscriptionPlans } = await import('../lib/db');
   const { eq } = await import('drizzle-orm');
   
   try {

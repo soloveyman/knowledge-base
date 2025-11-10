@@ -4,6 +4,7 @@ import { requireStripe, isStripeConfigured } from '@/lib/stripe/client';
 import { createCheckoutSessionSchema } from '@/lib/stripe/schemas';
 import { db, subscriptionPlans, subscriptions } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { isTrialPlan } from '@/lib/subscription/trial';
 
 export async function POST(request: Request) {
   try {
@@ -92,21 +93,36 @@ export async function POST(request: Request) {
     }
 
     // Check if user already has an active subscription (only for authenticated users)
+    // Allow upgrades/downgrades between plans (including free trial → paid, paid → paid)
     if (isAuthenticated) {
       const existingSubscription = await db
-        .select()
+        .select({
+          subscription: subscriptions,
+          plan: subscriptionPlans,
+        })
         .from(subscriptions)
+        .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
         .where(eq(subscriptions.ownerId, session.user.id))
         .limit(1);
 
-      if (existingSubscription.length > 0 && existingSubscription[0].status === 'active') {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'You already have an active subscription. Please cancel it first or manage it from your account.',
-          },
-          { status: 400 }
-        );
+      if (existingSubscription.length > 0 && existingSubscription[0].subscription.status === 'active') {
+        const existingPlan = existingSubscription[0].plan;
+        
+        // Only block if user is trying to subscribe to the exact same plan
+        if (existingPlan && existingPlan.id === planId) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'You already have an active subscription to this plan. Please manage your subscription from your account.',
+            },
+            { status: 400 }
+          );
+        }
+        
+        // Allow all other cases:
+        // - Free trial → any paid plan (upgrade)
+        // - Any paid plan → different paid plan (upgrade/downgrade)
+        // - Any plan → different plan (plan change)
       }
     }
 
