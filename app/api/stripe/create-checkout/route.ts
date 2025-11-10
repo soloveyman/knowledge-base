@@ -150,8 +150,8 @@ export async function POST(request: Request) {
         },
       ],
       metadata,
-      success_url: successUrl || `${baseUrl}/auth/signin?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${baseUrl}/subscription?canceled=true`,
+      success_url: successUrl || `${baseUrl}/owner?tab=settings&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${baseUrl}/owner?tab=settings&canceled=true`,
     });
 
     return NextResponse.json({

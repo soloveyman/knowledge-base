@@ -31,6 +31,7 @@
     "test:auth": "tsx scripts/test-auth-flow.ts",
     "check:env": "tsx scripts/check-env.ts",
     "test:smtp": "tsx scripts/test-smtp.ts",
+    "verify:stripe": "tsx scripts/verify-stripe.ts",
     "setup:env": "tsx scripts/setup-env.ts",
     "setup:trial": "tsx scripts/setup-trial-plan.ts",
     "setup:starter": "tsx scripts/setup-starter-plan.ts",

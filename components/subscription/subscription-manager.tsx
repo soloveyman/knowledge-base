@@ -420,7 +420,7 @@ export default function SubscriptionManager({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          returnUrl: `${baseUrl}/subscription`,
+          returnUrl: `${baseUrl}/owner?tab=settings`,
         }),
       });
 
@@ -743,15 +743,49 @@ export default function SubscriptionManager({
                     <Button
                       className={isOptimal ? "w-full" : "w-full text-primary border-primary hover:bg-primary hover:text-primary-foreground"}
                       variant={selectedPlan === plan.id || isOptimal ? 'default' : 'outline'}
-                      disabled={plan.id === currentSubscription?.plan?.id}
-                      onClick={(e) => {
+                      disabled={plan.id === currentSubscription?.plan?.id || !isStripeEnabled}
+                      onClick={async (e) => {
                         e.stopPropagation()
-                        if (plan.id !== currentSubscription?.plan?.id) {
-                          handlePlanSelect(plan.id)
+                        if (plan.id === currentSubscription?.plan?.id) {
+                          return
+                        }
+                        
+                        if (!isStripeEnabled) {
+                          alert('Payment processing is not available at this time. Please contact support.')
+                          return
+                        }
+                        
+                        try {
+                          const response = await fetch('/api/stripe/create-checkout', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              planId: plan.id,
+                            }),
+                          })
+
+                          const result = await response.json()
+
+                          if (result.success && result.data.url) {
+                            // Redirect to Stripe Checkout
+                            window.location.href = result.data.url
+                          } else {
+                            console.error('Failed to create checkout session:', result.message)
+                            alert(result.message || 'Failed to create checkout session. Please try again.')
+                          }
+                        } catch (error) {
+                          console.error('Error creating checkout session:', error)
+                          alert('An error occurred. Please try again.')
                         }
                       }}
                     >
-                      {plan.id === currentSubscription?.plan?.id ? t('currentPlan') : t('selectPlan')}
+                      {plan.id === currentSubscription?.plan?.id 
+                        ? t('currentPlan') 
+                        : !isStripeEnabled
+                        ? t('paymentUnavailable') || 'Payment Unavailable'
+                        : t('selectPlan')}
                     </Button>
                   </div>
                 </div>
