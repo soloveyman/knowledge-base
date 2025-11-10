@@ -12,6 +12,7 @@ import { formatDateShort } from "@/lib/date-format";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/translation-context";
 import { 
   Crown, 
   Users, 
@@ -65,6 +66,7 @@ interface SubscriptionStats {
 export default function SuperAdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useTranslation();
   const [owners, setOwners] = useState<OwnerSubscription[]>([]);
   const [stats, setStats] = useState<SubscriptionStats>({
     totalRevenue: 0,
@@ -457,13 +459,17 @@ export default function SuperAdminPage() {
                                 )}
                               </SelectTrigger>
                               <SelectContent>
-                                {plans.map((plan) => (
-                                  <SelectItem key={plan.id} value={plan.id}>
-                                    {plan.displayName} - {plan.price === 0 || plan.name === 'free-trial' 
-                                      ? 'Free' 
-                                      : `$${(plan.price / 100).toFixed(2)}/${plan.currency === 'USD' ? 'mo' : 'mo'}`}
-                                  </SelectItem>
-                                ))}
+                                {plans.length === 0 ? (
+                                  <div className="p-2 text-sm text-muted-foreground">{t('noItems') || 'No items available'}</div>
+                                ) : (
+                                  plans.map((plan) => (
+                                    <SelectItem key={plan.id} value={plan.id}>
+                                      {plan.displayName} - {plan.price === 0 || plan.name === 'free-trial' 
+                                        ? 'Free' 
+                                        : `$${(plan.price / 100).toFixed(2)}/${plan.currency === 'USD' ? 'mo' : 'mo'}`}
+                                    </SelectItem>
+                                  ))
+                                )}
                               </SelectContent>
                             </Select>
                           </div>

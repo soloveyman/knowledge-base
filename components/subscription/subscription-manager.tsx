@@ -469,8 +469,8 @@ export default function SubscriptionManager({
       case 'free':
       case 'free-trial': return <Shield className="h-6 w-6" />
       case 'starter':
-      case 'optimal':
-      case 'standard': return <Users className="h-6 w-6" />
+      case 'standard':
+      case 'optimal': return <Users className="h-6 w-6" />
       case 'pro': return <Zap className="h-6 w-6" />
       case 'business': return <Crown className="h-6 w-6" />
       default: return <Shield className="h-6 w-6" />
@@ -482,8 +482,8 @@ export default function SubscriptionManager({
       case 'free':
       case 'free-trial': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
       case 'starter':
-      case 'optimal':
-      case 'standard': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      case 'standard':
+      case 'optimal': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       case 'pro': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
       case 'business': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
@@ -546,13 +546,15 @@ export default function SubscriptionManager({
     
     try {
       const baseUrl = window.location.origin;
+      // Return to the current page (subscription/billing page)
+      const returnUrl = window.location.href || `${baseUrl}/owner?tab=settings`;
       const response = await fetch('/api/stripe/create-portal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          returnUrl: `${baseUrl}/owner?tab=settings`,
+          returnUrl,
         }),
       });
 
@@ -838,8 +840,8 @@ export default function SubscriptionManager({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.filter(plan => plan.interval === selectedInterval || plan.name === 'free-trial').map((plan) => {
-              const isOptimal = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Optimal'
-              const isStandard = plan.name === 'starter' || translatePlanName(plan.displayName) === 'Standard'
+              const isOptimal = (plan.name === 'starter' || plan.name === 'standard') || translatePlanName(plan.displayName) === 'Optimal'
+              const isStandard = (plan.name === 'starter' || plan.name === 'standard') || translatePlanName(plan.displayName) === 'Standard'
               return (
               <div
                 key={plan.id}
@@ -983,10 +985,6 @@ export default function SubscriptionManager({
           <div className="space-y-6">
             {/* Manage Subscription */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Wallet className="h-4 w-4" />
-                <div className="font-medium">{t('subscriptionsAndPayments')}</div>
-              </div>
               <div className="space-y-3">
                 {currentSubscription && (
                   <div className="space-y-3">
@@ -998,16 +996,14 @@ export default function SubscriptionManager({
                         </AlertDescription>
                       </Alert>
                     ) : null}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button variant="outline" onClick={handleCancel} className="flex-1" disabled={!isStripeEnabled}>
-                        <Crown className="h-4 w-4 mr-2" />
-                        {t('manageSubscription')}
-                      </Button>
-                      <Button variant="outline" onClick={handleBilling} className="flex-1" disabled={!isStripeEnabled}>
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        {t('billingSettings')}
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="secondary" 
+                      onClick={handleCancel} 
+                      className="w-full sm:w-auto" 
+                      disabled={!isStripeEnabled}
+                    >
+                      {t('manageBilling')}
+                    </Button>
                   </div>
                 )}
                 {!currentSubscription && (
@@ -1016,16 +1012,15 @@ export default function SubscriptionManager({
               </div>
             </div>
 
-            {/* Payment History - Only show for users with paid subscriptions */}
-            {currentSubscription?.plan?.price && currentSubscription.plan.price > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <CreditCard className="h-4 w-4" />
-                  <div className="font-medium">{t('paymentHistory')}</div>
-                </div>
-                <div className="space-y-3">
-                  {paymentHistory && paymentHistory.length > 0 ? (
-                    paymentHistory.map((invoice) => {
+            {/* Payment History */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <CreditCard className="h-4 w-4" />
+                <div className="font-medium">{t('paymentHistory')}</div>
+              </div>
+              <div className="space-y-3">
+                {paymentHistory && paymentHistory.length > 0 ? (
+                  paymentHistory.map((invoice) => {
                   const plan = plans.find(p => p.name === invoice.planName)
                   const planDisplayName = plan ? translatePlanName(plan.displayName) : invoice.planName
                   // Format amount from cents to currency string
@@ -1054,9 +1049,8 @@ export default function SubscriptionManager({
                   ) : (
                     <p className="text-sm text-muted-foreground">{t('noPaymentHistory') || 'No payment history available'}</p>
                   )}
-                </div>
               </div>
-            )}
+            </div>
           </div>
         </CardContent>
       </Card>

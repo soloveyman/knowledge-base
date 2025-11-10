@@ -426,14 +426,18 @@ export default function AssignmentBuilderClient({
                       <SelectValue placeholder={t('chooseDocument')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {savedDocuments.map((doc) => (
-                        <SelectItem key={doc.id} value={doc.id}>
-                          <div className="flex items-center space-x-2">
-                            <FileText className="h-4 w-4" />
-                            <span>{doc.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {savedDocuments.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground">{t('noItems') || 'No items available'}</div>
+                      ) : (
+                        savedDocuments.map((doc) => (
+                          <SelectItem key={doc.id} value={doc.id}>
+                            <div className="flex items-center space-x-2">
+                              <FileText className="h-4 w-4" />
+                              <span>{doc.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </FormField>
@@ -450,7 +454,7 @@ export default function AssignmentBuilderClient({
                     </SelectTrigger>
                     <SelectContent>
                       {savedTests.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground">No tests available. Create a test first.</div>
+                        <div className="p-2 text-sm text-muted-foreground">{t('noItems') || 'No items available'}</div>
                       ) : (
                         savedTests.map((test) => (
                           <SelectItem key={test.id} value={test.id}>

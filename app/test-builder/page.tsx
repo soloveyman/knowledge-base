@@ -989,7 +989,7 @@ export default function TestBuilderPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {documents.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground">No documents available</div>
+                        <div className="p-2 text-sm text-muted-foreground">{t('noItems') || 'No items available'}</div>
                       ) : (
                         documents.map((doc) => {
                           const docId = String(doc.id)

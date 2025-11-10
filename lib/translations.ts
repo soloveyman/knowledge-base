@@ -137,6 +137,7 @@ export const translations = {
     // Messages
     loading: "Loading...",
     noData: "No data available",
+    noItems: "No items available",
     error: "Something went wrong. Try again later.",
     success: "Saved successfully 🎉",
     noDocumentsUploaded: "No documents uploaded yet",
@@ -560,6 +561,7 @@ export const translations = {
     noPaymentHistory: "No payment history available",
     manageSubscription: "Manage Subscription",
     manageSubscriptionDesc: "Cancel, resume, or modify your subscription",
+    manageBilling: "Manage billing",
     paymentSettings: "Payment Settings",
     paymentSettingsDesc: "Update payment methods and billing information",
     subscriptionsAndPayments: "Subscriptions and Payments",
@@ -787,6 +789,7 @@ export const translations = {
     // Messages
     loading: "Загрузка...",
     noData: "Нет данных",
+    noItems: "Нет доступных элементов",
     error: "Не удалось выполнить действие. Попробуйте позже.",
     success: "Сохранено 🎉",
     noDocumentsUploaded: "Документы ещё не загружены",
@@ -1193,6 +1196,7 @@ export const translations = {
     noPaymentHistory: "История платежей недоступна",
     manageSubscription: "Управление подпиской",
     manageSubscriptionDesc: "Отменить, возобновить или изменить подписку",
+    manageBilling: "Управление платежами",
     paymentSettings: "Настройки платежей",
     paymentSettingsDesc: "Обновить способы оплаты и информацию о выставлении счетов",
     subscriptionsAndPayments: "Подписки и платежи",

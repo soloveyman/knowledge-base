@@ -35,18 +35,20 @@ async function setupStarterPlan() {
   try {
     console.log('Setting up Standard plan...');
     
-    // Check if Standard plan (name: starter) already exists
+    // Check if Standard plan (name: standard or starter) already exists
+    const { or } = await import('drizzle-orm');
     const existing = await db
       .select()
       .from(subscriptionPlans)
-      .where(eq(subscriptionPlans.name, 'starter'))
+      .where(or(eq(subscriptionPlans.name, 'standard'), eq(subscriptionPlans.name, 'starter')))
       .limit(1);
     
     if (existing.length > 0) {
-      // Update existing plan to Standard
+      // Update existing plan to Standard (rename from starter to standard if needed)
       const [updatedPlan] = await db
         .update(subscriptionPlans)
         .set({
+          name: 'standard', // Update name from 'starter' to 'standard'
           displayName: 'Standard',
           description: 'For small teams and startups',
           price: 4500, // $45/month in cents
@@ -68,7 +70,8 @@ async function setupStarterPlan() {
       
       console.log('✅ Standard plan updated:');
       console.log(`   ID: ${updatedPlan.id}`);
-      console.log(`   Name: ${updatedPlan.displayName}`);
+      console.log(`   Name: ${updatedPlan.name}`);
+      console.log(`   Display Name: ${updatedPlan.displayName}`);
       console.log(`   Price: $${(updatedPlan.price || 0) / 100}/month`);
       process.exit(0);
     }
@@ -77,7 +80,7 @@ async function setupStarterPlan() {
     const [starterPlan] = await db
       .insert(subscriptionPlans)
       .values({
-        name: 'starter',
+        name: 'standard',
         displayName: 'Standard',
         description: 'For small teams and startups',
         price: 4500, // $45/month in cents
