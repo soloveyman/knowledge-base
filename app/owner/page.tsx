@@ -1223,7 +1223,9 @@ function OwnerPageInner() {
   const handleViewDocument = (id: string, name?: string) => {
     console.log('Owner: handleViewDocument called with id:', id, 'name:', name)
     // Use ID for navigation - more reliable than name
-    const url = `/docs/${encodeURIComponent(id)}`
+    // Preserve current URL with tab for return navigation
+    const currentUrl = window.location.pathname + window.location.search
+    const url = `/docs/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(currentUrl)}`
     // Prefetch for instant navigation
     router.prefetch(url)
     router.push(url)

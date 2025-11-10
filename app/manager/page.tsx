@@ -1093,7 +1093,9 @@ function ManagerPageInner() {
     console.log('📄 ID:', id, 'ID type:', typeof id, 'Name:', name)
     // Use ID for navigation - more reliable than name
     const encodedId = encodeURIComponent(String(id))
-    const url = `/docs/${encodedId}`
+    // Preserve current URL with tab for return navigation
+    const currentUrl = window.location.pathname + window.location.search
+    const url = `/docs/${encodedId}?returnTo=${encodeURIComponent(currentUrl)}`
     console.log('📄 Navigating to:', url)
     // Prefetch for instant navigation (non-blocking)
     router.prefetch(url)

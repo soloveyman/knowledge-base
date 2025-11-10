@@ -378,7 +378,12 @@ export default function DocumentReaderPage() {
     const userRole = (session?.user as UserWithRole)?.role || 'employee'
     // Ensure userRole is a string and valid
     const validRole = typeof userRole === 'string' ? userRole : 'employee'
-    navigateBack(validRole as 'employee' | 'manager' | 'owner', 'assignments')
+    // Handle super-admin - redirect to owner page
+    if (validRole === 'super-admin') {
+      router.push('/owner?tab=assignments')
+    } else {
+      navigateBack(validRole as 'employee' | 'manager' | 'owner', 'assignments')
+    }
   }
 
 

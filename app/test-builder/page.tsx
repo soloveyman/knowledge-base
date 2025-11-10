@@ -725,7 +725,7 @@ export default function TestBuilderPage() {
     } else {
       // Fallback: redirect based on user role
       const userRole = session?.user?.role
-      if (userRole === 'owner') {
+      if (userRole === 'owner' || userRole === 'super-admin') {
         router.push(addTimestamp('/owner?tab=tests'))
       } else {
         router.push(addTimestamp('/manager?tab=tests'))
@@ -900,10 +900,13 @@ export default function TestBuilderPage() {
         return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
       }
       
+      const userRole = session?.user?.role
       const redirectUrl = returnTo 
         ? addTimestamp(returnTo)
-        : (session?.user?.role === 'owner' 
+        : (userRole === 'owner' 
             ? addTimestamp('/owner?tab=tests')
+            : userRole === 'super-admin'
+            ? addTimestamp('/owner?tab=tests') // Super-admin uses owner page
             : addTimestamp('/manager?tab=tests'))
       
       router.replace(redirectUrl)

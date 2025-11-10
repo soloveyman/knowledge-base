@@ -81,6 +81,33 @@ export default function DocumentViewer() {
   const [documentData, setDocumentData] = useState<DocumentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [returnUrl, setReturnUrl] = useState<string | null>(null)
+
+  // Preserve return URL from query params or referrer
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const returnTo = urlParams.get('returnTo')
+      
+      if (returnTo) {
+        setReturnUrl(returnTo)
+      } else {
+        // Try to get from referrer
+        const referrer = document.referrer
+        if (referrer && (referrer.includes('/owner') || referrer.includes('/manager') || referrer.includes('/employee'))) {
+          // Extract the path from referrer
+          try {
+            const referrerUrl = new URL(referrer)
+            if (referrerUrl.pathname.startsWith('/owner') || referrerUrl.pathname.startsWith('/manager') || referrerUrl.pathname.startsWith('/employee')) {
+              setReturnUrl(referrerUrl.pathname + referrerUrl.search)
+            }
+          } catch {
+            // Invalid URL, ignore
+          }
+        }
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (status === "loading") return
@@ -488,23 +515,74 @@ export default function DocumentViewer() {
             originalFileName: d.originalFileName,
             title: d.title
           })))
-          // Document doesn't exist, redirect back to previous tab
+          // Document doesn't exist, redirect back
+          if (returnUrl) {
+            router.push(returnUrl)
+            return
+          }
+          
           const userRole = (session?.user as UserWithRole)?.role || 'manager'
-          navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+          
+          // Handle super-admin - redirect to owner page with docs tab
+          if (userRole === 'super-admin') {
+            router.push('/owner?tab=docs')
+            return
+          }
+          
+          // For other roles, use navigateBack
+          if (userRole === 'owner' || userRole === 'manager' || userRole === 'employee') {
+            navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+          } else {
+            router.push('/owner?tab=docs')
+          }
           return
         }
       } else {
         console.error('Failed to load documents:', result.message)
         // Redirect back on error
+        if (returnUrl) {
+          router.push(returnUrl)
+          return
+        }
+        
         const userRole = (session?.user as UserWithRole)?.role || 'manager'
-        navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+        
+        // Handle super-admin - redirect to owner page with docs tab
+        if (userRole === 'super-admin') {
+          router.push('/owner?tab=docs')
+          return
+        }
+        
+        // For other roles, use navigateBack
+        if (userRole === 'owner' || userRole === 'manager' || userRole === 'employee') {
+          navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+        } else {
+          router.push('/owner?tab=docs')
+        }
         return
       }
     } catch (error) {
       console.error('Error loading document:', error)
       // Redirect back on error
+      if (returnUrl) {
+        router.push(returnUrl)
+        return
+      }
+      
       const userRole = (session?.user as UserWithRole)?.role || 'manager'
-      navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+      
+      // Handle super-admin - redirect to owner page with docs tab
+      if (userRole === 'super-admin') {
+        router.push('/owner?tab=docs')
+        return
+      }
+      
+      // For other roles, use navigateBack
+      if (userRole === 'owner' || userRole === 'manager' || userRole === 'employee') {
+        navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+      } else {
+        router.push('/owner?tab=docs')
+      }
       return
     } finally {
       setLoading(false)
@@ -512,9 +590,28 @@ export default function DocumentViewer() {
   }
 
   const handleClose = () => {
-    // Navigate back to the previous tab
+    // Use preserved return URL if available
+    if (returnUrl) {
+      router.push(returnUrl)
+      return
+    }
+    
+    // Navigate back to the previous tab based on role
     const userRole = (session?.user as UserWithRole)?.role || 'manager'
-    navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+    
+    // Handle super-admin - redirect to owner page with docs tab (super-admin shouldn't use doc viewer from owner/manager pages)
+    if (userRole === 'super-admin') {
+      router.push('/owner?tab=docs')
+      return
+    }
+    
+    // For other roles, use navigateBack
+    if (userRole === 'owner' || userRole === 'manager' || userRole === 'employee') {
+      navigateBack(userRole as 'employee' | 'manager' | 'owner', 'docs')
+    } else {
+      // Fallback to owner page
+      router.push('/owner?tab=docs')
+    }
   }
 
 

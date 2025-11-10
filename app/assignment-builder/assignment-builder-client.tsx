@@ -304,9 +304,10 @@ export default function AssignmentBuilderClient({
         return url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`
       }
       
+      const userRole = session?.user?.role
       const redirectUrl = returnTo 
         ? addTimestamp(returnTo)
-        : (session?.user?.role === 'owner' 
+        : (userRole === 'owner' || userRole === 'super-admin'
             ? addTimestamp('/owner?tab=assignments')
             : addTimestamp('/manager?tab=assignments'))
       
@@ -328,7 +329,7 @@ export default function AssignmentBuilderClient({
       router.replace(addTimestamp(returnTo))
     } else {
       const userRole = session?.user?.role
-      if (userRole === 'owner') {
+      if (userRole === 'owner' || userRole === 'super-admin') {
         router.replace(addTimestamp('/owner?tab=assignments'))
       } else {
         router.replace(addTimestamp('/manager?tab=assignments'))
