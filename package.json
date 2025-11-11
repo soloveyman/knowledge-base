@@ -14,6 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:railway": "node scripts/migrate-railway.js",
+    "db:sync:railway": "tsx scripts/sync-railway-db.ts",
+    "stripe:set-railway": "powershell -ExecutionPolicy Bypass -File scripts/set-stripe-vars-railway.ps1",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:health": "tsx scripts/check-health.ts",
