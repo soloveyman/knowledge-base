@@ -89,6 +89,7 @@ temp/
 *.db
 *.sqlite
 
-# Drizzle
-drizzle/
+# Drizzle migrations (keep meta/ but allow migrations/)
+# drizzle/
+drizzle/meta/
 .env*.local
