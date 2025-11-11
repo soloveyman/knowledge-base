@@ -23,16 +23,21 @@ function getPool(): Pool {
     const isLocalhost = process.env.DATABASE_URL?.includes('localhost') || 
                        process.env.DATABASE_URL?.includes('127.0.0.1')
 
-    // Railway-optimized connection pool configuration
+    // Optimized connection pool configuration for Vercel + Railway
+    // Vercel serverless functions: each instance is isolated, can scale to many concurrent instances
+    // Railway connection limits:
+    // - Hobby: ~20 connections
+    // - Pro: ~100 connections
+    // - Enterprise: Custom
+    // Pool size accounts for: max connections per instance × concurrent instances
+    const isVercel = !!process.env.VERCEL
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      // Railway connection limits:
-      // - Hobby: ~20 connections
-      // - Pro: ~100 connections
-      // - Enterprise: Custom
-      max: 10, // Conservative limit for Railway
+      max: isVercel ? 5 : 10, // Smaller pool for Vercel (more instances = more total connections)
       idleTimeoutMillis: 30000, // 30 seconds
       connectionTimeoutMillis: 10000, // 10 seconds
+      // Allow pool to create connections on demand (better for serverless)
+      min: 0, // Start with 0, create connections as needed
       // SSL for production and Railway (Railway uses SSL)
       // Also enable SSL if connection string contains 'railway.app' (connecting to Railway from anywhere)
       // Disable SSL for local Docker connections (localhost)

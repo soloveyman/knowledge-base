@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, assignments, documents, modules, assignmentUsers, testAttempts, users } from '@/lib/db'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { InferSelectModel } from 'drizzle-orm'
 
@@ -40,41 +40,73 @@ export async function GET() {
       }
     }
     
-    // Fetch users for each assignment
-    const assignmentsWithUsers = await Promise.all(
-      assignmentsData.map(async (assignment) => {
-        const users = await db.select().from(assignmentUsers)
-          .where(eq(assignmentUsers.assignmentId, assignment.id))
-        
-        // For each user, check if there are test attempts and get the latest score
-        const usersWithScores = await Promise.all(
-          users.map(async (user) => {
-            if (assignment.testId) {
-              // Get the latest test attempt for this user and this test
-              const attempts = await db.select().from(testAttempts)
-                .where(
-                  and(
-                    eq(testAttempts.testId, assignment.testId),
-                    eq(testAttempts.userId, user.userId)
-                  )
-                )
-                .orderBy(desc(testAttempts.completedAt))
-                .limit(1)
-              
-              if (attempts.length > 0) {
-                return {
-                  ...user,
-                  testScore: attempts[0].score
-                }
-              }
+    // Optimize: Fetch all assignment users in one query instead of N queries
+    const assignmentIds = assignmentsData.map(a => a.id)
+    const allAssignmentUsers = assignmentIds.length > 0
+      ? await db
+          .select()
+          .from(assignmentUsers)
+          .where(inArray(assignmentUsers.assignmentId, assignmentIds))
+      : []
+
+    // Group assignment users by assignmentId for O(1) lookup
+    const usersByAssignment = new Map<string, typeof allAssignmentUsers>()
+    for (const au of allAssignmentUsers) {
+      if (!usersByAssignment.has(au.assignmentId)) {
+        usersByAssignment.set(au.assignmentId, [])
+      }
+      usersByAssignment.get(au.assignmentId)!.push(au)
+    }
+
+    // Collect all test attempts in parallel (batch query instead of N queries)
+    const assignmentsWithTests = assignmentsData.filter(a => a.testId)
+    const testIds = [...new Set(assignmentsWithTests.map(a => a.testId!))]
+    const userIds = [...new Set(allAssignmentUsers.map(au => au.userId))]
+    
+    const allTestAttempts = testIds.length > 0 && userIds.length > 0
+      ? await db
+          .select()
+          .from(testAttempts)
+          .where(
+            and(
+              inArray(testAttempts.testId, testIds),
+              inArray(testAttempts.userId, userIds)
+            )
+          )
+          .orderBy(desc(testAttempts.completedAt))
+      : []
+
+    // Group test attempts by testId and userId for O(1) lookup
+    const attemptsByTestAndUser = new Map<string, typeof allTestAttempts[0]>()
+    for (const attempt of allTestAttempts) {
+      const key = `${attempt.testId}:${attempt.userId}`
+      // Keep only the latest attempt (already sorted by completedAt desc)
+      if (!attemptsByTestAndUser.has(key)) {
+        attemptsByTestAndUser.set(key, attempt)
+      }
+    }
+
+    // Build assignments with users and scores (no more database queries)
+    const assignmentsWithUsers = assignmentsData.map((assignment) => {
+      const users = usersByAssignment.get(assignment.id) || []
+      
+      const usersWithScores = users.map((user) => {
+        if (assignment.testId) {
+          const key = `${assignment.testId}:${user.userId}`
+          const attempt = attemptsByTestAndUser.get(key)
+          
+          if (attempt) {
+            return {
+              ...user,
+              testScore: attempt.score
             }
-            return user
-          })
-        )
-        
-        return { ...assignment, users: usersWithScores }
+          }
+        }
+        return user
       })
-    )
+      
+      return { ...assignment, users: usersWithScores }
+    })
 
     return NextResponse.json({
       success: true,

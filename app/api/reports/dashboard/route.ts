@@ -156,19 +156,32 @@ export async function GET() {
       overdueCount: number
     }>()
 
+    // Collect all unique module IDs first
+    const uniqueModuleIds = [...new Set(
+      assignmentsData
+        .map(a => a.moduleId)
+        .filter((id): id is string => !!id)
+    )]
+
+    // Fetch all modules in parallel (critical performance optimization)
+    const allModules = uniqueModuleIds.length > 0
+      ? await db
+          .select()
+          .from(modules)
+          .where(inArray(modules.id, uniqueModuleIds))
+      : []
+
+    // Create a lookup map for O(1) access
+    const moduleLookup = new Map(allModules.map(m => [m.id, m]))
+
     for (const assignment of assignmentsData) {
       if (!assignment.moduleId) continue
 
-      const module = await db
-        .select()
-        .from(modules)
-        .where(eq(modules.id, assignment.moduleId))
-        .limit(1)
-
-      if (module.length === 0) continue
+      const module = moduleLookup.get(assignment.moduleId)
+      if (!module) continue
 
       const moduleId = assignment.moduleId
-      const moduleTitle = module[0].title
+      const moduleTitle = module.title
 
       if (!modulesMap.has(moduleId)) {
         modulesMap.set(moduleId, {
