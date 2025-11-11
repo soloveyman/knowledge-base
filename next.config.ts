@@ -67,6 +67,8 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Enable standalone output for Docker
+  output: 'standalone',
   // Optimize images
   images: {
     // Modern formats with AVIF first (best compression)
