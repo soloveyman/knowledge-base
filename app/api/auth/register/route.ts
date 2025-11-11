@@ -6,7 +6,8 @@ import bcrypt from 'bcryptjs'
 import { db, users } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
-import { emailExists, normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
+import { normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
+import { emailExists } from '@/lib/email-validation-server'
 import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
 
 const schema = z.object({

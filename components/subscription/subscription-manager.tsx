@@ -188,14 +188,19 @@ export default function SubscriptionManager({
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
       
-      // Force fresh fetch with timestamp to bypass cache
-      const response = await fetch(`/api/subscription?t=${Date.now()}`, { 
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      })
+      // Use stale-while-revalidate for better UX (only force refresh if returning from checkout)
+      const shouldForceRefresh = checkoutSuccess === 'success' && sessionId
+      const fetchOptions: RequestInit = shouldForceRefresh
+        ? { 
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          }
+        : { next: { revalidate: 60 } } // Revalidate every 60 seconds
+      
+      const response = await fetch('/api/subscription', fetchOptions)
       const result = await response.json()
       
       if (result.success) {
@@ -269,17 +274,24 @@ export default function SubscriptionManager({
     // Restore from cache if available (instant render on tab switch)
     if (subscriptionDataCache && !shouldForceRefresh) {
       const cached = subscriptionDataCache
-      setPlans(cached.plans)
-      setCurrentSubscription(cached.currentSubscription)
-      setUsage(cached.usage)
-      setIsStripeEnabled(cached.isStripeEnabled)
-      setPaymentHistory(cached.paymentHistory)
-      setIsLoading(false)
-      // Refresh in background after a delay to avoid blocking render
-      setTimeout(() => {
-        loadSubscriptionData()
-      }, 200)
-    } else if (plans.length === 0 && !currentSubscription && !usage) {
+      // Only restore if we have meaningful data
+      if (cached.plans.length > 0 || cached.currentSubscription || cached.usage) {
+        setPlans(cached.plans)
+        setCurrentSubscription(cached.currentSubscription)
+        setUsage(cached.usage)
+        setIsStripeEnabled(cached.isStripeEnabled)
+        setPaymentHistory(cached.paymentHistory)
+        setIsLoading(false)
+        // Refresh in background after a delay to avoid blocking render
+        setTimeout(() => {
+          loadSubscriptionData()
+        }, 200)
+        return // Exit early to prevent loading state
+      }
+    }
+    
+    // Only show loading if we truly have no cached data
+    if (plans.length === 0 && !currentSubscription && !usage) {
       // Only load if no cached data and state is empty
       loadSubscriptionData()
     } else if (shouldForceRefresh) {
@@ -648,10 +660,10 @@ export default function SubscriptionManager({
                       </div>
                       {currentSubscription.plan?.price !== null && currentSubscription.plan?.price !== undefined && (
                         <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Price:</span>
+                          <span className="text-sm text-muted-foreground">{t('price')}:</span>
                           <span className="text-sm font-medium">        
                             {formatPrice(currentSubscription.plan.price, currentSubscription.plan.currency || 'USD')}
-                            {currentSubscription.plan.interval && ` / ${currentSubscription.plan.interval === 'month' ? 'month' : 'year'}`}
+                            {currentSubscription.plan.interval && ` / ${t(currentSubscription.plan.interval === 'month' ? 'month' : 'year')}`}
                           </span>
                         </div>
                       )}
@@ -883,7 +895,12 @@ export default function SubscriptionManager({
                         </div>
                         {plan.interval === 'year' ? (
                           <div className="text-sm text-muted-foreground mt-1">
-                            {formatPrice(Math.round(plan.price / 12), plan.currency)} {t('per')} {t('month')}
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: plan.currency,
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            }).format(plan.price / 12 / 100)} {t('per')} {t('month')}
                           </div>
                         ) : (
                           <div className="text-sm text-muted-foreground">

@@ -133,6 +133,13 @@ const nextConfig: NextConfig = {
         'pg-native': false,
       };
     }
+    
+    // Optimize webpack cache to reduce serialization warnings
+    if (config.cache && typeof config.cache === 'object') {
+      config.cache.maxMemoryGenerations = 1;
+      config.cache.maxAge = 1000 * 60 * 60 * 24; // 24 hours
+    }
+    
     return config;
   },
 };

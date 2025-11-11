@@ -33,9 +33,9 @@ async function setupAnnualPlans() {
     
     // Standard plan annual version
     // Monthly: $45/month = $540/year
-    // Annual with 20% discount: $432/year (2 months free)
+    // Annual with discount: $399/year
     const standardMonthlyPrice = 4500; // $45/month in cents
-    const standardAnnualPrice = 43200; // $432/year in cents (20% discount)
+    const standardAnnualPrice = 39900; // $399/year in cents
     
     // Check if annual Standard plan exists
     const existingStandardAnnual = await db

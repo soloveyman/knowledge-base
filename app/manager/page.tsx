@@ -781,10 +781,15 @@ function ManagerPageInner() {
         lastLoadedTabRef.current = null
         isLoadingRef.current = false
         
-        // Use cache-busting to ensure fresh data - fetch immediately
+        // Use stale-while-revalidate for better UX (same as other tabs)
         if (tab === 'docs') {
-          // Direct fetch for documents with cache-busting
-          fetch('/api/documents', { cache: 'no-store' })
+          // Only show loading if we don't have cached data
+          if (documents.length === 0) {
+            setIsLoadingDocuments(true)
+          }
+          
+          // Direct fetch for documents with stale-while-revalidate
+          fetch('/api/documents', { next: { revalidate: 30 } })
             .then(res => res.json())
             .then(result => {
               if (result.success && result.data.documents) {
@@ -813,13 +818,17 @@ function ManagerPageInner() {
                 syncLocalStorageWithDatabase(transformedDocs)
                 lastLoadedTabRef.current = tab
               }
+              setIsLoadingDocuments(false)
             })
-            .catch(console.error)
+            .catch((error) => {
+              console.error('Error loading documents:', error)
+              setIsLoadingDocuments(false)
+            })
         } else if (tab === 'tests') {
-          // Direct fetch for tests with cache-busting - fetch tests and documents in parallel
+          // Direct fetch for tests with stale-while-revalidate - fetch tests and documents in parallel
           Promise.all([
-            fetch('/api/tests', { cache: 'no-store' }),
-            fetch('/api/documents', { cache: 'no-store' })
+            fetch('/api/tests', { next: { revalidate: 30 } }),
+            fetch('/api/documents', { next: { revalidate: 30 } })
           ])
             .then(async ([testsResponse, documentsResponse]) => {
               const [testsResult, documentsResult] = await Promise.all([
@@ -1418,8 +1427,9 @@ function ManagerPageInner() {
                   const tab = getTabFromUrl(searchParams)
                   const isReturningFromImport = hasTimestamp && tab === 'docs'
                   
-                  // Show loading if actually loading
-                  if (isLoadingDocuments) {
+                  // Only show loading if we have no cached data AND are actually loading
+                  // This prevents flicker when we have cached data from localStorage
+                  if (isLoadingDocuments && documents.length === 0) {
                     return (
                       <div className="flex items-center justify-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>

@@ -5,7 +5,8 @@ import { auth } from '@/lib/auth'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { strictRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit'
-import { emailExists, normalizeEmail, isNotDisposableEmail, isValidEmailFormat } from '@/lib/email-validation'
+import { normalizeEmail, isNotDisposableEmail, isValidEmailFormat } from '@/lib/email-validation'
+import { emailExists } from '@/lib/email-validation-server'
 import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
 
 // Route segment config for performance

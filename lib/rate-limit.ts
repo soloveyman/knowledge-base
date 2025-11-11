@@ -4,6 +4,7 @@ import { Redis } from "@upstash/redis"
 // Initialize Redis client (works with Upstash or any Redis instance)
 // If Upstash env vars are not set, fallback to in-memory rate limiting
 let redis: Redis | null = null
+let warningShown = false
 
 // Check if Upstash environment variables are set
 const hasUpstashConfig = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -13,10 +14,19 @@ if (hasUpstashConfig) {
     redis = Redis.fromEnv()
   } catch {
     // If Redis initialization fails, use in-memory fallback
-    console.warn("Upstash Redis initialization failed. Rate limiting will use in-memory fallback.")
+    if (!warningShown && process.env.NODE_ENV !== 'production') {
+      console.warn("Upstash Redis initialization failed. Rate limiting will use in-memory fallback.")
+      warningShown = true
+    }
   }
 } else {
-  console.warn("Upstash Redis not configured. Rate limiting will use in-memory fallback.")
+  // Only show warning once in development, never in production
+  if (!warningShown && process.env.NODE_ENV !== 'production') {
+    // Suppress warning - in-memory fallback is expected in development
+    // Uncomment the line below if you want to see the warning once
+    // console.warn("Upstash Redis not configured. Rate limiting will use in-memory fallback.")
+    warningShown = true
+  }
 }
 
 // In-memory rate limit fallback (for development or when Redis is unavailable)

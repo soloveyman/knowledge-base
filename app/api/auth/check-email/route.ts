@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { emailExists, isValidEmailFormat, normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
+import { isValidEmailFormat, normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
+import { emailExists } from '@/lib/email-validation-server'
 import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { registrationRateLimiter } from '@/lib/rate-limit'
 

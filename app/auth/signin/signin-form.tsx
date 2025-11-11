@@ -49,6 +49,10 @@ export function SignInForm() {
   }, [isRegister])
   
   // Validate fields in real-time
+  // Extract specific properties from emailValidation to avoid infinite loop
+  const emailValidationError = emailValidation.error
+  const emailValidationIsAvailable = emailValidation.isAvailable
+  
   useEffect(() => {
     if (!isRegister) return
     
@@ -61,9 +65,9 @@ export function SignInForm() {
         errors.email = emailError
       } else if (isDisposableEmail(email)) {
         errors.email = 'Disposable/temporary email addresses are not allowed. Please use a real email address.'
-      } else if (emailValidation.error) {
-        errors.email = emailValidation.error
-      } else if (emailValidation.isAvailable === false) {
+      } else if (emailValidationError) {
+        errors.email = emailValidationError
+      } else if (emailValidationIsAvailable === false) {
         errors.email = 'This email is already registered'
       }
     }
@@ -87,8 +91,27 @@ export function SignInForm() {
       }
     }
     
-    setFieldErrors(errors)
-  }, [email, password, name, touched, isRegister, emailValidation])
+    // Only update if errors actually changed (shallow comparison)
+    setFieldErrors(prev => {
+      const prevKeys = Object.keys(prev)
+      const newKeys = Object.keys(errors)
+      
+      // Quick check: different number of keys means different
+      if (prevKeys.length !== newKeys.length) {
+        return errors
+      }
+      
+      // Check if any values changed
+      for (const key of newKeys) {
+        if (prev[key] !== errors[key]) {
+          return errors
+        }
+      }
+      
+      // No changes, return previous to avoid re-render
+      return prev
+    })
+  }, [email, password, name, touched, isRegister, emailValidationError, emailValidationIsAvailable])
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)

@@ -8,6 +8,11 @@ let dbInstance: ReturnType<typeof drizzle> | null = null;
 
 function getPool(): Pool {
   if (!pool) {
+    // Prevent database access on the client side
+    if (typeof window !== 'undefined') {
+      throw new Error('Database access is not available on the client side. This module should only be imported in server components or API routes.');
+    }
+    
     // Validate DATABASE_URL only when actually needed
     if (!process.env.DATABASE_URL) {
       console.error('❌ DATABASE_URL environment variable is not set');
