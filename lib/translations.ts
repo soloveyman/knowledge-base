@@ -586,7 +586,8 @@ export const translations = {
     month: "month",
     year: "year",
     monthly: "Monthly",
-    yearly: "Yearly",
+    annual: "Annual",
+    yearly: "Annual", // Deprecated, use 'annual'
     currentPlan: "Current Plan",
     selectPlan: "Select plan",
     downgradeNotAllowed: "Downgrade Not Allowed",
@@ -613,6 +614,8 @@ export const translations = {
     freeTrialDescription: "7 days of full access",
     starterDescription: "For small teams and startups",
     proDescription: "For growing companies and networks",
+    annualPlansNotAvailable: "Annual plans are not available yet. Please select monthly plans or contact support.",
+    switchToMonthly: "Switch to Monthly Plans",
     
     // Dynamic Greetings (20 variants)
     greeting1: "👋 Welcome back",
@@ -1221,7 +1224,8 @@ export const translations = {
     month: "месяц",
     year: "год",
     monthly: "Месячная",
-    yearly: "Годовая",
+    annual: "Годовая",
+    yearly: "Годовая", // Deprecated, use 'annual'
     currentPlan: "Текущий план",
     selectPlan: "Выбрать план",
     downgradeNotAllowed: "Понижение не разрешено",
@@ -1248,6 +1252,8 @@ export const translations = {
     freeTrialDescription: "7 дней полного доступа",
     starterDescription: "Для малых команд и стартапов",
     proDescription: "Для растущих компаний и сетей",
+    annualPlansNotAvailable: "Годовые планы пока недоступны. Пожалуйста, выберите месячные планы или свяжитесь с поддержкой.",
+    switchToMonthly: "Переключиться на месячные планы",
     
     // Dynamic Greetings (20 variants)
     greeting1: "👋 С возвращением",

@@ -132,7 +132,7 @@ export default function SubscriptionManager({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('year')
+  const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('month')
 
   // Use module-level cache (persists across component remounts)
   const dataCache = useRef(subscriptionDataCache)
@@ -823,7 +823,7 @@ export default function SubscriptionManager({
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {t('yearly')}
+                {t('annual')}
               </button>
               <button
                 type="button"
@@ -838,8 +838,29 @@ export default function SubscriptionManager({
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.filter(plan => plan.interval === selectedInterval || plan.name === 'free-trial').map((plan) => {
+          {(() => {
+            const filteredPlans = plans.filter(plan => plan.interval === selectedInterval || plan.name === 'free-trial')
+            const paidPlans = filteredPlans.filter(plan => plan.price > 0)
+            
+            if (paidPlans.length === 0 && selectedInterval === 'year') {
+              return (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    {t('annualPlansNotAvailable') || 'Annual plans are not available yet. Please select monthly plans or contact support.'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedInterval('month')}
+                  >
+                    {t('switchToMonthly') || 'Switch to Monthly Plans'}
+                  </Button>
+                </div>
+              )
+            }
+            
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {filteredPlans.map((plan) => {
               const isOptimal = (plan.name === 'starter' || plan.name === 'standard') || translatePlanName(plan.displayName) === 'Optimal'
               const isStandard = (plan.name === 'starter' || plan.name === 'standard') || translatePlanName(plan.displayName) === 'Standard'
               return (
@@ -966,7 +987,9 @@ export default function SubscriptionManager({
               </div>
               )
             })}
-          </div>
+              </div>
+            )
+          })()}
 
         </CardContent>
       </Card>
