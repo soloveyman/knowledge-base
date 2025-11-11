@@ -487,6 +487,8 @@ function OwnerPageInner() {
           }
         })
         setSavedTestsWithLog(transformedTests)
+        // Track when data was loaded for cache invalidation
+        sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -521,8 +523,10 @@ function OwnerPageInner() {
   const loadTabData = useCallback(async (tab: string, preserveData = false, forceRefresh = false) => {
     try {
       if (tab === 'docs') {
-        // Always show loading when fetching, but preserve existing data if preserveData is true
-        setIsLoadingDocuments(true)
+        // Only show loading if not preserving data (to avoid flicker when switching tabs)
+        if (!preserveData) {
+          setIsLoadingDocuments(true)
+        }
         try {
           // Use cache-busting if forceRefresh is true (e.g., returning from import)
           const fetchOptions = forceRefresh 
@@ -558,6 +562,8 @@ function OwnerPageInner() {
             // Ensure localStorage is synced immediately
             // Cast to Document[] type to match the utility function signature
             syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+            // Track when data was loaded for cache invalidation
+            sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
           }
         } finally {
           setIsLoadingDocuments(false)
@@ -620,6 +626,8 @@ function OwnerPageInner() {
             }
           })
           setSavedTestsWithLog(transformedTests)
+          // Track when data was loaded for cache invalidation
+          sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
         }
         setIsLoadingTests(false)
       } else if (tab === 'assignments') {
@@ -669,16 +677,21 @@ function OwnerPageInner() {
   const lastLoadedTabRef = useRef<string | null>(null)
   const isLoadingRef = useRef<boolean>(false)
   
-  // Always reload data when tab changes to ensure fresh data
-  // This ensures fresh data after returning from import/edit pages
+  // Load data when tab changes, but only if data is stale or tab hasn't been loaded yet
   useEffect(() => {
-    // Skip if this tab was already loaded and not forced (prevent duplicate loads)
-    if (lastLoadedTabRef.current === defaultTab && !isLoadingRef.current) {
+    // Skip if already loading
+    if (isLoadingRef.current) {
       return
     }
     
-    // Skip if already loading
-    if (isLoadingRef.current) {
+    // Check if this tab was already loaded recently (within last 2 minutes)
+    const lastDataLoadTime = sessionStorage.getItem('ownerLastDataLoadTime')
+    const dataAge = lastDataLoadTime ? Date.now() - parseInt(lastDataLoadTime) : Infinity
+    const isDataFresh = dataAge < 120000 // 2 minutes
+    
+    // Skip if this tab was already loaded and data is fresh
+    if (lastLoadedTabRef.current === defaultTab && isDataFresh) {
+      console.log(`Owner: Skipping reload for ${defaultTab} tab - data is fresh (${Math.round(dataAge/1000)}s old)`)
       return
     }
     
@@ -1080,15 +1093,22 @@ function OwnerPageInner() {
   }, [defaultTab])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer or test page)
-  // Only reload if we've been away for more than 30 seconds to avoid unnecessary refreshes
+  // Only reload if we've been away for more than 60 seconds AND data is stale (2+ minutes old)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
         const lastFocusTime = sessionStorage.getItem('ownerLastFocusTime')
+        const lastDataLoadTime = sessionStorage.getItem('ownerLastDataLoadTime')
         const now = Date.now()
-        // Only reload if away for more than 30 seconds
-        if (!lastFocusTime || (now - parseInt(lastFocusTime)) > 30000) {
-          console.log(`Owner: Page became visible after ${now - (lastFocusTime ? parseInt(lastFocusTime) : 0)}ms, reloading ${defaultTab} tab...`)
+        // Only reload if:
+        // 1. Away for more than 60 seconds (not just tab switching)
+        // 2. Data is older than 2 minutes (stale data)
+        const awayTime = lastFocusTime ? now - parseInt(lastFocusTime) : Infinity
+        const dataAge = lastDataLoadTime ? now - parseInt(lastDataLoadTime) : Infinity
+        const shouldReload = awayTime > 60000 || dataAge > 120000 // 60s away or 2min stale
+        
+        if (shouldReload) {
+          console.log(`Owner: Page became visible (away: ${Math.round(awayTime/1000)}s, data age: ${Math.round(dataAge/1000)}s), reloading ${defaultTab} tab...`)
           // Use requestIdleCallback to avoid blocking UI
           if ('requestIdleCallback' in window) {
             requestIdleCallback(() => {
@@ -1097,6 +1117,7 @@ function OwnerPageInner() {
               } else {
                 loadTabData(defaultTab, true).catch(console.error)
               }
+              sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
             })
           } else {
             setTimeout(() => {
@@ -1105,20 +1126,26 @@ function OwnerPageInner() {
               } else {
                 loadTabData(defaultTab, true).catch(console.error)
               }
+              sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
             }, 100)
           }
-          sessionStorage.setItem('ownerLastFocusTime', now.toString())
         }
+        sessionStorage.setItem('ownerLastFocusTime', now.toString())
       }
     }
 
     const handleFocus = () => {
       if (defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
         const lastFocusTime = sessionStorage.getItem('ownerLastFocusTime')
+        const lastDataLoadTime = sessionStorage.getItem('ownerLastDataLoadTime')
         const now = Date.now()
-        // Only reload if away for more than 30 seconds
-        if (!lastFocusTime || (now - parseInt(lastFocusTime)) > 30000) {
-          console.log(`Owner: Window focused after ${now - (lastFocusTime ? parseInt(lastFocusTime) : 0)}ms, reloading ${defaultTab} tab...`)
+        // Only reload if away for more than 60 seconds AND data is stale (2+ minutes old)
+        const awayTime = lastFocusTime ? now - parseInt(lastFocusTime) : Infinity
+        const dataAge = lastDataLoadTime ? now - parseInt(lastDataLoadTime) : Infinity
+        const shouldReload = awayTime > 60000 || dataAge > 120000 // 60s away or 2min stale
+        
+        if (shouldReload) {
+          console.log(`Owner: Window focused (away: ${Math.round(awayTime/1000)}s, data age: ${Math.round(dataAge/1000)}s), reloading ${defaultTab} tab...`)
           if ('requestIdleCallback' in window) {
             requestIdleCallback(() => {
               if (defaultTab === 'overview') {
@@ -1126,6 +1153,7 @@ function OwnerPageInner() {
               } else {
                 loadTabData(defaultTab, true).catch(console.error)
               }
+              sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
             })
           } else {
             setTimeout(() => {
@@ -1134,10 +1162,11 @@ function OwnerPageInner() {
               } else {
                 loadTabData(defaultTab, true).catch(console.error)
               }
+              sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
             }, 100)
           }
-          sessionStorage.setItem('ownerLastFocusTime', now.toString())
         }
+        sessionStorage.setItem('ownerLastFocusTime', now.toString())
       }
     }
 
@@ -1435,8 +1464,8 @@ function OwnerPageInner() {
             if (value !== defaultTab) {
               router.replace(`/owner?tab=${value}`, { scroll: false })
               saveCurrentTab('owner', value)
-              // Reset last loaded tab ref when switching tabs to allow reload
-              lastLoadedTabRef.current = null
+              // Don't reset lastLoadedTabRef - let the useEffect check if data is fresh
+              // This prevents unnecessary reloads when switching between tabs
             }
           }
         }} className="space-y-3 md:space-y-6">

@@ -113,6 +113,7 @@ let subscriptionDataCache: {
   usage: Usage | null
   paymentHistory: PaymentHistory[] | null
   isStripeEnabled: boolean
+  _timestamp?: number // Cache timestamp for stale-while-revalidate
 } | null = null
 
 export default function SubscriptionManager({ 
@@ -179,7 +180,8 @@ export default function SubscriptionManager({
           currentSubscription: null,
           usage: null,
           paymentHistory: null,
-          isStripeEnabled: false
+          isStripeEnabled: false,
+          _timestamp: 0
         }
         dataCache.current = subscriptionDataCache
         
@@ -211,9 +213,12 @@ export default function SubscriptionManager({
           paymentHistory: result.data.paymentHistory || null,
           isStripeEnabled: result.data.isStripeConfigured ?? false
         }
-        // Cache data for future remounts (module-level)
-        subscriptionDataCache = data
-        dataCache.current = data
+        // Cache data for future remounts (module-level) with timestamp
+        subscriptionDataCache = {
+          ...data,
+          _timestamp: Date.now()
+        }
+        dataCache.current = subscriptionDataCache
         setPlans(data.plans)
         setCurrentSubscription(data.currentSubscription)
         setUsage(data.usage)
@@ -282,10 +287,15 @@ export default function SubscriptionManager({
         setIsStripeEnabled(cached.isStripeEnabled)
         setPaymentHistory(cached.paymentHistory)
         setIsLoading(false)
-        // Refresh in background after a delay to avoid blocking render
-        setTimeout(() => {
-          loadSubscriptionData()
-        }, 200)
+        // Only refresh in background if data is older than 60 seconds (stale-while-revalidate pattern)
+        const cacheAge = Date.now() - (subscriptionDataCache._timestamp || 0)
+        const CACHE_TTL = 60000 // 60 seconds
+        if (cacheAge > CACHE_TTL) {
+          // Refresh in background without blocking UI
+          setTimeout(() => {
+            loadSubscriptionData()
+          }, 200)
+        }
         return // Exit early to prevent loading state
       }
     }
