@@ -56,8 +56,8 @@ const graphikMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Knowledge Base Platform",
-  description: "Employee training and knowledge management system",
+  title: "Uppstaff | AI Training & Knowledge Platform",
+  description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time — fast, transparent, and secure.",
 };
 
 export default function RootLayout({
