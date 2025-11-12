@@ -36,9 +36,16 @@ export const stripe = getStripeClient();
 
 /**
  * Check if Stripe is configured
+ * Re-checks environment variable to handle cases where env vars are set after module load
  */
 export function isStripeConfigured(): boolean {
-  return stripe !== null && !!process.env.STRIPE_SECRET_KEY;
+  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY;
+  // If we have a secret key but stripe instance is null, try to initialize it
+  if (hasSecretKey && stripe === null) {
+    const newStripe = getStripeClient();
+    return newStripe !== null;
+  }
+  return stripe !== null && hasSecretKey;
 }
 
 /**

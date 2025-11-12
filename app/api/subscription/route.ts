@@ -214,6 +214,13 @@ export async function GET() {
       });
     }
 
+    const stripeConfigured = isStripeConfigured();
+    console.log('[Subscription API] Stripe configured:', stripeConfigured, {
+      hasSecretKey: !!process.env.STRIPE_SECRET_KEY,
+      hasPublishableKey: !!process.env.STRIPE_PUBLISHABLE_KEY,
+      secretKeyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 10) || 'missing'
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -235,7 +242,7 @@ export async function GET() {
         currentSubscription,
         usage: usageData,
         paymentHistory,
-        isStripeConfigured: isStripeConfigured(),
+        isStripeConfigured: stripeConfigured,
       }
     });
   } catch (error) {

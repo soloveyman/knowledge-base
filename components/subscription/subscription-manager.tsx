@@ -229,8 +229,12 @@ export default function SubscriptionManager({
           subscription: data.currentSubscription,
           planId: data.currentSubscription?.planId,
           planName: data.currentSubscription?.plan?.name,
-          stripeEnabled: data.isStripeEnabled
+          stripeEnabled: data.isStripeEnabled,
+          plansCount: data.plans.length
         })
+        if (!data.isStripeEnabled) {
+          console.warn('[Subscription] ⚠️ Stripe is not enabled! Buttons will be disabled. Check server-side STRIPE_SECRET_KEY configuration.')
+        }
         
         // Show success message if returning from checkout
         if (data.currentSubscription && checkoutSuccess === 'success') {
@@ -959,11 +963,18 @@ export default function SubscriptionManager({
                       
                       const isDisabled = isCurrentPlan || !isStripeEnabled
                       
+                      // Debug logging
+                      if (!isStripeEnabled && !isCurrentPlan) {
+                        console.warn(`[Subscription] Button disabled for plan ${plan.id}: isStripeEnabled=${isStripeEnabled}, isCurrentPlan=${isCurrentPlan}`)
+                        console.warn(`[Subscription] Check /api/test-env to verify Stripe configuration on server`)
+                      }
+                      
                       return (
                         <Button
                           className={`w-full ${isCurrentPlan ? 'border border-primary' : ''}`}
                           variant={isCurrentPlan ? 'secondary' : 'default'}
                           disabled={isDisabled}
+                          title={!isStripeEnabled && !isCurrentPlan ? 'Stripe is not configured. Check server environment variables.' : isCurrentPlan ? 'This is your current plan' : 'Select this plan'}
                           onClick={async (e) => {
                             e.stopPropagation()
                             if (isCurrentPlan) {
@@ -971,7 +982,8 @@ export default function SubscriptionManager({
                             }
                             
                             if (!isStripeEnabled) {
-                              alert('Payment processing is not available at this time. Please contact support.')
+                              toast.error('Payment processing is not available. Please check server configuration or contact support.')
+                              console.error('[Subscription] Stripe not enabled. Check /api/test-env endpoint for details.')
                               return
                             }
                         
