@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { requireStripe, isStripeConfigured } from '@/lib/stripe/client';
 import { createPortalSessionSchema } from '@/lib/stripe/schemas';
+import Stripe from 'stripe';
 
 export async function POST(request: Request) {
   try {
@@ -96,10 +97,19 @@ export async function POST(request: Request) {
     }
 
     // Create portal session
-    const portalSession = await stripe.billingPortal.sessions.create({
+    // Use custom configuration if provided via environment variable
+    const portalConfigurationId = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID;
+    const portalSessionParams: Stripe.BillingPortal.SessionCreateParams = {
       customer: customerId,
       return_url: returnUrl,
-    });
+    };
+    
+    // Add configuration ID if provided
+    if (portalConfigurationId) {
+      portalSessionParams.configuration = portalConfigurationId;
+    }
+    
+    const portalSession = await stripe.billingPortal.sessions.create(portalSessionParams);
 
     return NextResponse.json({
       success: true,
