@@ -119,7 +119,7 @@ STRIPE_SECRET_KEY="sk_test_..."
 # ❌ НЕПРАВИЛЬНО (реальные значения)
 DATABASE_URL="postgresql://postgres:REAL_PASSWORD@real-host:5432/real_db"
 NEXTAUTH_SECRET="actual-secret-key-abc123"
-STRIPE_SECRET_KEY="sk_live_51AbCdEfGhIjKlMnOpQrStUvWxYz"
+STRIPE_SECRET_KEY="sk_live_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 
 ## Что делать, если секрет уже попал в Git
