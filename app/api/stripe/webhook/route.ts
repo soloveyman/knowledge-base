@@ -111,6 +111,16 @@ async function getOrCreateUserFromCheckout(session: Stripe.Checkout.Session): Pr
   }
 }
 
+// GET endpoint for health check
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    endpoint: '/api/stripe/webhook',
+    configured: isStripeConfigured(),
+    message: 'Stripe webhook endpoint is ready. Use POST method for webhook events.',
+  });
+}
+
 export async function POST(request: Request) {
   try {
     // Check if Stripe is configured
