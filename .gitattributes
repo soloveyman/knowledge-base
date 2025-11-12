@@ -1,0 +1,13 @@
+# Ensure .env files are never tracked, even if accidentally added
+.env* linguist-vendored
+.env* -diff -merge
+*.env* -text
+.env.local binary
+.env binary
+
+# Protect secret files
+*.secret binary
+*.key binary
+secrets.json binary
+config/secrets.json binary
+
