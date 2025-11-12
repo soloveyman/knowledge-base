@@ -225,6 +225,7 @@ export async function GET() {
           price: plan.price,
           currency: plan.currency,
           interval: plan.interval,
+          stripePriceId: (plan as any).stripePriceId || null, // Optional field
           maxUsers: plan.maxUsers,
           maxImportsPerMonth: plan.maxImportsPerMonth,
           maxGenerationsPerMonth: plan.maxGenerationsPerMonth,

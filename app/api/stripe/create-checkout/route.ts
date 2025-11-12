@@ -146,25 +146,30 @@ export async function POST(request: Request) {
       metadata.isGuestCheckout = 'true';
     }
 
+    // Use Stripe Price ID if available, otherwise create price_data dynamically
+    const lineItems = plan.stripePriceId
+      ? [{ price: plan.stripePriceId, quantity: 1 }]
+      : [
+          {
+            price_data: {
+              currency: (plan.currency?.toLowerCase() || 'usd') as 'usd',
+              product_data: {
+                name: plan.displayName,
+                description: plan.description || undefined,
+              },
+              unit_amount: plan.price || 0, // Already in cents
+              recurring: {
+                interval: (plan.interval || 'month') as 'month' | 'year',
+              },
+            },
+            quantity: 1,
+          },
+        ];
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: customerEmail || undefined,
-      line_items: [
-        {
-          price_data: {
-            currency: (plan.currency?.toLowerCase() || 'usd') as 'usd',
-            product_data: {
-              name: plan.displayName,
-              description: plan.description || undefined,
-            },
-            unit_amount: plan.price || 0, // Already in cents
-            recurring: {
-              interval: (plan.interval || 'month') as 'month' | 'year',
-            },
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       metadata,
       success_url: successUrl || `${baseUrl}/owner?tab=settings&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${baseUrl}/owner?tab=settings&canceled=true`,

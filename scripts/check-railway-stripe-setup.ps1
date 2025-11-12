@@ -47,7 +47,7 @@ if ($secretKey -and $publishableKey -and $webhookSecret) {
     Write-Host "     2. Create endpoint: https://knowledge-base.up.railway.app/api/stripe/webhook" -ForegroundColor White
     Write-Host "     3. Select events: checkout.session.completed, customer.subscription.*, invoice.*" -ForegroundColor White
     Write-Host "     4. Copy Signing secret (whsec_...)" -ForegroundColor White
-    Write-Host "     5. Set in Railway: railway variables --set `"STRIPE_WEBHOOK_SECRET=whsec_...`"" -ForegroundColor White
+    Write-Host '     5. Set in Railway: railway variables --set "STRIPE_WEBHOOK_SECRET=whsec_..."' -ForegroundColor White
 } else {
     Write-Host "  ❌ Missing required variables. Set them in Railway Dashboard Variables tab" -ForegroundColor Red
 }

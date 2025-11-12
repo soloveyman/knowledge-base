@@ -232,6 +232,7 @@ export const subscriptionPlans = pgTable('subscription_plans', {
   price: integer('price'), // in cents
   currency: text('currency').default('USD'),
   interval: text('interval').default('month'), // 'month', 'year'
+  stripePriceId: text('stripe_price_id'), // Stripe Price ID (e.g., 'price_xxx') - optional, falls back to price_data if not set
   maxUsers: integer('max_users'),
   maxImportsPerMonth: integer('max_imports_per_month'),
   maxGenerationsPerMonth: integer('max_generations_per_month'),
