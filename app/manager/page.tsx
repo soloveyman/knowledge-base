@@ -710,7 +710,7 @@ function ManagerPageInner() {
               const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
               if (pendingTests) {
                 try {
-                  const { tests, documents, timestamp: storedTimestamp } = JSON.parse(pendingTests)
+                  const { tests, documents, timestamp: storedTimestamp, editedTestId } = JSON.parse(pendingTests)
                   // Only use if timestamp is recent (within last 10 seconds)
                   if (Date.now() - storedTimestamp < 10000 && tests && documents) {
                     console.log('Manager: Using pre-fetched tests from sessionStorage')
@@ -750,7 +750,41 @@ function ManagerPageInner() {
                         createdBy: test.createdBy
                       }
                     })
-                    setSavedTestsWithLog(transformedTests)
+                    
+                    // If this is an edit operation, preserve the order by updating only the edited test
+                    if (editedTestId && savedTests.length > 0) {
+                      // Find the updated test in the new data
+                      const updatedTest = transformedTests.find(t => t.id === editedTestId)
+                      if (updatedTest) {
+                        // Update only the edited test in the existing list, preserving order
+                        setSavedTests(prevTests => {
+                          const testIndex = prevTests.findIndex(t => t.id === editedTestId)
+                          if (testIndex !== -1) {
+                            // Update the test at its original position
+                            const newTests = [...prevTests]
+                            newTests[testIndex] = updatedTest
+                            // Also update localStorage
+                            if (typeof window !== 'undefined') {
+                              try {
+                                localStorage.setItem('manager-tests', JSON.stringify(newTests))
+                              } catch (error) {
+                                console.error('Error saving tests to localStorage:', error)
+                              }
+                            }
+                            return newTests
+                          }
+                          // If not found, fall back to full replacement
+                          return transformedTests
+                        })
+                      } else {
+                        // Updated test not found, use full replacement
+                        setSavedTestsWithLog(transformedTests)
+                      }
+                    } else {
+                      // New test or no existing tests, use full replacement
+                      setSavedTestsWithLog(transformedTests)
+                    }
+                    
                     sessionStorage.removeItem('pendingTestsRefresh')
                     lastLoadedTabRef.current = tab
                     return // Skip API call since we have the data
@@ -895,6 +929,61 @@ function ManagerPageInner() {
             })
             .catch(console.error)
         } else if (tab === 'assignments') {
+          // Check sessionStorage first for pre-fetched data (after edit/create)
+          const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
+          if (pendingAssignments) {
+            try {
+              const { data, timestamp: storedTimestamp, editedAssignmentId } = JSON.parse(pendingAssignments)
+              // Only use if timestamp is recent (within last 10 seconds)
+              if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                console.log('Manager: Using pre-fetched assignments from sessionStorage, count:', data.length)
+                
+                // If this is an edit operation, preserve the order by updating only the edited assignment
+                if (editedAssignmentId && savedAssignments.length > 0) {
+                  // Find the updated assignment in the new data
+                  const updatedAssignment = data.find((a: SavedAssignment) => a.id === editedAssignmentId)
+                  if (updatedAssignment) {
+                    // Update only the edited assignment in the existing list, preserving order
+                    setSavedAssignments(prevAssignments => {
+                      const assignmentIndex = prevAssignments.findIndex(a => a.id === editedAssignmentId)
+                      if (assignmentIndex !== -1) {
+                        // Update the assignment at its original position
+                        const newAssignments = [...prevAssignments]
+                        newAssignments[assignmentIndex] = updatedAssignment
+                        // Also update localStorage
+                        if (typeof window !== 'undefined') {
+                          try {
+                            localStorage.setItem('manager-assignments', JSON.stringify(newAssignments))
+                          } catch (error) {
+                            console.error('Error saving assignments to localStorage:', error)
+                          }
+                        }
+                        return newAssignments
+                      }
+                      // If not found, fall back to full replacement
+                      return data
+                    })
+                  } else {
+                    // Updated assignment not found, use full replacement
+                    setSavedAssignmentsWithLog(data)
+                  }
+                } else {
+                  // New assignment or no existing assignments, use full replacement
+                  setSavedAssignmentsWithLog(data)
+                }
+                
+                sessionStorage.removeItem('pendingAssignmentsRefresh')
+                lastLoadedTabRef.current = tab
+                return // Skip API call since we have the data
+              } else {
+                sessionStorage.removeItem('pendingAssignmentsRefresh') // Clean up expired data
+              }
+            } catch (error) {
+              console.error('Failed to parse pending assignments:', error)
+              sessionStorage.removeItem('pendingAssignmentsRefresh') // Clean up corrupted data
+            }
+          }
+          
           // Direct fetch for assignments with cache-busting
           fetch('/api/assignments', { cache: 'no-store' })
             .then(res => res.json())

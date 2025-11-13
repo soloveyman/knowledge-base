@@ -834,6 +834,29 @@ export default function TestBuilderPage() {
         }
 
         toast.success(`Test updated successfully! ${generatedQuestions.length} questions updated.`)
+        
+        // Fetch tests and documents immediately after update to refresh the list
+        try {
+          const [testsResponse, documentsResponse] = await Promise.all([
+            fetch('/api/tests', { cache: 'no-store' }),
+            fetch('/api/documents', { cache: 'no-store' })
+          ])
+          const [testsResult, documentsResult] = await Promise.all([
+            testsResponse.json(),
+            documentsResponse.json()
+          ])
+          if (testsResult.success && documentsResult.success && typeof window !== 'undefined') {
+            // Store in sessionStorage for immediate use by owner/manager page
+            sessionStorage.setItem('pendingTestsRefresh', JSON.stringify({
+              tests: testsResult.data.tests,
+              documents: documentsResult.data.documents,
+              timestamp: Date.now(),
+              editedTestId: editingTestId // Mark this as an edit operation
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to fetch tests after update:', error)
+        }
       } else {
         // Create new test
         const response = await fetch('/api/tests', {

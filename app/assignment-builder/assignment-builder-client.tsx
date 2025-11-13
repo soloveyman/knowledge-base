@@ -244,6 +244,21 @@ export default function AssignmentBuilderClient({
         } else {
           toast.success('Assignment updated successfully')
         }
+        
+        // Fetch assignments immediately after update to refresh the list
+        try {
+          const assignmentsResponse = await fetch('/api/assignments', { cache: 'no-store' })
+          const assignmentsResult = await assignmentsResponse.json()
+          if (assignmentsResult.success && typeof window !== 'undefined') {
+            sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
+              data: assignmentsResult.data.assignments,
+              timestamp: Date.now(),
+              editedAssignmentId: editingAssignmentId // Mark this as an edit operation
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to fetch assignments after update:', error)
+        }
       } else {
         // Create new assignment
         const assignmentData: Record<string, unknown> = {
