@@ -35,7 +35,7 @@ export function AppBar({ role, onSignOut, user }: AppBarProps) {
   const title = getTitle()
 
   return (
-    <header className="bg-card border-b border-border sticky top-0 z-50">
+    <header className="bg-card/95 backdrop-blur-sm border-b border-border sticky top-0 z-50 supports-[backdrop-filter]:bg-card/80">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-3 min-w-0">
