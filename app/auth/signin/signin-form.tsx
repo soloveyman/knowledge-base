@@ -261,6 +261,13 @@ export function SignInForm() {
         return
       }
 
+      // Check if user has a password (OAuth users don't have passwords)
+      if (emailCheckData.hasPassword === false) {
+        setError('This account was registered with Google. Please use "Sign in with Google" button to continue.')
+        setIsLoading(false)
+        return
+      }
+
       // Email exists, attempt sign-in
       const result = await signIn("credentials", { email: normalizedEmail, password, redirect: false })
       if (result?.error) {
@@ -319,7 +326,13 @@ export function SignInForm() {
             )}
             {error && !isRegister && (
               <Alert 
-                variant={error.includes('not found') || error.includes('create an account') ? "default" : "destructive"}
+                variant={
+                  error.includes('not found') || 
+                  error.includes('create an account') || 
+                  error.includes('registered with Google')
+                    ? "default" 
+                    : "destructive"
+                }
                 id={formErrorId}
               >
                 <AlertDescription>

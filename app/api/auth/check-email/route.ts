@@ -3,6 +3,8 @@ import { isValidEmailFormat, normalizeEmail, isNotDisposableEmail } from '@/lib/
 import { emailExists } from '@/lib/email-validation-server'
 import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { registrationRateLimiter } from '@/lib/rate-limit'
+import { db, users } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -55,13 +57,18 @@ export async function GET(request: Request) {
       )
     }
 
-    // Check if email exists
-    const exists = await emailExists(email)
+    const normalizedEmail = normalizeEmail(email)
+
+    // Check if email exists and get password status
+    const existingUsers = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
+    const exists = existingUsers.length > 0
+    const hasPassword = exists && existingUsers[0].password !== null
 
     return NextResponse.json({
       available: !exists,
-      email: normalizeEmail(email),
-      exists
+      email: normalizedEmail,
+      exists,
+      hasPassword: exists ? hasPassword : undefined
     })
   } catch (error) {
     console.error('Check email error:', error)
