@@ -297,13 +297,24 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
 
               <div className="flex gap-2">
                 {parsingStatus === 'idle' && (
-                  <Button 
-                    onClick={startImport} 
-                    className="flex-1"
-                    disabled={isImportDisabled || !selectedFile}
+                  <div 
+                    onClick={(e) => {
+                      if (isImportDisabled && selectedFile) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        startImport()
+                      }
+                    }}
+                    className={isImportDisabled && selectedFile ? "flex-1 cursor-pointer" : "flex-1"}
                   >
-                    Import Document
-                  </Button>
+                    <Button 
+                      onClick={startImport} 
+                      className="flex-1 w-full"
+                      disabled={isImportDisabled || !selectedFile}
+                    >
+                      Import Document
+                    </Button>
+                  </div>
                 )}
                 
                 {parsingStatus === 'completed' && (

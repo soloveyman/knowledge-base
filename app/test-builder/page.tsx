@@ -1176,11 +1176,21 @@ export default function TestBuilderPage() {
                 </div>
 
                 <div className="pt-4">
-                  <Button 
-                    onClick={handleGenerateTest}
-                    disabled={isGenerationDisabled || isGenerating || !selectedDocument}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  <div
+                    onClick={(e) => {
+                      if (isGenerationDisabled && !isGenerating && selectedDocument) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleGenerateTest()
+                      }
+                    }}
+                    className={isGenerationDisabled && !isGenerating && selectedDocument ? "w-full cursor-pointer" : "w-full"}
                   >
+                    <Button 
+                      onClick={handleGenerateTest}
+                      disabled={isGenerationDisabled || isGenerating || !selectedDocument}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
                     {isGenerating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1193,6 +1203,7 @@ export default function TestBuilderPage() {
                       </>
                     )}
                   </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

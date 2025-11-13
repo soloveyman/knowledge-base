@@ -25,6 +25,16 @@ export function ManagementCard({
   actionButton, 
   children 
 }: ManagementCardProps) {
+  const handleButtonClick = (e: React.MouseEvent) => {
+    // Always call onClick, even if button is disabled
+    // This allows showing toast messages for disabled buttons
+    if (actionButton.disabled) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    actionButton.onClick()
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -33,14 +43,19 @@ export function ManagementCard({
             <CardTitle>{title}</CardTitle>
             <CardDescription>{description}</CardDescription>
           </div>
-          <Button 
-            className="w-full sm:w-auto"
-            onClick={actionButton.onClick}
-            disabled={actionButton.disabled}
+          <div 
+            onClick={actionButton.disabled ? handleButtonClick : undefined}
+            className={actionButton.disabled ? "cursor-pointer" : ""}
           >
-            {actionButton.icon && <span className="h-4 w-4 mr-2">{actionButton.icon}</span>}
-            {actionButton.label}
-          </Button>
+            <Button 
+              className="w-full sm:w-auto"
+              onClick={handleButtonClick}
+              disabled={actionButton.disabled}
+            >
+              {actionButton.icon && <span className="h-4 w-4 mr-2">{actionButton.icon}</span>}
+              {actionButton.label}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

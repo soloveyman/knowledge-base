@@ -333,11 +333,21 @@ export default function UserBuilderPage() {
                     {isEditMode ? t('updateUserDetailsAndRole') : t('createNewUserAccount')}
                   </CardDescription>
                 </div>
-                <Button 
-                  onClick={handleCreateUser}
-                  disabled={isCreating || (!isEditMode && isUserLimitDisabled)}
-                  className="w-full sm:w-auto"
+                <div 
+                  onClick={(e) => {
+                    if (!isEditMode && isUserLimitDisabled && !isCreating) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleCreateUser()
+                    }
+                  }}
+                  className={!isEditMode && isUserLimitDisabled && !isCreating ? "w-full sm:w-auto cursor-pointer" : "w-full sm:w-auto"}
                 >
+                  <Button 
+                    onClick={handleCreateUser}
+                    disabled={isCreating || (!isEditMode && isUserLimitDisabled)}
+                    className="w-full sm:w-auto"
+                  >
                   {isCreating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -350,6 +360,7 @@ export default function UserBuilderPage() {
                     </>
                   )}
                 </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

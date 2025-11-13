@@ -1524,20 +1524,9 @@ function OwnerPageInner() {
 
   // Show skeleton immediately instead of blocking on session/auth
   // This improves FCP significantly
+  // Note: Next.js loading.tsx will handle the initial loading state
   if (status === "loading" || !session) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="h-16 bg-background border-b" />
-        <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-4 md:py-8">
-          <div className="h-20 bg-muted rounded-lg animate-pulse mb-6" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" />
-            ))}
-          </div>
-        </main>
-      </div>
-    )
+    return null
   }
 
   return (
@@ -1779,23 +1768,34 @@ function OwnerPageInner() {
                         </div>
                         <div className="shrink-0 flex items-center gap-1">
                           {!doc.parsedContent?.metadata?.enhancedBy && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground hover:text-primary"
+                            <div
                               onClick={(e) => {
-                                e.stopPropagation()
-                                handleEnhanceDocument(doc.id)
+                                if (isEnhancementDisabled && enhancingDocId !== doc.id) {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  handleEnhanceDocument(doc.id)
+                                }
                               }}
-                              disabled={isEnhancementDisabled || enhancingDocId === doc.id}
-                              title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
+                              className={isEnhancementDisabled && enhancingDocId !== doc.id ? "cursor-pointer" : ""}
                             >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEnhanceDocument(doc.id)
+                                }}
+                                disabled={isEnhancementDisabled || enhancingDocId === doc.id}
+                                title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
+                              >
                               {enhancingDocId === doc.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Sparkles className="h-4 w-4" />
                               )}
                             </Button>
+                            </div>
                           )}
                           <DeleteConfirmation
                             onConfirm={() => handleDeleteDocument(doc.id)}

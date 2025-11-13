@@ -1331,12 +1331,8 @@ function ManagerPageInner() {
     })
   }
 
-  // Don't block UI while session loads - show page immediately
-  if (status === "loading") {
-    // Show page but with disabled state - don't block with spinner
-  }
-
-  if (!session) {
+  // Note: Next.js loading.tsx will handle the initial loading state
+  if (status === "loading" || !session) {
     return null
   }
 
@@ -1591,23 +1587,34 @@ function ManagerPageInner() {
                         </div>
                         <div className="shrink-0 flex items-center gap-1">
                           {!doc.parsedContent?.metadata?.enhancedBy && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground hover:text-primary"
+                            <div
                               onClick={(e) => {
-                                e.stopPropagation()
-                                handleEnhanceDocument(doc.id)
+                                if (isEnhancementDisabled && enhancingDocId !== doc.id) {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  handleEnhanceDocument(doc.id)
+                                }
                               }}
-                              disabled={isEnhancementDisabled || enhancingDocId === doc.id}
-                              title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
+                              className={isEnhancementDisabled && enhancingDocId !== doc.id ? "cursor-pointer" : ""}
                             >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEnhanceDocument(doc.id)
+                                }}
+                                disabled={isEnhancementDisabled || enhancingDocId === doc.id}
+                                title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
+                              >
                               {enhancingDocId === doc.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Sparkles className="h-4 w-4" />
                               )}
                             </Button>
+                            </div>
                           )}
                           <DeleteConfirmation
                             onConfirm={() => handleDeleteDocument(doc.id)}
