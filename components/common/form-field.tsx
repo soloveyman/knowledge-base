@@ -40,14 +40,19 @@ export function FormField({
         (typeof element.type === 'function' && element.type.name === 'Input') ||
         hasDataSlot) {
       const childProps = (element?.props || {}) as { className?: string } & Record<string, unknown>
+      
+      // Build aria-describedby string
+      const describedBy = [
+        error ? `${id}-error` : null,
+        helpText ? `${id}-help` : null,
+        childProps['aria-describedby'] as string | null
+      ].filter(Boolean).join(' ') || undefined
+      
       return React.cloneElement(element, {
         id,
         'aria-invalid': error ? 'true' : 'false',
-        'aria-describedby': error 
-          ? `${id}-error` 
-          : helpText 
-            ? `${id}-help` 
-            : undefined,
+        'aria-describedby': describedBy,
+        'aria-required': required || undefined,
         className: cn(
           childProps?.className,
           error && 'border-destructive focus-visible:ring-destructive/20'

@@ -14,6 +14,8 @@ import { useTranslation } from "@/lib/translation-context"
 import { useEmailValidation } from "@/lib/hooks/use-email-validation"
 import { validationRules, validateField } from "@/lib/validation"
 import { isDisposableEmail } from "@/lib/disposable-email"
+import { useFocusOnError, useErrorAnnouncement } from "@/lib/hooks/use-focus-management"
+import { useId } from "react"
 
 export function SignInForm() {
   const [email, setEmail] = useState("")
@@ -34,9 +36,14 @@ export function SignInForm() {
   
   const router = useRouter()
   const { t } = useTranslation()
+  const formErrorId = useId()
   
   // Email validation hook (only for registration)
   const emailValidation = useEmailValidation(email, 500, !isRegister)
+  
+  // Focus management for errors
+  useFocusOnError(fieldErrors, formErrorId)
+  useErrorAnnouncement(fieldErrors, error)
   
   // Reset validation state when switching modes
   useEffect(() => {
@@ -311,7 +318,10 @@ export function SignInForm() {
               </Alert>
             )}
             {error && !isRegister && (
-              <Alert variant={error.includes('not found') || error.includes('create an account') ? "default" : "destructive"}>
+              <Alert 
+                variant={error.includes('not found') || error.includes('create an account') ? "default" : "destructive"}
+                id={formErrorId}
+              >
                 <AlertDescription>
                   {error}
                   {error.includes('not found') && (
@@ -325,6 +335,7 @@ export function SignInForm() {
                           setError('')
                         }}
                         className="w-full"
+                        aria-label="Create a new account"
                       >
                         Create Account
                       </Button>
@@ -358,23 +369,27 @@ export function SignInForm() {
                     onChange={(e) => setName(e.target.value)}
                     onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
                     className={touched.name && fieldErrors.name ? "border-destructive" : ""}
+                    aria-invalid={touched.name && fieldErrors.name ? "true" : "false"}
+                    aria-describedby={touched.name && fieldErrors.name ? "name-error" : undefined}
                   />
                   {touched.name && name.trim().length > 0 && !fieldErrors.name && (
-                    <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                    <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" aria-hidden="true" />
                   )}
                   {touched.name && fieldErrors.name && (
-                    <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" />
+                    <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" aria-hidden="true" />
                   )}
                 </div>
                 {touched.name && fieldErrors.name && (
-                  <p className="text-xs text-destructive">{fieldErrors.name}</p>
+                  <p id="name-error" className="text-xs text-destructive" role="alert" aria-live="polite">
+                    {fieldErrors.name}
+                  </p>
                 )}
               </div>
             )}
             <div className="space-y-2">
               <Label htmlFor="email">{t('email')} *</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="email"
                   type="email"
@@ -387,26 +402,35 @@ export function SignInForm() {
                   onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
                   className={`pl-10 ${touched.email && fieldErrors.email ? "border-destructive" : ""} ${isRegister && touched.email && !fieldErrors.email && emailValidation.isAvailable === true ? "border-green-500" : ""}`}
                   required
+                  aria-invalid={touched.email && fieldErrors.email ? "true" : "false"}
+                  aria-describedby={[
+                    touched.email && fieldErrors.email ? "email-error" : null,
+                    isRegister && touched.email && !fieldErrors.email && emailValidation.isAvailable === true ? "email-success" : null
+                  ].filter(Boolean).join(' ') || undefined}
                 />
                 {isRegister && touched.email && (
                   <>
                     {emailValidation.isChecking && (
-                      <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                      <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" aria-label="Checking email availability" />
                     )}
                     {!emailValidation.isChecking && emailValidation.isAvailable === true && !fieldErrors.email && (
-                      <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                      <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" aria-hidden="true" />
                     )}
                     {!emailValidation.isChecking && (fieldErrors.email || emailValidation.isAvailable === false) && (
-                      <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" />
+                      <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" aria-hidden="true" />
                     )}
                   </>
                 )}
               </div>
               {touched.email && fieldErrors.email && (
-                <p className="text-xs text-destructive">{fieldErrors.email}</p>
+                <p id="email-error" className="text-xs text-destructive" role="alert" aria-live="polite">
+                  {fieldErrors.email}
+                </p>
               )}
               {isRegister && touched.email && !fieldErrors.email && emailValidation.isAvailable === true && (
-                <p className="text-xs text-green-600">Email is available</p>
+                <p id="email-success" className="text-xs text-green-600" role="status" aria-live="polite">
+                  Email is available
+                </p>
               )}
             </div>
             
@@ -417,13 +441,14 @@ export function SignInForm() {
                   <a
                     href="/auth/forgot-password"
                     className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    aria-label="Reset your password"
                   >
                     {t('forgotPassword')}
                   </a>
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -437,30 +462,41 @@ export function SignInForm() {
                   className={`pl-10 pr-10 ${touched.password && fieldErrors.password ? "border-destructive" : ""} ${isRegister && touched.password && !fieldErrors.password && password.length >= 8 ? "border-green-500" : ""}`}
                   minLength={isRegister ? 8 : undefined}
                   required
+                  aria-invalid={touched.password && fieldErrors.password ? "true" : "false"}
+                  aria-describedby={[
+                    touched.password && fieldErrors.password ? "password-error" : null,
+                    isRegister && touched.password && !fieldErrors.password && password.length >= 8 ? "password-success" : null,
+                    isRegister && password.length > 0 && password.length < 8 ? "password-hint" : null
+                  ].filter(Boolean).join(' ') || undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-10 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-10 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
                   aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                  aria-pressed={showPassword}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </button>
                 {isRegister && touched.password && !fieldErrors.password && password.length >= 8 && (
-                  <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                  <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" aria-hidden="true" />
                 )}
                 {isRegister && touched.password && fieldErrors.password && (
-                  <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" />
+                  <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" aria-hidden="true" />
                 )}
               </div>
               {touched.password && fieldErrors.password && (
-                <p className="text-xs text-destructive">{fieldErrors.password}</p>
+                <p id="password-error" className="text-xs text-destructive" role="alert" aria-live="polite">
+                  {fieldErrors.password}
+                </p>
               )}
               {isRegister && touched.password && !fieldErrors.password && password.length >= 8 && (
-                <p className="text-xs text-green-600">Password is valid</p>
+                <p id="password-success" className="text-xs text-green-600" role="status" aria-live="polite">
+                  Password is valid
+                </p>
               )}
               {isRegister && password.length > 0 && password.length < 8 && (
-                <p className="text-xs text-muted-foreground">
+                <p id="password-hint" className="text-xs text-muted-foreground" role="note">
                   Password must be at least 8 characters ({password.length}/8)
                 </p>
               )}
@@ -470,9 +506,11 @@ export function SignInForm() {
               type="submit" 
               className="w-full min-w-[96px]" 
               disabled={isLoading || (isRegister && (Object.keys(fieldErrors).length > 0 || emailValidation.isChecking || emailValidation.isAvailable === false))}
+              aria-busy={isLoading}
+              aria-disabled={isLoading || (isRegister && (Object.keys(fieldErrors).length > 0 || emailValidation.isChecking || emailValidation.isAvailable === false))}
             >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isRegister ? t('signUp') : t('signIn')}
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              <span aria-live="polite">{isRegister ? t('signUp') : t('signIn')}</span>
             </Button>
           </form>
           
@@ -484,8 +522,10 @@ export function SignInForm() {
             className="w-full min-w-[96px] bg-white hover:bg-gray-50 text-gray-700 border-gray-300 hover:border-gray-400 dark:bg-white dark:hover:bg-gray-100 dark:text-gray-700 dark:border-gray-300"
             onClick={handleGoogleSignIn}
             disabled={isLoading || isGoogleLoading}
+            aria-label="Sign in with Google"
+            aria-busy={isGoogleLoading}
           >
-            {isGoogleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isGoogleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 fill="#4285F4"
