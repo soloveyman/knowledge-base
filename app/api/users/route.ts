@@ -123,6 +123,22 @@ export async function POST(request: Request) {
       }, { status: 409 })
     }
 
+    // Check usage limit for users (only for owners)
+    if (session.user.role === 'owner') {
+      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+      const limitCheck = await checkUsageLimit(session.user.id, 'users')
+      
+      if (!limitCheck.allowed) {
+        return NextResponse.json({
+          success: false,
+          message: limitCheck.message || 'User limit reached. Please upgrade your plan to continue.',
+          error: 'USAGE_LIMIT_EXCEEDED',
+          current: limitCheck.current,
+          max: limitCheck.max
+        }, { status: 403 })
+      }
+    }
+
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 12)
 

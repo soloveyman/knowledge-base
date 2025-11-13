@@ -277,8 +277,21 @@ Preserve all original sections and tables, but improve their titles and content 
       .where(eq(documents.id, documentId))
       .returning()
 
-    // Update usage counter for enhancements (only for owners)
+    // Check usage limit before allowing enhancement (only for owners)
     if (session.user.role === 'owner') {
+      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+      const limitCheck = await checkUsageLimit(session.user.id, 'enhancements')
+      
+      if (!limitCheck.allowed) {
+        return NextResponse.json({
+          success: false,
+          message: limitCheck.message || 'Enhancement limit reached. Please upgrade your plan to continue.',
+          error: 'USAGE_LIMIT_EXCEEDED',
+          current: limitCheck.current,
+          max: limitCheck.max
+        }, { status: 403 })
+      }
+
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       

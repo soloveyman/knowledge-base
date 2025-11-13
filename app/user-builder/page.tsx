@@ -13,6 +13,7 @@ import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { validationRules, validateField } from "@/lib/validation"
 import { useEmailValidation } from "@/lib/hooks/use-email-validation"
+import { useUsageLimits } from "@/lib/hooks/use-usage-limits"
 import { isDisposableEmail } from "@/lib/disposable-email"
 import { toast } from "sonner"
 import { 
@@ -56,6 +57,8 @@ export default function UserBuilderPage() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const { limits } = useUsageLimits()
+  const isUserLimitDisabled = limits?.users.expired ?? false
 
   // Generate random password
   const generateRandomPassword = () => {
@@ -158,6 +161,15 @@ export default function UserBuilderPage() {
   }
 
   const handleCreateUser = async () => {
+    // Check usage limit for new users (not for editing)
+    if (!isEditMode && isUserLimitDisabled) {
+      toast.error(
+        `User limit reached (${limits?.users.current}/${limits?.users.max}). Please upgrade your plan to continue.`,
+        { duration: 5000 }
+      )
+      return
+    }
+
     // Validate all fields
     if (!validateAll()) {
       return
@@ -323,7 +335,7 @@ export default function UserBuilderPage() {
                 </div>
                 <Button 
                   onClick={handleCreateUser}
-                  disabled={isCreating}
+                  disabled={isCreating || (!isEditMode && isUserLimitDisabled)}
                   className="w-full sm:w-auto"
                 >
                   {isCreating ? (

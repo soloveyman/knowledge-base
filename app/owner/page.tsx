@@ -13,6 +13,7 @@ import { GreetingCard } from "@/components/common/greeting-card"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { Badge } from "@/components/ui/badge"
+import { useUsageLimits } from "@/lib/hooks/use-usage-limits"
 import { toast } from "sonner"
 import { 
   FileText,
@@ -1270,8 +1271,18 @@ function OwnerPageInner() {
 
   // Document handlers
   const [enhancingDocId, setEnhancingDocId] = useState<string | null>(null)
+  const { limits } = useUsageLimits()
+  const isEnhancementDisabled = limits?.enhancements.expired ?? false
 
   const handleEnhanceDocument = async (id: string) => {
+    if (isEnhancementDisabled) {
+      toast.error(
+        `Enhancement limit reached (${limits?.enhancements.current}/${limits?.enhancements.max}). Please upgrade your plan to continue.`,
+        { duration: 5000 }
+      )
+      return
+    }
+
     try {
       setEnhancingDocId(id)
       toast.loading('Enhancing document with Grok API...', { id: 'enhance' })
@@ -1776,8 +1787,8 @@ function OwnerPageInner() {
                                 e.stopPropagation()
                                 handleEnhanceDocument(doc.id)
                               }}
-                              disabled={enhancingDocId === doc.id}
-                              title="Enhance with Grok API"
+                              disabled={isEnhancementDisabled || enhancingDocId === doc.id}
+                              title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
                             >
                               {enhancingDocId === doc.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -189,8 +189,21 @@ export async function POST(request: Request) {
     console.log('Saved parsedContent tables:', (savedDocument.parsedContent as any)?.tables?.length || 0)
     console.log('Saved parsedContent images:', (savedDocument.parsedContent as any)?.images?.length || 0)
 
-    // Update usage counter for imports (only for owners and only when creating new document)
+    // Check usage limit before allowing import (only for owners and only when creating new document)
     if (session.user.role === 'owner' && existingDocument.length === 0) {
+      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+      const limitCheck = await checkUsageLimit(session.user.id, 'imports')
+      
+      if (!limitCheck.allowed) {
+        return NextResponse.json({
+          success: false,
+          message: limitCheck.message || 'Import limit reached. Please upgrade your plan to continue.',
+          error: 'USAGE_LIMIT_EXCEEDED',
+          current: limitCheck.current,
+          max: limitCheck.max
+        }, { status: 403 })
+      }
+
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       

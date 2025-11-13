@@ -15,6 +15,8 @@ import {
 import { parseDocument, UnsupportedFileTypeError, FileReadError, ParseError, ParsedContent } from "@/lib/parsers"
 import { clearParsingCache } from "@/lib/localStorage-utils"
 import { useTranslation } from '@/lib/translation-context'
+import { useUsageLimits } from "@/lib/hooks/use-usage-limits"
+import { toast } from "sonner"
 
 interface ParsingLog {
   level: 'info' | 'warning' | 'error'
@@ -37,6 +39,8 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
   const [parsingLog, setParsingLog] = useState<ParsingLog[]>([])
   const [error, setError] = useState<string | null>(null)
   const { t } = useTranslation()
+  const { limits } = useUsageLimits()
+  const isImportDisabled = limits?.imports.expired ?? false
 
   const handleFileSelect = useCallback((file: File) => {
     // Validate file type
@@ -90,6 +94,14 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
 
   const startImport = async () => {
     if (!selectedFile) return
+
+    if (isImportDisabled) {
+      toast.error(
+        `Import limit reached (${limits?.imports.current}/${limits?.imports.max}). Please upgrade your plan to continue.`,
+        { duration: 5000 }
+      )
+      return
+    }
 
     // Clear any cached parsing results to ensure fresh parsing
     console.log('Clearing parsing cache to ensure fresh parsing...')
@@ -288,6 +300,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                   <Button 
                     onClick={startImport} 
                     className="flex-1"
+                    disabled={isImportDisabled || !selectedFile}
                   >
                     Import Document
                   </Button>

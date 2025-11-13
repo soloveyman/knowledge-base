@@ -521,9 +521,20 @@ export default function SubscriptionManager({
   }
 
   const getUsageColor = (percentage: number) => {
-    if (percentage >= 90) return 'text-red-600 dark:text-red-400'
+    if (percentage >= 90) return 'text-yellow-600 dark:text-yellow-400'
     if (percentage >= 75) return 'text-yellow-600 dark:text-yellow-400'
-    return 'text-green-600 dark:text-green-400'
+    return 'text-muted-foreground'
+  }
+
+  const isUsageExpired = (current: number, max: number) => {
+    return current >= max
+  }
+
+  const getProgressColor = (percentage: number, isExpired: boolean = false) => {
+    if (isExpired || percentage >= 100) return 'bg-red-600 dark:bg-red-500'
+    if (percentage >= 90) return 'bg-red-500 dark:bg-red-400'
+    if (percentage >= 75) return 'bg-yellow-500 dark:bg-yellow-400'
+    return 'bg-green-500 dark:bg-green-400'
   }
 
   const handlePlanSelect = (planId: string) => {

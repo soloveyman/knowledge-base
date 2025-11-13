@@ -5,7 +5,9 @@ import { ManagementPage } from "@/components/common/management-page"
 import { Plus } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
+import { useUsageLimits } from "@/lib/hooks/use-usage-limits"
 import { formatDateShort } from "@/lib/date-format"
+import { toast } from "sonner"
 
 interface User {
   id: string
@@ -36,6 +38,19 @@ export function UsersPage({
   const router = useRouter()
   const { t } = useTranslation()
   const translateBadge = useBadgeTranslation()
+  const { limits } = useUsageLimits()
+  const isUserLimitDisabled = limits?.users.expired ?? false
+
+  const handleAddUser = () => {
+    if (isUserLimitDisabled) {
+      toast.error(
+        `User limit reached (${limits?.users.current}/${limits?.users.max}). Please upgrade your plan to continue.`,
+        { duration: 5000 }
+      )
+      return
+    }
+    router.push('/user-builder')
+  }
 
   const userItems = users.map((user) => ({
     id: user.id,
@@ -68,7 +83,8 @@ export function UsersPage({
       actionButton={{
         label: t('addUser'),
         icon: <Plus className="h-4 w-4" />,
-        onClick: () => router.push('/user-builder')
+        onClick: handleAddUser,
+        disabled: isUserLimitDisabled
       }}
       items={userItems}
       showEditButton={true}
@@ -78,7 +94,7 @@ export function UsersPage({
         title: t('noUsersCreatedYet'),
         description: t('createYourFirstUserAccount'),
         actionLabel: t('addUser'),
-        onAction: () => router.push('/user-builder')
+        onAction: handleAddUser
       }}
     />
   )

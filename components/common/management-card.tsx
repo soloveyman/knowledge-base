@@ -13,6 +13,7 @@ interface ManagementCardProps {
     label: string
     onClick: () => void
     icon?: React.ReactNode
+    disabled?: boolean
   }
   children: React.ReactNode
 }
@@ -35,6 +36,7 @@ export function ManagementCard({
           <Button 
             className="w-full sm:w-auto"
             onClick={actionButton.onClick}
+            disabled={actionButton.disabled}
           >
             {actionButton.icon && <span className="h-4 w-4 mr-2">{actionButton.icon}</span>}
             {actionButton.label}

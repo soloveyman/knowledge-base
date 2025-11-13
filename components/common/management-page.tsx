@@ -13,6 +13,7 @@ interface ManagementPageProps {
     label: string
     onClick: () => void
     icon?: ReactNode
+    disabled?: boolean
   }
   items: Array<{
     id: string

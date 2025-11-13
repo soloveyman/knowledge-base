@@ -17,6 +17,7 @@ import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
 import { validationRules } from "@/lib/validation"
+import { useUsageLimits } from "@/lib/hooks/use-usage-limits"
 import { toast } from "sonner"
 import { 
   FileText, 
@@ -113,6 +114,8 @@ export default function TestBuilderPage() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingTestId, setEditingTestId] = useState<string | null>(null)
   const [originalQuestionCount, setOriginalQuestionCount] = useState(0)
+  const { limits } = useUsageLimits()
+  const isGenerationDisabled = limits?.generations.expired ?? false
 
   // Load documents from API - use useLayoutEffect for faster initial load
   useLayoutEffect(() => {
@@ -566,6 +569,15 @@ export default function TestBuilderPage() {
   }
 
   const handleGenerateTest = async () => {
+    // Check usage limit first
+    if (isGenerationDisabled) {
+      toast.error(
+        `Generation limit reached (${limits?.generations.current}/${limits?.generations.max}). Please upgrade your plan to continue.`,
+        { duration: 5000 }
+      )
+      return
+    }
+
     // Validate all fields before generating
     if (!validateAll()) {
       setError(t('pleaseFixErrors'))
@@ -1166,7 +1178,7 @@ export default function TestBuilderPage() {
                 <div className="pt-4">
                   <Button 
                     onClick={handleGenerateTest}
-                    disabled={isGenerating || !selectedDocument}
+                    disabled={isGenerationDisabled || isGenerating || !selectedDocument}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     {isGenerating ? (
