@@ -28,11 +28,10 @@ export function Toolbar({ actions, className }: ToolbarProps) {
         <Button
           key={index}
           variant={action.variant || "ghost"}
-          size="sm"
+          size="icon-sm"
           onClick={action.onClick}
           disabled={action.disabled}
           title={action.tooltip}
-          className="h-8 w-8 p-0"
         >
           {action.icon}
         </Button>
