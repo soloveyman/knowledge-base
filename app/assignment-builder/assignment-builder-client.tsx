@@ -236,13 +236,13 @@ export default function AssignmentBuilderClient({
         }
 
         const result = await response.json()
-        const assignmentCount = result.data?.count || assignmentConfig.selectedUsers.length
-        const skippedCount = result.data?.skippedCount || 0
+        const addedCount = result.data?.addedCount || 0
+        const removedCount = result.data?.removedCount || 0
         
-        if (skippedCount > 0) {
-          toast.success(`Updated ${assignmentCount} assignment(s). ${skippedCount} user(s) already had this assignment.`)
+        if (addedCount > 0 || removedCount > 0) {
+          toast.success(result.message || 'Assignment updated successfully')
         } else {
-          toast.success(`Successfully updated ${assignmentCount} assignment(s)!`)
+          toast.success('Assignment updated successfully')
         }
       } else {
         // Create new assignment

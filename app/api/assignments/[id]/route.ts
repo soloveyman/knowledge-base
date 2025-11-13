@@ -123,23 +123,28 @@ export async function PUT(
       .where(eq(assignmentUsers.assignmentId, id))
     
     const existingUserIds = new Set(existingAssignmentUsers.map(au => au.userId))
+    const newUserIds = new Set(userIds)
     
-    // Filter out users who already have this assignment
+    // Find users to remove (in existing but not in new list)
+    const usersToRemove = existingAssignmentUsers.filter(au => !newUserIds.has(au.userId))
+    
+    // Find users to add (in new list but not in existing)
     const usersToAssign = userIds.filter(userId => !existingUserIds.has(userId))
-    
-    if (usersToAssign.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          assignment: existingAssignment[0],
-          count: 0
-        },
-        message: 'All selected users already have this assignment',
-        warning: 'No new users were added'
-      })
-    }
 
-    const skippedCount = userIds.length - usersToAssign.length
+    // Remove users who were unchecked
+    let removedCount = 0
+    for (const assignmentUser of usersToRemove) {
+      try {
+        await db.delete(assignmentUsers)
+          .where(and(
+            eq(assignmentUsers.assignmentId, id),
+            eq(assignmentUsers.userId, assignmentUser.userId)
+          ))
+        removedCount++
+      } catch (error) {
+        console.error(`Failed to remove user ${assignmentUser.userId} from assignment:`, error)
+      }
+    }
 
     // Add users to the assignment
     interface AssignmentUserRow {
@@ -168,20 +173,28 @@ export async function PUT(
       }
     }
 
-    console.log('Users added successfully:', newAssignmentUsers.length)
+    console.log('Users removed:', removedCount, 'Users added:', newAssignmentUsers.length)
 
-    const responseMessage = usersToAssign.length === userIds.length
-      ? `Successfully added ${newAssignmentUsers.length} user(s) to assignment`
-      : `Added ${newAssignmentUsers.length} user(s) to assignment. ${skippedCount} user(s) already had this assignment.`
+    // Build response message
+    const messages: string[] = []
+    if (removedCount > 0) {
+      messages.push(`Removed ${removedCount} user(s)`)
+    }
+    if (newAssignmentUsers.length > 0) {
+      messages.push(`Added ${newAssignmentUsers.length} user(s)`)
+    }
+    if (removedCount === 0 && newAssignmentUsers.length === 0) {
+      messages.push('No changes made to assigned users')
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         assignment: existingAssignment[0],
-        count: newAssignmentUsers.length,
-        skippedCount
+        addedCount: newAssignmentUsers.length,
+        removedCount
       },
-      message: responseMessage
+      message: messages.join('. ')
     })
   } catch (error) {
     console.error('Update assignment API error:', error)
