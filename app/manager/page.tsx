@@ -22,13 +22,25 @@ import {
 import { DeleteConfirmation } from "@/components/common/delete-confirmation"
 import dynamic from "next/dynamic"
 
+import { SkeletonCard, SkeletonList } from "@/components/ui/skeleton"
+
 // Lazy load heavy tab components to reduce initial bundle size
 const TestsPage = dynamic(() => import("@/components/pages/tests-page").then(mod => ({ default: mod.TestsPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  loading: () => (
+    <div className="space-y-4 py-8">
+      <SkeletonCard className="p-6" />
+      <SkeletonList count={3} />
+    </div>
+  ),
   ssr: false // Disable SSR for better performance on client-side only components
 })
 const AssignmentsPage = dynamic(() => import("@/components/pages/assignments-page").then(mod => ({ default: mod.AssignmentsPage })), {
-  loading: () => <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div></div>,
+  loading: () => (
+    <div className="space-y-4 py-8">
+      <SkeletonCard className="p-6" />
+      <SkeletonList count={3} />
+    </div>
+  ),
   ssr: false
 })
 const UserProgressReport = dynamic(() => import("@/components/reports/user-progress-report"), {

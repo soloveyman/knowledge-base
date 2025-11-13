@@ -398,8 +398,11 @@ export default function DocumentReaderPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background animate-in fade-in-0 duration-200">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading document...</p>
+        </div>
       </div>
     )
   }

@@ -1223,3 +1223,87 @@ header[class*="sticky"] {
     }
   }
 }
+
+/* Tab content transitions */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-to-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-8px);
+    opacity: 0;
+  }
+}
+
+.animate-in {
+  animation: fade-in 200ms ease-in-out;
+}
+
+.animate-out {
+  animation: fade-out 200ms ease-in-out;
+}
+
+.fade-in-0 {
+  animation: fade-in 200ms ease-in-out;
+}
+
+.fade-out-0 {
+  animation: fade-out 200ms ease-in-out;
+}
+
+.slide-in-from-right-2 {
+  animation: slide-in-from-right 200ms ease-in-out;
+}
+
+.slide-out-to-left-2 {
+  animation: slide-out-to-left 200ms ease-in-out;
+}
+
+/* Card hover micro-interactions */
+[data-slot="card"] {
+  transition: all 200ms ease-in-out;
+}
+
+[data-slot="card"]:hover {
+  transform: translateY(-2px);
+}
+
+[data-slot="card"][onclick]:hover,
+[data-slot="card"]:has(button):hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+[data-slot="card"][onclick]:active,
+[data-slot="card"]:has(button):active {
+  transform: translateY(0);
+}
