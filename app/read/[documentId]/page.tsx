@@ -213,12 +213,25 @@ export default function DocumentReaderPage() {
             return posA - posB
           })
           
+          // Load image data (for large images stored in database)
+          const { getImageDataUrl } = await import('@/lib/image-loader')
+          const imageDataPromises = sortedImages.map(async (img: any) => {
+            try {
+              const dataUrl = await getImageDataUrl(img)
+              return { ...img, dataUrl }
+            } catch (error) {
+              console.error(`Failed to load image: ${img.filename}`, error)
+              return { ...img, dataUrl: `data:${img.type || 'image/png'};base64,` }
+            }
+          })
+          const imagesWithData = await Promise.all(imageDataPromises)
+          
           // Insert images at their positions or append at the end
           let contentWithImages = content
           let offset = 0
           
-          sortedImages.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
-            const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
+          imagesWithData.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+            const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
             
             if (img.position !== undefined && img.position >= 0 && img.position < content.length) {
               // Insert at the specified position

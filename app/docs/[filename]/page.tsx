@@ -388,14 +388,27 @@ export default function DocumentViewer() {
               return posA - posB
             })
             
+            // Load image data (for large images stored in database)
+            const { getImageDataUrl } = await import('@/lib/image-loader')
+            const imageDataPromises = sortedImages.map(async (img: any) => {
+              try {
+                const dataUrl = await getImageDataUrl(img)
+                return { ...img, dataUrl }
+              } catch (error) {
+                console.error(`Failed to load image: ${img.filename}`, error)
+                return { ...img, dataUrl: `data:${img.type || 'image/png'};base64,` }
+              }
+            })
+            const imagesWithData = await Promise.all(imageDataPromises)
+            
             // Separate images with valid positions from those without
-            const imagesWithPositions = sortedImages.filter(img => 
+            const imagesWithPositions = imagesWithData.filter(img => 
               img.position !== undefined && 
               img.position >= 0 && 
               img.position < content.length && 
               img.position > 0
             )
-            const imagesWithoutPositions = sortedImages.filter(img => 
+            const imagesWithoutPositions = imagesWithData.filter(img => 
               !(img.position !== undefined && 
                 img.position >= 0 && 
                 img.position < content.length && 
@@ -406,8 +419,8 @@ export default function DocumentViewer() {
             let offset = 0
             
             // First, insert images with valid positions
-            imagesWithPositions.forEach((img: { filename: string; data: string; type: string; position?: number }) => {
-              const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
+            imagesWithPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+              const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
               const insertPos = img.position! + offset
               if (insertPos < contentWithImages.length) {
                 contentWithImages = 
@@ -423,46 +436,12 @@ export default function DocumentViewer() {
               }
             })
             
-            // Then, distribute images without positions evenly throughout the document
+            // Then, append images without positions at the end
             if (imagesWithoutPositions.length > 0) {
-              // Calculate positions to distribute images evenly
-              const contentLength = contentWithImages.length
-              const sectionSize = Math.floor(contentLength / (imagesWithoutPositions.length + 1))
-              
-              imagesWithoutPositions.forEach((img: { filename: string; data: string; type: string; position?: number }, index: number) => {
-                const imageMarkdown = `\n\n![${img.filename}](${img.data})\n\n`
-                
-                // Try fallback position first if available
-                if (insertPosition !== null && index === 0) {
-                  // First image without position goes to fallback position
-                  const insertPos = insertPosition + offset
-                  if (insertPos < contentWithImages.length) {
-                    contentWithImages = 
-                      contentWithImages.slice(0, insertPos) + 
-                      imageMarkdown + 
-                      contentWithImages.slice(insertPos)
-                    offset += imageMarkdown.length
-                    console.log(`📸 Inserted image "${img.filename}" at fallback position ${insertPos}`)
-                  } else {
-                    // Fallback position is out of bounds, distribute evenly
-                    const insertPos = Math.min((index + 1) * sectionSize + offset, contentWithImages.length)
-                    contentWithImages = 
-                      contentWithImages.slice(0, insertPos) + 
-                      imageMarkdown + 
-                      contentWithImages.slice(insertPos)
-                    offset += imageMarkdown.length
-                    console.log(`📸 Inserted image "${img.filename}" at distributed position ${insertPos}`)
-                  }
-                } else {
-                  // Distribute remaining images evenly
-                  const insertPos = Math.min((index + 1) * sectionSize + offset, contentWithImages.length)
-                  contentWithImages = 
-                    contentWithImages.slice(0, insertPos) + 
-                    imageMarkdown + 
-                    contentWithImages.slice(insertPos)
-                  offset += imageMarkdown.length
-                  console.log(`📸 Inserted image "${img.filename}" at distributed position ${insertPos}`)
-                }
+              imagesWithoutPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+                const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
+                contentWithImages += imageMarkdown
+                console.log(`📸 Appended image "${img.filename}" at the end`)
               })
             }
             

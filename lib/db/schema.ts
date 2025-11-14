@@ -112,6 +112,16 @@ export const documents = pgTable('documents', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const documentImages = pgTable('document_images', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  documentId: uuid('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  filename: text('filename').notNull(),
+  data: text('data').notNull(), // base64 encoded image data
+  type: text('type').notNull(), // MIME type (e.g., 'image/png', 'image/jpeg')
+  position: integer('position'), // Position in document (optional)
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const questions = pgTable('questions', {
   id: uuid('id').primaryKey().defaultRandom(),
   moduleId: uuid('module_id').references(() => modules.id),

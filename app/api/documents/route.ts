@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, documents, users, usage } from '@/lib/db'
+import { db, documents, users, usage, documentImages } from '@/lib/db'
 import { desc, eq, and, or } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -139,6 +139,81 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
+    // Process images: save large images to document_images table
+    // Large images (>500KB base64) are stored in the table, small ones stay in JSON
+    const LARGE_IMAGE_THRESHOLD = 500 * 1024 // 500KB in bytes (base64 is ~33% larger, so ~375KB binary)
+    const imagesToSaveInTable: Array<{
+      filename: string
+      data: string // base64 data (without data URL prefix)
+      type: string
+      position?: number
+    }> = []
+
+    if (parsedContent?.images && Array.isArray(parsedContent.images)) {
+      const processedImages: typeof parsedContent.images = []
+      
+      for (const img of parsedContent.images) {
+        // Skip images that already have imageId (already stored in table)
+        if ((img as any).imageId) {
+          processedImages.push(img)
+          continue
+        }
+        
+        // Extract base64 data from data URL if present (format: "data:image/png;base64,<base64>")
+        let base64Data = img.data || ''
+        if (!base64Data || base64Data.trim().length === 0) {
+          // No data, skip this image
+          console.warn(`Skipping image ${img.filename}: no data provided`)
+          continue
+        }
+        
+        if (base64Data.startsWith('data:')) {
+          // Extract just the base64 part after the comma
+          const commaIndex = base64Data.indexOf(',')
+          if (commaIndex !== -1) {
+            base64Data = base64Data.substring(commaIndex + 1)
+          } else {
+            // Invalid data URL format
+            console.warn(`Skipping image ${img.filename}: invalid data URL format`)
+            continue
+          }
+        }
+        
+        // Calculate base64 data size (approximate: base64 is ~33% larger than binary)
+        const base64Size = base64Data.length
+        if (base64Size === 0) {
+          console.warn(`Skipping image ${img.filename}: empty base64 data`)
+          continue
+        }
+        
+        const estimatedBinarySize = (base64Size * 3) / 4
+        
+        if (estimatedBinarySize > LARGE_IMAGE_THRESHOLD) {
+          // Large image - will be saved in table
+          // Store just the base64 data (without data URL prefix) in database
+          imagesToSaveInTable.push({
+            filename: img.filename || 'image.png',
+            data: base64Data, // Store just base64, not full data URL
+            type: img.type || 'image/png',
+            position: (img as any).textPosition || img.position
+          })
+          // Replace with reference in parsedContent
+          processedImages.push({
+            filename: img.filename || 'image.png',
+            data: null, // Will be replaced with imageId after saving
+            type: img.type || 'image/png',
+            position: (img as any).textPosition || img.position,
+            imageId: null // Placeholder, will be set after insert
+          } as any)
+        } else {
+          // Small image - keep in JSON (preserve original format)
+          processedImages.push(img)
+        }
+      }
+      
+      parsedContent.images = processedImages
+    }
+
     // Check if document with same title already exists
     const existingDocument = await db
       .select()
@@ -149,6 +224,11 @@ export async function POST(request: Request) {
     let savedDocument
 
     if (existingDocument.length > 0) {
+      // Delete old large images for this document
+      await db
+        .delete(documentImages)
+        .where(eq(documentImages.documentId, existingDocument[0].id))
+      
       // Update existing document instead of creating a new one
       const updated = await db
         .update(documents)
@@ -181,6 +261,63 @@ export async function POST(request: Request) {
       }).returning()
       
       savedDocument = newDocument[0]
+    }
+
+    // Save large images to documentImages table
+    if (imagesToSaveInTable.length > 0) {
+      const imageReferences: Array<{ id: string; index: number }> = []
+      
+      for (let i = 0; i < imagesToSaveInTable.length; i++) {
+        const img = imagesToSaveInTable[i]
+        const savedImage = await db.insert(documentImages).values({
+          documentId: savedDocument.id,
+          filename: img.filename,
+          data: img.data,
+          type: img.type,
+          position: img.position
+        }).returning()
+        
+        imageReferences.push({ id: savedImage[0].id, index: i })
+      }
+      
+      // Update parsedContent.images with image IDs for large images
+      if (parsedContent?.images && Array.isArray(parsedContent.images)) {
+        let largeImageIndex = 0
+        for (let i = 0; i < parsedContent.images.length; i++) {
+          const img = parsedContent.images[i] as any
+          if (img.data === null && img.imageId === null && largeImageIndex < imageReferences.length) {
+            // This is a large image placeholder
+            img.imageId = imageReferences[largeImageIndex].id
+            largeImageIndex++
+          }
+        }
+        
+        // Safety check: ensure we processed all large images
+        if (largeImageIndex !== imageReferences.length) {
+          console.warn(`Image ID assignment mismatch: expected ${imageReferences.length} large images, processed ${largeImageIndex}`)
+        }
+        
+        // Update document with image IDs
+        await db
+          .update(documents)
+          .set({
+            parsedContent: parsedContent
+          })
+          .where(eq(documents.id, savedDocument.id))
+        
+        // Reload document to get updated parsedContent
+        const reloaded = await db
+          .select()
+          .from(documents)
+          .where(eq(documents.id, savedDocument.id))
+          .limit(1)
+        
+        if (reloaded.length > 0) {
+          savedDocument = reloaded[0]
+        }
+      }
+      
+      console.log(`Saved ${imagesToSaveInTable.length} large images to document_images table`)
     }
 
     console.log('Document saved - ID:', savedDocument.id)
