@@ -29,17 +29,30 @@ export async function getImageDataUrl(img: ImageData): Promise<string> {
   // If image has imageId (large image), fetch from API
   if (img.imageId) {
     try {
-      const response = await fetch(`/api/documents/images/${img.imageId}`)
+      console.log(`Loading large image from API: ${img.filename} (imageId: ${img.imageId})`)
+      const response = await fetch(`/api/documents/images/${img.imageId}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      })
+      
       if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.statusText}`)
+        const errorText = await response.text().catch(() => response.statusText)
+        console.error(`Failed to fetch image ${img.imageId}: HTTP ${response.status} - ${errorText}`)
+        throw new Error(`Failed to fetch image: HTTP ${response.status} - ${errorText}`)
       }
+      
       const result = await response.json()
       if (result.success && result.data?.dataUrl) {
+        console.log(`Successfully loaded image ${img.filename} from API (${result.data.dataUrl.length} chars)`)
         return result.data.dataUrl
       }
+      
+      console.error(`Invalid response from image API for ${img.imageId}:`, result)
       throw new Error('Invalid response from image API')
     } catch (error) {
-      console.error('Error loading image from API:', error)
+      console.error(`Error loading image ${img.filename} (imageId: ${img.imageId}) from API:`, error)
       // Return placeholder or empty data URL
       return `data:${img.type};base64,` // Empty base64
     }

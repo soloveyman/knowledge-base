@@ -49,8 +49,12 @@ export async function GET() {
     }
     
     // If user has businessId, filter by tenant; otherwise, show only user's own documents
+    // Use subquery to get uploader's businessId, then filter documents
     const rows = await db
-      .select({ document: documents, uploaderBusinessId: users.businessId })
+      .select({ 
+        document: documents, 
+        uploaderBusinessId: users.businessId 
+      })
       .from(documents)
       .leftJoin(users, eq(documents.uploadedBy, users.id))
       .where(
@@ -62,7 +66,14 @@ export async function GET() {
           : eq(documents.uploadedBy, session.user.id) // If no businessId, show only user's documents
       )
       .orderBy(desc(documents.createdAt))
-    const allDocuments = rows.map(r => r.document).filter(doc => doc !== null)
+    
+    // Filter out null documents and ensure we have valid documents
+    const allDocuments = rows
+      .map(r => r.document)
+      .filter((doc): doc is typeof documents.$inferSelect => doc !== null)
+    
+    // Log for debugging
+    console.log('GET /api/documents - Found documents:', allDocuments.length, 'for user:', session.user.id, 'businessId:', tenantId)
 
     return NextResponse.json({
       success: true,
@@ -300,9 +311,12 @@ export async function POST(request: Request) {
       
       // Update parsedContent.images with image IDs for large images
       if (parsedContent?.images && Array.isArray(parsedContent.images)) {
+        // Create a deep copy of parsedContent to avoid mutating the original
+        const updatedParsedContent = JSON.parse(JSON.stringify(parsedContent))
+        
         let largeImageIndex = 0
-        for (let i = 0; i < parsedContent.images.length; i++) {
-          const img = parsedContent.images[i] as any
+        for (let i = 0; i < updatedParsedContent.images.length; i++) {
+          const img = updatedParsedContent.images[i] as any
           if (img.data === null && img.imageId === null && largeImageIndex < imageReferences.length) {
             // This is a large image placeholder
             img.imageId = imageReferences[largeImageIndex].id
@@ -315,23 +329,31 @@ export async function POST(request: Request) {
           console.warn(`Image ID assignment mismatch: expected ${imageReferences.length} large images, processed ${largeImageIndex}`)
         }
         
-        // Update document with image IDs
-        await db
+        // Update document with image IDs - use returning() to get updated document immediately
+        const updated = await db
           .update(documents)
           .set({
-            parsedContent: parsedContent
+            parsedContent: updatedParsedContent,
+            updatedAt: new Date()
           })
           .where(eq(documents.id, savedDocument.id))
+          .returning()
         
-        // Reload document to get updated parsedContent
-        const reloaded = await db
-          .select()
-          .from(documents)
-          .where(eq(documents.id, savedDocument.id))
-          .limit(1)
-        
-        if (reloaded.length > 0) {
-          savedDocument = reloaded[0]
+        if (updated.length > 0) {
+          savedDocument = updated[0]
+          console.log('Document updated with image IDs, parsedContent images:', (savedDocument.parsedContent as any)?.images?.length || 0)
+        } else {
+          console.error('Failed to update document with image IDs')
+          // Fallback: reload document
+          const reloaded = await db
+            .select()
+            .from(documents)
+            .where(eq(documents.id, savedDocument.id))
+            .limit(1)
+          
+          if (reloaded.length > 0) {
+            savedDocument = reloaded[0]
+          }
         }
       }
       
@@ -340,9 +362,17 @@ export async function POST(request: Request) {
 
     console.log('Document saved - ID:', savedDocument.id)
     console.log('Saved parsedContent exists:', !!savedDocument.parsedContent)
-    console.log('Saved parsedContent sections:', (savedDocument.parsedContent as any)?.sections?.length || 0)
-    console.log('Saved parsedContent tables:', (savedDocument.parsedContent as any)?.tables?.length || 0)
-    console.log('Saved parsedContent images:', (savedDocument.parsedContent as any)?.images?.length || 0)
+    if (savedDocument.parsedContent) {
+      const pc = savedDocument.parsedContent as any
+      console.log('Saved parsedContent sections:', pc?.sections?.length || 0)
+      console.log('Saved parsedContent tables:', pc?.tables?.length || 0)
+      console.log('Saved parsedContent images:', pc?.images?.length || 0)
+      if (pc?.images && Array.isArray(pc.images)) {
+        const imagesWithId = pc.images.filter((img: any) => img.imageId).length
+        const imagesWithData = pc.images.filter((img: any) => img.data).length
+        console.log(`Saved parsedContent images breakdown: ${imagesWithId} with imageId, ${imagesWithData} with inline data`)
+      }
+    }
 
     // Update usage count AFTER successful save (only for owners and only when creating new document)
     if (session.user.role === 'owner' && existingDocument.length === 0) {
