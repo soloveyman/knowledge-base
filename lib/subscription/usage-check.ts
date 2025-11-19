@@ -1,7 +1,8 @@
 import { db } from '@/lib/db'
-import { subscriptions, subscriptionPlans, usage, users } from '@/lib/db/schema'
+import { subscriptions, subscriptionPlans, usage, users, payments } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { getTenantDb } from '@/lib/db/tenant'
+import { assignFreeTrialToOwner } from './trial'
 
 /**
  * Check if user has reached a usage limit
@@ -12,7 +13,7 @@ export async function checkUsageLimit(
 ): Promise<{ allowed: boolean; current: number; max: number | null; message?: string }> {
   try {
     // Get user's current subscription
-    const userSubscription = await db
+    let userSubscription = await db
       .select({
         subscription: subscriptions,
         plan: subscriptionPlans,
@@ -22,12 +23,51 @@ export async function checkUsageLimit(
       .where(eq(subscriptions.ownerId, userId))
       .limit(1)
 
+    // If no subscription found, try to assign free trial (for owners only)
     if (userSubscription.length === 0 || !userSubscription[0].plan) {
-      return {
-        allowed: false,
-        current: 0,
-        max: null,
-        message: 'No active subscription found'
+      // Check if user is an owner
+      const [user] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+
+      if (user?.role === 'owner') {
+        // Check if user has any payments (if yes, don't assign trial)
+        const existingPayments = await db
+          .select()
+          .from(payments)
+          .where(eq(payments.ownerId, userId))
+          .limit(1)
+
+        if (existingPayments.length === 0) {
+          // Try to assign free trial
+          try {
+            await assignFreeTrialToOwner(userId)
+            // Re-fetch subscription after trial assignment
+            userSubscription = await db
+              .select({
+                subscription: subscriptions,
+                plan: subscriptionPlans,
+              })
+              .from(subscriptions)
+              .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+              .where(eq(subscriptions.ownerId, userId))
+              .limit(1)
+          } catch (error) {
+            console.error('[Usage Check] Failed to assign free trial:', error)
+          }
+        }
+      }
+
+      // If still no subscription after trying to assign trial
+      if (userSubscription.length === 0 || !userSubscription[0].plan) {
+        return {
+          allowed: false,
+          current: 0,
+          max: null,
+          message: 'No active subscription found'
+        }
       }
     }
 

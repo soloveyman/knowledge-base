@@ -593,8 +593,8 @@ function DocImportPageInner() {
                       </div>
                     </div>
                     {file.warning && (
-                      <div className="w-full p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
+                      <div className="w-full p-2 bg-gray-50 dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800 rounded-lg">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
                           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                           <span>{file.warning}</span>
                         </p>

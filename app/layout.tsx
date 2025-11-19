@@ -100,8 +100,8 @@ export default function RootLayout({
         <ClientProviders>
           {children}
         </ClientProviders>
-        <Analytics />
-        <SpeedInsights />
+        {process.env.VERCEL && <Analytics />}
+        {process.env.VERCEL && <SpeedInsights />}
       </body>
     </html>
   );
