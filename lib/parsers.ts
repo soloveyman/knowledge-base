@@ -1,5 +1,4 @@
 import * as XLSX from 'xlsx'
-import * as pdfParse from 'pdf-parse'
 import * as mammoth from 'mammoth'
 import * as JSZip from 'jszip'
 
@@ -61,11 +60,6 @@ interface MammothMessage {
     src: string
     contentType?: string
   }
-}
-
-interface PdfParseResult {
-  text: string
-  numpages: number
 }
 
 export interface ParsedContent {
@@ -491,59 +485,6 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
   }
 }
 
-
-export async function parsePdf(buffer: ArrayBuffer, options: {
-  includeMetadata?: boolean
-  normalizeWhitespace?: boolean
-} = {}): Promise<ParseResult> {
-  try {
-    // Ensure we have a valid buffer
-    if (!buffer || buffer.byteLength === 0) {
-      throw new Error('Empty or invalid buffer provided')
-    }
-
-    console.log('Buffer details:', {
-      byteLength: buffer.byteLength,
-      constructor: buffer.constructor.name,
-      isArrayBuffer: buffer instanceof ArrayBuffer
-    })
-
-    // Convert ArrayBuffer to Buffer for pdf-parse
-    const uint8Array = new Uint8Array(buffer)
-    const pdfBuffer = Buffer.from(uint8Array)
-    
-    console.log('Parsing PDF with pdf-parse...')
-    
-    // Use pdf-parse to extract text from PDF with timeout
-    const data = await Promise.race([
-      (pdfParse as unknown as (buffer: Buffer) => Promise<PdfParseResult>)(pdfBuffer),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('PDF parsing timeout after 15 seconds')), 15000)
-      )
-    ]) as PdfParseResult
-    
-    let text = data.text
-    
-    console.log('PDF parsing completed, text length:', text.length)
-    console.log('PDF pages:', data.numpages)
-    
-    if (options.normalizeWhitespace) {
-      text = text.replace(/\s+/g, ' ').trim()
-    }
-
-    const metadata: ParseMetadata | undefined = options.includeMetadata ? {
-      parsedAt: new Date(),
-      parserVersion: '1.0.0'
-    } : undefined
-
-    return {
-      text,
-      metadata
-    }
-  } catch (error) {
-    throw new ParseError(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
-}
 
 export async function parseXlsx(buffer: ArrayBuffer, options: {
   includeMetadata?: boolean
