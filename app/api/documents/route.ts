@@ -17,15 +17,6 @@ export async function GET() {
     // All roles filter by businessId for tenant isolation (except super-admin)
     const tenantId = session?.user?.businessId
     
-    if (!tenantId && userRole !== 'super-admin') {
-      return NextResponse.json({
-        success: true,
-        data: {
-          documents: []
-        }
-      })
-    }
-    
     // Super-admin sees all documents
     if (userRole === 'super-admin') {
       const allDocuments = await db
@@ -45,8 +36,9 @@ export async function GET() {
         }
       })
     }
+    
     // Get documents where the uploader's businessId matches, or where uploadedBy matches current user
-    // This ensures documents are returned even if the user doesn't exist or doesn't have a businessId
+    // This ensures documents are returned even if the user doesn't have a businessId yet
     if (!session?.user?.id) {
       return NextResponse.json({
         success: true,
@@ -56,6 +48,7 @@ export async function GET() {
       })
     }
     
+    // If user has businessId, filter by tenant; otherwise, show only user's own documents
     const rows = await db
       .select({ document: documents, uploaderBusinessId: users.businessId })
       .from(documents)
@@ -66,7 +59,7 @@ export async function GET() {
               eq(users.businessId, tenantId),
               eq(documents.uploadedBy, session.user.id)
             )
-          : eq(documents.uploadedBy, session.user.id)
+          : eq(documents.uploadedBy, session.user.id) // If no businessId, show only user's documents
       )
       .orderBy(desc(documents.createdAt))
     const allDocuments = rows.map(r => r.document).filter(doc => doc !== null)

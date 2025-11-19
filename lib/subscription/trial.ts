@@ -1,4 +1,4 @@
-import { db, subscriptionPlans, subscriptions, payments } from '@/lib/db';
+import { db, subscriptionPlans, subscriptions, payments, users } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -133,6 +133,32 @@ export async function assignFreeTrialToOwner(ownerId: string) {
     if (existingPayments.length > 0) {
       console.log(`[Trial] Owner ${ownerId} has payment records (paid subscription), skipping trial assignment`);
       return null;
+    }
+
+    // Ensure user has businessId (required for tenant isolation)
+    const [owner] = await db
+      .select({ id: users.id, businessId: users.businessId })
+      .from(users)
+      .where(eq(users.id, ownerId))
+      .limit(1);
+
+    if (!owner) {
+      console.error(`[Trial] Owner ${ownerId} not found`);
+      return null;
+    }
+
+    // Set businessId if not set (use owner's id as businessId)
+    if (!owner.businessId) {
+      try {
+        await db
+          .update(users)
+          .set({ businessId: owner.id })
+          .where(eq(users.id, owner.id));
+        console.log(`[Trial] Set businessId for owner ${ownerId}`);
+      } catch (error) {
+        console.error(`[Trial] Failed to set businessId for owner ${ownerId}:`, error);
+        // Continue anyway - businessId might not be critical for trial assignment
+      }
     }
 
     // Get or create trial plan
