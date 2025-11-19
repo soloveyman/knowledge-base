@@ -321,18 +321,43 @@ function DocImportPageInner() {
           })
 
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            console.error('Failed to save document:', file.name, errorData)
+            let errorData
+            try {
+              errorData = await response.json()
+            } catch {
+              errorData = { message: response.statusText }
+            }
+            console.error('Failed to save document:', file.name, {
+              status: response.status,
+              statusText: response.statusText,
+              errorData
+            })
             throw new Error(`Failed to save ${file.name}: ${errorData.message || response.statusText}`)
           }
           
-          const result = await response.json()
+          let result
+          try {
+            result = await response.json()
+          } catch (parseError) {
+            console.error('Failed to parse response JSON:', parseError)
+            throw new Error(`Failed to parse server response for ${file.name}`)
+          }
+
           if (!result.success) {
             console.error('Document save returned success=false:', file.name, result)
             throw new Error(`Failed to save ${file.name}: ${result.message || 'Unknown error'}`)
           }
           
-          console.log('Document saved successfully:', file.name, result)
+          if (!result.data || !result.data.document) {
+            console.error('Document save response missing document data:', file.name, result)
+            throw new Error(`Server response missing document data for ${file.name}`)
+          }
+          
+          console.log('Document saved successfully:', file.name, {
+            documentId: result.data.document.id,
+            title: result.data.document.title,
+            hasParsedContent: !!result.data.document.parsedContent
+          })
           return result
         } catch (error) {
           console.error('Error saving document:', file.name, error)

@@ -139,6 +139,13 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
+    // Validate parsedContent exists and has required structure
+    if (!parsedContent) {
+      console.warn('Warning: parsedContent is null or undefined')
+    } else if (!parsedContent.sections || !Array.isArray(parsedContent.sections)) {
+      console.warn('Warning: parsedContent.sections is missing or not an array')
+    }
+
     // Process images: save large images to document_images table
     // Large images (>500KB base64) are stored in the table, small ones stay in JSON
     const LARGE_IMAGE_THRESHOLD = 500 * 1024 // 500KB in bytes (base64 is ~33% larger, so ~375KB binary)
@@ -221,6 +228,22 @@ export async function POST(request: Request) {
       .where(eq(documents.title, title))
       .limit(1)
 
+    // Check usage limit BEFORE saving (only for owners and only when creating new document)
+    if (session.user.role === 'owner' && existingDocument.length === 0) {
+      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+      const limitCheck = await checkUsageLimit(session.user.id, 'imports')
+      
+      if (!limitCheck.allowed) {
+        return NextResponse.json({
+          success: false,
+          message: limitCheck.message || 'Import limit reached. Please upgrade your plan to continue.',
+          error: 'USAGE_LIMIT_EXCEEDED',
+          current: limitCheck.current,
+          max: limitCheck.max
+        }, { status: 403 })
+      }
+    }
+
     let savedDocument
 
     if (existingDocument.length > 0) {
@@ -246,6 +269,7 @@ export async function POST(request: Request) {
         .returning()
       
       savedDocument = updated[0]
+      console.log('Existing document updated with ID:', savedDocument.id)
     } else {
       // Create new document
       const newDocument = await db.insert(documents).values({
@@ -261,6 +285,7 @@ export async function POST(request: Request) {
       }).returning()
       
       savedDocument = newDocument[0]
+      console.log('New document created with ID:', savedDocument.id)
     }
 
     // Save large images to documentImages table
@@ -326,21 +351,8 @@ export async function POST(request: Request) {
     console.log('Saved parsedContent tables:', (savedDocument.parsedContent as any)?.tables?.length || 0)
     console.log('Saved parsedContent images:', (savedDocument.parsedContent as any)?.images?.length || 0)
 
-    // Check usage limit before allowing import (only for owners and only when creating new document)
+    // Update usage count AFTER successful save (only for owners and only when creating new document)
     if (session.user.role === 'owner' && existingDocument.length === 0) {
-      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
-      const limitCheck = await checkUsageLimit(session.user.id, 'imports')
-      
-      if (!limitCheck.allowed) {
-        return NextResponse.json({
-          success: false,
-          message: limitCheck.message || 'Import limit reached. Please upgrade your plan to continue.',
-          error: 'USAGE_LIMIT_EXCEEDED',
-          current: limitCheck.current,
-          max: limitCheck.max
-        }, { status: 403 })
-      }
-
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       
@@ -385,6 +397,11 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Create document API error:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : typeof error
+    })
     return NextResponse.json({
       success: false,
       message: 'Failed to create document',
