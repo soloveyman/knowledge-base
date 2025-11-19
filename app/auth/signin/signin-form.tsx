@@ -386,10 +386,10 @@ export function SignInForm() {
                     aria-describedby={touched.name && fieldErrors.name ? "name-error" : undefined}
                   />
                   {touched.name && name.trim().length > 0 && !fieldErrors.name && (
-                    <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" aria-hidden="true" />
+                    <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" aria-hidden="true" />
                   )}
                   {touched.name && fieldErrors.name && (
-                    <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" aria-hidden="true" />
+                    <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" aria-hidden="true" />
                   )}
                 </div>
                 {touched.name && fieldErrors.name && (
@@ -402,7 +402,7 @@ export function SignInForm() {
             <div className="space-y-2">
               <Label htmlFor="email">{t('email')} *</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="email"
                   type="email"
@@ -424,13 +424,13 @@ export function SignInForm() {
                 {isRegister && touched.email && (
                   <>
                     {emailValidation.isChecking && (
-                      <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" aria-label="Checking email availability" />
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" aria-label="Checking email availability" />
                     )}
                     {!emailValidation.isChecking && emailValidation.isAvailable === true && !fieldErrors.email && (
-                      <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" aria-hidden="true" />
+                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" aria-hidden="true" />
                     )}
                     {!emailValidation.isChecking && (fieldErrors.email || emailValidation.isAvailable === false) && (
-                      <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" aria-hidden="true" />
+                      <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" aria-hidden="true" />
                     )}
                   </>
                 )}
@@ -461,7 +461,7 @@ export function SignInForm() {
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -472,7 +472,7 @@ export function SignInForm() {
                     setTouched(prev => ({ ...prev, password: true }))
                   }}
                   onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
-                  className={`pl-10 pr-10 ${touched.password && fieldErrors.password ? "border-destructive" : ""} ${isRegister && touched.password && !fieldErrors.password && password.length >= 8 ? "border-green-500" : ""}`}
+                  className={`pl-10 ${isRegister && touched.password ? "pr-16" : "pr-10"} ${touched.password && fieldErrors.password ? "border-destructive" : ""} ${isRegister && touched.password && !fieldErrors.password && password.length >= 8 ? "border-green-500" : ""}`}
                   minLength={isRegister ? 8 : undefined}
                   required
                   aria-invalid={touched.password && fieldErrors.password ? "true" : "false"}
@@ -485,17 +485,17 @@ export function SignInForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-10 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                  className={`absolute ${isRegister && touched.password ? "right-10" : "right-3"} top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded`}
                   aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                   aria-pressed={showPassword}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </button>
                 {isRegister && touched.password && !fieldErrors.password && password.length >= 8 && (
-                  <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-green-600" aria-hidden="true" />
+                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" aria-hidden="true" />
                 )}
                 {isRegister && touched.password && fieldErrors.password && (
-                  <XCircle className="absolute right-3 top-3 h-4 w-4 text-destructive" aria-hidden="true" />
+                  <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" aria-hidden="true" />
                 )}
               </div>
               {touched.password && fieldErrors.password && (
