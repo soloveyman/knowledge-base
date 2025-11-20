@@ -233,6 +233,9 @@ export default function DocumentViewer() {
           
           // Extract content from sections - include titles in content
           let content = ''
+          // Track position mapping from original text to combined content (for image positioning)
+          let positionMap: Array<{ originalStart: number; originalEnd: number; combinedStart: number; combinedEnd: number }> = []
+          
           if (document.parsedContent?.sections && document.parsedContent.sections.length > 0) {
             // Log all sections for debugging
             console.log('All sections:', document.parsedContent.sections.map((s: any, idx: number) => ({
@@ -265,14 +268,23 @@ export default function DocumentViewer() {
               }
             }
             
+            // Build content and track position mapping from original text to combined content
+            let originalTextPos = 0 // Position in original text (without headings)
+            positionMap = []
+            
             content = mergedSections
               .map((s: { title?: string; level?: number; content: string }, idx: number) => {
                 const titleText = s.title?.trim() || ''
                 const contentText = s.content?.trim() || ''
                 
+                // Track original text position (without headings)
+                const sectionOriginalStart = originalTextPos
+                const sectionOriginalEnd = originalTextPos + contentText.length
+                
                 // If title is just an empty formatting tag, skip the title but keep the content
                 if (titleText && /^\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]\s*\[\/\1\]$/i.test(titleText)) {
                   // Title is just an empty formatting tag, return only content
+                  originalTextPos = sectionOriginalEnd
                   return contentText
                 }
                 
@@ -290,14 +302,63 @@ export default function DocumentViewer() {
                 
                 const result = sectionContent.trim()
                 console.log(`Section ${idx}: title="${titleText}", contentLength=${contentText.length}, resultLength=${result.length}`)
+                
+                // Update position mapping
+                originalTextPos = sectionOriginalEnd
                 return result
               })
               .filter((c: string) => c && c.length > 0) // Filter out empty sections
               .join('\n\n')
+            
             // Trim leading/trailing newlines but preserve internal structure
             content = content.replace(/^\n+/, '').replace(/\n+$/, '')
             
+            // Rebuild position mapping by recalculating combined positions
+            originalTextPos = 0
+            let combinedPos = 0
+            const rebuiltSections = mergedSections
+              .map((s: { title?: string; level?: number; content: string }, idx: number) => {
+                const titleText = s.title?.trim() || ''
+                const contentText = s.content?.trim() || ''
+                
+                const sectionOriginalStart = originalTextPos
+                const sectionOriginalEnd = originalTextPos + contentText.length
+                
+                let sectionContent = ''
+                if (titleText && !/^\[(BOLD|ITALIC|CENTER|RIGHT|JUSTIFY)\]\s*\[\/\1\]$/i.test(titleText)) {
+                  const level = s.level || 2
+                  const headingPrefix = '#'.repeat(Math.min(level, 6))
+                  sectionContent = `${headingPrefix} ${titleText}\n\n`
+                }
+                if (contentText) {
+                  sectionContent += contentText
+                }
+                
+                const result = sectionContent.trim()
+                const sectionCombinedStart = combinedPos
+                const sectionCombinedEnd = combinedPos + result.length
+                
+                // Store position mapping for this section
+                if (contentText.length > 0) {
+                  positionMap.push({
+                    originalStart: sectionOriginalStart,
+                    originalEnd: sectionOriginalEnd,
+                    combinedStart: sectionCombinedStart,
+                    combinedEnd: sectionCombinedEnd
+                  })
+                }
+                
+                originalTextPos = sectionOriginalEnd
+                combinedPos = sectionCombinedEnd + 2 // +2 for \n\n separator
+                return result
+              })
+              .filter((c: string) => c && c.length > 0)
+            
+            content = rebuiltSections.join('\n\n')
+            content = content.replace(/^\n+/, '').replace(/\n+$/, '')
+            
             console.log('Combined content length:', content.length)
+            console.log('Position mappings:', positionMap.length, 'sections')
             console.log('Combined content preview:', content.substring(0, 500))
           }
           
@@ -430,19 +491,40 @@ export default function DocumentViewer() {
             })
             const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null && img.dataUrl && img.dataUrl.trim().length > 0)
             
+            // Map image positions from original text to combined content
+            const mapPositionToCombined = (originalPos: number): number | null => {
+              // Find which section this position belongs to
+              for (const mapping of positionMap) {
+                if (originalPos >= mapping.originalStart && originalPos <= mapping.originalEnd) {
+                  // Calculate relative position within section
+                  const relativePos = originalPos - mapping.originalStart
+                  // Map to combined position
+                  const combinedPos = mapping.combinedStart + relativePos
+                  return Math.min(combinedPos, mapping.combinedEnd)
+                }
+              }
+              // If position is beyond all sections, return end of content
+              if (originalPos > (positionMap[positionMap.length - 1]?.originalEnd || 0)) {
+                return content.length
+              }
+              return null
+            }
+            
             // Separate images with valid positions from those without
-            // Position should be valid if it's within the content length
-            // But we need to account for the fact that positions are relative to the original text before section formatting
-            const imagesWithPositions = imagesWithData.filter(img => {
-              if (img.position === undefined || img.position < 0) return false
-              // Allow positions up to content.length (they might be at the end)
-              // But exclude position 0 (start of document) as it's likely invalid
-              return img.position > 0 && img.position <= content.length
-            })
+            // Map positions from original text to combined content
+            const imagesWithPositions = imagesWithData
+              .map(img => {
+                if (img.position === undefined || img.position < 0) return null
+                const combinedPosition = mapPositionToCombined(img.position)
+                if (combinedPosition !== null && combinedPosition > 0 && combinedPosition <= content.length) {
+                  return { ...img, mappedPosition: combinedPosition }
+                }
+                return null
+              })
+              .filter((img): img is { filename: string; dataUrl: string; type: string; position?: number; mappedPosition: number } => img !== null)
             const imagesWithoutPositions = imagesWithData.filter(img => 
               !(img.position !== undefined && 
-                img.position > 0 && 
-                img.position <= content.length)
+                img.position > 0)
             )
             
             console.log(`📸 Image position analysis:`, {
@@ -456,18 +538,18 @@ export default function DocumentViewer() {
             let contentWithImages = content
             let offset = 0
             
-            // First, insert images with valid positions (sorted by position to maintain order)
-            const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => (a.position || 0) - (b.position || 0))
-            sortedImagesWithPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+            // First, insert images with valid positions (sorted by mapped position to maintain order)
+            const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => a.mappedPosition - b.mappedPosition)
+            sortedImagesWithPositions.forEach((img) => {
               const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
-              const insertPos = Math.min(img.position! + offset, contentWithImages.length)
+              const insertPos = Math.min(img.mappedPosition + offset, contentWithImages.length)
               if (insertPos <= contentWithImages.length) {
                 contentWithImages = 
                   contentWithImages.slice(0, insertPos) + 
                   imageMarkdown + 
                   contentWithImages.slice(insertPos)
                 offset += imageMarkdown.length
-                console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (adjusted: ${insertPos}, content length: ${contentWithImages.length})`)
+                console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (mapped to ${img.mappedPosition}, adjusted: ${insertPos}, content length: ${contentWithImages.length})`)
               } else {
                 // Position is out of bounds after previous insertions, append at the end
                 contentWithImages += imageMarkdown
