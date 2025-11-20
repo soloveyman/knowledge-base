@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { useTranslation } from "@/lib/translation-context"
 import { 
@@ -93,7 +93,6 @@ export default function TestGenerator({
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([])
-  const [error, setError] = useState<string | null>(null)
   const [previewMode, setPreviewMode] = useState(false)
 
   const questionTypeOptions = [
@@ -136,13 +135,14 @@ export default function TestGenerator({
 
   const generateQuestions = async () => {
     if (params.sectionIds.length === 0) {
-      setError('Please select at least one section to generate questions from')
+      toast.error('Please select at least one section to generate questions from', {
+        duration: 5000
+      })
       return
     }
 
     setIsGenerating(true)
     setGenerationProgress(0)
-    setError(null)
 
     try {
       // Simulate generation progress
@@ -189,7 +189,9 @@ export default function TestGenerator({
       }
 
     } catch (err) {
-      setError('Failed to generate questions. Please try again.')
+      toast.error('Failed to generate questions. Please try again.', {
+        duration: 5000
+      })
       setIsGenerating(false)
     }
   }
@@ -448,13 +450,6 @@ export default function TestGenerator({
             </div>
           )}
 
-          {/* Error */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
 

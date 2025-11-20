@@ -53,7 +53,6 @@ export default function UserBuilderPage() {
   const { t } = useTranslation()
   
   const [isCreating, setIsCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -137,7 +136,9 @@ export default function UserBuilderPage() {
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text()
         console.error('Non-JSON response:', text.substring(0, 200))
-        setError('Server returned an invalid response. Please try again.')
+        toast.error('Server returned an invalid response. Please try again.', {
+          duration: 5000
+        })
         return
       }
       
@@ -150,13 +151,16 @@ export default function UserBuilderPage() {
         validation.setValue('email', user.email || '')
         validation.setValue('password', '') // New password field
         validation.setValue('role', user.role || 'employee')
-        setError(null)
       } else {
-        setError('Failed to load user data')
+        toast.error('Failed to load user data', {
+          duration: 5000
+        })
       }
     } catch (error) {
       console.error('Error loading user for editing:', error)
-      setError('Failed to load user for editing')
+      toast.error('Failed to load user for editing', {
+        duration: 5000
+      })
     }
   }
 
@@ -176,7 +180,6 @@ export default function UserBuilderPage() {
     }
 
     setIsCreating(true)
-    setError(null)
 
     try {
       if (isEditMode && editingUserId) {
@@ -268,7 +271,10 @@ export default function UserBuilderPage() {
       await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create user')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create user'
+      toast.error(errorMessage, {
+        duration: 5000
+      })
     } finally {
       setIsCreating(false)
     }

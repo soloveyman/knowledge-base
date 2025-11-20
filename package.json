@@ -41,7 +41,17 @@
     "db:add-manual-plan-change-column": "tsx scripts/add-manual-plan-change-column.ts",
     "typecheck": "tsc --noEmit",
     "lint:ci": "next lint --max-warnings=0",
-    "db:reset:test": "node scripts/reset-for-testing.js"
+    "db:reset:test": "node scripts/reset-for-testing.js",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:api": "playwright test tests/api",
+    "test:auth": "playwright test tests/api/authenticated-api.test.ts tests/pages/authenticated-pages.test.ts",
+    "test:pages": "playwright test tests/pages",
+    "test:sessions": "playwright test tests/sessions",
+    "test:practices": "playwright test tests/best-practices",
+    "test:integration": "playwright test tests/integration",
+    "test:prod": "npm run build && npm run start & sleep 5 && playwright test && pkill -f 'next start' || true"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",
@@ -95,6 +105,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

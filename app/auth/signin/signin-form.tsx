@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
 import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 import { useEmailValidation } from "@/lib/hooks/use-email-validation"
@@ -22,7 +23,6 @@ export function SignInForm() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [error, setError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isRegister, setIsRegister] = useState(false)
   const [name, setName] = useState("")
@@ -43,14 +43,13 @@ export function SignInForm() {
   
   // Focus management for errors
   useFocusOnError(fieldErrors, formErrorId)
-  useErrorAnnouncement(fieldErrors, error)
+  useErrorAnnouncement(fieldErrors, null)
   
   // Reset validation state when switching modes
   useEffect(() => {
     if (!isRegister) {
       setTouched({})
       setFieldErrors({})
-      setError('')
       setSuccessMessage('')
     }
   }, [isRegister])
@@ -122,7 +121,6 @@ export function SignInForm() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
-    setError("")
     
     try {
       // For OAuth, signIn returns a URL to redirect to Google
@@ -132,7 +130,9 @@ export function SignInForm() {
       })
       
       if (result?.error) {
-        setError(result.error || 'Google sign-in failed')
+        toast.error(result.error || 'Google sign-in failed', {
+          duration: 5000
+        })
         setIsGoogleLoading(false)
         return
       }
@@ -155,7 +155,9 @@ export function SignInForm() {
         setIsGoogleLoading(false)
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to sign in with Google')
+      toast.error(error instanceof Error ? error.message : 'Failed to sign in with Google', {
+        duration: 5000
+      })
       setIsGoogleLoading(false)
     }
   }
@@ -166,13 +168,14 @@ export function SignInForm() {
     // Honeypot check - if filled, it's likely a bot
     if (honeypot) {
       console.warn("Bot detected: honeypot field was filled")
-      setError("Invalid request")
+      toast.error("Invalid request", {
+        duration: 5000
+      })
       setIsLoading(false)
       return
     }
     
     setIsLoading(true)
-    setError("")
 
     try {
       if (isRegister) {
@@ -219,7 +222,9 @@ export function SignInForm() {
           if (errorMessage.toLowerCase().includes('email')) {
             setFieldErrors(prev => ({ ...prev, email: errorMessage }))
           } else {
-            setError(errorMessage)
+            toast.error(errorMessage, {
+              duration: 5000
+            })
           }
           setIsLoading(false)
           return
@@ -227,14 +232,15 @@ export function SignInForm() {
         
         // Show success message about email verification
         if (body.message) {
-          setError('') // Clear any errors
           setSuccessMessage(body.message || 'Registration successful! Please check your email to verify your account.')
         }
         
         // Immediately sign in after successful registration (user can still sign in but needs to verify)
         const result = await signIn("credentials", { email: email.toLowerCase().trim(), password, redirect: false })
         if (result?.error) {
-          setError(result.error || t('errorOccurred'))
+          toast.error(result.error || t('errorOccurred'), {
+            duration: 5000
+          })
           setIsLoading(false)
           return
         }
@@ -255,7 +261,13 @@ export function SignInForm() {
       
       if (!emailCheckData.exists) {
         // Email doesn't exist - suggest registration
-        setError('Email not found. Would you like to create an account?')
+        toast.error('Email not found. Would you like to create an account?', {
+          duration: 6000,
+          action: {
+            label: 'Create Account',
+            onClick: () => setIsRegister(true)
+          }
+        })
         setIsRegister(true) // Switch to registration mode
         setIsLoading(false)
         return
@@ -263,7 +275,9 @@ export function SignInForm() {
 
       // Check if user has a password (OAuth users don't have passwords)
       if (emailCheckData.hasPassword === false) {
-        setError('This account was registered with Google. Please use "Sign in with Google" button to continue.')
+        toast.error('This account was registered with Google. Please use "Sign in with Google" button to continue.', {
+          duration: 6000
+        })
         setIsLoading(false)
         return
       }
@@ -272,7 +286,9 @@ export function SignInForm() {
       const result = await signIn("credentials", { email: normalizedEmail, password, redirect: false })
       if (result?.error) {
         // Email exists but password is wrong
-        setError('Incorrect password. Please try again or use "Forgot Password"')
+        toast.error('Incorrect password. Please try again or use "Forgot Password"', {
+          duration: 5000
+        })
         setHasFailedAttempt(true) // Show forgot password link after failed attempt
         setIsLoading(false)
         return
@@ -286,7 +302,9 @@ export function SignInForm() {
       else router.push('/employee')
       return
     } catch (error) {
-      setError(error instanceof Error ? error.message : t('errorOccurred'))
+      toast.error(error instanceof Error ? error.message : t('errorOccurred'), {
+        duration: 5000
+      })
       setIsLoading(false)
     }
   }
@@ -321,39 +339,6 @@ export function SignInForm() {
               <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-950">
                 <AlertDescription className="text-green-800 dark:text-green-200">
                   {successMessage}
-                </AlertDescription>
-              </Alert>
-            )}
-            {error && !isRegister && (
-              <Alert 
-                variant={
-                  error.includes('not found') || 
-                  error.includes('create an account') || 
-                  error.includes('registered with Google')
-                    ? "default" 
-                    : "destructive"
-                }
-                id={formErrorId}
-              >
-                <AlertDescription>
-                  {error}
-                  {error.includes('not found') && (
-                    <div className="mt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsRegister(true)
-                          setError('')
-                        }}
-                        className="w-full"
-                        aria-label="Create a new account"
-                      >
-                        Create Account
-                      </Button>
-                    </div>
-                  )}
                 </AlertDescription>
               </Alert>
             )}
@@ -566,7 +551,6 @@ export function SignInForm() {
               type="button"
               onClick={() => { 
                 setIsRegister(!isRegister)
-                setError("")
                 setSuccessMessage("")
                 setTouched({})
                 setFieldErrors({})

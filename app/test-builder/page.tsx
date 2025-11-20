@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ErrorMessage } from "@/components/common/error-message"
 import { FormField } from "@/components/common/form-field"
 import { useTranslation } from "@/lib/translation-context"
 import { useFormValidation } from "@/lib/hooks/use-form-validation"
@@ -108,7 +107,6 @@ export default function TestBuilderPage() {
   })
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([])
-  const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [aiProvider, setAiProvider] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -397,7 +395,9 @@ export default function TestBuilderPage() {
       }
     } catch (error) {
       console.error('Test Builder: Error loading test for editing:', error)
-      setError(t('failedToLoadTest'))
+      toast.error(t('failedToLoadTest'), {
+        duration: 5000
+      })
     }
   }, [])
 
@@ -580,12 +580,16 @@ export default function TestBuilderPage() {
 
     // Validate all fields before generating
     if (!validateAll()) {
-      setError(t('pleaseFixErrors'))
+      toast.error(t('pleaseFixErrors'), {
+        duration: 5000
+      })
       return
     }
     
     if (!selectedDocument) {
-      setError(t('pleaseSelectDocument'))
+      toast.error(t('pleaseSelectDocument'), {
+        duration: 5000
+      })
       return
     }
 
@@ -598,7 +602,6 @@ export default function TestBuilderPage() {
     }
 
     setIsGenerating(true)
-    setError(null)
 
     try {
       // Use document language for generation (not user-selected locale if it differs)
@@ -716,7 +719,18 @@ export default function TestBuilderPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate test'
       console.error('Test generation error:', err)
-      setError(errorMessage)
+      
+      // Показать toast для ошибок конфигурации API
+      if (errorMessage.includes('GROK_API_KEY') || errorMessage.includes('not set') || errorMessage.includes('environment variables')) {
+        toast.error('API не настроен', {
+          description: 'Проверьте настройки GROK_API_KEY в .env.local',
+          duration: 6000
+        })
+      } else {
+        toast.error(errorMessage, {
+          duration: 6000
+        })
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -805,17 +819,20 @@ export default function TestBuilderPage() {
 
   const handleSaveTest = async () => {
     if (generatedQuestions.length === 0) {
-      setError(t('noQuestionsToSave'))
+      toast.error(t('noQuestionsToSave'), {
+        duration: 5000
+      })
       return
     }
 
     if (!selectedDocument) {
-      setError(t('pleaseSelectDocumentForSave'))
+      toast.error(t('pleaseSelectDocumentForSave'), {
+        duration: 5000
+      })
       return
     }
 
     setIsSaving(true)
-    setError(null)
 
     try {
       if (isEditMode && editingTestId) {
@@ -949,7 +966,10 @@ export default function TestBuilderPage() {
       await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('failedToSaveTest'))
+      const errorMessage = err instanceof Error ? err.message : t('failedToSaveTest')
+      toast.error(errorMessage, {
+        duration: 5000
+      })
     } finally {
       setIsSaving(false)
     }
@@ -1214,7 +1234,6 @@ export default function TestBuilderPage() {
 
           {/* Results Panel */}
           <div className="space-y-3 md:space-y-6 min-w-0">
-            <ErrorMessage error={error} />
 
             {generatedQuestions.length > 0 && (
               <Card className="overflow-hidden">

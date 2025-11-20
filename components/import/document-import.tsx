@@ -37,7 +37,6 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
   const [parsingStatus, setParsingStatus] = useState<'idle' | 'uploading' | 'parsing' | 'completed' | 'error'>('idle')
   const [, setParsedContent] = useState<ParsedContent | null>(null)
   const [parsingLog, setParsingLog] = useState<ParsingLog[]>([])
-  const [error, setError] = useState<string | null>(null)
   const { t } = useTranslation()
   const { limits } = useUsageLimits()
   const isImportDisabled = limits?.imports.expired ?? false
@@ -52,18 +51,23 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
     ]
     
     if (!allowedTypes.includes(file.type)) {
-      setError('Please upload a DOCX or XLSX file')
+      toast.error('Unsupported file type', {
+        description: 'Please upload a DOCX or XLSX file',
+        duration: 5000
+      })
       return
     }
 
     // Validate file size (3MB limit - accounts for base64 encoding overhead, Vercel API route limit is 4.5MB)
     if (file.size > 3 * 1024 * 1024) {
-      setError('File size must be less than 3MB')
+      toast.error('File too large', {
+        description: 'File size must be less than 3MB',
+        duration: 5000
+      })
       return
     }
 
     setSelectedFile(file)
-    setError(null)
   }, [])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -110,7 +114,6 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
     setParsingStatus('uploading')
     setUploadProgress(0)
     setParsingLog([])
-    setError(null)
 
     try {
       // Simulate upload progress
@@ -169,8 +172,12 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
         errorMessage = `Parse error: ${err.message}`
       }
       
-      setError(errorMessage)
       setParsingStatus('error')
+      
+      // Показать ошибку в toast
+      toast.error(errorMessage, {
+        duration: 5000
+      })
       
       // Add error to parsing log
       setParsingLog(prev => [
@@ -186,7 +193,6 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
     setUploadProgress(0)
     setParsedContent(null)
     setParsingLog([])
-    setError(null)
   }
 
   const getStatusIcon = () => {
@@ -288,12 +294,6 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                 </Alert>
               )}
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
 
               <div className="flex gap-2">
                 {parsingStatus === 'idle' && (

@@ -42,7 +42,12 @@ async function checkEmailExists(email: string) {
   }
 }
 
-const email = process.argv[2] || 'bonapinsk@gmail.com'
+const email = process.argv[2]
+if (!email) {
+  console.error('❌ Email is required as argument')
+  console.error('Usage: tsx scripts/check-email-exists.ts <email>')
+  process.exit(1)
+}
 checkEmailExists(email).then(() => {
   console.log('\n✅ Check completed')
   process.exit(0)

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
 import { Loader2, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 import Link from "next/link"
@@ -15,11 +16,11 @@ function ResetPasswordFormInner() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [tokenValid, setTokenValid] = useState<boolean | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t } = useTranslation()
@@ -29,7 +30,11 @@ function ResetPasswordFormInner() {
   useEffect(() => {
     if (!token) {
       setTokenValid(false)
-      setError(t('resetLinkInvalid'))
+      const errorMessage = t('resetLinkInvalid')
+      setError(errorMessage)
+      toast.error(errorMessage, {
+        duration: 5000
+      })
       return
     }
 
@@ -41,14 +46,22 @@ function ResetPasswordFormInner() {
         
         if (!res.ok || !data.valid) {
           setTokenValid(false)
-          setError(data.error || t('resetLinkExpired'))
+          const errorMessage = data.error || t('resetLinkExpired')
+          setError(errorMessage)
+          toast.error(errorMessage, {
+            duration: 5000
+          })
           return
         }
         
         setTokenValid(true)
-      } catch (error) {
+      } catch (err) {
         setTokenValid(false)
-        setError(t('resetLinkInvalid'))
+        const errorMessage = t('resetLinkInvalid')
+        setError(errorMessage)
+        toast.error(errorMessage, {
+          duration: 5000
+        })
       }
     }
 
@@ -59,22 +72,27 @@ function ResetPasswordFormInner() {
     e.preventDefault()
     
     if (!token) {
-      setError(t('resetLinkInvalid'))
+      toast.error(t('resetLinkInvalid'), {
+        duration: 5000
+      })
       return
     }
 
     if (password.length < 8) {
-      setError(t('passwordTooShort'))
+      toast.error(t('passwordTooShort'), {
+        duration: 5000
+      })
       return
     }
 
     if (password !== confirmPassword) {
-      setError(t('passwordsDoNotMatch'))
+      toast.error(t('passwordsDoNotMatch'), {
+        duration: 5000
+      })
       return
     }
 
     setIsLoading(true)
-    setError("")
 
     try {
       const res = await fetch('/api/auth/reset-password', {
@@ -86,20 +104,27 @@ function ResetPasswordFormInner() {
       const data = await res.json().catch(() => ({}))
       
       if (!res.ok) {
-        setError(data.error || 'Failed to reset password')
+        toast.error(data.error || 'Failed to reset password', {
+          duration: 5000
+        })
         setIsLoading(false)
         return
       }
 
       setSuccess(true)
       setIsLoading(false)
+      toast.success(t('passwordResetSuccess') || 'Password reset successfully!', {
+        duration: 3000
+      })
       
       // Redirect to sign in after 2 seconds
       setTimeout(() => {
         router.push('/auth/signin')
       }, 2000)
     } catch (error) {
-      setError(error instanceof Error ? error.message : t('errorOccurred'))
+      toast.error(error instanceof Error ? error.message : t('errorOccurred'), {
+        duration: 5000
+      })
       setIsLoading(false)
     }
   }
@@ -130,11 +155,6 @@ function ResetPasswordFormInner() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pb-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
           
           {success ? (
             <Alert>
@@ -215,7 +235,7 @@ function ResetPasswordFormInner() {
             </form>
           ) : (
             <div className="text-center">
-              <p className="text-muted-foreground mb-4">{error}</p>
+              <p className="text-muted-foreground mb-4">{error || t('resetLinkInvalid')}</p>
               <Link
                 href="/auth/forgot-password"
                 className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium"

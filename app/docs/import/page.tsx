@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ErrorMessage } from "@/components/common/error-message"
 import { Progress } from "@/components/ui/progress"
 import { 
   FileText, 
@@ -22,6 +21,9 @@ import {
 import { parseDocument, ParsedContent } from '@/lib/parsers'
 import { clearParsingCache } from '@/lib/localStorage-utils'
 import { useTranslation } from '@/lib/translation-context'
+import { useGooglePicker } from '@/lib/hooks/use-google-picker'
+import type { GooglePickerDocument } from '@/types/google-picker'
+import { toast } from 'sonner'
 
 interface UploadedFile {
   id: string
@@ -58,7 +60,9 @@ function DocImportPageInner() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isGooglePickerLoading, setIsGooglePickerLoading] = useState(false)
+  
+  const { openPicker, isLoading: isPickerInitializing } = useGooglePicker()
 
   // Get the return URL from query parameters, with proper encoding
   const returnTo = searchParams.get('returnTo') || '/docs'
@@ -119,19 +123,24 @@ function DocImportPageInner() {
   }
 
   const handleFiles = (fileList: File[]) => {
-    setError(null)
     const newFiles: UploadedFile[] = []
 
     fileList.forEach((file) => {
       // Validate file type
       if (!Object.keys(ACCEPTED_FILE_TYPES).includes(file.type)) {
-        setError(`File type ${file.type} is not supported`)
+        toast.error(`File type ${file.type} is not supported`, {
+          description: 'Please upload DOCX or XLSX files only',
+          duration: 5000
+        })
         return
       }
 
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File ${file.name} is too large. Maximum size is 3MB`)
+        toast.error(`File ${file.name} is too large`, {
+          description: `Maximum size is ${formatFileSize(MAX_FILE_SIZE)}`,
+          duration: 5000
+        })
         return
       }
 
@@ -256,6 +265,126 @@ function DocImportPageInner() {
 
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId))
+  }
+
+  // Обработка файла из Google Drive
+  const handleGoogleDriveFile = async (file: GooglePickerDocument, accessToken: string) => {
+    setIsGooglePickerLoading(true)
+
+    try {
+      // Проверить тип файла
+      const isDocx = file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      const isXlsx = file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      
+      if (!isDocx && !isXlsx) {
+        throw new Error('Only DOCX and XLSX files are supported')
+      }
+
+      // Скачать файл через Drive API
+      const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error?.message || 'Failed to download file from Google Drive')
+      }
+
+      const blob = await response.blob()
+      
+      // Проверить размер файла
+      if (blob.size > MAX_FILE_SIZE) {
+        throw new Error(`File size (${formatFileSize(blob.size)}) exceeds maximum allowed size (${formatFileSize(MAX_FILE_SIZE)})`)
+      }
+
+      // Преобразовать blob в File
+      const fileObj = new File([blob], file.name, {
+        type: file.mimeType
+      })
+
+      // Использовать существующую логику обработки файла
+      handleFiles([fileObj])
+    } catch (error) {
+      console.error('Error handling Google Drive file:', error)
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to import from Google Drive'
+      toast.error(errorMessage, {
+        duration: 5000
+      })
+    } finally {
+      setIsGooglePickerLoading(false)
+    }
+  }
+
+  // Открыть Google Picker
+  const handleOpenGooglePicker = async () => {
+    setIsGooglePickerLoading(true)
+
+    try {
+      await openPicker((file, accessToken) => {
+        handleGoogleDriveFile(file, accessToken)
+      })
+    } catch (error) {
+      console.error('Google Picker error:', error)
+      
+      // Извлечь сообщение об ошибке из разных типов
+      let errorMessage = 'Failed to open Google Drive'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message || errorMessage
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        // Попробовать извлечь сообщение из объекта
+        if ('message' in error && typeof error.message === 'string') {
+          errorMessage = error.message
+        } else if ('error' in error && typeof error.error === 'string') {
+          errorMessage = error.error
+        } else if ('toString' in error) {
+          const errorString = error.toString()
+          if (errorString !== '[object Object]') {
+            errorMessage = errorString
+          }
+        }
+      }
+      
+      // Показать toast для ошибок конфигурации
+      if (errorMessage.includes('GOOGLE_CLIENT_ID') || 
+          errorMessage.includes('not configured') || 
+          errorMessage.includes('environment variables') ||
+          errorMessage.includes('Google OAuth not configured')) {
+        toast.error('Google Drive не настроен', {
+          description: 'Проверьте настройки GOOGLE_CLIENT_ID в .env.local',
+          duration: 6000
+        })
+      } else if (errorMessage.includes('idpiframe_initialization_failed') ||
+                 errorMessage.includes('OAuth initialization failed')) {
+        toast.error('Ошибка инициализации OAuth', {
+          description: 'Убедитесь, что ваш Google аккаунт добавлен как тестовый пользователь в OAuth Consent Screen в Google Cloud Console',
+          duration: 8000
+        })
+      } else if (errorMessage.includes('not loaded') || 
+                 errorMessage.includes('API is not loaded') ||
+                 errorMessage.includes('Failed to load')) {
+        toast.error('Не удалось загрузить Google Picker', {
+          description: 'Проверьте подключение к интернету и попробуйте снова',
+          duration: 6000
+        })
+      } else if (errorMessage.includes('Authorization cancelled')) {
+        // Не показывать ошибку, если пользователь отменил авторизацию
+        return
+      } else {
+        toast.error(errorMessage, {
+          duration: 5000
+        })
+      }
+      
+      setIsGooglePickerLoading(false)
+    }
   }
 
   const saveDocuments = async () => {
@@ -395,12 +524,15 @@ function DocImportPageInner() {
           return ''
         }).filter(Boolean)
         
-        const errorMsg = failed.length === readyFiles.length
-          ? `Failed to save all documents:\n${errorMessages.join('\n')}`
-          : `Failed to save ${failed.length} of ${readyFiles.length} documents:\n${errorMessages.join('\n')}`
-        
         console.error('Document save errors:', errorMessages)
-        setError(errorMsg)
+        
+        // Показать toast для каждой ошибки
+        errorMessages.forEach((msg) => {
+          toast.error(msg, {
+            duration: 6000
+          })
+        })
+        
         setIsUploading(false)
         return // Don't redirect if there are failures
       }
@@ -488,7 +620,9 @@ function DocImportPageInner() {
       const errorMsg = error instanceof Error 
         ? `Failed to save documents: ${error.message}` 
         : 'Failed to save some documents. Please try again.'
-      setError(errorMsg)
+      toast.error(errorMsg, {
+        duration: 5000
+      })
       setIsUploading(false)
     }
   }
@@ -583,11 +717,34 @@ function DocImportPageInner() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
             </div>
+            <div className="mt-4 flex gap-2 justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenGooglePicker}
+                disabled={isGooglePickerLoading || isPickerInitializing}
+                className="gap-2 w-full sm:w-auto"
+              >
+                {isGooglePickerLoading || isPickerInitializing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t('openingGoogleDrive')}
+                  </>
+                ) : (
+                  <>
+                    <img 
+                      src="https://img.icons8.com/color/48/google-drive--v2.png" 
+                      alt="Google Drive" 
+                      className="h-4 w-4"
+                    />
+                    {t('importFromGoogleDrive')}
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Error Display */}
-        <ErrorMessage error={error} showIcon={true} />
 
         {/* File List */}
         {files.length > 0 && (
@@ -633,7 +790,7 @@ function DocImportPageInner() {
                     {file.warning && (
                       <div className="w-full p-2 bg-gray-50 dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800 rounded-lg">
                         <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
-                          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                           <span>{file.warning}</span>
                         </p>
                       </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
 import { Loader2, Mail, ArrowLeft } from "lucide-react"
 import { useTranslation } from "@/lib/translation-context"
 import Link from "next/link"
@@ -14,7 +14,6 @@ import Link from "next/link"
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const router = useRouter()
   const { t } = useTranslation()
@@ -22,7 +21,6 @@ export function ForgotPasswordForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setError("")
     setSuccess(false)
 
     try {
@@ -35,15 +33,22 @@ export function ForgotPasswordForm() {
       const data = await res.json().catch(() => ({}))
       
       if (!res.ok) {
-        setError(data.error || 'Failed to send reset link')
+        toast.error(data.error || 'Failed to send reset link', {
+          duration: 5000
+        })
         setIsLoading(false)
         return
       }
 
       setSuccess(true)
       setIsLoading(false)
+      toast.success(t('resetLinkSent') || 'Reset link sent to your email', {
+        duration: 5000
+      })
     } catch (error) {
-      setError(error instanceof Error ? error.message : t('errorOccurred'))
+      toast.error(error instanceof Error ? error.message : t('errorOccurred'), {
+        duration: 5000
+      })
       setIsLoading(false)
     }
   }
@@ -60,16 +65,10 @@ export function ForgotPasswordForm() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pb-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
           {success ? (
-            <Alert>
-              <AlertDescription>{t('resetLinkSent')}</AlertDescription>
-            </Alert>
+            <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-green-800 dark:text-green-200">{t('resetLinkSent')}</p>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">

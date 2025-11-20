@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ErrorMessage } from "@/components/common/error-message"
 import { useTranslation } from "@/lib/translation-context"
 import { FormField } from "@/components/common/form-field"
 import { toast } from "sonner"
@@ -151,7 +150,6 @@ export default function AssignmentBuilderClient({
   const [savedUsers, setSavedUsers] = useState<User[]>(initialUsers)
   const [savedDocuments, setSavedDocuments] = useState(transformedDocuments)
   const [isCreating, setIsCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(!!editingId)
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(editingId)
@@ -202,12 +200,13 @@ export default function AssignmentBuilderClient({
   const handleCreateAssignment = async () => {
     // Basic validation - check required fields
     if (!assignmentConfig.name.trim() || !assignmentConfig.documentId || assignmentConfig.selectedUsers.length === 0) {
-      setError("Please fill in all required fields")
+      toast.error("Please fill in all required fields", {
+        duration: 5000
+      })
       return
     }
 
     setIsCreating(true)
-    setError(null)
 
     try {
       if (isEditMode && editingAssignmentId) {
@@ -329,7 +328,10 @@ export default function AssignmentBuilderClient({
       router.replace(redirectUrl)
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create assignment')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create assignment'
+      toast.error(errorMessage, {
+        duration: 5000
+      })
     } finally {
       setIsCreating(false)
     }
@@ -563,7 +565,6 @@ export default function AssignmentBuilderClient({
 
           {/* Employee Selection Panel */}
           <div className="space-y-3 md:space-y-6">
-            <ErrorMessage error={error} />
 
             <Card>
               <CardHeader>

@@ -62,6 +62,7 @@ interface ApiDocument {
 }
 import { X } from "lucide-react"
 import { useParams } from "next/navigation"
+import { toast } from "sonner"
 
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes'
@@ -80,7 +81,6 @@ export default function DocumentViewer() {
 
   const [documentData, setDocumentData] = useState<DocumentData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [returnUrl, setReturnUrl] = useState<string | null>(null)
 
   // Preserve return URL from query params or referrer
@@ -494,6 +494,12 @@ export default function DocumentViewer() {
             originalFileName: d.originalFileName,
             title: d.title
           })))
+          
+          toast.error('Document not found', {
+            description: 'The requested document could not be found',
+            duration: 5000
+          })
+          
           // Document doesn't exist, redirect back
           if (returnUrl) {
             router.push(returnUrl)
@@ -518,6 +524,12 @@ export default function DocumentViewer() {
         }
       } else {
         console.error('Failed to load documents:', result.message)
+        
+        toast.error('Failed to load document', {
+          description: result.message || 'An error occurred while loading the document',
+          duration: 5000
+        })
+        
         // Redirect back on error
         if (returnUrl) {
           router.push(returnUrl)
@@ -542,6 +554,13 @@ export default function DocumentViewer() {
       }
     } catch (error) {
       console.error('Error loading document:', error)
+      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load document'
+      toast.error('Error loading document', {
+        description: errorMessage,
+        duration: 5000
+      })
+      
       // Redirect back on error
       if (returnUrl) {
         router.push(returnUrl)
@@ -598,17 +617,6 @@ export default function DocumentViewer() {
     return (
       <div className="min-h-screen bg-background p-6">
         <DocumentLoadingSkeleton />
-      </div>
-    )
-  }
-  
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="text-center space-y-4">
-          <p className="text-destructive">{error}</p>
-          <Button onClick={() => router.back()}>Go Back</Button>
-        </div>
       </div>
     )
   }

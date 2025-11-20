@@ -335,6 +335,8 @@ export const translations = {
     ready: "Ready",
     uploaded: "Uploaded",
     importAnother: "Import Another",
+    importFromGoogleDrive: "Import from Google Drive",
+    openingGoogleDrive: "Opening Google Drive...",
     // Sign In Page
     knowledgeBasePlatform: "Uppstaff",
     signInToAccess: "Sign in to access your learning management system",
@@ -998,6 +1000,8 @@ export const translations = {
     ready: "Готов",
     uploaded: "Загружено",
     importAnother: "Импортировать ещё",
+    importFromGoogleDrive: "Импорт из Google Drive",
+    openingGoogleDrive: "Открытие Google Drive...",
     // Sign In Page
     knowledgeBasePlatform: "Uppstaff",
     signInToAccess: "Войдите в систему для доступа к вашей системе управления обучением",
