@@ -421,6 +421,14 @@ export async function POST(request: Request) {
           const img = updatedParsedContent.images[i] as any
           const result = urlMap.get(i)
           
+          console.log(`📸 Processing image ${i}:`, {
+            filename: img.filename,
+            hasResult: !!result,
+            hasUrl: !!result?.url,
+            hasImageId: !!result?.imageId,
+            originalHasData: !!img.data
+          })
+          
           if (result) {
             if (result.url) {
               // Successfully uploaded to Spaces - store URL
@@ -429,6 +437,8 @@ export async function POST(request: Request) {
               if (result.imageId) {
                 img.imageId = result.imageId // Keep imageId for reference
               }
+              
+              console.log(`✅ Image ${i} (${img.filename}) updated with URL: ${result.url}`)
               
               // Collect for content insertion
               imagesToInsert.push({
@@ -440,14 +450,28 @@ export async function POST(request: Request) {
               // Failed to upload but saved to DB - keep imageId for API lookup
               img.imageId = result.imageId
               img.data = null // Don't store base64 in parsedContent
+              console.warn(`⚠️ Image ${i} (${img.filename}) failed to upload but has imageId: ${result.imageId}`)
+            } else {
+              console.error(`❌ Image ${i} (${img.filename}) failed to upload and has no imageId`)
             }
             // If both failed, keep original data as fallback
+          } else {
+            console.warn(`⚠️ Image ${i} (${img.filename}) has no upload result`)
           }
         }
+        
+        console.log(`📸 Updated parsedContent.images:`, updatedParsedContent.images.map((img: any, idx: number) => ({
+          index: idx,
+          filename: img.filename,
+          hasUrl: !!img.url,
+          hasImageId: !!img.imageId,
+          url: img.url ? img.url.substring(0, 100) + '...' : null
+        })))
         
         // Insert images into content sections as markdown
         if (imagesToInsert.length > 0 && updatedParsedContent.sections && Array.isArray(updatedParsedContent.sections)) {
           console.log(`📸 Processing ${imagesToInsert.length} images for content insertion...`)
+          console.log(`📸 Sections count: ${updatedParsedContent.sections.length}`)
           
           // Track which images have been inserted to avoid duplicates
           const insertedImages = new Set<number>()
@@ -456,6 +480,7 @@ export async function POST(request: Request) {
           // This handles images that were already in the content as data URLs
           imagesToInsert.forEach((img, imgIndex) => {
             const imageMarkdown = `![${img.filename}](${img.url})`
+            console.log(`📸 Processing image ${imgIndex}: ${img.filename}, URL: ${img.url.substring(0, 100)}...`)
             
             // Try to find and replace data URL for this image in content
             for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
@@ -469,7 +494,9 @@ export async function POST(request: Request) {
               
               // Create a new string with replacements
               let newContent = section.content
+              const matches: string[] = []
               while ((match = dataUrlPattern.exec(section.content)) !== null) {
+                matches.push(match[0])
                 const altText = match[1] || ''
                 // Check if this might be the same image (by filename in alt)
                 if (altText.includes(img.filename) || altText === img.filename.replace(/\.[^/.]+$/, '')) {
@@ -478,8 +505,14 @@ export async function POST(request: Request) {
                   foundMatch = true
                   insertedImages.add(imgIndex)
                   console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename}`)
+                  console.log(`📸 Content before: ${section.content.substring(0, 200)}...`)
+                  console.log(`📸 Content after: ${newContent.substring(0, 200)}...`)
                   break // Only replace first match
                 }
+              }
+              
+              if (matches.length > 0 && !foundMatch) {
+                console.log(`📸 Found ${matches.length} data URL(s) in section ${sectionIndex} but none matched ${img.filename}`)
               }
               
               if (foundMatch) {
@@ -508,6 +541,7 @@ export async function POST(request: Request) {
           // Insert images that weren't replaced
           imagesToInsertNew.forEach((img) => {
             const imageMarkdown = `![${img.filename}](${img.url})`
+            console.log(`📸 Attempting to insert image: ${img.filename} at position ${img.position}`)
             let inserted = false
             
             // Try to insert at specific position if available
@@ -522,6 +556,8 @@ export async function POST(request: Request) {
                   const relativePos = img.position - currentPos
                   const before = section.content.substring(0, relativePos)
                   const after = section.content.substring(relativePos)
+                  
+                  console.log(`📸 Inserting image ${img.filename} at position ${img.position} (relative: ${relativePos}) in section ${sectionIndex}`)
                   
                   // Insert image markdown (with newlines for proper formatting)
                   updatedParsedContent.sections[sectionIndex].content = 
@@ -542,9 +578,28 @@ export async function POST(request: Request) {
               console.log(`⚠️ Skipping image "${img.filename}" - no valid position and not found in content`)
             }
           })
+          
+          console.log(`📸 Content insertion complete. Summary:`, {
+            totalImages: imagesToInsert.length,
+            replaced: insertedImages.size,
+            inserted: imagesToInsertNew.filter((img, idx) => {
+              // Check if image was actually inserted
+              return updatedParsedContent.sections.some((section: any) => 
+                section.content.includes(`![${img.filename}](${img.url})`)
+              )
+            }).length,
+            skipped: imagesToInsert.length - insertedImages.size
+          })
         }
         
         parsedContent = updatedParsedContent
+        
+        console.log(`📸 Final parsedContent.images summary:`, {
+          totalImages: parsedContent.images.length,
+          imagesWithUrl: parsedContent.images.filter((img: any) => img.url).length,
+          imagesWithImageId: parsedContent.images.filter((img: any) => img.imageId).length,
+          imagesWithData: parsedContent.images.filter((img: any) => img.data).length
+        })
       }
       
       const successfulUploads = uploadResults.filter(r => r.url).length
@@ -553,6 +608,8 @@ export async function POST(request: Request) {
       if (failedUploads > 0) {
         console.warn(`⚠️ ${failedUploads} image(s) failed to upload to S3 and were skipped (base64 storage is disabled)`)
       }
+    } else {
+      console.log('📸 No images to upload (imagesToUpload.length === 0)')
     }
 
     // Update document with final parsedContent (with URLs)
