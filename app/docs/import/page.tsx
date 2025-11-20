@@ -490,8 +490,25 @@ function DocImportPageInner() {
   }
 
   const saveDocuments = async () => {
+    console.log('saveDocuments called, total files:', files.length)
+    console.log('Files status breakdown:', {
+      ready: files.filter(f => f.status === 'ready').length,
+      processing: files.filter(f => f.status === 'processing').length,
+      uploading: files.filter(f => f.status === 'uploading').length,
+      error: files.filter(f => f.status === 'error').length
+    })
+    
     const readyFiles = files.filter(f => f.status === 'ready')
-    if (readyFiles.length === 0) return
+    console.log('Ready files:', readyFiles.length, readyFiles.map(f => ({ name: f.name, hasParsedContent: !!f.parsedContent })))
+    
+    if (readyFiles.length === 0) {
+      console.warn('No ready files to save')
+      toast.error('No files ready to save', {
+        description: 'Please wait for files to finish processing',
+        duration: 5000
+      })
+      return
+    }
 
     setIsUploading(true)
     
@@ -510,6 +527,18 @@ function DocImportPageInner() {
         }
         
         try {
+          // Validate that parsedContent exists before saving
+          if (!file.parsedContent) {
+            console.error(`File ${file.name} has no parsedContent - cannot save`)
+            throw new Error(`File "${file.name}" is not ready to save. Please wait for processing to complete.`)
+          }
+          
+          // Validate parsedContent structure
+          if (!file.parsedContent.sections || !Array.isArray(file.parsedContent.sections)) {
+            console.error(`File ${file.name} has invalid parsedContent.sections`)
+            throw new Error(`File "${file.name}" has invalid content structure. Please re-upload the file.`)
+          }
+          
           // Prepare request body
           const requestBody = {
             title: file.name,
@@ -517,7 +546,7 @@ function DocImportPageInner() {
             fileType: file.type.split('/')[1],
             fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
             fileSize: file.size,
-            parsedContent: file.parsedContent || null,
+            parsedContent: file.parsedContent,
             parsingLog: file.parsingLog || null,
             uploadedBy: session?.user?.id || 'unknown'
           }
@@ -598,12 +627,17 @@ function DocImportPageInner() {
           return result
         } catch (error) {
           console.error('Error saving document:', file.name, error)
+          console.error('Error details:', {
+            name: error instanceof Error ? error.name : typeof error,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          })
           // Update file status to show error
           setFiles(prev => prev.map(f => 
             f.id === file.id 
               ? { 
                   ...f, 
-                  status: 'error', 
+                  status: 'error' as const, 
                   error: error instanceof Error ? error.message : 'Failed to save document'
                 }
               : f
@@ -613,6 +647,7 @@ function DocImportPageInner() {
       })
 
       // Wait for all saves to complete - use allSettled to handle partial failures
+      console.log(`Starting to save ${savePromises.length} documents...`)
       const results = await Promise.allSettled(savePromises)
       
       // Check if all succeeded
@@ -620,6 +655,28 @@ function DocImportPageInner() {
       const succeeded = results.filter(r => r.status === 'fulfilled')
       
       console.log(`Save results: ${succeeded.length} succeeded, ${failed.length} failed`)
+      
+      // Log detailed results
+      if (succeeded.length > 0) {
+        console.log('Successfully saved documents:', succeeded.map((r, idx) => {
+          if (r.status === 'fulfilled' && r.value?.data?.document) {
+            return { name: readyFiles[idx]?.name, id: r.value.data.document.id }
+          }
+          return { name: readyFiles[idx]?.name, status: 'fulfilled but no data' }
+        }))
+      }
+      
+      if (failed.length > 0) {
+        console.error('Failed to save documents:', failed.map((r, idx) => {
+          if (r.status === 'rejected') {
+            return { 
+              name: readyFiles[idx]?.name, 
+              error: r.reason instanceof Error ? r.reason.message : String(r.reason)
+            }
+          }
+          return { name: readyFiles[idx]?.name, status: 'unknown error' }
+        }))
+      }
       
       if (failed.length > 0) {
         // Some files failed - show specific error messages

@@ -147,9 +147,30 @@ export async function POST(request: Request) {
 
     // Validate parsedContent exists and has required structure
     if (!parsedContent) {
-      console.warn('Warning: parsedContent is null or undefined')
-    } else if (!parsedContent.sections || !Array.isArray(parsedContent.sections)) {
-      console.warn('Warning: parsedContent.sections is missing or not an array')
+      console.error('ERROR: parsedContent is null or undefined - document cannot be saved without content')
+      return NextResponse.json({
+        success: false,
+        message: 'Document content is missing. Please re-upload the file.'
+      }, { status: 400 })
+    }
+    
+    if (!parsedContent.sections || !Array.isArray(parsedContent.sections)) {
+      console.warn('Warning: parsedContent.sections is missing or not an array, creating empty sections array')
+      if (!parsedContent.sections) {
+        parsedContent.sections = []
+      }
+    }
+    
+    // Ensure images array exists
+    if (!parsedContent.images || !Array.isArray(parsedContent.images)) {
+      console.warn('Warning: parsedContent.images is missing or not an array, creating empty images array')
+      parsedContent.images = []
+    }
+    
+    // Ensure tables array exists
+    if (!parsedContent.tables || !Array.isArray(parsedContent.tables)) {
+      console.warn('Warning: parsedContent.tables is missing or not an array, creating empty tables array')
+      parsedContent.tables = []
     }
 
     // Process images: upload ALL images to Spaces
@@ -523,9 +544,12 @@ export async function POST(request: Request) {
     }
 
     if (!savedDocument) {
+      console.error('Failed to save document - savedDocument is null/undefined')
+      console.error('Document ID was:', documentId)
+      console.error('Existing document check:', existingDocument.length > 0)
       return NextResponse.json({
         success: false,
-        message: 'Failed to save document'
+        message: 'Failed to save document - document was not created or updated'
       }, { status: 500 })
     }
 

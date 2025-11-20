@@ -305,9 +305,14 @@ export default function DocumentViewer() {
           const tables = document.parsedContent?.tables || []
           
           // Extract images from parsedContent and embed them in content
+          // NOTE: Images may already be in sections from save process, so check first
           const images = document.parsedContent?.images || []
-          if (images.length > 0) {
-            console.log(`📸 Found ${images.length} images to display`)
+          
+          // Check if images are already in content (from save process)
+          const contentHasImages = content.includes('![') || content.includes('<img')
+          
+          if (images.length > 0 && !contentHasImages) {
+            console.log(`📸 Found ${images.length} images to display (not in content yet)`)
             
             // Find where to insert images - look for "1. General Principles" section
             // Try multiple variations of the heading
@@ -483,9 +488,9 @@ export default function DocumentViewer() {
             content = contentWithImages
             
             // Debug: Check if images are in content
-            const imageCount = (content.match(/!\[.*?\]\(data:image/gi) || []).length
+            const imageCount = (content.match(/!\[.*?\]\([^)]+\)/gi) || []).length
             console.log(`📸 Images in content string: ${imageCount}`)
-            console.log(`📸 Content includes image markdown: ${content.includes('![image')}`)
+            console.log(`📸 Content includes image markdown: ${content.includes('![')}`)
           }
           
           // If no sections but we have tables, leave content empty (tables will be shown)

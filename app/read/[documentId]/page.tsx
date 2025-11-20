@@ -201,9 +201,14 @@ export default function DocumentReaderPage() {
         // Extract tables separately (for xlsx files)
         const tables = document.parsedContent?.tables || []
         
-        // Extract images from parsedContent and embed them in content
-        const images = document.parsedContent?.images || []
-        if (images.length > 0) {
+          // Extract images from parsedContent and embed them in content
+          // NOTE: Images may already be in sections from save process, so check first
+          const images = document.parsedContent?.images || []
+          
+          // Check if images are already in content (from save process)
+          const contentHasImages = content.includes('![') || content.includes('<img')
+          
+          if (images.length > 0 && !contentHasImages) {
           console.log(`📸 Found ${images.length} images to display`)
           
           // Sort images by position (if available) to insert them in order
@@ -305,9 +310,9 @@ export default function DocumentReaderPage() {
           content = contentWithImages
           
           // Debug: Check if images are in content
-          const imageCount = (content.match(/!\[.*?\]\(data:image/gi) || []).length
+          const imageCount = (content.match(/!\[.*?\]\([^)]+\)/gi) || []).length
           console.log(`📸 Images in content string: ${imageCount}`)
-          console.log(`📸 Content includes image markdown: ${content.includes('![image')}`)
+          console.log(`📸 Content includes image markdown: ${content.includes('![')}`)
         }
         
         // Fallback if no content
