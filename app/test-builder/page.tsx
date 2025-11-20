@@ -95,7 +95,7 @@ export default function TestBuilderPage() {
   const { values, errors, touched, setValue, setFieldTouched, validateAll } = validation
   
   const testConfig: TestConfig = {
-    count: values.count !== undefined && values.count !== '' ? values.count : 5,
+    count: values.count !== undefined && typeof values.count === 'number' ? values.count : 5,
     type: values.type || 'mcq',
     difficulty: values.difficulty || 'medium',
     locale: values.locale || 'en'
@@ -1062,12 +1062,13 @@ export default function TestBuilderPage() {
                       type="number"
                       min="1"
                       max="15"
-                      value={values.count !== undefined && values.count !== '' ? values.count : ''}
+                      value={values.count !== undefined && typeof values.count === 'number' ? values.count : ''}
                       onChange={(e) => {
                         const inputValue = e.target.value
                         // Allow empty value during input
                         if (inputValue === '') {
-                          setValue('count', '' as any)
+                          // Set to undefined to allow empty state
+                          setValue('count', undefined as any)
                         } else {
                           const numValue = parseFloat(inputValue)
                           // Accept any number during input, validation on blur
@@ -1080,21 +1081,19 @@ export default function TestBuilderPage() {
                         setFieldTouched('count')
                         // Validate and clamp value after user finishes editing
                         const currentValue = values.count
-                        if (currentValue === '' || currentValue === undefined || currentValue === null) {
-                          // Empty value, set to default
+                        if (currentValue === undefined || currentValue === null || (typeof currentValue === 'number' && isNaN(currentValue))) {
+                          // Empty or invalid value, set to default
                           setValue('count', 1)
-                        } else {
-                          const numValue = Number(currentValue)
-                          if (!isNaN(numValue)) {
-                            if (numValue < 1) {
-                              setValue('count', 1)
-                            } else if (numValue > 15) {
-                              setValue('count', 15)
-                            }
-                          } else {
-                            // Invalid number, set to default
+                        } else if (typeof currentValue === 'number') {
+                          const numValue = currentValue
+                          if (numValue < 1) {
                             setValue('count', 1)
+                          } else if (numValue > 15) {
+                            setValue('count', 15)
                           }
+                        } else {
+                          // Invalid type, set to default
+                          setValue('count', 1)
                         }
                       }}
                       className="w-full"
