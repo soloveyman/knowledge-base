@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import { ReactNode, useId } from "react"
 
 interface FormGroupProps {
-  label: string
+  label: string | ReactNode
   htmlFor?: string
   required?: boolean
   error?: string

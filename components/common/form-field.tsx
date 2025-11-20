@@ -5,7 +5,7 @@ import { FormGroup } from "./form-group"
 import { cn } from "@/lib/utils"
 
 interface FormFieldProps {
-  label: string
+  label: string | React.ReactNode
   htmlFor?: string
   required?: boolean
   error?: string

@@ -252,6 +252,7 @@ export const translations = {
     // selectDocument: "Select Document", // Already exists
     chooseDocumentToGenerate: "Choose a document to generate questions from...",
     numberOfQuestions: "Number of Questions",
+    numberOfQuestionsShort: "Number",
     enterNumberOfQuestions: "Enter number of questions",
     questionType: "Question Type",
     difficulty: "Difficulty",
@@ -915,6 +916,7 @@ export const translations = {
     selectDocument: "Выберите документ",
     chooseDocumentToGenerate: "Выберите документ для генерации вопросов...",
     numberOfQuestions: "Количество вопросов",
+    numberOfQuestionsShort: "Количество",
     enterNumberOfQuestions: "Введите количество вопросов",
     questionType: "Тип вопроса",
     difficulty: "Сложность",

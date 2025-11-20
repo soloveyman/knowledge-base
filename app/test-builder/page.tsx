@@ -95,7 +95,7 @@ export default function TestBuilderPage() {
   const { values, errors, touched, setValue, setFieldTouched, validateAll } = validation
   
   const testConfig: TestConfig = {
-    count: values.count || 5,
+    count: values.count !== undefined && values.count !== '' ? values.count : 5,
     type: values.type || 'mcq',
     difficulty: values.difficulty || 'medium',
     locale: values.locale || 'en'
@@ -1049,7 +1049,12 @@ export default function TestBuilderPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
-                    label={t('numberOfQuestions')}
+                    label={
+                      <>
+                        <span className="md:hidden">{t('numberOfQuestionsShort')}</span>
+                        <span className="hidden md:inline">{t('numberOfQuestions')}</span>
+                      </>
+                    }
                     required
                     error={touched.count ? errors.count : undefined}
                   >
@@ -1057,27 +1062,38 @@ export default function TestBuilderPage() {
                       type="number"
                       min="1"
                       max="15"
-                      value={testConfig.count ?? ''}
+                      value={values.count !== undefined && values.count !== '' ? values.count : ''}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === '') {
-                          // Don't update when empty - validation will catch it
-                          return
+                        const inputValue = e.target.value
+                        // Allow empty value during input
+                        if (inputValue === '') {
+                          setValue('count', '' as any)
                         } else {
-                          const numValue = Number(value)
-                          if (!isNaN(numValue) && numValue >= 1 && numValue <= 15) {
+                          const numValue = parseFloat(inputValue)
+                          // Accept any number during input, validation on blur
+                          if (!isNaN(numValue)) {
                             setValue('count', numValue)
                           }
                         }
                       }}
                       onBlur={() => {
                         setFieldTouched('count')
-                        // Ensure value is within valid range
-                        if (testConfig.count !== undefined) {
-                          if (testConfig.count < 1) {
+                        // Validate and clamp value after user finishes editing
+                        const currentValue = values.count
+                        if (currentValue === '' || currentValue === undefined || currentValue === null) {
+                          // Empty value, set to default
+                          setValue('count', 1)
+                        } else {
+                          const numValue = Number(currentValue)
+                          if (!isNaN(numValue)) {
+                            if (numValue < 1) {
+                              setValue('count', 1)
+                            } else if (numValue > 15) {
+                              setValue('count', 15)
+                            }
+                          } else {
+                            // Invalid number, set to default
                             setValue('count', 1)
-                          } else if (testConfig.count > 15) {
-                            setValue('count', 15)
                           }
                         }
                       }}
