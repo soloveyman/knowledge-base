@@ -245,30 +245,26 @@ function DocImportPageInner() {
               warningMessages.push(`This document contains ${imageCount} image(s) totaling ${totalImageSizeMB.toFixed(2)}MB. Large images may cause upload issues.`)
             }
             
-            setFiles(prev => {
-              const updated = prev.map(f => 
-                f.id === file.id 
-                  ? { 
-                      ...f, 
-                      status: 'ready',
-                      progress: 100,
-                      parsedContent: parsedContent,
-                      parsingLog: warningMessages.length > 0 ? warningMessages.map(msg => ({ level: 'warning', message: msg })) : [],
-                      warning: warningMessages.length > 0 ? warningMessages.join(' ') : undefined
-                    }
-                  : f
-              )
-              const updatedFile = updated.find(f => f.id === file.id)
-              if (updatedFile) {
+            setFiles(prev => prev.map(f => {
+              if (f.id === file.id) {
+                const updatedFile: UploadedFile = {
+                  ...f,
+                  status: 'ready' as const,
+                  progress: 100,
+                  parsedContent: parsedContent,
+                  parsingLog: warningMessages.length > 0 ? warningMessages.map(msg => ({ level: 'warning', message: msg })) : [],
+                  warning: warningMessages.length > 0 ? warningMessages.join(' ') : undefined
+                }
                 console.log(`File ${fileObj.name} marked as ready:`, {
                   hasParsedContent: !!updatedFile.parsedContent,
                   sections: updatedFile.parsedContent?.sections?.length || 0,
                   tables: updatedFile.parsedContent?.tables?.length || 0,
                   images: updatedFile.parsedContent?.images?.length || 0
                 })
+                return updatedFile
               }
-              return updated
-            })
+              return f
+            }))
             
             // Show warning toast if large images detected
             if (warningMessages.length > 0) {
