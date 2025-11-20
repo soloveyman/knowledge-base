@@ -66,7 +66,10 @@ function DocumentContent({ content }: { content: string }) {
   
   // Debug: Log markdown preview
   console.log('📄 Markdown preview (first 500 chars):', markdown.substring(0, 500))
-  console.log('📄 Markdown contains image markdown:', /!\[.*?\]\(data:/gi.test(markdown))
+  console.log('📄 Markdown contains data URL images:', /!\[.*?\]\(data:/gi.test(markdown))
+  console.log('📄 Markdown contains external URL images:', /!\[.*?\]\(https?:\/\//gi.test(markdown))
+  const allImageMatches = markdown.match(/!\[.*?\]\([^)]+\)/gi)
+  console.log('📄 All image markdown found:', allImageMatches?.length || 0, allImageMatches?.map(m => m.substring(0, 80)) || [])
   
   // Convert markdown images to HTML img tags (ReactMarkdown with rehypeRaw can handle HTML)
   // This avoids parsing issues with very long data URLs

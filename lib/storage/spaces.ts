@@ -33,10 +33,21 @@ if (spacesOriginEndpoint.includes('.')) {
 const isSpacesConfigured = !!(spacesKey && spacesSecret)
 
 if (!isSpacesConfigured) {
-  console.warn('DigitalOcean Spaces credentials not configured')
+  console.warn('⚠️ DigitalOcean Spaces credentials not configured')
+  console.warn('⚠️ Missing environment variables:', {
+    hasKey: !!spacesKey,
+    hasSecret: !!spacesSecret,
+    endpoint: spacesOriginEndpoint,
+    bucket: spacesBucket,
+    region: spacesRegion
+  })
 } else {
   console.log(`✅ Spaces configured: bucket="${spacesBucket}", endpoint="${spacesOriginEndpoint}", region="${spacesRegion}"`)
+  console.log(`✅ Spaces CDN: ${spacesCdnEndpoint}, useCdn: ${useCdn}`)
 }
+
+// Export isSpacesConfigured for checking in other modules
+export { isSpacesConfigured }
 
 // Only create S3Client if credentials are configured
 // Use path-style URLs to avoid hostname issues with bucket names
@@ -71,12 +82,31 @@ export async function uploadImageToSpaces(
   folder: string = 'images'
 ): Promise<UploadImageResult> {
   if (!isSpacesConfigured || !s3Client) {
-    throw new Error('DigitalOcean Spaces not configured')
+    const errorMsg = 'DigitalOcean Spaces not configured. Please set DO_SPACES_KEY and DO_SPACES_SECRET environment variables.'
+    console.error(`❌ ${errorMsg}`)
+    console.error('❌ Configuration check:', {
+      isSpacesConfigured,
+      hasS3Client: !!s3Client,
+      hasKey: !!spacesKey,
+      hasSecret: !!spacesSecret,
+      endpoint: spacesOriginEndpoint,
+      bucket: spacesBucket
+    })
+    throw new Error(errorMsg)
   }
 
   // Генерируем уникальное имя файла
   const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_')
   const key = `${folder}/${Date.now()}-${sanitizedFilename}`
+  
+  console.log(`📤 Uploading to Spaces:`, {
+    bucket: spacesBucket,
+    key,
+    filename,
+    contentType,
+    size: buffer.length,
+    endpoint: spacesOriginEndpoint
+  })
   
   const command = new PutObjectCommand({
     Bucket: spacesBucket,
@@ -86,7 +116,26 @@ export async function uploadImageToSpaces(
     ACL: 'public-read', // Публичный доступ для изображений
   })
 
-  await s3Client.send(command)
+  try {
+    await s3Client.send(command)
+    console.log(`✅ Successfully uploaded to Spaces: ${key} (${buffer.length} bytes)`)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCode = (error as any)?.$metadata?.httpStatusCode
+    const errorName = (error as any)?.name
+    
+    console.error(`❌ Spaces upload failed:`, {
+      key,
+      bucket: spacesBucket,
+      filename,
+      error: errorMessage,
+      code: errorCode,
+      name: errorName,
+      metadata: (error as any)?.$metadata,
+      endpoint: spacesOriginEndpoint
+    })
+    throw error
+  }
 
   // Формируем URL в зависимости от стиля (path-style или virtual-hosted-style)
   // Для path-style: https://endpoint/bucket/key

@@ -348,6 +348,10 @@ export async function POST(request: Request) {
     if (imagesToUpload.length > 0) {
       console.log(`📤 Uploading ${imagesToUpload.length} images to Spaces...`)
       
+      // Check Spaces configuration before attempting upload
+      // Note: isSpacesConfigured is checked inside uploadImageToSpaces, but we log here for visibility
+      console.log('📤 Checking Spaces configuration before upload...')
+      
       const uploadResults: Array<{
         originalIndex: number
         url: string | null
@@ -359,7 +363,11 @@ export async function POST(request: Request) {
       // Upload images in parallel (but limit concurrency to avoid overwhelming Spaces)
       const uploadPromises = imagesToUpload.map(async (img) => {
         try {
+          console.log(`📤 Starting upload for ${img.filename} (${img.base64Data.length} bytes base64)`)
+          
           const imageBuffer = Buffer.from(img.base64Data, 'base64')
+          console.log(`📤 Image buffer created: ${imageBuffer.length} bytes for ${img.filename}`)
+          
           const uploadResult = await uploadImageToSpaces(
             imageBuffer,
             img.filename,
@@ -367,7 +375,12 @@ export async function POST(request: Request) {
             `documents/${documentId}`
           )
           
-          console.log(`✅ Uploaded ${img.filename} to Spaces: ${uploadResult.url}`)
+          console.log(`✅ Uploaded ${img.filename} to Spaces:`, {
+            url: uploadResult.url,
+            cdnUrl: uploadResult.cdnUrl,
+            key: uploadResult.key,
+            size: imageBuffer.length
+          })
           
           // Save to documentImages table for management
           const savedImage = await db.insert(documentImages).values({
@@ -379,6 +392,8 @@ export async function POST(request: Request) {
             position: img.position
           }).returning()
           
+          console.log(`✅ Saved image to database: ${savedImage[0].id} for ${img.filename}`)
+          
           return {
             originalIndex: img.originalIndex,
             url: uploadResult.url,
@@ -387,7 +402,17 @@ export async function POST(request: Request) {
             error: undefined
           }
         } catch (error) {
-          console.error(`❌ Failed to upload ${img.filename} to Spaces:`, error)
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          const errorStack = error instanceof Error ? error.stack : undefined
+          console.error(`❌ Failed to upload ${img.filename} to Spaces:`, {
+            error: errorMessage,
+            stack: errorStack,
+            filename: img.filename,
+            type: img.type,
+            base64Length: img.base64Data.length,
+            errorName: error instanceof Error ? error.name : typeof error,
+            errorDetails: error
+          })
           // Don't save base64 - all images must be in S3
           // If upload fails, skip the image and log the error
           console.error(`Skipping image ${img.filename} - S3 upload failed and base64 storage is disabled`)
@@ -396,7 +421,7 @@ export async function POST(request: Request) {
             url: null,
             storageKey: null,
             imageId: null,
-            error: error instanceof Error ? error.message : 'S3 upload failed - base64 storage disabled'
+            error: errorMessage
           }
         }
       })
@@ -499,12 +524,16 @@ export async function POST(request: Request) {
                 matches.push(match[0])
                 const altText = match[1] || ''
                 // Check if this might be the same image (by filename in alt)
-                if (altText.includes(img.filename) || altText === img.filename.replace(/\.[^/.]+$/, '')) {
+                // Also match if it's the first data URL and we haven't matched any images yet (more lenient)
+                const filenameMatch = altText.includes(img.filename) || altText === img.filename.replace(/\.[^/.]+$/, '')
+                const isFirstUnmatched = matches.length === 1 && insertedImages.size === 0
+                
+                if (filenameMatch || isFirstUnmatched) {
                   // Replace this data URL with the Spaces URL (only first match)
                   newContent = newContent.replace(match[0], imageMarkdown)
                   foundMatch = true
                   insertedImages.add(imgIndex)
-                  console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename}`)
+                  console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename} (match: ${filenameMatch ? 'filename' : 'first unmatched'})`)
                   console.log(`📸 Content before: ${section.content.substring(0, 200)}...`)
                   console.log(`📸 Content after: ${newContent.substring(0, 200)}...`)
                   break // Only replace first match
@@ -513,6 +542,13 @@ export async function POST(request: Request) {
               
               if (matches.length > 0 && !foundMatch) {
                 console.log(`📸 Found ${matches.length} data URL(s) in section ${sectionIndex} but none matched ${img.filename}`)
+                // If we have data URLs but no match, replace the first one anyway to ensure image is shown
+                if (matches.length > 0 && insertedImages.size === 0) {
+                  newContent = section.content.replace(matches[0], imageMarkdown)
+                  foundMatch = true
+                  insertedImages.add(imgIndex)
+                  console.log(`📸 Replaced first data URL (no filename match) with Spaces URL for ${img.filename}`)
+                }
               }
               
               if (foundMatch) {
@@ -572,10 +608,17 @@ export async function POST(request: Request) {
               }
             }
             
-            // If not inserted at specific position, don't append to end
-            // Images should only be inserted if they have a valid position or were already in content
+            // If not inserted at specific position, append to first section or end of content
+            // This ensures images are always visible even if position is missing
             if (!inserted) {
-              console.log(`⚠️ Skipping image "${img.filename}" - no valid position and not found in content`)
+              if (updatedParsedContent.sections.length > 0) {
+                // Append to first section
+                updatedParsedContent.sections[0].content += '\n\n' + imageMarkdown
+                console.log(`✅ Appended image "${img.filename}" to first section (no valid position)`)
+                inserted = true
+              } else {
+                console.warn(`⚠️ Cannot insert image "${img.filename}" - no sections available`)
+              }
             }
           })
           
