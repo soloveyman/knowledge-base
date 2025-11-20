@@ -320,7 +320,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                 {parsingStatus === 'completed' && (
                   <>
                     <Button variant="outline" onClick={resetImport} className="flex-1">
-                      Import Another
+                      {t('importAnother')}
                     </Button>
                   </>
                 )}

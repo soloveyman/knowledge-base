@@ -185,6 +185,12 @@ export const translations = {
     enterYourAnswer: "Enter your answer here...",
     correctAnswers: "Correct Answers",
     totalQuestions: "Total Questions",
+    continueTest: "Continue Test",
+    exitTest: "Exit Test",
+    testNotFound: "The requested test could not be found.",
+    testNotFoundTitle: "Test Not Found",
+    documentNotFound: "The requested document could not be found.",
+    documentNotFoundTitle: "Document Not Found",
     
     // Reports
     reports: "Reports",
@@ -327,6 +333,7 @@ export const translations = {
     documentImport: "Document Import",
     ready: "Ready",
     uploaded: "Uploaded",
+    importAnother: "Import Another",
     // Sign In Page
     knowledgeBasePlatform: "Uppstaff",
     signInToAccess: "Sign in to access your learning management system",
@@ -841,6 +848,12 @@ export const translations = {
     enterYourAnswer: "Введите ваш ответ здесь...",
     correctAnswers: "Правильные ответы",
     totalQuestions: "Всего вопросов",
+    continueTest: "Продолжить тест",
+    exitTest: "Выйти из теста",
+    testNotFound: "Запрошенный тест не найден.",
+    testNotFoundTitle: "Тест не найден",
+    documentNotFound: "Запрошенный документ не найден.",
+    documentNotFoundTitle: "Документ не найден",
     
     // Reports
     reports: "Отчёты",
@@ -982,6 +995,7 @@ export const translations = {
     documentImport: "Импорт документа",
     ready: "Готов",
     uploaded: "Загружено",
+    importAnother: "Импортировать ещё",
     // Sign In Page
     knowledgeBasePlatform: "Uppstaff",
     signInToAccess: "Войдите в систему для доступа к вашей системе управления обучением",

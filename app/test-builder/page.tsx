@@ -40,31 +40,31 @@ import type {
 
 // Documents will be loaded from API
 
-const questionTypes: QuestionType[] = [
-  { value: "mcq", label: "Multiple Choice (Single)" },
-  { value: "mcq_multi", label: "Multiple Choice (Multiple)" },
-  { value: "tf", label: "True/False" },
-  { value: "complete", label: "Fill in the Blank" },
-  { value: "cloze", label: "Cloze Test" },
-  { value: "match", label: "Matching" },
-  { value: "order", label: "Ordering" },
-  { value: "mixed", label: "Mixed Types" }
-]
-
-const difficultyLevels: DifficultyLevel[] = [
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" }
-]
-
-const locales: Locale[] = [
-  { value: "ru", label: "Russian" },
-  { value: "en", label: "English" }
-]
-
 export default function TestBuilderPage() {
   const { data: session, status } = useSession()
   const { t } = useTranslation()
+  
+  const questionTypes: QuestionType[] = [
+    { value: "mcq", label: t('multipleChoiceSingle') },
+    { value: "mcq_multi", label: t('multipleChoiceMultiple') },
+    { value: "tf", label: t('trueFalse') },
+    { value: "complete", label: t('fillInBlank') },
+    { value: "cloze", label: t('clozeTest') },
+    { value: "match", label: t('matching') },
+    { value: "order", label: t('ordering') },
+    { value: "mixed", label: t('mixedTypes') }
+  ]
+
+  const difficultyLevels: DifficultyLevel[] = [
+    { value: "easy", label: t('easy') },
+    { value: "medium", label: t('medium') },
+    { value: "hard", label: t('hard') }
+  ]
+
+  const locales: Locale[] = [
+    { value: "ru", label: t('russian') },
+    { value: "en", label: t('english') }
+  ]
   const router = useRouter()
   
   const [documents, setDocuments] = useState<Document[]>([])
@@ -1103,15 +1103,7 @@ export default function TestBuilderPage() {
                       <SelectContent>
                         {questionTypes.map((type) => (
                           <SelectItem key={type.value} value={type.value}>
-                            {type.value === 'mcq' ? t('multipleChoiceSingle') :
-                             type.value === 'mcq_multi' ? t('multipleChoiceMultiple') :
-                             type.value === 'tf' ? t('trueFalse') :
-                             type.value === 'complete' ? t('fillInBlank') :
-                             type.value === 'cloze' ? t('clozeTest') :
-                             type.value === 'match' ? t('matching') :
-                             type.value === 'order' ? t('ordering') :
-                             type.value === 'mixed' ? t('mixedTypes') :
-                             type.label}
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1138,10 +1130,7 @@ export default function TestBuilderPage() {
                       <SelectContent>
                         {difficultyLevels.map((level) => (
                           <SelectItem key={level.value} value={level.value}>
-                            {level.value === 'easy' ? t('easy') :
-                             level.value === 'medium' ? t('medium') :
-                             level.value === 'hard' ? t('hard') :
-                             level.label}
+                            {level.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1165,9 +1154,7 @@ export default function TestBuilderPage() {
                       <SelectContent>
                         {locales.map((locale) => (
                           <SelectItem key={locale.value} value={locale.value}>
-                            {locale.value === 'ru' ? t('russian') :
-                             locale.value === 'en' ? t('english') :
-                             locale.label}
+                            {locale.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

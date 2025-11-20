@@ -331,11 +331,11 @@ export default function TestPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <TestTube className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-xl font-semibold text-foreground dark:text-white mb-2">Test Not Found</h2>
-          <p className="text-muted-foreground mb-4">The requested test could not be found.</p>
+          <h2 className="text-xl font-semibold text-foreground dark:text-white mb-2">{t('testNotFoundTitle')}</h2>
+          <p className="text-muted-foreground mb-4">{t('testNotFound')}</p>
           <Button onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Assignments
+            {t('backToAssignments')}
           </Button>
         </div>
       </div>
@@ -585,10 +585,10 @@ export default function TestPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={handleCancelExit}>
-              Continue Test
+              {t('continueTest')}
             </Button>
             <Button variant="destructive" onClick={handleConfirmExit}>
-              Exit Test
+              {t('exitTest')}
             </Button>
           </DialogFooter>
         </DialogContent>

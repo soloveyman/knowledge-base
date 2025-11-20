@@ -426,14 +426,14 @@ export default function DocumentReaderPage() {
         <div className="text-center px-4">
           <FileText className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 sm:mb-6 text-muted-foreground" />
           <h2 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-white mb-3 sm:mb-4 leading-tight">
-            Document Not Found
+            {t('documentNotFoundTitle')}
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 leading-relaxed max-w-md mx-auto">
-            The requested document could not be found.
+            {t('documentNotFound')}
           </p>
           <Button onClick={handleBack} size="lg">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Assignments
+            {t('backToAssignments')}
           </Button>
         </div>
       </div>
