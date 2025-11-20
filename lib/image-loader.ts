@@ -4,17 +4,24 @@
 
 export interface ImageData {
   filename: string
-  data?: string | null // base64 data (for small images)
+  data?: string | null // base64 data (deprecated, kept for legacy support)
+  url?: string | null // URL from DigitalOcean Spaces (preferred)
   type: string
   position?: number
-  imageId?: string | null // ID for large images stored in database
+  imageId?: string | null // ID for images stored in database (for API lookup)
 }
 
 /**
- * Get image data URL from either inline data or API
+ * Get image URL/data URL from Spaces URL, inline data, or API
  */
 export async function getImageDataUrl(img: ImageData): Promise<string> {
-  // If image has inline data (small image)
+  // Priority 1: URL from Spaces (fastest, most efficient)
+  if (img.url) {
+    console.log(`Using Spaces URL for ${img.filename}: ${img.url}`)
+    return img.url
+  }
+  
+  // Priority 2: Inline base64 data (legacy support)
   if (img.data) {
     // Check if it's already a data URL (starts with "data:")
     if (img.data.startsWith('data:')) {
@@ -26,7 +33,7 @@ export async function getImageDataUrl(img: ImageData): Promise<string> {
     }
   }
   
-  // If image has imageId (large image), fetch from API
+  // Priority 3: Fetch from API using imageId (for legacy images or fallback)
   if (img.imageId) {
     try {
       console.log(`Loading large image from API: ${img.filename} (imageId: ${img.imageId})`)
@@ -44,8 +51,16 @@ export async function getImageDataUrl(img: ImageData): Promise<string> {
       }
       
       const result = await response.json()
+      
+      // Приоритет: URL из Spaces (быстрее и эффективнее)
+      if (result.success && result.data?.url) {
+        console.log(`Successfully loaded image ${img.filename} from Spaces: ${result.data.url}`)
+        return result.data.url
+      }
+      
+      // Fallback: data URL из БД (для старых изображений)
       if (result.success && result.data?.dataUrl) {
-        console.log(`Successfully loaded image ${img.filename} from API (${result.data.dataUrl.length} chars)`)
+        console.log(`Successfully loaded image ${img.filename} from API (base64, ${result.data.dataUrl.length} chars)`)
         return result.data.dataUrl
       }
       

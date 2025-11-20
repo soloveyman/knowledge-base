@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, documents, assignments } from '@/lib/db'
+import { db, documents, assignments, documentImages } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { deleteImageFromSpaces } from '@/lib/storage/spaces'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -104,7 +105,33 @@ export async function DELETE(
       }
     }
 
-    // Delete the document
+    // Get all images for this document before deletion
+    const documentImagesList = await db
+      .select()
+      .from(documentImages)
+      .where(eq(documentImages.documentId, id))
+
+    // Delete images from Spaces (if they have storageKey)
+    if (documentImagesList.length > 0) {
+      console.log(`🗑️ Deleting ${documentImagesList.length} images from Spaces for document ${id}`)
+      
+      const deletePromises = documentImagesList
+        .filter(img => img.storageKey) // Only delete if has storageKey
+        .map(async (img) => {
+          try {
+            await deleteImageFromSpaces(img.storageKey!)
+            console.log(`✅ Deleted image from Spaces: ${img.storageKey}`)
+          } catch (error) {
+            // Log error but don't fail document deletion if Spaces deletion fails
+            console.error(`❌ Failed to delete image from Spaces (${img.storageKey}):`, error)
+          }
+        })
+      
+      await Promise.allSettled(deletePromises) // Use allSettled to continue even if some fail
+      console.log(`✅ Finished deleting images from Spaces for document ${id}`)
+    }
+
+    // Delete the document (cascade will delete documentImages from DB)
     await db.delete(documents).where(eq(documents.id, id))
 
     return NextResponse.json({

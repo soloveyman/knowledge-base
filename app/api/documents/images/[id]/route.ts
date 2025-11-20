@@ -71,21 +71,41 @@ export async function GET(
       }
     }
 
-    // Return image as base64 data URL
-    // imageData.data is stored as base64 (without data URL prefix) in the database
-    const dataUrl = `data:${imageData.type};base64,${imageData.data}`
+    // Если есть URL в Spaces, используем его (приоритет)
+    if (imageData.url) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: imageData.id,
+          filename: imageData.filename,
+          type: imageData.type,
+          position: imageData.position,
+          url: imageData.url, // Прямой URL из Spaces (CDN)
+        }
+      })
+    }
 
+    // Fallback: возвращаем base64 из БД (для старых изображений)
+    if (imageData.data) {
+      const dataUrl = `data:${imageData.type};base64,${imageData.data}`
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: imageData.id,
+          filename: imageData.filename,
+          type: imageData.type,
+          position: imageData.position,
+          dataUrl: dataUrl, // Full data URL for direct use
+          data: imageData.data // Raw base64 for flexibility
+        }
+      })
+    }
+
+    // Если нет ни URL, ни данных
     return NextResponse.json({
-      success: true,
-      data: {
-        id: imageData.id,
-        filename: imageData.filename,
-        type: imageData.type,
-        position: imageData.position,
-        dataUrl: dataUrl, // Full data URL for direct use
-        data: imageData.data // Raw base64 for flexibility
-      }
-    })
+      success: false,
+      message: 'Image data not available'
+    }, { status: 404 })
   } catch (error) {
     console.error('Get image API error:', error)
     return NextResponse.json({

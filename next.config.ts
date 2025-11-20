@@ -92,7 +92,16 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     // Remote patterns for external images (add domains as needed)
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'uppstaff.ams3.digitaloceanspaces.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'uppstaff.ams3.cdn.digitaloceanspaces.com',
+      },
+    ],
     // Small image optimization rules:
     // - Small images (≤256px) use higher quality (95-100) since file size is negligible
     // - QR codes and icons get priority loading and maximum quality

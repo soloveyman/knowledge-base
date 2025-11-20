@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db, documents, users, usage, documentImages } from '@/lib/db'
 import { desc, eq, and, or } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { uploadImageToSpaces } from '@/lib/storage/spaces'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -114,7 +115,8 @@ export async function POST(request: Request) {
       }, { status: 413 })
     }
     
-    const { title, originalFileName, fileType, fileUrl, fileSize, parsedContent, parsingLog } = body
+    const { title, originalFileName, fileType, fileUrl, fileSize, parsingLog } = body
+    let parsedContent = body.parsedContent // Use let to allow reassignment
 
     console.log('POST /api/documents - Saving document:', title)
     console.log('ParsedContent exists:', !!parsedContent)
@@ -150,30 +152,34 @@ export async function POST(request: Request) {
       console.warn('Warning: parsedContent.sections is missing or not an array')
     }
 
-    // Process images: save large images to document_images table
-    // Large images (>500KB base64) are stored in the table, small ones stay in JSON
-    const LARGE_IMAGE_THRESHOLD = 500 * 1024 // 500KB in bytes (base64 is ~33% larger, so ~375KB binary)
-    const imagesToSaveInTable: Array<{
+    // Process images: upload ALL images to Spaces
+    // All images are uploaded to Spaces and URLs are stored in parsedContent
+    const imagesToUpload: Array<{
       filename: string
-      data: string // base64 data (without data URL prefix)
+      base64Data: string // base64 data (without data URL prefix)
       type: string
       position?: number
+      originalIndex: number // Index in original images array
     }> = []
 
     if (parsedContent?.images && Array.isArray(parsedContent.images)) {
-      const processedImages: typeof parsedContent.images = []
-      
-      for (const img of parsedContent.images) {
-        // Skip images that already have imageId (already stored in table)
-        if ((img as any).imageId) {
-          processedImages.push(img)
+      // First pass: collect all images for upload
+      for (let i = 0; i < parsedContent.images.length; i++) {
+        const img = parsedContent.images[i]
+        
+        // Skip images that already have URL (already uploaded)
+        if ((img as any).url) {
           continue
         }
         
-        // Extract base64 data from data URL if present (format: "data:image/png;base64,<base64>")
+        // Skip images that already have imageId but no URL (legacy, will be handled later)
+        if ((img as any).imageId && !(img as any).url) {
+          continue
+        }
+        
+        // Extract base64 data from data URL if present
         let base64Data = img.data || ''
         if (!base64Data || base64Data.trim().length === 0) {
-          // No data, skip this image
           console.warn(`Skipping image ${img.filename}: no data provided`)
           continue
         }
@@ -184,45 +190,24 @@ export async function POST(request: Request) {
           if (commaIndex !== -1) {
             base64Data = base64Data.substring(commaIndex + 1)
           } else {
-            // Invalid data URL format
             console.warn(`Skipping image ${img.filename}: invalid data URL format`)
             continue
           }
         }
         
-        // Calculate base64 data size (approximate: base64 is ~33% larger than binary)
-        const base64Size = base64Data.length
-        if (base64Size === 0) {
+        if (base64Data.length === 0) {
           console.warn(`Skipping image ${img.filename}: empty base64 data`)
           continue
         }
         
-        const estimatedBinarySize = (base64Size * 3) / 4
-        
-        if (estimatedBinarySize > LARGE_IMAGE_THRESHOLD) {
-          // Large image - will be saved in table
-          // Store just the base64 data (without data URL prefix) in database
-          imagesToSaveInTable.push({
-            filename: img.filename || 'image.png',
-            data: base64Data, // Store just base64, not full data URL
-            type: img.type || 'image/png',
-            position: (img as any).textPosition || img.position
-          })
-          // Replace with reference in parsedContent
-          processedImages.push({
-            filename: img.filename || 'image.png',
-            data: null, // Will be replaced with imageId after saving
-            type: img.type || 'image/png',
-            position: (img as any).textPosition || img.position,
-            imageId: null // Placeholder, will be set after insert
-          } as any)
-        } else {
-          // Small image - keep in JSON (preserve original format)
-          processedImages.push(img)
-        }
+        imagesToUpload.push({
+          filename: img.filename || 'image.png',
+          base64Data,
+          type: img.type || 'image/png',
+          position: (img as any).textPosition || img.position,
+          originalIndex: i
+        })
       }
-      
-      parsedContent.images = processedImages
     }
 
     // Check if document with same title already exists
@@ -248,15 +233,152 @@ export async function POST(request: Request) {
       }
     }
 
+    // Upload ALL images to Spaces before saving document
+    // We need a temporary document ID, so we'll create/update document first, then upload images
     let savedDocument
+    let documentId: string
 
     if (existingDocument.length > 0) {
-      // Delete old large images for this document
+      documentId = existingDocument[0].id
+      // Delete old images for this document (will be replaced with new ones)
       await db
         .delete(documentImages)
-        .where(eq(documentImages.documentId, existingDocument[0].id))
+        .where(eq(documentImages.documentId, documentId))
+    } else {
+      // Create temporary document to get ID for image folder structure
+      const tempDocument = await db.insert(documents).values({
+        title,
+        originalFileName,
+        fileType,
+        fileUrl,
+        fileSize,
+        parsedContent, // Will be updated with URLs after upload
+        parsingLog,
+        uploadedBy: session.user.id,
+        status: 'uploading' // Temporary status
+      }).returning()
       
-      // Update existing document instead of creating a new one
+      documentId = tempDocument[0].id
+      savedDocument = tempDocument[0]
+    }
+
+    // Upload all images to Spaces and update parsedContent with URLs
+    if (imagesToUpload.length > 0) {
+      console.log(`📤 Uploading ${imagesToUpload.length} images to Spaces...`)
+      
+      const uploadResults: Array<{
+        originalIndex: number
+        url: string | null
+        storageKey: string | null
+        imageId: string | null
+        error?: string
+      }> = []
+
+      // Upload images in parallel (but limit concurrency to avoid overwhelming Spaces)
+      const uploadPromises = imagesToUpload.map(async (img) => {
+        try {
+          const imageBuffer = Buffer.from(img.base64Data, 'base64')
+          const uploadResult = await uploadImageToSpaces(
+            imageBuffer,
+            img.filename,
+            img.type,
+            `documents/${documentId}`
+          )
+          
+          console.log(`✅ Uploaded ${img.filename} to Spaces: ${uploadResult.url}`)
+          
+          // Save to documentImages table for management
+          const savedImage = await db.insert(documentImages).values({
+            documentId,
+            filename: img.filename,
+            url: uploadResult.url,
+            storageKey: uploadResult.key,
+            type: img.type,
+            position: img.position
+          }).returning()
+          
+          return {
+            originalIndex: img.originalIndex,
+            url: uploadResult.url,
+            storageKey: uploadResult.key,
+            imageId: savedImage[0].id,
+            error: undefined
+          }
+        } catch (error) {
+          console.error(`❌ Failed to upload ${img.filename} to Spaces:`, error)
+          // Fallback: save base64 in database
+          try {
+            const savedImage = await db.insert(documentImages).values({
+              documentId,
+              filename: img.filename,
+              data: img.base64Data, // Fallback to base64
+              type: img.type,
+              position: img.position
+            }).returning()
+            
+            return {
+              originalIndex: img.originalIndex,
+              url: null,
+              storageKey: null,
+              imageId: savedImage[0].id,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            }
+          } catch (dbError) {
+            console.error(`❌ Failed to save ${img.filename} to database:`, dbError)
+            return {
+              originalIndex: img.originalIndex,
+              url: null,
+              storageKey: null,
+              imageId: null,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            }
+          }
+        }
+      })
+
+      const results = await Promise.all(uploadPromises)
+      uploadResults.push(...results)
+
+      // Update parsedContent.images with URLs from Spaces
+      if (parsedContent?.images && Array.isArray(parsedContent.images)) {
+        const updatedParsedContent = JSON.parse(JSON.stringify(parsedContent))
+        
+        // Map upload results by original index
+        const urlMap = new Map<number, { url: string | null; imageId: string | null }>()
+        uploadResults.forEach(result => {
+          urlMap.set(result.originalIndex, { url: result.url, imageId: result.imageId })
+        })
+        
+        // Update images in parsedContent
+        for (let i = 0; i < updatedParsedContent.images.length; i++) {
+          const img = updatedParsedContent.images[i] as any
+          const result = urlMap.get(i)
+          
+          if (result) {
+            if (result.url) {
+              // Successfully uploaded to Spaces - store URL
+              img.url = result.url
+              img.data = null // Remove base64 data
+              if (result.imageId) {
+                img.imageId = result.imageId // Keep imageId for reference
+              }
+            } else if (result.imageId) {
+              // Failed to upload but saved to DB - keep imageId for API lookup
+              img.imageId = result.imageId
+              img.data = null // Don't store base64 in parsedContent
+            }
+            // If both failed, keep original data as fallback
+          }
+        }
+        
+        parsedContent = updatedParsedContent
+      }
+      
+      console.log(`✅ Processed ${uploadResults.length} images: ${uploadResults.filter(r => r.url).length} uploaded to Spaces, ${uploadResults.filter(r => !r.url && r.imageId).length} saved to DB as fallback`)
+    }
+
+    // Update document with final parsedContent (with URLs)
+    if (existingDocument.length > 0) {
       const updated = await db
         .update(documents)
         .set({
@@ -269,95 +391,45 @@ export async function POST(request: Request) {
           status: 'ready',
           updatedAt: new Date()
         })
-        .where(eq(documents.id, existingDocument[0].id))
+        .where(eq(documents.id, documentId))
         .returning()
       
       savedDocument = updated[0]
       console.log('Existing document updated with ID:', savedDocument.id)
     } else {
-      // Create new document
-      const newDocument = await db.insert(documents).values({
-        title,
-        originalFileName,
-        fileType,
-        fileUrl,
-        fileSize,
-        parsedContent,
-        parsingLog,
-        uploadedBy: session.user.id,
-        status: 'ready' // Set status to 'ready' since parsing is complete
-      }).returning()
+      // Update temporary document with final parsedContent
+      const updated = await db
+        .update(documents)
+        .set({
+          parsedContent,
+          status: 'ready',
+          updatedAt: new Date()
+        })
+        .where(eq(documents.id, documentId))
+        .returning()
       
-      savedDocument = newDocument[0]
-      console.log('New document created with ID:', savedDocument.id)
+      if (updated.length > 0) {
+        savedDocument = updated[0]
+        console.log('New document created with ID:', savedDocument.id)
+      } else {
+        // Fallback: reload document
+        const reloaded = await db
+          .select()
+          .from(documents)
+          .where(eq(documents.id, documentId))
+          .limit(1)
+        
+        if (reloaded.length > 0) {
+          savedDocument = reloaded[0]
+        }
+      }
     }
 
-    // Save large images to documentImages table
-    if (imagesToSaveInTable.length > 0) {
-      const imageReferences: Array<{ id: string; index: number }> = []
-      
-      for (let i = 0; i < imagesToSaveInTable.length; i++) {
-        const img = imagesToSaveInTable[i]
-        const savedImage = await db.insert(documentImages).values({
-          documentId: savedDocument.id,
-          filename: img.filename,
-          data: img.data,
-          type: img.type,
-          position: img.position
-        }).returning()
-        
-        imageReferences.push({ id: savedImage[0].id, index: i })
-      }
-      
-      // Update parsedContent.images with image IDs for large images
-      if (parsedContent?.images && Array.isArray(parsedContent.images)) {
-        // Create a deep copy of parsedContent to avoid mutating the original
-        const updatedParsedContent = JSON.parse(JSON.stringify(parsedContent))
-        
-        let largeImageIndex = 0
-        for (let i = 0; i < updatedParsedContent.images.length; i++) {
-          const img = updatedParsedContent.images[i] as any
-          if (img.data === null && img.imageId === null && largeImageIndex < imageReferences.length) {
-            // This is a large image placeholder
-            img.imageId = imageReferences[largeImageIndex].id
-            largeImageIndex++
-          }
-        }
-        
-        // Safety check: ensure we processed all large images
-        if (largeImageIndex !== imageReferences.length) {
-          console.warn(`Image ID assignment mismatch: expected ${imageReferences.length} large images, processed ${largeImageIndex}`)
-        }
-        
-        // Update document with image IDs - use returning() to get updated document immediately
-        const updated = await db
-          .update(documents)
-          .set({
-            parsedContent: updatedParsedContent,
-            updatedAt: new Date()
-          })
-          .where(eq(documents.id, savedDocument.id))
-          .returning()
-        
-        if (updated.length > 0) {
-          savedDocument = updated[0]
-          console.log('Document updated with image IDs, parsedContent images:', (savedDocument.parsedContent as any)?.images?.length || 0)
-        } else {
-          console.error('Failed to update document with image IDs')
-          // Fallback: reload document
-          const reloaded = await db
-            .select()
-            .from(documents)
-            .where(eq(documents.id, savedDocument.id))
-            .limit(1)
-          
-          if (reloaded.length > 0) {
-            savedDocument = reloaded[0]
-          }
-        }
-      }
-      
-      console.log(`Saved ${imagesToSaveInTable.length} large images to document_images table`)
+    if (!savedDocument) {
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to save document'
+      }, { status: 500 })
     }
 
     console.log('Document saved - ID:', savedDocument.id)

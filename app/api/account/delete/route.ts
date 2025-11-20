@@ -21,7 +21,9 @@ import {
   sections,
   moduleVersions,
   modules,
+  documentImages,
 } from '@/lib/db'
+import { deleteImageFromSpaces } from '@/lib/storage/spaces'
 import { eq, inArray } from 'drizzle-orm'
 
 export async function POST() {
@@ -165,6 +167,33 @@ export async function POST() {
     
     if (businessDocuments.length > 0) {
       const documentIds = businessDocuments.map(d => d.id)
+      
+      // Get all images for these documents before deletion
+      const allDocumentImages = await db
+        .select()
+        .from(documentImages)
+        .where(inArray(documentImages.documentId, documentIds))
+      
+      // Delete images from Spaces
+      if (allDocumentImages.length > 0) {
+        console.log(`[Delete Account] Deleting ${allDocumentImages.length} images from Spaces`)
+        
+        const deletePromises = allDocumentImages
+          .filter(img => img.storageKey) // Only delete if has storageKey
+          .map(async (img) => {
+            try {
+              await deleteImageFromSpaces(img.storageKey!)
+            } catch (error) {
+              // Log error but don't fail account deletion if Spaces deletion fails
+              console.error(`[Delete Account] Failed to delete image from Spaces (${img.storageKey}):`, error)
+            }
+          })
+        
+        await Promise.allSettled(deletePromises)
+        console.log('[Delete Account] Finished deleting images from Spaces')
+      }
+      
+      // Delete documents (cascade will delete documentImages from DB)
       await db.delete(documents).where(inArray(documents.id, documentIds))
       console.log('[Delete Account] Deleted documents')
     }

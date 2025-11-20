@@ -116,7 +116,9 @@ export const documentImages = pgTable('document_images', {
   id: uuid('id').primaryKey().defaultRandom(),
   documentId: uuid('document_id').notNull().references(() => documents.id, { onDelete: 'cascade' }),
   filename: text('filename').notNull(),
-  data: text('data').notNull(), // base64 encoded image data
+  data: text('data'), // base64 encoded image data (deprecated, kept for migration/fallback)
+  url: text('url'), // URL to image in DigitalOcean Spaces (CDN)
+  storageKey: text('storage_key'), // Key in Spaces for deletion
   type: text('type').notNull(), // MIME type (e.g., 'image/png', 'image/jpeg')
   position: integer('position'), // Position in document (optional)
   createdAt: timestamp('created_at').defaultNow(),
