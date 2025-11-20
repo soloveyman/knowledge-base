@@ -9,7 +9,7 @@
 Добавьте следующие переменные в **оба** окружения (Vercel и Railway):
 
 ```bash
-DO_SPACES_ENDPOINT=uppstaff.ams3.digitaloceanspaces.com
+DO_SPACES_ENDPOINT=ams3.digitaloceanspaces.com
 DO_SPACES_CDN_ENDPOINT=uppstaff.ams3.cdn.digitaloceanspaces.com
 DO_SPACES_KEY=your-spaces-access-key
 DO_SPACES_SECRET=your-spaces-secret-key
@@ -17,6 +17,11 @@ DO_SPACES_BUCKET=uppstaff
 DO_SPACES_REGION=ams3
 DO_SPACES_USE_CDN=true
 ```
+
+**⚠️ ВАЖНО:** 
+- `DO_SPACES_ENDPOINT` должен быть **БЕЗ** имени bucket: `ams3.digitaloceanspaces.com` (не `uppstaff.ams3.digitaloceanspaces.com`)
+- `DO_SPACES_CDN_ENDPOINT` должен **СОДЕРЖАТЬ** имя bucket: `uppstaff.ams3.cdn.digitaloceanspaces.com`
+- Это необходимо для правильной работы с path-style URLs
 
 ## Где взять ключи
 
