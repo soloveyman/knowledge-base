@@ -119,6 +119,7 @@ export async function POST(request: Request) {
     let parsedContent = body.parsedContent // Use let to allow reassignment
 
     console.log('POST /api/documents - Saving document:', title)
+    console.log('Document source:', originalFileName?.includes('Google') ? 'Google Drive' : 'Local upload')
     console.log('ParsedContent exists:', !!parsedContent)
     console.log('ParsedContent sections:', parsedContent?.sections?.length || 0)
     console.log('ParsedContent tables:', parsedContent?.tables?.length || 0)
@@ -240,9 +241,16 @@ export async function POST(request: Request) {
       .limit(1)
 
     // Check usage limit BEFORE saving (only for owners and only when creating new document)
+    // This applies to BOTH local uploads and Google Drive imports - they are counted the same way
     if (session.user.role === 'owner' && existingDocument.length === 0) {
       const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
       const limitCheck = await checkUsageLimit(session.user.id, 'imports')
+      
+      console.log(`[Usage Check] Document import from ${originalFileName?.includes('Google') ? 'Google Drive' : 'local upload'}:`, {
+        current: limitCheck.current,
+        max: limitCheck.max,
+        allowed: limitCheck.allowed
+      })
       
       if (!limitCheck.allowed) {
         return NextResponse.json({
@@ -568,6 +576,7 @@ export async function POST(request: Request) {
     }
 
     // Update usage count AFTER successful save (only for owners and only when creating new document)
+    // Google Drive imports and local uploads are counted the same way - both increment importsCount
     if (session.user.role === 'owner' && existingDocument.length === 0) {
       const now = new Date()
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -584,15 +593,20 @@ export async function POST(request: Request) {
         )
         .limit(1)
 
+      const documentSource = originalFileName?.includes('Google') ? 'Google Drive' : 'local upload'
+      
       if (existingUsage.length > 0) {
+        const newCount = (existingUsage[0].importsCount || 0) + 1
         // Update existing usage record
         await db
           .update(usage)
           .set({
-            importsCount: (existingUsage[0].importsCount || 0) + 1,
+            importsCount: newCount,
             updatedAt: new Date()
           })
           .where(eq(usage.id, existingUsage[0].id))
+        
+        console.log(`[Usage Update] Document import from ${documentSource} counted. New importsCount: ${newCount}`)
       } else {
         // Create new usage record
         await db.insert(usage).values({
@@ -601,6 +615,8 @@ export async function POST(request: Request) {
           importsCount: 1,
           generationsCount: 0
         })
+        
+        console.log(`[Usage Update] Document import from ${documentSource} counted. Created new usage record with importsCount: 1`)
       }
     }
 

@@ -524,6 +524,56 @@ function OwnerPageInner() {
   const loadTabData = useCallback(async (tab: string, preserveData = false, forceRefresh = false) => {
     try {
       if (tab === 'docs') {
+        // First, check sessionStorage for pre-fetched data (faster than API call)
+        if (typeof window !== 'undefined') {
+          const pendingDocs = sessionStorage.getItem('pendingDocumentsRefresh')
+          if (pendingDocs) {
+            try {
+              const { data, timestamp: storedTimestamp } = JSON.parse(pendingDocs)
+              // Use if timestamp is recent (within last 30 seconds) - increased from 10s
+              if (Date.now() - storedTimestamp < 30000 && data && Array.isArray(data)) {
+                console.log('Owner: Using pre-fetched documents from sessionStorage, count:', data.length)
+                const transformedDocs = data.map((doc: {
+                  id: string
+                  originalFileName?: string
+                  title: string
+                  fileType?: string
+                  createdAt: string
+                  updatedAt?: string
+                  fileSize?: number
+                  status?: string
+                  moduleId?: string | null
+                  parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                }) => ({
+                  id: doc.id,
+                  name: doc.originalFileName || doc.title,
+                  type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                  uploadedAt: formatDateShort(doc.createdAt),
+                  size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                  status: doc.status || 'ready',
+                  moduleId: doc.moduleId || null,
+                  createdAt: doc.createdAt,
+                  updatedAt: doc.updatedAt,
+                  parsedContent: doc.parsedContent || null
+                }))
+                setDocumentsWithLog(transformedDocs)
+                syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                sessionStorage.removeItem('pendingDocumentsRefresh')
+                if (!preserveData) {
+                  setIsLoadingDocuments(false)
+                }
+                return // Skip API call since we have the data
+              } else {
+                // Data is stale, remove it
+                sessionStorage.removeItem('pendingDocumentsRefresh')
+              }
+            } catch (error) {
+              console.error('Failed to parse pending documents:', error)
+              sessionStorage.removeItem('pendingDocumentsRefresh')
+            }
+          }
+        }
+        
         // Only show loading if not preserving data (to avoid flicker when switching tabs)
         if (!preserveData) {
           setIsLoadingDocuments(true)
@@ -756,8 +806,8 @@ function OwnerPageInner() {
               if (pendingDocs) {
                 try {
                   const { data, timestamp: storedTimestamp } = JSON.parse(pendingDocs)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                  // Only use if timestamp is recent (within last 30 seconds) - increased for slower redirects
+                  if (Date.now() - storedTimestamp < 30000 && data && Array.isArray(data)) {
                     console.log('Owner: Using pre-fetched documents from sessionStorage, count:', data.length)
                     const transformedDocs = data.map((doc: {
                       id: string
