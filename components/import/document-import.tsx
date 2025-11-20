@@ -58,10 +58,10 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
       return
     }
 
-    // Validate file size (3MB limit - accounts for base64 encoding overhead, Vercel API route limit is 4.5MB)
-    if (file.size > 3 * 1024 * 1024) {
+    // Validate file size (15MB limit - images are stored separately in Spaces, only text content is counted)
+    if (file.size > 15 * 1024 * 1024) {
       toast.error('File too large', {
-        description: 'File size must be less than 3MB',
+        description: 'File size must be less than 15MB',
         duration: 5000
       })
       return

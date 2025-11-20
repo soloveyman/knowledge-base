@@ -247,7 +247,6 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         
         if (largeImages.length > 0) {
           console.warn(`⚠️ Found ${largeImages.length} large high-resolution image(s):`, largeImages)
-          console.warn(`⚠️ Large images can cause upload failures due to Vercel's 4.5MB payload limit. Consider compressing images before adding to documents.`)
         }
         console.log(`📸 Total images extracted from word/media: ${images.length}`)
       } else {
@@ -645,7 +644,6 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
         
         if (largeImages.length > 0) {
           console.warn(`⚠️ Found ${largeImages.length} large high-resolution image(s):`, largeImages)
-          console.warn(`⚠️ Large images can cause upload failures due to Vercel's 4.5MB payload limit. Consider compressing images before adding to documents.`)
         }
         console.log(`📸 Total images extracted from xl/media: ${images.length}`)
       } else {
@@ -965,10 +963,10 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   const parseTimestamp = Date.now()
   console.log('Parse timestamp (cache-busting):', parseTimestamp)
   
-  // Validate file size (3MB limit - accounts for base64 encoding overhead, Vercel API route limit is 4.5MB)
-  const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB
+  // Validate file size (15MB limit - images are stored separately in Spaces, only text content is counted)
+  const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
   if (file.size > MAX_FILE_SIZE) {
-    throw new ParseError(`File size exceeds 3MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
+    throw new ParseError(`File size exceeds 15MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
   }
   
   const buffer = await file.arrayBuffer()

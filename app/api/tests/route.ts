@@ -3,6 +3,37 @@ import { db, tests, questions as questionsTable, users, usage } from '@/lib/db'
 import { eq, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
+/**
+ * Get owner ID for usage counting - if user is owner, return their ID,
+ * if user is manager/employee, find owner with same businessId
+ */
+async function getOwnerIdForUsage(userId: string, userRole: string, businessId: string | null): Promise<string | null> {
+  // If user is owner, use their ID
+  if (userRole === 'owner') {
+    return userId
+  }
+  
+  // If user is manager/employee, find owner with same businessId
+  if (businessId) {
+    const owner = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.role, 'owner'),
+          eq(users.businessId, businessId)
+        )
+      )
+      .limit(1)
+    
+    if (owner.length > 0) {
+      return owner[0].id
+    }
+  }
+  
+  return null
+}
+
 // Route segment config
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -509,53 +540,61 @@ export async function POST(request: Request) {
 
     console.log('Test created successfully:', newTest[0])
 
-    // Check usage limit before allowing generation (only for owners)
-    if (session.user.role === 'owner') {
-      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
-      const limitCheck = await checkUsageLimit(session.user.id, 'generations')
+    // Check usage limit before allowing generation (for owners and managers - count in owner's usage)
+    if (session.user.role === 'owner' || session.user.role === 'manager') {
+      const ownerId = await getOwnerIdForUsage(session.user.id, session.user.role, session.user.businessId)
       
-      if (!limitCheck.allowed) {
-        return NextResponse.json({
-          success: false,
-          message: limitCheck.message || 'Generation limit reached. Please upgrade your plan to continue.',
-          error: 'USAGE_LIMIT_EXCEEDED',
-          current: limitCheck.current,
-          max: limitCheck.max
-        }, { status: 403 })
-      }
+      if (ownerId) {
+        const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+        const limitCheck = await checkUsageLimit(ownerId, 'generations')
+        
+        if (!limitCheck.allowed) {
+          return NextResponse.json({
+            success: false,
+            message: limitCheck.message || 'Generation limit reached. Please upgrade your plan to continue.',
+            error: 'USAGE_LIMIT_EXCEEDED',
+            current: limitCheck.current,
+            max: limitCheck.max
+          }, { status: 403 })
+        }
 
-      const now = new Date()
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      
-      // Check if usage record exists for current month
-      const existingUsage = await db
-        .select()
-        .from(usage)
-        .where(
-          and(
-            eq(usage.userId, session.user.id),
-            eq(usage.month, currentMonth)
+        const now = new Date()
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        
+        // Check if usage record exists for current month
+        const existingUsage = await db
+          .select()
+          .from(usage)
+          .where(
+            and(
+              eq(usage.userId, ownerId),
+              eq(usage.month, currentMonth)
+            )
           )
-        )
-        .limit(1)
+          .limit(1)
 
-      if (existingUsage.length > 0) {
-        // Update existing usage record
-        await db
-          .update(usage)
-          .set({
-            generationsCount: (existingUsage[0].generationsCount || 0) + 1,
-            updatedAt: new Date()
+        if (existingUsage.length > 0) {
+          // Update existing usage record
+          await db
+            .update(usage)
+            .set({
+              generationsCount: (existingUsage[0].generationsCount || 0) + 1,
+              updatedAt: new Date()
+            })
+            .where(eq(usage.id, existingUsage[0].id))
+          
+          console.log(`[Usage Update] Test generation by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. New generationsCount: ${(existingUsage[0].generationsCount || 0) + 1}`)
+        } else {
+          // Create new usage record
+          await db.insert(usage).values({
+            userId: ownerId,
+            month: currentMonth,
+            importsCount: 0,
+            generationsCount: 1
           })
-          .where(eq(usage.id, existingUsage[0].id))
-      } else {
-        // Create new usage record
-        await db.insert(usage).values({
-          userId: session.user.id,
-          month: currentMonth,
-          importsCount: 0,
-          generationsCount: 1
-        })
+          
+          console.log(`[Usage Update] Test generation by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. Created new usage record with generationsCount: 1`)
+        }
       }
     }
 

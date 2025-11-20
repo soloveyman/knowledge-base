@@ -1,8 +1,39 @@
 import { NextResponse } from 'next/server'
-import { db, documents, usage } from '@/lib/db'
+import { db, documents, usage, users } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
+
+/**
+ * Get owner ID for usage counting - if user is owner, return their ID,
+ * if user is manager/employee, find owner with same businessId
+ */
+async function getOwnerIdForUsage(userId: string, userRole: string, businessId: string | null): Promise<string | null> {
+  // If user is owner, use their ID
+  if (userRole === 'owner') {
+    return userId
+  }
+  
+  // If user is manager/employee, find owner with same businessId
+  if (businessId) {
+    const owner = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.role, 'owner'),
+          eq(users.businessId, businessId)
+        )
+      )
+      .limit(1)
+    
+    if (owner.length > 0) {
+      return owner[0].id
+    }
+  }
+  
+  return null
+}
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -277,54 +308,62 @@ Preserve all original sections and tables, but improve their titles and content 
       .where(eq(documents.id, documentId))
       .returning()
 
-    // Check usage limit before allowing enhancement (only for owners)
-    if (session.user.role === 'owner') {
-      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
-      const limitCheck = await checkUsageLimit(session.user.id, 'enhancements')
+    // Check usage limit before allowing enhancement (for owners and managers - count in owner's usage)
+    if (session.user.role === 'owner' || session.user.role === 'manager') {
+      const ownerId = await getOwnerIdForUsage(session.user.id, session.user.role, session.user.businessId)
       
-      if (!limitCheck.allowed) {
-        return NextResponse.json({
-          success: false,
-          message: limitCheck.message || 'Enhancement limit reached. Please upgrade your plan to continue.',
-          error: 'USAGE_LIMIT_EXCEEDED',
-          current: limitCheck.current,
-          max: limitCheck.max
-        }, { status: 403 })
-      }
+      if (ownerId) {
+        const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+        const limitCheck = await checkUsageLimit(ownerId, 'enhancements')
+        
+        if (!limitCheck.allowed) {
+          return NextResponse.json({
+            success: false,
+            message: limitCheck.message || 'Enhancement limit reached. Please upgrade your plan to continue.',
+            error: 'USAGE_LIMIT_EXCEEDED',
+            current: limitCheck.current,
+            max: limitCheck.max
+          }, { status: 403 })
+        }
 
-      const now = new Date()
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      
-      // Check if usage record exists for current month
-      const existingUsage = await db
-        .select()
-        .from(usage)
-        .where(
-          and(
-            eq(usage.userId, session.user.id),
-            eq(usage.month, currentMonth)
+        const now = new Date()
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        
+        // Check if usage record exists for current month
+        const existingUsage = await db
+          .select()
+          .from(usage)
+          .where(
+            and(
+              eq(usage.userId, ownerId),
+              eq(usage.month, currentMonth)
+            )
           )
-        )
-        .limit(1)
+          .limit(1)
 
-      if (existingUsage.length > 0) {
-        // Update existing usage record
-        await db
-          .update(usage)
-          .set({
-            enhancementsCount: (existingUsage[0].enhancementsCount || 0) + 1,
-            updatedAt: new Date()
+        if (existingUsage.length > 0) {
+          // Update existing usage record
+          await db
+            .update(usage)
+            .set({
+              enhancementsCount: (existingUsage[0].enhancementsCount || 0) + 1,
+              updatedAt: new Date()
+            })
+            .where(eq(usage.id, existingUsage[0].id))
+          
+          console.log(`[Usage Update] Document enhancement by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. New enhancementsCount: ${(existingUsage[0].enhancementsCount || 0) + 1}`)
+        } else {
+          // Create new usage record
+          await db.insert(usage).values({
+            userId: ownerId,
+            month: currentMonth,
+            importsCount: 0,
+            generationsCount: 0,
+            enhancementsCount: 1
           })
-          .where(eq(usage.id, existingUsage[0].id))
-      } else {
-        // Create new usage record
-        await db.insert(usage).values({
-          userId: session.user.id,
-          month: currentMonth,
-          importsCount: 0,
-          generationsCount: 0,
-          enhancementsCount: 1
-        })
+          
+          console.log(`[Usage Update] Document enhancement by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. Created new usage record with enhancementsCount: 1`)
+        }
       }
     }
 

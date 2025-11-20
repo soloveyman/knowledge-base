@@ -42,6 +42,7 @@ interface UploadedFile {
     [key: string]: unknown
   }>
   file?: File // Store the actual File object
+  fileUrl?: string | null // URL for Google Drive files
 }
 
 const ACCEPTED_FILE_TYPES = {
@@ -49,7 +50,7 @@ const ACCEPTED_FILE_TYPES = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx'
 }
 
-const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB (accounts for base64 encoding overhead - Vercel API route limit is 4.5MB)
+const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB (images are stored separately in Spaces, only text content is counted)
 
 function DocImportPageInner() {
   const { data: session, status } = useSession()
@@ -398,7 +399,8 @@ function DocImportPageInner() {
         type: fileObj.type,
         lastModified: fileObj.lastModified,
         isFile: fileObj instanceof File,
-        constructor: fileObj.constructor.name
+        constructor: fileObj.constructor.name,
+        googleDriveUrl: file.url
       })
       
       // Убедимся, что File объект валиден перед передачей
@@ -410,7 +412,33 @@ function DocImportPageInner() {
         throw new Error(`Invalid file object: name=${fileObj.name}, size=${fileObj.size}`)
       }
       
-      handleFiles([fileObj])
+      // Добавить файл вручную с сохранением Google Drive URL
+      const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9)
+      const googleDriveFile: UploadedFile = {
+        id: fileId,
+        name: fileObj.name,
+        size: fileObj.size,
+        type: fileObj.type,
+        status: 'uploading',
+        progress: 0,
+        file: fileObj,
+        fileUrl: file.url // Сохранить URL из Google Drive
+      }
+      
+      console.log('[Google Drive] Created file entry with URL:', {
+        id: googleDriveFile.id,
+        name: googleDriveFile.name,
+        fileUrl: googleDriveFile.fileUrl,
+        hasFile: !!googleDriveFile.file
+      })
+      
+      setFiles(prev => {
+        const updated = [...prev, googleDriveFile]
+        console.log('[Google Drive] Total files in state:', updated.length)
+        return updated
+      })
+      
+      uploadFiles([googleDriveFile])
       
       console.log('[Google Drive] File added to processing queue')
       
@@ -583,36 +611,30 @@ function DocImportPageInner() {
             title: file.name,
             originalFileName: file.name,
             fileType: file.type.split('/')[1],
-            fileUrl: null, // UploadedFile doesn't have url property - file is stored via upload
+            fileUrl: file.fileUrl || null, // Use Google Drive URL if available
             fileSize: file.size,
             parsedContent: file.parsedContent,
             parsingLog: file.parsingLog || null,
             uploadedBy: session?.user?.id || 'unknown'
           }
           
-          // Check payload size before sending (Vercel limit is 4.5MB)
-          const payloadString = JSON.stringify(requestBody)
+          // Check payload size before sending (only text content, images are excluded as they go to Spaces)
+          // Create a copy of requestBody without images for size calculation
+          const requestBodyWithoutImages = {
+            ...requestBody,
+            parsedContent: {
+              ...requestBody.parsedContent,
+              images: [] // Exclude images from size calculation
+            }
+          }
+          const payloadString = JSON.stringify(requestBodyWithoutImages)
           const payloadSizeMB = payloadString.length / (1024 * 1024)
           const VERCEL_LIMIT_MB = 4.5
           
-          // Calculate image size separately for better error messages
-          const imageCount = file.parsedContent?.images?.length || 0
-          let totalImageSizeMB = 0
-          if (imageCount > 0 && file.parsedContent?.images) {
-            const totalImageSize = file.parsedContent.images.reduce((sum: number, img: any) => {
-              return sum + (img.data?.length || 0)
-            }, 0)
-            totalImageSizeMB = totalImageSize / (1024 * 1024)
-          }
-          
-          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images: ${imageCount}, image data: ${totalImageSizeMB.toFixed(2)}MB)`)
+          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images excluded from size calculation)`)
           
           if (payloadSizeMB > VERCEL_LIMIT_MB) {
-            let errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB payload). Maximum payload size is ${VERCEL_LIMIT_MB}MB.`
-            if (imageCount > 0) {
-              errorMsg += ` This document contains ${imageCount} image(s) (${totalImageSizeMB.toFixed(2)}MB), which increases the payload size due to base64 encoding.`
-            }
-            errorMsg += ` Try reducing the number of images or file size.`
+            const errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB text content). Maximum text content size is ${VERCEL_LIMIT_MB}MB.`
             console.error(errorMsg)
             throw new Error(errorMsg)
           }

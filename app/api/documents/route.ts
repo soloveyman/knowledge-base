@@ -4,6 +4,37 @@ import { desc, eq, and, or } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { uploadImageToSpaces } from '@/lib/storage/spaces'
 
+/**
+ * Get owner ID for usage counting - if user is owner, return their ID,
+ * if user is manager/employee, find owner with same businessId
+ */
+async function getOwnerIdForUsage(userId: string, userRole: string, businessId: string | null): Promise<string | null> {
+  // If user is owner, use their ID
+  if (userRole === 'owner') {
+    return userId
+  }
+  
+  // If user is manager/employee, find owner with same businessId
+  if (businessId) {
+    const owner = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.role, 'owner'),
+          eq(users.businessId, businessId)
+        )
+      )
+      .limit(1)
+    
+    if (owner.length > 0) {
+      return owner[0].id
+    }
+  }
+  
+  return null
+}
+
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -75,6 +106,16 @@ export async function GET() {
     
     // Log for debugging
     console.log('GET /api/documents - Found documents:', allDocuments.length, 'for user:', session.user.id, 'businessId:', tenantId)
+    if (allDocuments.length > 0) {
+      console.log('GET /api/documents - Sample document:', {
+        id: allDocuments[0].id,
+        title: allDocuments[0].title,
+        uploadedBy: allDocuments[0].uploadedBy,
+        status: allDocuments[0].status,
+        fileUrl: allDocuments[0].fileUrl,
+        originalFileName: allDocuments[0].originalFileName
+      })
+    }
 
     return NextResponse.json({
       success: true,
@@ -111,7 +152,7 @@ export async function POST(request: Request) {
       console.error('Failed to parse request body:', error)
       return NextResponse.json({ 
         success: false, 
-        message: 'Request body too large. Maximum file size is 3MB (Vercel API route limit is 4.5MB). Documents with many images may exceed this limit.' 
+        message: 'Request body too large. Maximum text content size is 4.5MB (images are stored separately).' 
       }, { status: 413 })
     }
     
@@ -233,33 +274,44 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check if document with same title already exists
+    // Check if document with same title already exists for this user
     const existingDocument = await db
       .select()
       .from(documents)
-      .where(eq(documents.title, title))
+      .where(
+        and(
+          eq(documents.title, title),
+          eq(documents.uploadedBy, session.user.id)
+        )
+      )
       .limit(1)
 
-    // Check usage limit BEFORE saving (only for owners and only when creating new document)
+    // Check usage limit BEFORE saving (for owners and managers - count in owner's usage)
     // This applies to BOTH local uploads and Google Drive imports - they are counted the same way
-    if (session.user.role === 'owner' && existingDocument.length === 0) {
-      const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
-      const limitCheck = await checkUsageLimit(session.user.id, 'imports')
+    if (existingDocument.length === 0 && (session.user.role === 'owner' || session.user.role === 'manager')) {
+      const ownerId = await getOwnerIdForUsage(session.user.id, session.user.role, session.user.businessId)
       
-      console.log(`[Usage Check] Document import from ${originalFileName?.includes('Google') ? 'Google Drive' : 'local upload'}:`, {
-        current: limitCheck.current,
-        max: limitCheck.max,
-        allowed: limitCheck.allowed
-      })
-      
-      if (!limitCheck.allowed) {
-        return NextResponse.json({
-          success: false,
-          message: limitCheck.message || 'Import limit reached. Please upgrade your plan to continue.',
-          error: 'USAGE_LIMIT_EXCEEDED',
+      if (ownerId) {
+        const { checkUsageLimit } = await import('@/lib/subscription/usage-check')
+        const limitCheck = await checkUsageLimit(ownerId, 'imports')
+        
+        console.log(`[Usage Check] Document import from ${originalFileName?.includes('Google') ? 'Google Drive' : 'local upload'} by ${session.user.role}:`, {
+          userId: session.user.id,
+          ownerId,
           current: limitCheck.current,
-          max: limitCheck.max
-        }, { status: 403 })
+          max: limitCheck.max,
+          allowed: limitCheck.allowed
+        })
+        
+        if (!limitCheck.allowed) {
+          return NextResponse.json({
+            success: false,
+            message: limitCheck.message || 'Import limit reached. Please upgrade your plan to continue.',
+            error: 'USAGE_LIMIT_EXCEEDED',
+            current: limitCheck.current,
+            max: limitCheck.max
+          }, { status: 403 })
+        }
       }
     }
 
@@ -520,8 +572,35 @@ export async function POST(request: Request) {
         .where(eq(documents.id, documentId))
         .returning()
       
-      savedDocument = updated[0]
-      console.log('Existing document updated with ID:', savedDocument.id)
+      if (updated.length > 0) {
+        savedDocument = updated[0]
+        console.log('Existing document updated with ID:', savedDocument.id)
+      } else {
+        console.error('Failed to update existing document - update returned empty array')
+        // Fallback: reload document
+        const reloaded = await db
+          .select()
+          .from(documents)
+          .where(eq(documents.id, documentId))
+          .limit(1)
+        
+        if (reloaded.length > 0) {
+          savedDocument = reloaded[0]
+          // Ensure status is 'ready' even after reload
+          if (savedDocument.status !== 'ready') {
+            console.warn(`Document ${savedDocument.id} has status '${savedDocument.status}', updating to 'ready'`)
+            const statusUpdated = await db
+              .update(documents)
+              .set({ status: 'ready', updatedAt: new Date() })
+              .where(eq(documents.id, documentId))
+              .returning()
+            if (statusUpdated.length > 0) {
+              savedDocument = statusUpdated[0]
+            }
+          }
+          console.log('Reloaded existing document with ID:', savedDocument.id)
+        }
+      }
     } else {
       // Update temporary document with final parsedContent
       const updated = await db
@@ -547,6 +626,18 @@ export async function POST(request: Request) {
         
         if (reloaded.length > 0) {
           savedDocument = reloaded[0]
+          // Ensure status is 'ready' even after reload
+          if (savedDocument.status !== 'ready') {
+            console.warn(`Document ${savedDocument.id} has status '${savedDocument.status}', updating to 'ready'`)
+            const statusUpdated = await db
+              .update(documents)
+              .set({ status: 'ready', updatedAt: new Date() })
+              .where(eq(documents.id, documentId))
+              .returning()
+            if (statusUpdated.length > 0) {
+              savedDocument = statusUpdated[0]
+            }
+          }
         }
       }
     }
@@ -562,6 +653,11 @@ export async function POST(request: Request) {
     }
 
     console.log('Document saved - ID:', savedDocument.id)
+    console.log('Document saved - Title:', savedDocument.title)
+    console.log('Document saved - uploadedBy:', savedDocument.uploadedBy)
+    console.log('Document saved - status:', savedDocument.status)
+    console.log('Document saved - fileUrl:', savedDocument.fileUrl)
+    console.log('Document saved - originalFileName:', savedDocument.originalFileName)
     console.log('Saved parsedContent exists:', !!savedDocument.parsedContent)
     if (savedDocument.parsedContent) {
       const pc = savedDocument.parsedContent as any
@@ -575,48 +671,52 @@ export async function POST(request: Request) {
       }
     }
 
-    // Update usage count AFTER successful save (only for owners and only when creating new document)
+    // Update usage count AFTER successful save (for owners and managers - count in owner's usage)
     // Google Drive imports and local uploads are counted the same way - both increment importsCount
-    if (session.user.role === 'owner' && existingDocument.length === 0) {
-      const now = new Date()
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    if (existingDocument.length === 0 && (session.user.role === 'owner' || session.user.role === 'manager')) {
+      const ownerId = await getOwnerIdForUsage(session.user.id, session.user.role, session.user.businessId)
       
-      // Check if usage record exists for current month
-      const existingUsage = await db
-        .select()
-        .from(usage)
-        .where(
-          and(
-            eq(usage.userId, session.user.id),
-            eq(usage.month, currentMonth)
+      if (ownerId) {
+        const now = new Date()
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        
+        // Check if usage record exists for current month
+        const existingUsage = await db
+          .select()
+          .from(usage)
+          .where(
+            and(
+              eq(usage.userId, ownerId),
+              eq(usage.month, currentMonth)
+            )
           )
-        )
-        .limit(1)
+          .limit(1)
 
-      const documentSource = originalFileName?.includes('Google') ? 'Google Drive' : 'local upload'
-      
-      if (existingUsage.length > 0) {
-        const newCount = (existingUsage[0].importsCount || 0) + 1
-        // Update existing usage record
-        await db
-          .update(usage)
-          .set({
-            importsCount: newCount,
-            updatedAt: new Date()
+        const documentSource = originalFileName?.includes('Google') ? 'Google Drive' : 'local upload'
+        
+        if (existingUsage.length > 0) {
+          const newCount = (existingUsage[0].importsCount || 0) + 1
+          // Update existing usage record
+          await db
+            .update(usage)
+            .set({
+              importsCount: newCount,
+              updatedAt: new Date()
+            })
+            .where(eq(usage.id, existingUsage[0].id))
+          
+          console.log(`[Usage Update] Document import from ${documentSource} by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. New importsCount: ${newCount}`)
+        } else {
+          // Create new usage record
+          await db.insert(usage).values({
+            userId: ownerId,
+            month: currentMonth,
+            importsCount: 1,
+            generationsCount: 0
           })
-          .where(eq(usage.id, existingUsage[0].id))
-        
-        console.log(`[Usage Update] Document import from ${documentSource} counted. New importsCount: ${newCount}`)
-      } else {
-        // Create new usage record
-        await db.insert(usage).values({
-          userId: session.user.id,
-          month: currentMonth,
-          importsCount: 1,
-          generationsCount: 0
-        })
-        
-        console.log(`[Usage Update] Document import from ${documentSource} counted. Created new usage record with importsCount: 1`)
+          
+          console.log(`[Usage Update] Document import from ${documentSource} by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. Created new usage record with importsCount: 1`)
+        }
       }
     }
 
