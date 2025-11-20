@@ -1,11 +1,11 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
-const spacesOriginEndpoint = process.env.DO_SPACES_ENDPOINT || 'uppstaff.ams3.digitaloceanspaces.com'
-const spacesCdnEndpoint = process.env.DO_SPACES_CDN_ENDPOINT || 'uppstaff.ams3.cdn.digitaloceanspaces.com'
+const spacesOriginEndpoint = process.env.DO_SPACES_ENDPOINT || 'your-space.ams3.digitaloceanspaces.com'
+const spacesCdnEndpoint = process.env.DO_SPACES_CDN_ENDPOINT || 'your-space.ams3.cdn.digitaloceanspaces.com'
 const spacesKey = process.env.DO_SPACES_KEY
 const spacesSecret = process.env.DO_SPACES_SECRET
-const spacesBucket = process.env.DO_SPACES_BUCKET || 'uppstaff'
+const spacesBucket = process.env.DO_SPACES_BUCKET || 'your-bucket-name'
 const spacesRegion = process.env.DO_SPACES_REGION || 'ams3'
 const useCdn = process.env.DO_SPACES_USE_CDN !== 'false' // По умолчанию используем CDN
 
