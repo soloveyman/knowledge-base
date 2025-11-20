@@ -149,10 +149,20 @@ export async function DELETE(
     }
 
     // Get all images for this document before deletion
-    const documentImagesList = await db
-      .select()
-      .from(documentImages)
-      .where(eq(documentImages.documentId, id))
+    // Select only columns that exist in the database (storageKey is the only one we need)
+    let documentImagesList: Array<{ id: string; storageKey: string | null }> = []
+    try {
+      documentImagesList = await db
+        .select({
+          id: documentImages.id,
+          storageKey: documentImages.storageKey
+        })
+        .from(documentImages)
+        .where(eq(documentImages.documentId, id))
+    } catch (error) {
+      console.error(`⚠️ Failed to fetch document images for ${id}:`, error)
+      // Continue with deletion even if we can't fetch images
+    }
 
     // Delete images from Spaces (if they have storageKey)
     if (documentImagesList.length > 0) {
@@ -181,15 +191,37 @@ export async function DELETE(
           }
         })
         
-        await Promise.allSettled(deletePromises) // Use allSettled to continue even if some fail
-        console.log(`✅ Finished deleting images from Spaces for document ${id}`)
+        try {
+          await Promise.allSettled(deletePromises) // Use allSettled to continue even if some fail
+          console.log(`✅ Finished deleting images from Spaces for document ${id}`)
+        } catch (error) {
+          console.error(`⚠️ Error during Promise.allSettled for image deletion:`, error)
+          // Continue with document deletion even if image deletion fails
+        }
       }
     }
 
     // Delete the document (cascade will delete documentImages from DB)
     console.log(`🗑️ Deleting document ${id} from database`)
-    await db.delete(documents).where(eq(documents.id, id))
-    console.log(`✅ Document ${id} deleted successfully`)
+    try {
+      await db.delete(documents).where(eq(documents.id, id))
+      console.log(`✅ Document ${id} deleted successfully`)
+    } catch (dbError) {
+      console.error(`❌ Database error deleting document ${id}:`, dbError)
+      const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      
+      // Check if it's a foreign key constraint error
+      if (dbErrorMessage.includes('foreign key') || dbErrorMessage.includes('constraint')) {
+        return NextResponse.json({
+          success: false,
+          message: 'Cannot delete document. It is still referenced by other records.',
+          error: 'FOREIGN_KEY_CONSTRAINT'
+        }, { status: 400 })
+      }
+      
+      // Re-throw to be caught by outer catch
+      throw dbError
+    }
 
     return NextResponse.json({
       success: true,

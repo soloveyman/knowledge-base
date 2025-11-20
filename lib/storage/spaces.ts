@@ -9,11 +9,14 @@ const spacesBucket = process.env.DO_SPACES_BUCKET || 'your-bucket-name'
 const spacesRegion = process.env.DO_SPACES_REGION || 'ams3'
 const useCdn = process.env.DO_SPACES_USE_CDN !== 'false' // По умолчанию используем CDN
 
-if (!spacesKey || !spacesSecret) {
+const isSpacesConfigured = !!(spacesKey && spacesSecret)
+
+if (!isSpacesConfigured) {
   console.warn('DigitalOcean Spaces credentials not configured')
 }
 
-const s3Client = new S3Client({
+// Only create S3Client if credentials are configured
+const s3Client = isSpacesConfigured ? new S3Client({
   endpoint: `https://${spacesOriginEndpoint}`,
   region: spacesRegion,
   credentials: {
@@ -21,7 +24,7 @@ const s3Client = new S3Client({
     secretAccessKey: spacesSecret!,
   },
   forcePathStyle: false,
-})
+}) : null
 
 export interface UploadImageResult {
   url: string
@@ -43,7 +46,7 @@ export async function uploadImageToSpaces(
   contentType: string,
   folder: string = 'images'
 ): Promise<UploadImageResult> {
-  if (!spacesKey || !spacesSecret) {
+  if (!isSpacesConfigured || !s3Client) {
     throw new Error('DigitalOcean Spaces not configured')
   }
 
@@ -79,7 +82,7 @@ export async function uploadImageToSpaces(
  * @returns URL изображения
  */
 export async function getImageUrl(key: string, expiresIn: number = 3600): Promise<string> {
-  if (!spacesKey || !spacesSecret) {
+  if (!isSpacesConfigured) {
     throw new Error('DigitalOcean Spaces not configured')
   }
 
@@ -98,16 +101,51 @@ export async function getImageUrl(key: string, expiresIn: number = 3600): Promis
  * @param key - Ключ файла в Spaces
  */
 export async function deleteImageFromSpaces(key: string): Promise<void> {
-  if (!spacesKey || !spacesSecret) {
+  if (!isSpacesConfigured || !s3Client) {
     throw new Error('DigitalOcean Spaces not configured')
   }
 
-  const command = new DeleteObjectCommand({
-    Bucket: spacesBucket,
-    Key: key,
-  })
+  // Validate key format
+  if (!key || typeof key !== 'string' || key.trim().length === 0) {
+    throw new Error(`Invalid storage key: ${key}`)
+  }
 
-  await s3Client.send(command)
+  // Remove leading slash if present (S3 doesn't need it)
+  const normalizedKey = key.startsWith('/') ? key.slice(1) : key
+
+  console.log(`🗑️ Attempting to delete from Spaces: bucket=${spacesBucket}, key=${normalizedKey}`)
+
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: spacesBucket,
+      Key: normalizedKey,
+    })
+
+    await s3Client.send(command)
+    console.log(`✅ Successfully deleted from Spaces: ${normalizedKey}`)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCode = (error as any)?.$metadata?.httpStatusCode
+    const errorName = (error as any)?.name
+    
+    // If file doesn't exist (404), that's okay - it's already deleted
+    if (errorCode === 404 || errorName === 'NotFound' || errorMessage.includes('NoSuchKey')) {
+      console.log(`ℹ️ File not found in Spaces (already deleted?): ${normalizedKey}`)
+      return // Success - file is already gone
+    }
+    
+    // Log detailed error for debugging
+    console.error(`❌ Failed to delete from Spaces:`, {
+      key: normalizedKey,
+      bucket: spacesBucket,
+      error: errorMessage,
+      code: errorCode,
+      name: errorName,
+      metadata: (error as any)?.$metadata
+    })
+    
+    throw error // Re-throw for caller to handle
+  }
 }
 
 /**

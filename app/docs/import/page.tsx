@@ -123,11 +123,19 @@ function DocImportPageInner() {
   }
 
   const handleFiles = (fileList: File[]) => {
+    console.log('[handleFiles] Processing files:', fileList.length)
     const newFiles: UploadedFile[] = []
 
     fileList.forEach((file) => {
+      console.log('[handleFiles] Processing file:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      })
+
       // Validate file type
       if (!Object.keys(ACCEPTED_FILE_TYPES).includes(file.type)) {
+        console.warn('[handleFiles] Unsupported file type:', file.type)
         toast.error(`File type ${file.type} is not supported`, {
           description: 'Please upload DOCX or XLSX files only',
           duration: 5000
@@ -137,6 +145,7 @@ function DocImportPageInner() {
 
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
+        console.warn('[handleFiles] File too large:', file.size, 'max:', MAX_FILE_SIZE)
         toast.error(`File ${file.name} is too large`, {
           description: `Maximum size is ${formatFileSize(MAX_FILE_SIZE)}`,
           duration: 5000
@@ -145,7 +154,7 @@ function DocImportPageInner() {
       }
 
       const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9)
-      newFiles.push({
+      const newFile: UploadedFile = {
         id: fileId,
         name: file.name,
         size: file.size,
@@ -153,12 +162,27 @@ function DocImportPageInner() {
         status: 'uploading',
         progress: 0,
         file: file // Store the actual File object
+      }
+      
+      console.log('[handleFiles] Created file entry:', {
+        id: newFile.id,
+        name: newFile.name,
+        hasFile: !!newFile.file
       })
+      
+      newFiles.push(newFile)
     })
 
     if (newFiles.length > 0) {
-      setFiles(prev => [...prev, ...newFiles])
+      console.log('[handleFiles] Adding files to state and starting upload:', newFiles.length)
+      setFiles(prev => {
+        const updated = [...prev, ...newFiles]
+        console.log('[handleFiles] Total files in state:', updated.length)
+        return updated
+      })
       uploadFiles(newFiles)
+    } else {
+      console.warn('[handleFiles] No valid files to process')
     }
   }
 
@@ -272,6 +296,13 @@ function DocImportPageInner() {
     setIsGooglePickerLoading(true)
 
     try {
+      console.log('[Google Drive] Processing file:', {
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.sizeBytes
+      })
+
       // Проверить тип файла
       const isDocx = file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       const isXlsx = file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -280,6 +311,8 @@ function DocImportPageInner() {
         throw new Error('Only DOCX and XLSX files are supported')
       }
 
+      console.log('[Google Drive] Downloading file from Drive API...')
+      
       // Скачать файл через Drive API
       const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`
       const response = await fetch(downloadUrl, {
@@ -289,11 +322,26 @@ function DocImportPageInner() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || 'Failed to download file from Google Drive')
+        const errorText = await response.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: { message: errorText } }
+        }
+        console.error('[Google Drive] Download failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
+        throw new Error(errorData.error?.message || `Failed to download file from Google Drive (${response.status})`)
       }
 
       const blob = await response.blob()
+      console.log('[Google Drive] File downloaded:', {
+        size: blob.size,
+        type: blob.type
+      })
       
       // Проверить размер файла
       if (blob.size > MAX_FILE_SIZE) {
@@ -305,16 +353,49 @@ function DocImportPageInner() {
         type: file.mimeType
       })
 
+      console.log('[Google Drive] File object created:', {
+        name: fileObj.name,
+        size: fileObj.size,
+        type: fileObj.type
+      })
+
       // Использовать существующую логику обработки файла
+      console.log('[Google Drive] Calling handleFiles with file object')
       handleFiles([fileObj])
+      
+      console.log('[Google Drive] File added to processing queue')
+      
+      toast.success('File imported from Google Drive', {
+        description: `${file.name} is being processed. Please wait for processing to complete, then click "Save Documents".`,
+        duration: 5000
+      })
     } catch (error) {
-      console.error('Error handling Google Drive file:', error)
+      console.error('[Google Drive] Error handling Google Drive file:', error)
       const errorMessage = error instanceof Error 
         ? error.message 
         : 'Failed to import from Google Drive'
-      toast.error(errorMessage, {
-        duration: 5000
-      })
+      
+      // More specific error messages
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        toast.error('Authorization failed', {
+          description: 'Please try selecting the file again. Your access token may have expired.',
+          duration: 6000
+        })
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        toast.error('Access denied', {
+          description: 'You may not have permission to access this file. Make sure you are signed in with the correct Google account.',
+          duration: 6000
+        })
+      } else if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+        toast.error('File not found', {
+          description: 'The file may have been deleted or moved. Please try selecting it again.',
+          duration: 6000
+        })
+      } else {
+        toast.error(errorMessage, {
+          duration: 5000
+        })
+      }
     } finally {
       setIsGooglePickerLoading(false)
     }

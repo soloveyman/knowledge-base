@@ -124,39 +124,82 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account }) {
       try {
         if (account?.provider === 'google' && user?.email) {
-          const existing = await db.select().from(users).where(eq(users.email, user.email)).limit(1)
+          console.log('[Auth] Processing Google OAuth sign-in for:', user.email)
+          
+          const normalizedEmail = user.email.toLowerCase().trim()
+          const existing = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
+          
           if (existing.length === 0) {
-            const [created] = await db.insert(users).values({
-              email: user.email,
-              name: user.name ?? null,
-              role: 'owner',
-              country: 'US',
-            }).returning()
-            await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
-            
-            // Assign free trial to new owner (non-blocking)
-            const { assignFreeTrialToOwner } = await import('@/lib/subscription/trial')
+            console.log('[Auth] Creating new user for:', normalizedEmail)
             try {
-              await assignFreeTrialToOwner(created.id)
-            } catch (error) {
-              console.error('[Auth] Failed to assign free trial:', error)
+              const [created] = await db.insert(users).values({
+                email: normalizedEmail,
+                name: user.name ?? null,
+                role: 'owner',
+                country: 'US',
+              }).returning()
+              
+              console.log('[Auth] User created with ID:', created.id)
+              
+              await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
+              
+              // Assign free trial to new owner (non-blocking)
+              const { assignFreeTrialToOwner } = await import('@/lib/subscription/trial')
+              try {
+                await assignFreeTrialToOwner(created.id)
+                console.log('[Auth] Free trial assigned to new user')
+              } catch (error) {
+                console.error('[Auth] Failed to assign free trial (non-fatal):', error)
+              }
+              
+              const u = user as { id?: string; role?: UserRole; businessId?: string }
+              u.id = created.id
+              u.role = 'owner'
+              u.businessId = created.id
+              
+              console.log('[Auth] User object updated with DB data')
+            } catch (dbError) {
+              console.error('[Auth] Database error creating user:', dbError)
+              const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+              
+              // Check for specific database errors
+              if (dbErrorMessage.includes('duplicate key') || dbErrorMessage.includes('unique constraint')) {
+                console.log('[Auth] User already exists (race condition), fetching existing user')
+                // Race condition - user was created between check and insert
+                const existingAfterRace = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
+                if (existingAfterRace.length > 0) {
+                  const dbUser = existingAfterRace[0] as unknown as { id: string; role: string; businessId?: string | null }
+                  const u = user as { id?: string; role?: UserRole; businessId?: string }
+                  u.id = dbUser.id
+                  u.role = (dbUser.role as string).toLowerCase() as UserRole
+                  u.businessId = (dbUser.businessId ?? dbUser.id)
+                  return true
+                }
+              }
+              
+              // Re-throw to be caught by outer catch
+              throw dbError
             }
-            
-            const u = user as { id?: string; role?: UserRole; businessId?: string }
-            u.id = created.id
-            u.role = 'owner'
-            u.businessId = created.id
           } else {
+            console.log('[Auth] Existing user found:', existing[0].id)
             const dbUser = existing[0] as unknown as { id: string; role: string; businessId?: string | null }
             const u = user as { id?: string; role?: UserRole; businessId?: string }
             u.id = dbUser.id
             u.role = (dbUser.role as string).toLowerCase() as UserRole
             u.businessId = (dbUser.businessId ?? dbUser.id)
+            
+            console.log('[Auth] User object updated with existing DB data')
           }
         }
         return true
       } catch (error) {
         console.error("[Auth] signIn callback error:", error)
+        console.error("[Auth] Error details:", {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          cause: error instanceof Error && error.cause ? error.cause : undefined
+        })
+        // Return false to prevent sign-in, but don't throw to avoid breaking NextAuth
         return false
       }
     },

@@ -6,12 +6,70 @@ const { GET: originalGET, POST: originalPOST } = handlers
 
 export async function GET(req: NextRequest) {
   try {
+    const url = new URL(req.url)
+    const pathname = url.pathname
+    
+    // Log callback requests for debugging
+    if (pathname.includes('/callback/')) {
+      console.log('[NextAuth] OAuth callback:', {
+        pathname,
+        searchParams: url.searchParams.toString(),
+        hasNEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+        NEXTAUTH_URL: process.env.NEXTAUTH_URL
+      })
+    }
+    
     return await originalGET(req)
   } catch (error) {
     console.error("NextAuth GET error:", error)
+    console.error("Error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cause: error instanceof Error && error.cause ? error.cause : undefined
+    })
+    
     const errorMessage = error instanceof Error ? error.message : "Authentication error occurred"
+    
+    // Check for specific error types
+    if (error instanceof Error) {
+      // Database connection errors
+      if (error.message.includes('DATABASE_URL') || error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          { 
+            error: "Database connection error. Please ensure the database is running.",
+            details: process.env.NODE_ENV === 'development' ? 
+              'Make sure Docker database is running: npm run docker:up' : 
+              undefined
+          },
+          { 
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+      }
+      
+      // URL parsing errors
+      if (error.message.includes("Failed to parse URL") || error.message.includes("Invalid URL")) {
+        return NextResponse.json(
+          { 
+            error: "Authentication configuration error. Please check server settings.",
+            details: process.env.NODE_ENV === 'development' ? 
+              `Failed to parse URL. Make sure NEXTAUTH_URL=http://localhost:3000 is set in .env.local and restart dev server` : 
+              'Check NEXTAUTH_URL environment variable in production'
+          },
+          { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+      }
+    }
+    
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: "Authentication error occurred",
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }
