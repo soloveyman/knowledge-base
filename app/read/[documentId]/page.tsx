@@ -221,10 +221,11 @@ export default function DocumentReaderPage() {
               return { ...img, dataUrl }
             } catch (error) {
               console.error(`Failed to load image: ${img.filename}`, error)
-              return { ...img, dataUrl: `data:${img.type || 'image/png'};base64,` }
+              // Skip image if it can't be loaded (don't show broken image)
+              return null
             }
           })
-          const imagesWithData = await Promise.all(imageDataPromises)
+          const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null)
           
           // Insert images at their positions or append at the end
           let contentWithImages = content

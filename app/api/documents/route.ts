@@ -153,10 +153,11 @@ export async function POST(request: Request) {
     }
 
     // Process images: upload ALL images to Spaces
-    // All images are uploaded to Spaces and URLs are stored in parsedContent
+    // All images MUST be uploaded to Spaces - base64 storage is disabled
+    // URLs from Spaces are stored in parsedContent and documentImages table
     const imagesToUpload: Array<{
       filename: string
-      base64Data: string // base64 data (without data URL prefix)
+      base64Data: string // Temporary base64 data for upload to S3 (not stored in DB)
       type: string
       position?: number
       originalIndex: number // Index in original images array
@@ -306,32 +307,15 @@ export async function POST(request: Request) {
           }
         } catch (error) {
           console.error(`❌ Failed to upload ${img.filename} to Spaces:`, error)
-          // Fallback: save base64 in database
-          try {
-            const savedImage = await db.insert(documentImages).values({
-              documentId,
-              filename: img.filename,
-              data: img.base64Data, // Fallback to base64
-              type: img.type,
-              position: img.position
-            }).returning()
-            
-            return {
-              originalIndex: img.originalIndex,
-              url: null,
-              storageKey: null,
-              imageId: savedImage[0].id,
-              error: error instanceof Error ? error.message : 'Unknown error'
-            }
-          } catch (dbError) {
-            console.error(`❌ Failed to save ${img.filename} to database:`, dbError)
-            return {
-              originalIndex: img.originalIndex,
-              url: null,
-              storageKey: null,
-              imageId: null,
-              error: error instanceof Error ? error.message : 'Unknown error'
-            }
+          // Don't save base64 - all images must be in S3
+          // If upload fails, skip the image and log the error
+          console.error(`Skipping image ${img.filename} - S3 upload failed and base64 storage is disabled`)
+          return {
+            originalIndex: img.originalIndex,
+            url: null,
+            storageKey: null,
+            imageId: null,
+            error: error instanceof Error ? error.message : 'S3 upload failed - base64 storage disabled'
           }
         }
       })
@@ -374,7 +358,12 @@ export async function POST(request: Request) {
         parsedContent = updatedParsedContent
       }
       
-      console.log(`✅ Processed ${uploadResults.length} images: ${uploadResults.filter(r => r.url).length} uploaded to Spaces, ${uploadResults.filter(r => !r.url && r.imageId).length} saved to DB as fallback`)
+      const successfulUploads = uploadResults.filter(r => r.url).length
+      const failedUploads = uploadResults.filter(r => !r.url).length
+      console.log(`✅ Processed ${uploadResults.length} images: ${successfulUploads} uploaded to Spaces, ${failedUploads} failed (base64 storage disabled)`)
+      if (failedUploads > 0) {
+        console.warn(`⚠️ ${failedUploads} image(s) failed to upload to S3 and were skipped (base64 storage is disabled)`)
+      }
     }
 
     // Update document with final parsedContent (with URLs)

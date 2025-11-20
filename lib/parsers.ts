@@ -165,7 +165,30 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         
         for (const filename of mediaFiles) {
           try {
-            const imageBuffer = await mediaFolder.file(filename)?.async('arraybuffer')
+            // Get the file object directly from mediaFolder.files
+            const fileEntry = mediaFolder.files[filename]
+            if (!fileEntry || fileEntry.dir) {
+              console.warn(`⚠️ Skipping ${filename} - not a file or is a directory`)
+              continue
+            }
+            
+            // Try to get file by full path first, then by relative path
+            let imageBuffer: ArrayBuffer | undefined
+            try {
+              imageBuffer = await fileEntry.async('arraybuffer')
+            } catch (fileError) {
+              // Try alternative: get file by full path from root zip
+              const fullPath = `word/media/${filename}`
+              const rootFile = zip.file(fullPath)
+              if (rootFile) {
+                imageBuffer = await rootFile.async('arraybuffer')
+                console.log(`✅ Retrieved ${filename} using full path: ${fullPath}`)
+              } else {
+                console.warn(`⚠️ Could not find file ${filename} in zip archive`)
+                throw fileError
+              }
+            }
+            
             if (imageBuffer && imageBuffer.byteLength > 0) {
               const imageSizeKB = imageBuffer.byteLength / 1024
               const imageSizeMB = imageBuffer.byteLength / (1024 * 1024)
@@ -180,12 +203,15 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
               
               totalImageSize += imageBuffer.byteLength
               
-              // Skip images that are too large to prevent payload size issues
-              if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
-                console.warn(`⚠️ Skipping image ${filename} - too large (${imageSizeMB.toFixed(2)}MB). Maximum recommended size is ${(MAX_IMAGE_SIZE / (1024 * 1024)).toFixed(2)}MB per image.`)
+              // Note: Large images will be uploaded to S3, not skipped
+              // We only skip if they exceed a very large limit (10MB) to prevent memory issues
+              const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB absolute limit
+              if (imageBuffer.byteLength > ABSOLUTE_MAX_SIZE) {
+                console.warn(`⚠️ Skipping image ${filename} - exceeds absolute limit (${imageSizeMB.toFixed(2)}MB). Maximum is ${(ABSOLUTE_MAX_SIZE / (1024 * 1024)).toFixed(2)}MB per image.`)
                 continue
               }
               
+              // Convert to base64 for transmission (will be uploaded to S3 on server)
               const base64 = Buffer.from(imageBuffer).toString('base64')
               const extension = filename.split('.').pop()?.toLowerCase() || 'png'
               // Map common extensions to MIME types
@@ -489,10 +515,137 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
 export async function parseXlsx(buffer: ArrayBuffer, options: {
   includeMetadata?: boolean
   normalizeWhitespace?: boolean
-} = {}): Promise<ParseResult> {
+} = {}): Promise<ParseResult & { images?: Array<{filename: string, data: string, type: string}> }> {
   try {
     // Convert ArrayBuffer to Uint8Array for xlsx
     const uint8Array = new Uint8Array(buffer)
+    
+    // Extract images from XLSX (XLSX is a ZIP archive, images are in xl/media/)
+    const images: Array<{filename: string, data: string, type: string}> = []
+    
+    try {
+      const zip = await JSZip.loadAsync(uint8Array)
+      const mediaFolder = zip.folder('xl/media')
+      
+      if (mediaFolder) {
+        console.log('Extracting images from xl/media...')
+        // Get only files that are actually in xl/media (not nested folders)
+        // and filter for image file extensions only
+        const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
+        const mediaFiles = Object.keys(mediaFolder.files)
+          .filter(filename => {
+            const file = mediaFolder.files[filename]
+            // Only process files (not directories) that are directly in xl/media
+            if (file.dir) return false
+            // Check if it's an image file by extension
+            const extension = filename.split('.').pop()?.toLowerCase()
+            return extension && imageExtensions.includes(extension)
+          })
+        
+        console.log(`Found ${mediaFiles.length} image files in xl/media folder:`, mediaFiles)
+        
+        // Image size limits (warn about large high-res images)
+        const MAX_IMAGE_SIZE = 500 * 1024 // 500KB per image (recommended)
+        const WARNING_IMAGE_SIZE = 200 * 1024 // 200KB per image (warning threshold)
+        const MAX_TOTAL_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB total for all images
+        let totalImageSize = 0
+        const largeImages: string[] = []
+        
+        for (const filename of mediaFiles) {
+          try {
+            // Get the file object directly from mediaFolder.files
+            const fileEntry = mediaFolder.files[filename]
+            if (!fileEntry || fileEntry.dir) {
+              console.warn(`⚠️ Skipping ${filename} - not a file or is a directory`)
+              continue
+            }
+            
+            // Try to get file by full path first, then by relative path
+            let imageBuffer: ArrayBuffer | undefined
+            try {
+              imageBuffer = await fileEntry.async('arraybuffer')
+            } catch (fileError) {
+              // Try alternative: get file by full path from root zip
+              const fullPath = `xl/media/${filename}`
+              const rootFile = zip.file(fullPath)
+              if (rootFile) {
+                imageBuffer = await rootFile.async('arraybuffer')
+                console.log(`✅ Retrieved ${filename} using full path: ${fullPath}`)
+              } else {
+                console.warn(`⚠️ Could not find file ${filename} in zip archive`)
+                throw fileError
+              }
+            }
+            
+            if (imageBuffer && imageBuffer.byteLength > 0) {
+              const imageSizeKB = imageBuffer.byteLength / 1024
+              const imageSizeMB = imageBuffer.byteLength / (1024 * 1024)
+              
+              // Check for large high-resolution images
+              if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
+                largeImages.push(`${filename} (${imageSizeMB.toFixed(2)}MB)`)
+                console.warn(`⚠️ Large high-resolution image detected: ${filename} (${imageSizeMB.toFixed(2)}MB)`)
+              } else if (imageBuffer.byteLength > WARNING_IMAGE_SIZE) {
+                console.warn(`⚠️ Large image detected: ${filename} (${imageSizeKB.toFixed(2)}KB) - consider compressing`)
+              }
+              
+              totalImageSize += imageBuffer.byteLength
+              
+              // Note: Large images will be uploaded to S3, not skipped
+              // We only skip if they exceed a very large limit (10MB) to prevent memory issues
+              const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB absolute limit
+              if (imageBuffer.byteLength > ABSOLUTE_MAX_SIZE) {
+                console.warn(`⚠️ Skipping image ${filename} - exceeds absolute limit (${imageSizeMB.toFixed(2)}MB). Maximum is ${(ABSOLUTE_MAX_SIZE / (1024 * 1024)).toFixed(2)}MB per image.`)
+                continue
+              }
+              
+              // Convert to base64 for transmission (will be uploaded to S3 on server)
+              const base64 = Buffer.from(imageBuffer).toString('base64')
+              const extension = filename.split('.').pop()?.toLowerCase() || 'png'
+              // Map common extensions to MIME types
+              const mimeTypeMap: Record<string, string> = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'gif': 'image/gif',
+                'bmp': 'image/bmp',
+                'webp': 'image/webp',
+                'svg': 'image/svg+xml'
+              }
+              const mimeType = mimeTypeMap[extension] || `image/${extension}`
+              images.push({
+                filename: filename,
+                data: `data:${mimeType};base64,${base64}`,
+                type: mimeType
+              })
+              console.log(`✅ Extracted image: ${filename} (${mimeType}, ${imageSizeKB.toFixed(2)}KB)`)
+            } else {
+              console.warn(`⚠️ Image buffer is null or empty for: ${filename}`)
+            }
+          } catch (error) {
+            console.warn(`❌ Failed to extract image ${filename}:`, error)
+          }
+        }
+        
+        // Warn about total image size
+        const totalImageSizeMB = totalImageSize / (1024 * 1024)
+        if (totalImageSize > MAX_TOTAL_IMAGE_SIZE) {
+          console.warn(`⚠️ Total image size (${totalImageSizeMB.toFixed(2)}MB) exceeds recommended limit (${(MAX_TOTAL_IMAGE_SIZE / (1024 * 1024)).toFixed(2)}MB). This may cause upload issues.`)
+        }
+        
+        if (largeImages.length > 0) {
+          console.warn(`⚠️ Found ${largeImages.length} large high-resolution image(s):`, largeImages)
+          console.warn(`⚠️ Large images can cause upload failures due to Vercel's 4.5MB payload limit. Consider compressing images before adding to documents.`)
+        }
+        console.log(`📸 Total images extracted from xl/media: ${images.length}`)
+      } else {
+        console.log('⚠️ xl/media folder not found in XLSX file')
+      }
+    } catch (zipError) {
+      console.warn('⚠️ Failed to extract images from XLSX (non-fatal):', zipError)
+      // Continue parsing even if image extraction fails
+    }
+    
     const workbook = XLSX.read(uint8Array, { type: 'array' })
     
     let text = ''
@@ -787,7 +940,8 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
     return {
       text,
       metadata,
-      tables
+      tables,
+      ...(images.length > 0 ? { images } : {})
     }
   } catch (error) {
     throw new ParseError(`Failed to parse XLSX: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -871,7 +1025,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
     structuredContent.tables = [...structuredContent.tables, ...parseResult.tables]
   }
   
-  // Merge images from DOCX parsing if they exist
+  // Merge images from document parsing (DOCX or XLSX) if they exist
   if ('images' in parseResult && parseResult.images && Array.isArray(parseResult.images) && parseResult.images.length > 0) {
     console.log('Found images in parseResult:', parseResult.images.length)
     structuredContent.images = parseResult.images.map((img, index) => {

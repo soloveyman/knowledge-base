@@ -51,7 +51,7 @@
     "test:sessions": "playwright test tests/sessions",
     "test:practices": "playwright test tests/best-practices",
     "test:integration": "playwright test tests/integration",
-    "test:prod": "npm run build && npm run start & sleep 5 && playwright test && pkill -f 'next start' || true"
+    "test:prod": "node scripts/test-prod.js"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",

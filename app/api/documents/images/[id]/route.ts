@@ -71,7 +71,7 @@ export async function GET(
       }
     }
 
-    // Если есть URL в Spaces, используем его (приоритет)
+    // Все изображения должны иметь URL в Spaces
     if (imageData.url) {
       return NextResponse.json({
         success: true,
@@ -85,26 +85,10 @@ export async function GET(
       })
     }
 
-    // Fallback: возвращаем base64 из БД (для старых изображений)
-    if (imageData.data) {
-      const dataUrl = `data:${imageData.type};base64,${imageData.data}`
-      return NextResponse.json({
-        success: true,
-        data: {
-          id: imageData.id,
-          filename: imageData.filename,
-          type: imageData.type,
-          position: imageData.position,
-          dataUrl: dataUrl, // Full data URL for direct use
-          data: imageData.data // Raw base64 for flexibility
-        }
-      })
-    }
-
-    // Если нет ни URL, ни данных
+    // Если нет URL - изображение недоступно (base64 storage отключен)
     return NextResponse.json({
       success: false,
-      message: 'Image data not available'
+      message: 'Image not available - URL from Spaces is required. Base64 storage is disabled.'
     }, { status: 404 })
   } catch (error) {
     console.error('Get image API error:', error)

@@ -70,29 +70,37 @@ function DocumentContent({ content }: { content: string }) {
   
   // Convert markdown images to HTML img tags (ReactMarkdown with rehypeRaw can handle HTML)
   // This avoids parsing issues with very long data URLs
+  // Handle both data URLs and external URLs (S3/CDN)
   let processedMarkdown = markdown
-  const imagePattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
+  const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
   const imageMatches: Array<{ match: string; alt: string; src: string }> = []
   let imageMatch
   while ((imageMatch = imagePattern.exec(markdown)) !== null) {
-    imageMatches.push({
-      match: imageMatch[0],
-      alt: imageMatch[1] || '',
-      src: imageMatch[2]
-    })
+    const src = imageMatch[2]
+    // Only process if it's a data URL or external URL (skip if already processed)
+    if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+      imageMatches.push({
+        match: imageMatch[0],
+        alt: imageMatch[1] || '',
+        src: src
+      })
+    }
   }
   
   // Replace markdown images with HTML img tags (in reverse order to preserve positions)
   for (let i = imageMatches.length - 1; i >= 0; i--) {
     const { match, alt, src } = imageMatches[i]
-    // Escape alt text for HTML (but not src - data URLs must remain unescaped)
+    // Escape alt text for HTML (but not src - URLs must remain unescaped)
     const escapedAlt = alt.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    // Escape src for HTML if it's an external URL (data URLs don't need escaping)
+    const escapedSrc = src.startsWith('data:') ? src : src.replace(/"/g, '&quot;')
     // Use HTML img tag instead of markdown syntax
-    // Note: src contains data URL which must remain unescaped (browser handles it correctly in quotes)
-    const htmlImg = `<img src="${src}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
+    // Note: data URLs must remain unescaped, but external URLs should be escaped
+    const htmlImg = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
     processedMarkdown = processedMarkdown.replace(match, htmlImg)
     console.log(`📸 Converted image ${i + 1}:`, {
       alt,
+      srcType: src.startsWith('data:') ? 'data URL' : src.startsWith('http') ? 'external URL' : 'unknown',
       srcLength: src.length,
       srcPreview: src.substring(0, 50),
       htmlImgPreview: htmlImg.substring(0, 100)
@@ -366,7 +374,9 @@ function DocumentContent({ content }: { content: string }) {
             : "rounded-lg border border-border w-full h-auto max-w-4xl")
           
           // Always use regular img tag for data URLs (Next.js Image doesn't support them)
-          if (isDataUrl || !isExternal) {
+          // For external URLs (S3/CDN), we can use either regular img or Next.js Image
+          // Using regular img for now to avoid Next.js Image domain configuration issues
+          if (isDataUrl || isExternal) {
             return (
               <div className={containerClass}>
                 <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
@@ -379,12 +389,22 @@ function DocumentContent({ content }: { content: string }) {
                     loading={isSmallImage || isQRCode ? "eager" : "lazy"}
                     style={{ maxWidth: '100%', height: 'auto' }}
                     onError={(e) => {
-                      console.error('Image failed to load:', { src: srcString.substring(0, 100), alt })
+                      console.error('Image failed to load:', { 
+                        src: srcString.substring(0, 100), 
+                        alt,
+                        isExternal,
+                        isDataUrl
+                      })
                       const target = e.target as HTMLImageElement
                       target.style.display = 'none'
                     }}
                     onLoad={() => {
-                      console.log('Image loaded successfully:', { src: srcString.substring(0, 100), alt })
+                      console.log('Image loaded successfully:', { 
+                        src: srcString.substring(0, 100), 
+                        alt,
+                        isExternal,
+                        isDataUrl
+                      })
                     }}
                   />
                 </div>
@@ -392,7 +412,8 @@ function DocumentContent({ content }: { content: string }) {
             )
           }
           
-          // For external URLs only, use Next.js Image component
+          // Fallback for unknown URL types (shouldn't happen, but just in case)
+          // For external URLs, use Next.js Image component (if domain is configured)
           const category = getImageSizeCategory(imgWidth, imgHeight)
           const optimizedProps = getOptimizedImageProps(category, {
             width: imgWidth,
@@ -742,6 +763,7 @@ function convertToMarkdown(content: string): string {
   
   // Also handle regular URLs (non-data URLs) - must come after data URL matching
   // Match: ![alt](http://... or https://... or relative paths)
+  // This includes S3/CDN URLs from DigitalOcean Spaces
   const regularImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
   let regularMatch
   while ((regularMatch = regularImagePattern.exec(md)) !== null) {
@@ -751,7 +773,9 @@ function convertToMarkdown(content: string): string {
       const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
       imagePlaceholders.push(fullMatch)
       images.push({ match: fullMatch, placeholder })
-      console.log(`📸 Preserved regular image in markdown: ${fullMatch}`)
+      const src = regularMatch[2]
+      const urlType = src.startsWith('http://') || src.startsWith('https://') ? 'external URL' : 'relative path'
+      console.log(`📸 Preserved ${urlType} image in markdown: ${fullMatch.substring(0, 100)}`)
     }
   }
   

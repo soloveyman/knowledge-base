@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { db, documents, assignments, documentImages } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, documents, assignments, documentImages, users } from '@/lib/db'
+import { eq, and, or } from 'drizzle-orm'
 import { deleteImageFromSpaces } from '@/lib/storage/spaces'
+import { auth, hasPermission } from '@/lib/auth'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -78,19 +79,61 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Check authentication
+    const session = await auth()
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({
+        success: false,
+        message: 'Unauthorized'
+      }, { status: 401 })
+    }
+
+    // Check permissions
+    if (!hasPermission(session.user.role, 'MATERIALS', 'delete')) {
+      return NextResponse.json({
+        success: false,
+        message: 'Forbidden - you do not have permission to delete documents'
+      }, { status: 403 })
+    }
+
     const { id } = await params
 
-    // Check if document exists
-    const existingDocument = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
-    if (existingDocument.length === 0) {
+    // Check if document exists and user has access
+    const existingDocument = await db
+      .select({ 
+        document: documents,
+        uploaderBusinessId: users.businessId 
+      })
+      .from(documents)
+      .leftJoin(users, eq(documents.uploadedBy, users.id))
+      .where(eq(documents.id, id))
+      .limit(1)
+
+    if (existingDocument.length === 0 || !existingDocument[0].document) {
       return NextResponse.json({
         success: false,
         message: 'Document not found'
       }, { status: 404 })
     }
 
+    const document = existingDocument[0].document
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+
+    // Check access: super-admin can delete any, others can only delete their own business documents
+    if (userRole !== 'super-admin') {
+      const uploaderBusinessId = existingDocument[0].uploaderBusinessId
+      const isOwner = document.uploadedBy === session.user.id
+      
+      if (!isOwner && uploaderBusinessId !== tenantId) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden - you can only delete documents from your business'
+        }, { status: 403 })
+      }
+    }
+
     // Check if document's module is used in assignments - if so, block deletion
-    const document = existingDocument[0]
     if (document.moduleId) {
       const relatedAssignments = await db.select().from(assignments).where(eq(assignments.moduleId, document.moduleId))
       
@@ -115,24 +158,38 @@ export async function DELETE(
     if (documentImagesList.length > 0) {
       console.log(`🗑️ Deleting ${documentImagesList.length} images from Spaces for document ${id}`)
       
-      const deletePromises = documentImagesList
-        .filter(img => img.storageKey) // Only delete if has storageKey
-        .map(async (img) => {
+      const imagesWithKeys = documentImagesList.filter(img => img.storageKey)
+      console.log(`Found ${imagesWithKeys.length} images with storageKey to delete`)
+      
+      if (imagesWithKeys.length > 0) {
+        const deletePromises = imagesWithKeys.map(async (img) => {
           try {
-            await deleteImageFromSpaces(img.storageKey!)
+            if (!img.storageKey) {
+              console.warn(`⚠️ Image ${img.id} has no storageKey, skipping`)
+              return
+            }
+            await deleteImageFromSpaces(img.storageKey)
             console.log(`✅ Deleted image from Spaces: ${img.storageKey}`)
           } catch (error) {
             // Log error but don't fail document deletion if Spaces deletion fails
-            console.error(`❌ Failed to delete image from Spaces (${img.storageKey}):`, error)
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            console.error(`❌ Failed to delete image from Spaces (${img.storageKey}):`, errorMessage)
+            // If Spaces is not configured, just log and continue
+            if (errorMessage.includes('not configured')) {
+              console.warn(`⚠️ Spaces not configured, skipping image deletion from S3`)
+            }
           }
         })
-      
-      await Promise.allSettled(deletePromises) // Use allSettled to continue even if some fail
-      console.log(`✅ Finished deleting images from Spaces for document ${id}`)
+        
+        await Promise.allSettled(deletePromises) // Use allSettled to continue even if some fail
+        console.log(`✅ Finished deleting images from Spaces for document ${id}`)
+      }
     }
 
     // Delete the document (cascade will delete documentImages from DB)
+    console.log(`🗑️ Deleting document ${id} from database`)
     await db.delete(documents).where(eq(documents.id, id))
+    console.log(`✅ Document ${id} deleted successfully`)
 
     return NextResponse.json({
       success: true,
@@ -140,10 +197,15 @@ export async function DELETE(
     })
   } catch (error) {
     console.error('Delete document API error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Error details:', { errorMessage, errorStack })
+    
     return NextResponse.json({
       success: false,
       message: 'Failed to delete document',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? errorStack : undefined
     }, { status: 500 })
   }
 }

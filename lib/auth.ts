@@ -35,17 +35,21 @@ const nextAuthUrl = process.env.NEXTAUTH_URL ||
 if (typeof process !== 'undefined' && !process.env.NEXTAUTH_URL) {
   if (process.env.NODE_ENV === 'production') {
     console.warn('⚠️  NEXTAUTH_URL is not set in production. This may cause authentication errors.')
-    console.warn('⚠️  Set NEXTAUTH_URL in Vercel environment variables (e.g., https://uppstaff.vercel.app)')
+    console.warn('⚠️  Set NEXTAUTH_URL in Vercel environment variables (e.g., https://uppstaff.net)')
   } else {
     console.warn('⚠️  NEXTAUTH_URL is not set. For localhost, trustHost: true should work, but consider setting NEXTAUTH_URL=http://localhost:3000 in .env.local')
   }
   console.warn('⚠️  Using trustHost: true as fallback')
+} else if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') {
+  // Log the actual NEXTAUTH_URL in production for debugging
+  console.log('✅ NEXTAUTH_URL is set:', process.env.NEXTAUTH_URL)
+  console.log('✅ Expected redirect URI:', `${process.env.NEXTAUTH_URL}/api/auth/callback/google`)
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   trustHost: true, // Allow NextAuth to trust the host from request headers (important for Vercel)
-  debug: false, // Disable debug to reduce console noise (enable only when debugging auth issues)
+  debug: process.env.NODE_ENV === 'development', // Enable debug in development to see redirect URIs
   providers: [
     ...oauthProviders,
     CredentialsProvider({

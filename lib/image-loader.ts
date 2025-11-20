@@ -4,39 +4,28 @@
 
 export interface ImageData {
   filename: string
-  data?: string | null // base64 data (deprecated, kept for legacy support)
-  url?: string | null // URL from DigitalOcean Spaces (preferred)
+  data?: string | null // base64 data (legacy only - not used for new images)
+  url?: string | null // URL from DigitalOcean Spaces (required for all new images)
   type: string
   position?: number
   imageId?: string | null // ID for images stored in database (for API lookup)
 }
 
 /**
- * Get image URL/data URL from Spaces URL, inline data, or API
+ * Get image URL from Spaces or API
+ * All images must be stored in S3 (DigitalOcean Spaces) - base64 storage is disabled
  */
 export async function getImageDataUrl(img: ImageData): Promise<string> {
-  // Priority 1: URL from Spaces (fastest, most efficient)
+  // Priority 1: URL from Spaces (all new images use this)
   if (img.url) {
     console.log(`Using Spaces URL for ${img.filename}: ${img.url}`)
     return img.url
   }
   
-  // Priority 2: Inline base64 data (legacy support)
-  if (img.data) {
-    // Check if it's already a data URL (starts with "data:")
-    if (img.data.startsWith('data:')) {
-      // Already a full data URL, return as-is
-      return img.data
-    } else {
-      // Just base64 data, construct the data URL
-      return `data:${img.type};base64,${img.data}`
-    }
-  }
-  
-  // Priority 3: Fetch from API using imageId (for legacy images or fallback)
+  // Priority 2: Fetch from API using imageId (must have URL in Spaces)
   if (img.imageId) {
     try {
-      console.log(`Loading large image from API: ${img.filename} (imageId: ${img.imageId})`)
+      console.log(`Loading image from API: ${img.filename} (imageId: ${img.imageId})`)
       const response = await fetch(`/api/documents/images/${img.imageId}`, {
         cache: 'no-store',
         headers: {
@@ -52,30 +41,24 @@ export async function getImageDataUrl(img: ImageData): Promise<string> {
       
       const result = await response.json()
       
-      // Приоритет: URL из Spaces (быстрее и эффективнее)
+      // URL из Spaces (обязательно для всех изображений)
       if (result.success && result.data?.url) {
         console.log(`Successfully loaded image ${img.filename} from Spaces: ${result.data.url}`)
         return result.data.url
       }
       
-      // Fallback: data URL из БД (для старых изображений)
-      if (result.success && result.data?.dataUrl) {
-        console.log(`Successfully loaded image ${img.filename} from API (base64, ${result.data.dataUrl.length} chars)`)
-        return result.data.dataUrl
-      }
-      
-      console.error(`Invalid response from image API for ${img.imageId}:`, result)
-      throw new Error('Invalid response from image API')
+      // Если нет URL - изображение недоступно (base64 storage отключен)
+      console.error(`Image ${img.imageId} has no URL in database - base64 storage is disabled`)
+      throw new Error(`Image ${img.filename} is not available - URL from Spaces is required`)
     } catch (error) {
       console.error(`Error loading image ${img.filename} (imageId: ${img.imageId}) from API:`, error)
-      // Return placeholder or empty data URL
-      return `data:${img.type};base64,` // Empty base64
+      throw error
     }
   }
   
-  // Fallback: return empty data URL
-  console.warn(`Image ${img.filename} has no data or imageId`)
-  return `data:${img.type};base64,`
+  // No URL and no imageId - image is missing
+  console.error(`Image ${img.filename} has no URL or imageId - image is missing`)
+  throw new Error(`Image ${img.filename} is not available`)
 }
 
 /**
