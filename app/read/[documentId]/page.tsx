@@ -251,25 +251,56 @@ export default function DocumentReaderPage() {
           const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null && img.dataUrl && img.dataUrl.trim().length > 0)
           
           // Insert images at their positions or append at the end
+          // Separate images with valid positions from those without
+          const imagesWithPositions = imagesWithData.filter(img => 
+            img.position !== undefined && 
+            img.position > 0 && 
+            img.position <= content.length
+          )
+          const imagesWithoutPositions = imagesWithData.filter(img => 
+            !(img.position !== undefined && 
+              img.position > 0 && 
+              img.position <= content.length)
+          )
+          
+          console.log(`📸 Image position analysis:`, {
+            total: imagesWithData.length,
+            withValidPositions: imagesWithPositions.length,
+            withoutPositions: imagesWithoutPositions.length,
+            contentLength: content.length
+          })
+          
           let contentWithImages = content
           let offset = 0
           
-          imagesWithData.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+          // First, insert images with valid positions (sorted by position to maintain order)
+          const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => (a.position || 0) - (b.position || 0))
+          sortedImagesWithPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
             const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
-            
-            if (img.position !== undefined && img.position >= 0 && img.position < content.length) {
-              // Insert at the specified position
-              const insertPos = img.position + offset
+            const insertPos = Math.min(img.position! + offset, contentWithImages.length)
+            if (insertPos <= contentWithImages.length) {
               contentWithImages = 
                 contentWithImages.slice(0, insertPos) + 
                 imageMarkdown + 
                 contentWithImages.slice(insertPos)
               offset += imageMarkdown.length
+              console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (adjusted: ${insertPos})`)
             } else {
-              // Append at the end
+              // Position is out of bounds, append at the end
               contentWithImages += imageMarkdown
+              console.log(`📸 Appended image "${img.filename}" at the end (position ${insertPos} out of bounds)`)
             }
           })
+          
+          // Then, append images without positions at the end
+          if (imagesWithoutPositions.length > 0) {
+            console.log(`📸 Appending ${imagesWithoutPositions.length} image(s) without valid positions at the end`)
+            imagesWithoutPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+              const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
+              contentWithImages += imageMarkdown
+              console.log(`📸 Appended image "${img.filename}" at the end (no valid position)`)
+            })
+          }
           
           content = contentWithImages
           

@@ -207,12 +207,19 @@ function DocImportPageInner() {
             clearParsingCache()
             
             console.log(`Starting to parse file: ${fileObj.name}`)
+            console.log(`File source: ${fileObj.name.includes('Google') ? 'Google Drive' : 'Local upload'}`)
             const startTime = Date.now()
             
             const parsedContent = await parseDocument(fileObj.file)
             
             const endTime = Date.now()
             console.log(`Parsing completed in ${endTime - startTime}ms for file: ${fileObj.name}`)
+            console.log(`Parsed content summary:`, {
+              sections: parsedContent.sections?.length || 0,
+              tables: parsedContent.tables?.length || 0,
+              images: parsedContent.images?.length || 0,
+              hasMetadata: !!parsedContent.metadata
+            })
             
             // Check for large images and warn user
             const imageCount = parsedContent.images?.length || 0
@@ -238,18 +245,30 @@ function DocImportPageInner() {
               warningMessages.push(`This document contains ${imageCount} image(s) totaling ${totalImageSizeMB.toFixed(2)}MB. Large images may cause upload issues.`)
             }
             
-            setFiles(prev => prev.map(f => 
-              f.id === file.id 
-                ? { 
-                    ...f, 
-                    status: 'ready',
-                    progress: 100,
-                    parsedContent: parsedContent,
-                    parsingLog: warningMessages.length > 0 ? warningMessages.map(msg => ({ level: 'warning', message: msg })) : [],
-                    warning: warningMessages.length > 0 ? warningMessages.join(' ') : undefined
-                  }
-                : f
-            ))
+            setFiles(prev => {
+              const updated = prev.map(f => 
+                f.id === file.id 
+                  ? { 
+                      ...f, 
+                      status: 'ready',
+                      progress: 100,
+                      parsedContent: parsedContent,
+                      parsingLog: warningMessages.length > 0 ? warningMessages.map(msg => ({ level: 'warning', message: msg })) : [],
+                      warning: warningMessages.length > 0 ? warningMessages.join(' ') : undefined
+                    }
+                  : f
+              )
+              const updatedFile = updated.find(f => f.id === file.id)
+              if (updatedFile) {
+                console.log(`File ${fileObj.name} marked as ready:`, {
+                  hasParsedContent: !!updatedFile.parsedContent,
+                  sections: updatedFile.parsedContent?.sections?.length || 0,
+                  tables: updatedFile.parsedContent?.tables?.length || 0,
+                  images: updatedFile.parsedContent?.images?.length || 0
+                })
+              }
+              return updated
+            })
             
             // Show warning toast if large images detected
             if (warningMessages.length > 0) {
@@ -361,6 +380,12 @@ function DocImportPageInner() {
 
       // Использовать существующую логику обработки файла
       console.log('[Google Drive] Calling handleFiles with file object')
+      console.log('[Google Drive] File object details:', {
+        name: fileObj.name,
+        size: fileObj.size,
+        type: fileObj.type,
+        lastModified: fileObj.lastModified
+      })
       handleFiles([fileObj])
       
       console.log('[Google Drive] File added to processing queue')
@@ -478,9 +503,15 @@ function DocImportPageInner() {
       // Save all files in parallel and wait for all to complete
       const savePromises = readyFiles.map(async (file) => {
         console.log('Saving document:', file.name)
+        console.log('File source:', file.name.includes('Google') ? 'Google Drive' : 'Local upload')
+        console.log('File status:', file.status)
         console.log('ParsedContent exists:', !!file.parsedContent)
         console.log('ParsedContent sections:', file.parsedContent?.sections?.length || 0)
         console.log('ParsedContent tables:', file.parsedContent?.tables?.length || 0)
+        console.log('ParsedContent images:', file.parsedContent?.images?.length || 0)
+        if (file.parsedContent?.images && file.parsedContent.images.length > 0) {
+          console.log('Image positions:', file.parsedContent.images.map((img: any) => ({ filename: img.filename, position: img.position })))
+        }
         
         try {
           // Prepare request body

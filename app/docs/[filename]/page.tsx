@@ -426,33 +426,43 @@ export default function DocumentViewer() {
             const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null && img.dataUrl && img.dataUrl.trim().length > 0)
             
             // Separate images with valid positions from those without
-            const imagesWithPositions = imagesWithData.filter(img => 
-              img.position !== undefined && 
-              img.position >= 0 && 
-              img.position < content.length && 
-              img.position > 0
-            )
+            // Position should be valid if it's within the content length
+            // But we need to account for the fact that positions are relative to the original text before section formatting
+            const imagesWithPositions = imagesWithData.filter(img => {
+              if (img.position === undefined || img.position < 0) return false
+              // Allow positions up to content.length (they might be at the end)
+              // But exclude position 0 (start of document) as it's likely invalid
+              return img.position > 0 && img.position <= content.length
+            })
             const imagesWithoutPositions = imagesWithData.filter(img => 
               !(img.position !== undefined && 
-                img.position >= 0 && 
-                img.position < content.length && 
-                img.position > 0)
+                img.position > 0 && 
+                img.position <= content.length)
             )
+            
+            console.log(`📸 Image position analysis:`, {
+              total: imagesWithData.length,
+              withValidPositions: imagesWithPositions.length,
+              withoutPositions: imagesWithoutPositions.length,
+              contentLength: content.length,
+              positions: imagesWithData.map(img => ({ filename: img.filename, position: img.position }))
+            })
             
             let contentWithImages = content
             let offset = 0
             
-            // First, insert images with valid positions
-            imagesWithPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+            // First, insert images with valid positions (sorted by position to maintain order)
+            const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => (a.position || 0) - (b.position || 0))
+            sortedImagesWithPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
               const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
-              const insertPos = img.position! + offset
-              if (insertPos < contentWithImages.length) {
+              const insertPos = Math.min(img.position! + offset, contentWithImages.length)
+              if (insertPos <= contentWithImages.length) {
                 contentWithImages = 
                   contentWithImages.slice(0, insertPos) + 
                   imageMarkdown + 
                   contentWithImages.slice(insertPos)
                 offset += imageMarkdown.length
-                console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (adjusted: ${insertPos})`)
+                console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (adjusted: ${insertPos}, content length: ${contentWithImages.length})`)
               } else {
                 // Position is out of bounds after previous insertions, append at the end
                 contentWithImages += imageMarkdown
@@ -460,12 +470,13 @@ export default function DocumentViewer() {
               }
             })
             
-            // Then, append images without positions at the end
+            // Then, append images without positions at the end (only if we have any)
             if (imagesWithoutPositions.length > 0) {
+              console.log(`📸 Appending ${imagesWithoutPositions.length} image(s) without valid positions at the end`)
               imagesWithoutPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
                 const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
                 contentWithImages += imageMarkdown
-                console.log(`📸 Appended image "${img.filename}" at the end`)
+                console.log(`📸 Appended image "${img.filename}" at the end (no valid position)`)
               })
             }
             
