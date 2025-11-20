@@ -425,11 +425,21 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         }
       })
       
-      // Remove placeholders in reverse order to preserve positions
+      // Replace placeholders with markdown images in reverse order to preserve positions
       placeholderPositions.sort((a, b) => b.pos - a.pos) // Sort by position descending
       placeholderPositions.forEach(({ index }) => {
         const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
-        workingText = workingText.replace(placeholder, '')
+        const image = imagePositions[index]?.image
+        if (image) {
+          // Replace placeholder with markdown image using data URL
+          const imageMarkdown = `![${image.filename}](${image.data})`
+          workingText = workingText.replace(placeholder, imageMarkdown)
+          console.log(`📸 Replaced placeholder [IMAGE_PLACEHOLDER_${index}] with markdown image for "${image.filename}"`)
+        } else {
+          // If image not found, just remove placeholder
+          workingText = workingText.replace(placeholder, '')
+          console.warn(`⚠️ Image not found for placeholder [IMAGE_PLACEHOLDER_${index}], removing placeholder`)
+        }
       })
       
       text = workingText.trim()

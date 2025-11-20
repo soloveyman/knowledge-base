@@ -368,13 +368,15 @@ export async function POST(request: Request) {
         if (imagesToInsert.length > 0 && updatedParsedContent.sections && Array.isArray(updatedParsedContent.sections)) {
           console.log(`📸 Processing ${imagesToInsert.length} images for content insertion...`)
           
-          // First, try to replace existing data URLs in content with Spaces URLs
+          // Track which images have been inserted to avoid duplicates
+          const insertedImages = new Set<number>()
+          
+          // Step 1: Replace existing data URLs in content with Spaces URLs
           // This handles images that were already in the content as data URLs
           imagesToInsert.forEach((img, imgIndex) => {
             const imageMarkdown = `![${img.filename}](${img.url})`
             
             // Try to find and replace data URL for this image in content
-            let replaced = false
             for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
               const section = updatedParsedContent.sections[sectionIndex]
               
@@ -382,80 +384,81 @@ export async function POST(request: Request) {
               // Pattern: ![alt](data:image/type;base64,...)
               const dataUrlPattern = /!\[([^\]]*)\]\(data:[^)]+\)/g
               let match
+              let foundMatch = false
+              
+              // Create a new string with replacements
+              let newContent = section.content
               while ((match = dataUrlPattern.exec(section.content)) !== null) {
-                // Check if this might be the same image (by filename in alt or by position)
                 const altText = match[1] || ''
+                // Check if this might be the same image (by filename in alt)
                 if (altText.includes(img.filename) || altText === img.filename.replace(/\.[^/.]+$/, '')) {
-                  // Replace this data URL with the Spaces URL
-                  updatedParsedContent.sections[sectionIndex].content = 
-                    section.content.replace(match[0], imageMarkdown)
+                  // Replace this data URL with the Spaces URL (only first match)
+                  newContent = newContent.replace(match[0], imageMarkdown)
+                  foundMatch = true
+                  insertedImages.add(imgIndex)
                   console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename}`)
-                  replaced = true
+                  break // Only replace first match
+                }
+              }
+              
+              if (foundMatch) {
+                updatedParsedContent.sections[sectionIndex].content = newContent
+                break // Move to next image
+              }
+            }
+          })
+          
+          // Step 2: Insert images that weren't found in content (no data URL to replace)
+          // Sort by position to maintain order
+          const imagesToInsertNew = imagesToInsert
+            .map((img, index) => ({ ...img, originalIndex: index }))
+            .filter((_, index) => !insertedImages.has(index))
+            .sort((a, b) => {
+              if (a.position !== undefined && b.position !== undefined) {
+                return a.position - b.position
+              }
+              if (a.position !== undefined) return -1
+              if (b.position !== undefined) return 1
+              return a.originalIndex - b.originalIndex // Maintain original order if no position
+            })
+          
+          console.log(`📸 ${imagesToInsertNew.length} images need to be inserted (not found in content)`)
+          
+          // Insert images that weren't replaced
+          imagesToInsertNew.forEach((img) => {
+            const imageMarkdown = `![${img.filename}](${img.url})`
+            let inserted = false
+            
+            // Try to insert at specific position if available
+            if (img.position !== undefined && img.position >= 0) {
+              let currentPos = 0
+              for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
+                const section = updatedParsedContent.sections[sectionIndex]
+                const sectionLength = section.content.length
+                
+                if (img.position >= currentPos && img.position < currentPos + sectionLength) {
+                  // Insert image into this section at the specified position
+                  const relativePos = img.position - currentPos
+                  const before = section.content.substring(0, relativePos)
+                  const after = section.content.substring(relativePos)
+                  
+                  // Insert image markdown (with newlines for proper formatting)
+                  updatedParsedContent.sections[sectionIndex].content = 
+                    before + (before.trim() ? '\n\n' : '') + imageMarkdown + (after.trim() ? '\n\n' : '') + after
+                  
+                  console.log(`📸 Inserted image "${img.filename}" into section ${sectionIndex} at position ${img.position}`)
+                  inserted = true
                   break
                 }
+                
+                currentPos += sectionLength + 1 // +1 for newline between sections
               }
-              
-              if (replaced) break
             }
             
-            // If not replaced (image wasn't in content as data URL), insert it
-            if (!replaced) {
-              // Sort images by position (if available) to maintain order
-              const sortedImages = [...imagesToInsert].sort((a, b) => {
-                if (a.position !== undefined && b.position !== undefined) {
-                  return a.position - b.position
-                }
-                if (a.position !== undefined) return -1
-                if (b.position !== undefined) return 1
-                return 0
-              })
-              
-              // Insert images into sections
-              // If position is defined, try to insert at that position
-              // Otherwise, append to the end of content
-              if (img.position !== undefined && img.position >= 0) {
-                // Try to find the section that contains this position
-                let currentPos = 0
-                for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
-                  const section = updatedParsedContent.sections[sectionIndex]
-                  const sectionLength = section.content.length
-                  
-                  if (img.position >= currentPos && img.position < currentPos + sectionLength) {
-                    // Insert image into this section
-                    const relativePos = img.position - currentPos
-                    const before = section.content.substring(0, relativePos)
-                    const after = section.content.substring(relativePos)
-                    
-                    // Insert image markdown (with newlines for proper formatting)
-                    updatedParsedContent.sections[sectionIndex].content = 
-                      before + (before.trim() ? '\n\n' : '') + imageMarkdown + (after.trim() ? '\n\n' : '') + after
-                    
-                    console.log(`📸 Inserted image ${imgIndex + 1} into section ${sectionIndex} at position ${img.position}`)
-                    replaced = true
-                    break
-                  }
-                  
-                  currentPos += sectionLength + 1 // +1 for newline between sections
-                }
-              }
-              
-              // If still not inserted, append to the last section
-              if (!replaced) {
-                if (updatedParsedContent.sections.length > 0) {
-                  const lastSection = updatedParsedContent.sections[updatedParsedContent.sections.length - 1]
-                  lastSection.content += (lastSection.content.trim() ? '\n\n' : '') + imageMarkdown
-                  console.log(`📸 Appended image ${imgIndex + 1} to last section`)
-                } else {
-                  // No sections - create one with the image
-                  updatedParsedContent.sections.push({
-                    title: 'Images',
-                    level: 1,
-                    content: imageMarkdown,
-                    order: 1
-                  })
-                  console.log(`📸 Created new section for image ${imgIndex + 1}`)
-                }
-              }
+            // If not inserted at specific position, don't append to end
+            // Images should only be inserted if they have a valid position or were already in content
+            if (!inserted) {
+              console.log(`⚠️ Skipping image "${img.filename}" - no valid position and not found in content`)
             }
           })
         }
