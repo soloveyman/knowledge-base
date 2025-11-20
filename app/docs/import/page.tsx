@@ -201,6 +201,13 @@ function DocImportPageInner() {
         // Parse the file content - use the file from filesToUpload since files state might not be updated yet
         const fileObj = filesToUpload.find(f => f.id === file.id)
         console.log('Looking for file with id:', file.id, 'Found:', !!fileObj, 'Has file:', !!(fileObj && fileObj.file))
+        console.log('File details:', {
+          name: fileObj?.name,
+          source: fileObj?.name?.includes('Google') ? 'Google Drive' : 'Local upload',
+          hasFileObject: !!(fileObj && fileObj.file),
+          fileType: fileObj?.file?.type,
+          fileSize: fileObj?.file?.size
+        })
         if (fileObj && fileObj.file) {
           try {
             // Clear any cached parsing results to ensure fresh parsing
@@ -267,8 +274,12 @@ function DocImportPageInner() {
             }))
             
             // Show warning toast if large images detected
+            // Note: This is just a warning, the file will still be saved
             if (warningMessages.length > 0) {
               console.warn(`⚠️ Warning for ${fileObj.name}:`, warningMessages.join(' '))
+              console.log(`✅ File ${fileObj.name} is ready to save despite warning (status: ready, hasParsedContent: true)`)
+            } else {
+              console.log(`✅ File ${fileObj.name} is ready to save (no warnings)`)
             }
           } catch (parseError) {
             console.error('Parse error:', parseError)
@@ -364,14 +375,19 @@ function DocImportPageInner() {
       }
 
       // Преобразовать blob в File
+      // Важно: сохраняем оригинальное имя файла из Google Drive для правильной идентификации
       const fileObj = new File([blob], file.name, {
-        type: file.mimeType
+        type: file.mimeType,
+        lastModified: Date.now()
       })
 
       console.log('[Google Drive] File object created:', {
         name: fileObj.name,
         size: fileObj.size,
-        type: fileObj.type
+        type: fileObj.type,
+        lastModified: fileObj.lastModified,
+        hasBlob: !!blob,
+        blobSize: blob.size
       })
 
       // Использовать существующую логику обработки файла
@@ -380,8 +396,20 @@ function DocImportPageInner() {
         name: fileObj.name,
         size: fileObj.size,
         type: fileObj.type,
-        lastModified: fileObj.lastModified
+        lastModified: fileObj.lastModified,
+        isFile: fileObj instanceof File,
+        constructor: fileObj.constructor.name
       })
+      
+      // Убедимся, что File объект валиден перед передачей
+      if (!(fileObj instanceof File)) {
+        throw new Error('Failed to create valid File object from Google Drive blob')
+      }
+      
+      if (!fileObj.name || fileObj.size === 0) {
+        throw new Error(`Invalid file object: name=${fileObj.name}, size=${fileObj.size}`)
+      }
+      
       handleFiles([fileObj])
       
       console.log('[Google Drive] File added to processing queue')
@@ -529,15 +557,26 @@ function DocImportPageInner() {
         try {
           // Validate that parsedContent exists before saving
           if (!file.parsedContent) {
-            console.error(`File ${file.name} has no parsedContent - cannot save`)
+            console.error(`[Save Error] File ${file.name} has no parsedContent - cannot save`)
             throw new Error(`File "${file.name}" is not ready to save. Please wait for processing to complete.`)
           }
           
           // Validate parsedContent structure
           if (!file.parsedContent.sections || !Array.isArray(file.parsedContent.sections)) {
-            console.error(`File ${file.name} has invalid parsedContent.sections`)
+            console.error(`[Save Error] File ${file.name} has invalid parsedContent.sections`)
             throw new Error(`File "${file.name}" has invalid content structure. Please re-upload the file.`)
           }
+          
+          // Log that we're attempting to save (even if there are warnings)
+          const hasWarning = !!file.warning
+          console.log(`[Save] Attempting to save file: ${file.name}`, {
+            source: file.name.includes('Google') ? 'Google Drive' : 'Local upload',
+            hasWarning,
+            warning: hasWarning ? file.warning : 'none',
+            hasParsedContent: !!file.parsedContent,
+            sections: file.parsedContent?.sections?.length || 0,
+            images: file.parsedContent?.images?.length || 0
+          })
           
           // Prepare request body
           const requestBody = {
@@ -615,14 +654,16 @@ function DocImportPageInner() {
           }
           
           if (!result.data || !result.data.document) {
-            console.error('Document save response missing document data:', file.name, result)
+            console.error('[Save Error] Document save response missing document data:', file.name, result)
             throw new Error(`Server response missing document data for ${file.name}`)
           }
           
-          console.log('Document saved successfully:', file.name, {
+          console.log('✅ Document saved successfully:', file.name, {
             documentId: result.data.document.id,
             title: result.data.document.title,
-            hasParsedContent: !!result.data.document.parsedContent
+            hasParsedContent: !!result.data.document.parsedContent,
+            source: file.name.includes('Google') ? 'Google Drive' : 'Local upload',
+            hadWarning: !!file.warning
           })
           return result
         } catch (error) {
@@ -684,6 +725,12 @@ function DocImportPageInner() {
           if (r.status === 'rejected') {
             const errorMsg = r.reason instanceof Error ? r.reason.message : 'Unknown error'
             const file = readyFiles[idx]
+            const fileSource = file?.name?.includes('Google') ? 'Google Drive' : 'local upload'
+            console.error(`[Save Error] ${fileSource} file failed:`, {
+              name: file?.name,
+              error: errorMsg,
+              hasParsedContent: !!file?.parsedContent
+            })
             return file ? `${file.name}: ${errorMsg}` : errorMsg
           }
           return ''
@@ -701,6 +748,30 @@ function DocImportPageInner() {
         setIsUploading(false)
         return // Don't redirect if there are failures
       }
+      
+      // All files saved successfully
+      const savedDocumentIds = succeeded
+        .filter(r => r.status === 'fulfilled' && r.value?.data?.document?.id)
+        .map(r => (r.value as any).data.document.id)
+      
+      console.log('✅ All documents saved successfully!', {
+        total: succeeded.length,
+        savedDocumentIds,
+        files: succeeded.map((r, idx) => {
+          const file = readyFiles[idx]
+          return {
+            name: file?.name,
+            source: file?.name?.includes('Google') ? 'Google Drive' : 'local upload',
+            documentId: r.status === 'fulfilled' && r.value?.data?.document?.id
+          }
+        })
+      })
+      
+      // Show success toast BEFORE redirect (with longer duration to ensure visibility)
+      toast.success('Documents saved successfully', {
+        description: `${succeeded.length} document(s) have been saved and will appear in your documents list`,
+        duration: 4000
+      })
       
       console.log('All documents saved successfully, waiting for DB commit...')
       
@@ -729,30 +800,30 @@ function DocImportPageInner() {
           const documentsResult = await documentsResponse.json()
           if (documentsResult.success && documentsResult.data?.documents && Array.isArray(documentsResult.data.documents)) {
             // Verify that at least one of the saved documents is in the response
-            const savedDocumentIds = succeeded
-              .filter(r => r.status === 'fulfilled' && r.value?.data?.document?.id)
-              .map(r => (r.value as any).data.document.id)
-            
             const foundDocuments = documentsResult.data.documents.filter((doc: { id: string }) => 
               savedDocumentIds.includes(doc.id)
             )
             
+            console.log(`[Documents Fetch] Found ${foundDocuments.length} of ${savedDocumentIds.length} saved documents in response`)
+            
             if (foundDocuments.length > 0 || retryCount === maxRetries - 1) {
-              console.log(`Storing documents in sessionStorage: ${documentsResult.data.documents.length} total, ${foundDocuments.length} newly saved`)
+              console.log(`[SessionStorage] Storing ${documentsResult.data.documents.length} documents (${foundDocuments.length} newly saved)`)
               if (typeof window !== 'undefined') {
                 // Store in sessionStorage for immediate use by owner/manager page
                 sessionStorage.setItem('pendingDocumentsRefresh', JSON.stringify({
                   data: documentsResult.data.documents,
-                  timestamp: Date.now()
+                  timestamp: Date.now(),
+                  savedDocumentIds: savedDocumentIds // Store IDs for verification
                 }))
+                console.log(`[SessionStorage] Documents stored successfully, timestamp: ${Date.now()}`)
               }
               documentsFetched = true
             } else {
-              console.log(`Not all saved documents found yet (found ${foundDocuments.length} of ${savedDocumentIds.length}), retrying...`)
+              console.log(`[Documents Fetch] Not all saved documents found yet (found ${foundDocuments.length} of ${savedDocumentIds.length}), retrying...`)
               retryCount++
             }
           } else {
-            console.error('Failed to fetch documents - result not successful:', documentsResult)
+            console.error('[Documents Fetch] Failed to fetch documents - result not successful:', documentsResult)
             retryCount++
           }
         } catch (error) {
@@ -769,16 +840,22 @@ function DocImportPageInner() {
       // Reset loading state before redirect
       setIsUploading(false)
       
+      // Wait a moment to ensure toast is visible before redirect
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       // Redirect to the specified return URL with cache-busting
       // Add a timestamp to force fresh data load
+      const timestamp = Date.now()
       const redirectUrl = safeReturnTo.includes('?') 
-        ? `${safeReturnTo}&_t=${Date.now()}`
-        : `${safeReturnTo}?_t=${Date.now()}`
+        ? `${safeReturnTo}&_t=${timestamp}`
+        : `${safeReturnTo}?_t=${timestamp}`
+      
+      console.log(`[Redirect] Navigating to ${redirectUrl} with timestamp ${timestamp}`)
       
       // Use replace instead of push to avoid back button issues
       router.replace(redirectUrl)
       // Small delay to ensure navigation starts
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await new Promise(resolve => setTimeout(resolve, 100))
       router.refresh()
     } catch (error) {
       console.error('Error saving documents:', error)
