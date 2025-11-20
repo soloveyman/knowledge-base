@@ -77,11 +77,28 @@ function DocumentContent({ content }: { content: string }) {
   let imageMatch
   while ((imageMatch = imagePattern.exec(markdown)) !== null) {
     const src = imageMatch[2]
+    const alt = imageMatch[1] || ''
+    
+    // Validate image source before processing
+    // 1. Skip empty data URLs
+    if (src.startsWith('data:') && (src.endsWith(',') || src.split(',').length === 1 || src.split(',')[1]?.trim().length === 0)) {
+      console.warn('Skipping empty data URL image:', { alt, src: src.substring(0, 50) })
+      continue
+    }
+    
+    // 2. Skip relative paths that aren't valid URLs (like word/media/image1.png)
+    if (!src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('/')) {
+      if (src.includes('/') || src.includes('\\')) {
+        console.warn('Skipping invalid relative path image:', { alt, src })
+        continue
+      }
+    }
+    
     // Only process if it's a data URL or external URL (skip if already processed)
     if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
       imageMatches.push({
         match: imageMatch[0],
-        alt: imageMatch[1] || '',
+        alt: alt,
         src: src
       })
     }
@@ -339,6 +356,22 @@ function DocumentContent({ content }: { content: string }) {
             return null
           }
           
+          // Validate and filter out invalid image sources
+          // 1. Empty data URLs (data:image/png;base64,)
+          if (srcString.startsWith('data:') && (srcString.endsWith(',') || srcString.split(',').length === 1 || srcString.split(',')[1]?.trim().length === 0)) {
+            console.warn('Image component: Empty data URL detected, skipping:', { alt, src: srcString.substring(0, 50) })
+            return null
+          }
+          
+          // 2. Relative paths that aren't valid (like word/media/image1.png)
+          if (!srcString.startsWith('data:') && !srcString.startsWith('http://') && !srcString.startsWith('https://') && !srcString.startsWith('/')) {
+            // Check if it looks like a file path (contains slashes but not a valid URL)
+            if (srcString.includes('/') || srcString.includes('\\')) {
+              console.warn('Image component: Invalid relative path detected, skipping:', { alt, src: srcString })
+              return null
+            }
+          }
+          
           // Fix base64 images that are missing the data: prefix
           if (srcString.startsWith('base64,')) {
             srcString = `data:image/png;${srcString}`
@@ -350,6 +383,12 @@ function DocumentContent({ content }: { content: string }) {
           // Check if it's a data URL or external URL
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
+          
+          // Final validation: if it's not a data URL or external URL, skip it
+          if (!isDataUrl && !isExternal) {
+            console.warn('Image component: Invalid image source (not data URL or external URL), skipping:', { alt, src: srcString.substring(0, 100) })
+            return null
+          }
           
           // Determine image dimensions
           let imgWidth = typeof width === 'number' ? width : typeof width === 'string' ? parseInt(width) : undefined

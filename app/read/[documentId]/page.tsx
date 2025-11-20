@@ -216,8 +216,31 @@ export default function DocumentReaderPage() {
           // Load image data (for large images stored in database)
           const { getImageDataUrl } = await import('@/lib/image-loader')
           const imageDataPromises = sortedImages.map(async (img: any) => {
+            // Early validation: skip images that clearly won't work
+            // Skip images with word/media paths in filename and no URL/imageId (legacy/corrupted data)
+            if ((img.filename?.includes('word/media/') || img.filename?.includes('xl/media/')) && !img.url && !img.imageId) {
+              console.warn(`Skipping invalid image reference: ${img.filename} (no URL or imageId)`)
+              return null
+            }
+            
             try {
               const dataUrl = await getImageDataUrl(img)
+              
+              // Validate the dataUrl before returning
+              // Skip empty data URLs
+              if (dataUrl.startsWith('data:') && (dataUrl.endsWith(',') || dataUrl.split(',').length === 1 || dataUrl.split(',')[1]?.trim().length === 0)) {
+                console.warn(`Skipping image ${img.filename}: empty data URL`)
+                return null
+              }
+              
+              // Skip invalid relative paths
+              if (!dataUrl.startsWith('data:') && !dataUrl.startsWith('http://') && !dataUrl.startsWith('https://') && !dataUrl.startsWith('/')) {
+                if (dataUrl.includes('/') || dataUrl.includes('\\')) {
+                  console.warn(`Skipping image ${img.filename}: invalid relative path: ${dataUrl}`)
+                  return null
+                }
+              }
+              
               return { ...img, dataUrl }
             } catch (error) {
               console.error(`Failed to load image: ${img.filename}`, error)
@@ -225,7 +248,7 @@ export default function DocumentReaderPage() {
               return null
             }
           })
-          const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null)
+          const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null && img.dataUrl && img.dataUrl.trim().length > 0)
           
           // Insert images at their positions or append at the end
           let contentWithImages = content

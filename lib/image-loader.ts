@@ -57,7 +57,8 @@ export async function getImageDataUrl(img: ImageData): Promise<string> {
   }
   
   // No URL and no imageId - image is missing
-  console.error(`Image ${img.filename} has no URL or imageId - image is missing`)
+  // This is expected for legacy data or corrupted files, so use warn instead of error
+  console.warn(`Image ${img.filename} has no URL or imageId - image is missing (this is expected for some legacy documents)`)
   throw new Error(`Image ${img.filename} is not available`)
 }
 

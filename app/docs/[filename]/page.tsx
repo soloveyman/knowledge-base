@@ -391,15 +391,39 @@ export default function DocumentViewer() {
             // Load image data (for large images stored in database)
             const { getImageDataUrl } = await import('@/lib/image-loader')
             const imageDataPromises = sortedImages.map(async (img: any) => {
+              // Early validation: skip images that clearly won't work
+              // Skip images with word/media paths in filename and no URL/imageId (legacy/corrupted data)
+              if ((img.filename?.includes('word/media/') || img.filename?.includes('xl/media/')) && !img.url && !img.imageId) {
+                console.warn(`Skipping invalid image reference: ${img.filename} (no URL or imageId)`)
+                return null
+              }
+              
               try {
                 const dataUrl = await getImageDataUrl(img)
+                
+                // Validate the dataUrl before returning
+                // Skip empty data URLs
+                if (dataUrl.startsWith('data:') && (dataUrl.endsWith(',') || dataUrl.split(',').length === 1 || dataUrl.split(',')[1]?.trim().length === 0)) {
+                  console.warn(`Skipping image ${img.filename}: empty data URL`)
+                  return null
+                }
+                
+                // Skip invalid relative paths
+                if (!dataUrl.startsWith('data:') && !dataUrl.startsWith('http://') && !dataUrl.startsWith('https://') && !dataUrl.startsWith('/')) {
+                  if (dataUrl.includes('/') || dataUrl.includes('\\')) {
+                    console.warn(`Skipping image ${img.filename}: invalid relative path: ${dataUrl}`)
+                    return null
+                  }
+                }
+                
                 return { ...img, dataUrl }
               } catch (error) {
                 console.error(`Failed to load image: ${img.filename}`, error)
-                return { ...img, dataUrl: `data:${img.type || 'image/png'};base64,` }
+                // Skip image if it can't be loaded (don't show broken image)
+                return null
               }
             })
-            const imagesWithData = await Promise.all(imageDataPromises)
+            const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null && img.dataUrl && img.dataUrl.trim().length > 0)
             
             // Separate images with valid positions from those without
             const imagesWithPositions = imagesWithData.filter(img => 

@@ -233,21 +233,21 @@ export interface User {
 export const PERMISSIONS = {
   // Materials (Documents)
   MATERIALS: {
-    owner: ['read'] as const,
+    owner: ['create', 'read', 'update', 'delete'] as const,
     manager: ['create', 'read', 'update', 'delete'] as const,
     employee: [] as const
   },
   
   // Tests/Modules
   TESTS: {
-    owner: ['read'] as const,
+    owner: ['create', 'read', 'update', 'delete'] as const,
     manager: ['create', 'read', 'update', 'delete'] as const,
     employee: ['pass', 'read_own'] as const
   },
   
   // Assignments
   ASSIGNMENTS: {
-    owner: ['read'] as const,
+    owner: ['create', 'read', 'update', 'delete'] as const,
     manager: ['create', 'read', 'update', 'delete'] as const,
     employee: ['read_own'] as const
   },

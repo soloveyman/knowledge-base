@@ -1186,6 +1186,27 @@ function ManagerPageInner() {
         method: 'DELETE',
         cache: 'no-store'
       })
+      
+      // Check response status before parsing JSON
+      if (!response.ok) {
+        let errorMessage = 'Failed to delete document'
+        try {
+          const errorResult = await response.json()
+          errorMessage = errorResult.message || errorMessage
+        } catch {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || errorMessage
+        }
+        
+        // Revert on error - restore previous state
+        startTransition(() => {
+          setDocumentsWithLog(previousDocuments)
+        })
+        console.error('Failed to delete document:', errorMessage)
+        toast.error(errorMessage)
+        return
+      }
+      
       const result = await response.json()
       
       if (result.success) {
@@ -1204,8 +1225,9 @@ function ManagerPageInner() {
       startTransition(() => {
         setDocumentsWithLog(previousDocuments)
       })
+      const errorMessage = error instanceof Error ? error.message : 'Error deleting document'
       console.error('Error deleting document:', error)
-      toast.error('Error deleting document')
+      toast.error(errorMessage)
     }
   }
 
