@@ -643,7 +643,12 @@ function DocImportPageInner() {
             fileUrl: string | null
             fileSize: number
             parsedContent: ParsedContent | { sections: []; tables: []; images: []; metadata: ParsedContent['metadata'] }
-            parsingLog: Array<{ level: string; message: string; timestamp?: string }> | null
+            parsingLog: Array<{
+              level?: string
+              message?: string
+              timestamp?: string
+              [key: string]: unknown
+            }> | null
             uploadedBy: string
           }
           let requestBody: DocumentRequestBody
