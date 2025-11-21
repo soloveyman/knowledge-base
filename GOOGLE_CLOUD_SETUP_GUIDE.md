@@ -245,4 +245,6 @@ NEXT_PUBLIC_GOOGLE_API_KEY="ваш-api-key-здесь"
 3. В OAuth Consent Screen добавьте продакшен домен в Authorized domains
 
 4. Если приложение в статусе "Testing", запросите публикацию или добавьте всех пользователей в Test users
+   - **Быстрое решение:** Добавьте email пользователей в Test users (см. [GOOGLE_OAUTH_TESTING_MODE_FIX.md](./GOOGLE_OAUTH_TESTING_MODE_FIX.md))
+   - **Для продакшена:** Опубликуйте приложение (требуется Privacy Policy)
 

@@ -68,6 +68,13 @@ NEXT_PUBLIC_GOOGLE_API_KEY="your-api-key"
 - Проверить интернет-соединение
 - Проверить, что нет блокировки Google API в браузере (ad blockers)
 
+### Ошибка "Access blocked" или "access_denied" (403: access_denied)
+- **Причина:** Приложение в режиме "Testing" в OAuth Consent Screen
+- **Решение:** 
+  - Добавить пользователя в Test users (быстрое решение)
+  - Или опубликовать приложение для всех пользователей
+  - Подробная инструкция: [GOOGLE_OAUTH_TESTING_MODE_FIX.md](./GOOGLE_OAUTH_TESTING_MODE_FIX.md)
+
 ### Ошибка "Failed to download file"
 - Проверить, что файл доступен выбранному Google аккаунту
 - Проверить, что scope `drive.readonly` добавлен в OAuth consent screen

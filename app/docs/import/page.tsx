@@ -496,6 +496,13 @@ function DocImportPageInner() {
           description: 'Убедитесь, что ваш Google аккаунт добавлен как тестовый пользователь в OAuth Consent Screen в Google Cloud Console',
           duration: 8000
         })
+      } else if (errorMessage.includes('access_denied') || 
+                 errorMessage.includes('Access blocked') ||
+                 errorMessage.includes('не прошло проверку')) {
+        toast.error('Доступ заблокирован', {
+          description: 'Приложение в режиме тестирования. Добавьте ваш email в Test users в Google Cloud Console или опубликуйте приложение. См. GOOGLE_OAUTH_TESTING_MODE_FIX.md',
+          duration: 10000
+        })
       } else if (errorMessage.includes('not loaded') || 
                  errorMessage.includes('API is not loaded') ||
                  errorMessage.includes('Failed to load')) {
