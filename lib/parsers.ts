@@ -1,4 +1,4 @@
-build import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx'
 import * as mammoth from 'mammoth'
 import * as JSZip from 'jszip'
 

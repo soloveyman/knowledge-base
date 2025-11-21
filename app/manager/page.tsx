@@ -1112,6 +1112,7 @@ function ManagerPageInner() {
           }
         }
       }
+    }
     } // Close checkAndReload function
     
     // Check immediately on mount and when searchParams change
