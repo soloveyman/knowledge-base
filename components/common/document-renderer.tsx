@@ -340,13 +340,12 @@ function DocumentContent({ content }: { content: string }) {
           // Validate and filter out invalid image sources
           // 1. Empty data URLs (data:image/png;base64,)
           if (srcString.startsWith('data:') && (srcString.endsWith(',') || srcString.split(',').length === 1 || srcString.split(',')[1]?.trim().length === 0)) {
-            // Show alt text instead of broken image
+            // Show alt text instead of broken image - compact version
             const displayText = getImageDisplayText(alt || '', srcString)
+            const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
             return (
-              <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground italic">
-                  {displayText}
-                </p>
+              <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
+                {shortText || 'Изображение недоступно'}
               </div>
             )
           }
@@ -355,13 +354,12 @@ function DocumentContent({ content }: { content: string }) {
           if (!srcString.startsWith('data:') && !srcString.startsWith('http://') && !srcString.startsWith('https://') && !srcString.startsWith('/')) {
             // Check if it looks like a file path (contains slashes but not a valid URL)
             if (srcString.includes('/') || srcString.includes('\\')) {
-              // Show alt text instead of broken image
+              // Show alt text instead of broken image - compact version
               const displayText = getImageDisplayText(alt || '', srcString)
+              const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
               return (
-                <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground italic">
-                    {displayText}
-                  </p>
+                <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
+                  {shortText || 'Изображение недоступно'}
                 </div>
               )
             }
@@ -382,11 +380,10 @@ function DocumentContent({ content }: { content: string }) {
           // Final validation: if it's not a data URL or external URL, show alt text
           if (!isDataUrl && !isExternal) {
             const displayText = getImageDisplayText(alt || '', srcString)
+            const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
             return (
-              <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground italic">
-                  {displayText}
-                </p>
+              <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
+                {shortText || 'Изображение недоступно'}
               </div>
             )
           }
@@ -961,14 +958,13 @@ function ImageWithPlaceholder({
     }
   }, [src, width, height])
 
-  // Show alt text if image failed to load
+  // Show alt text if image failed to load - compact version
   if (hasError) {
     const displayText = getImageDisplayText(alt || '', src)
+    const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
     return (
-      <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
-        <p className="text-sm text-muted-foreground italic">
-          {displayText}
-        </p>
+      <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
+        {shortText || 'Изображение недоступно'}
       </div>
     )
   }

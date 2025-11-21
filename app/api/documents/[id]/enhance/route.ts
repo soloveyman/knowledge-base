@@ -44,13 +44,15 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let documentId: string | undefined
   try {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: documentId } = await params
+    const paramsResolved = await params
+    documentId = paramsResolved.id
 
     // Fetch the document
     const doc = await db
@@ -83,15 +85,42 @@ export async function POST(
     }
 
     // Prepare content for Grok enhancement (skip images to save tokens)
-    // Remove image references from content
+    // Remove image references from content - comprehensive cleanup
     const cleanContent = (text: string): string => {
-      // Remove markdown image syntax ![alt](src)
-      let cleaned = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
-      // Remove HTML img tags
-      cleaned = cleaned.replace(/<img[^>]*>/gi, '')
-      // Remove base64 image data
-      cleaned = cleaned.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g, '[Image removed]')
-      return cleaned
+      if (!text || typeof text !== 'string') return ''
+      
+      let cleaned = text
+      
+      // Remove markdown image syntax ![alt](src) - handle both short and long URLs
+      // Match: ![alt](data:image/...very long base64...) or ![alt](https://...)
+      cleaned = cleaned.replace(/!\[([^\]]*)\]\([^)]+\)/g, '[Image]')
+      
+      // Remove HTML img tags (self-closing and with closing tag)
+      cleaned = cleaned.replace(/<img[^>]*\/?>/gi, '[Image]')
+      cleaned = cleaned.replace(/<img[^>]*>[\s\S]*?<\/img>/gi, '[Image]')
+      
+      // Remove base64 image data URLs (can be very long)
+      // Match data:image/type;base64, followed by base64 string (can be multiline)
+      cleaned = cleaned.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+/g, '[Image]')
+      
+      // Remove any remaining long base64-like strings (likely images)
+      // Match strings that look like base64 and are longer than 100 chars
+      cleaned = cleaned.replace(/[A-Za-z0-9+/=]{100,}/g, (match) => {
+        // If it looks like base64 (mostly alphanumeric with +/=), replace it
+        if (/^[A-Za-z0-9+/=\s]+$/.test(match) && match.length > 100) {
+          return '[Image data]'
+        }
+        return match
+      })
+      
+      // Remove image placeholders that might have been added
+      cleaned = cleaned.replace(/\[IMG_\d+\]/g, '[Image]')
+      cleaned = cleaned.replace(/__IMAGE_PLACEHOLDER_\d+__/g, '[Image]')
+      
+      // Clean up multiple [Image] markers
+      cleaned = cleaned.replace(/\[Image\](?:\s*\[Image\])+/g, '[Image]')
+      
+      return cleaned.trim()
     }
 
     const sectionsText = parsedContent.sections
@@ -105,15 +134,48 @@ export async function POST(
     const tablesText = parsedContent.tables
       ?.map(t => {
         const cleanTitle = cleanContent(t.title || 'Untitled')
-        const tableText = `Table: ${cleanTitle}\nHeaders: ${t.headers.join(' | ')}\n${t.rows.map(r => r.join(' | ')).join('\n')}`
+        // Clean headers and rows too - they might contain image references
+        const cleanHeaders = t.headers.map(h => cleanContent(String(h))).join(' | ')
+        const cleanRows = t.rows.map(r => r.map(cell => cleanContent(String(cell))).join(' | ')).join('\n')
+        const tableText = `Table: ${cleanTitle}\nHeaders: ${cleanHeaders}\n${cleanRows}`
         return tableText
       })
       .join('\n\n') || ''
 
-    const fullText = [sectionsText, tablesText].filter(Boolean).join('\n\n---\n\n')
+    let fullText = [sectionsText, tablesText].filter(Boolean).join('\n\n---\n\n')
+    
+    // Final cleanup pass - remove any remaining image data that might have slipped through
+    // This is especially important for very long base64 strings
+    fullText = cleanContent(fullText)
+    
+    console.log(`Content prepared for Grok: ${fullText.length} chars (images removed)`)
 
+    // Estimate token count (rough approximation: 1 token ≈ 4 characters)
+    // Grok models have different limits:
+    // - grok-4: 256000 tokens
+    // - grok-2: 131072 tokens
+    // - grok-3: similar to grok-4
+    const estimatedTokens = Math.ceil(fullText.length / 4)
+    const maxTokensForGrok4 = 256000
+    const maxTokensForGrok2 = 131072
+    const safetyMargin = 0.8 // Use 80% of limit to be safe
+    
+    console.log(`Document content size: ${fullText.length} chars, estimated tokens: ${estimatedTokens}`)
+    
+    // Truncate content if it's too large
+    let contentToSend = fullText
+    let wasTruncated = false
+    if (estimatedTokens > maxTokensForGrok4 * safetyMargin) {
+      const maxChars = Math.floor(maxTokensForGrok4 * safetyMargin * 4)
+      console.warn(`Content too large (${estimatedTokens} tokens), truncating to ${maxChars} chars`)
+      contentToSend = fullText.substring(0, maxChars) + '\n\n[... Content truncated due to size limits. Only the first part of the document will be enhanced ...]'
+      console.log(`Truncated content size: ${contentToSend.length} chars`)
+      wasTruncated = true
+    }
+    
     // Call Grok API to enhance the parsed content
-    const models = ['grok-4', 'grok-beta', 'grok-2']
+    // Updated models: grok-beta is deprecated, use grok-3 instead
+    const models = ['grok-4', 'grok-3', 'grok-2']
     let grokResponse: Response | null = null
     let lastError: string | null = null
 
@@ -211,7 +273,7 @@ Preserve all original sections and tables, but improve their titles and content 
               },
               {
                 role: 'user',
-                content: `Enhance this parsed document content (images are excluded to save tokens):\n\n${fullText}`
+                content: `Enhance this parsed document content (images are excluded to save tokens):\n\n${contentToSend}`
               }
             ],
             temperature: 0.3,
@@ -226,36 +288,131 @@ Preserve all original sections and tables, but improve their titles and content 
           console.log(`Grok API enhancement success with model: ${model} (${duration}ms)`)
           break
         } else {
-          const errorText = await grokResponse.text().catch(() => 'Unknown error')
-          lastError = `${grokResponse.status}: ${errorText.substring(0, 300)}`
-          console.error(`Grok API enhancement failed with model ${model}:`, lastError)
+          let errorText = 'Unknown error'
+          let errorDetails: any = null
+          try {
+            errorText = await grokResponse.text()
+            try {
+              errorDetails = JSON.parse(errorText)
+              errorText = errorDetails.error?.message || errorDetails.message || errorText
+            } catch {
+              // Use raw text if JSON parsing fails
+            }
+          } catch {
+            // Use default if text parsing fails
+          }
+          
+          // Check if it's a token limit error - skip this model
+          const isTokenLimitError = errorDetails?.error?.includes('maximum prompt length') || 
+                                   errorDetails?.error?.includes('tokens') ||
+                                   errorText.includes('maximum prompt length') ||
+                                   errorText.includes('tokens')
+          
+          if (isTokenLimitError) {
+            console.warn(`Model ${model} token limit exceeded, trying next model...`)
+            lastError = `Token limit exceeded for ${model}: ${errorText.substring(0, 200)}`
+          } else {
+            lastError = `${grokResponse.status}: ${errorText.substring(0, 300)}`
+          }
+          
+          console.error(`Grok API enhancement failed with model ${model} (${duration}ms):`, {
+            status: grokResponse.status,
+            statusText: grokResponse.statusText,
+            error: errorText.substring(0, 500),
+            isTokenLimitError,
+            documentId
+          })
           grokResponse = null
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+        const errorStack = err instanceof Error ? err.stack : undefined
         lastError = errorMessage
-        console.error(`Grok API enhancement error with model ${model}:`, errorMessage)
+        console.error(`Grok API enhancement error with model ${model}:`, {
+          message: errorMessage,
+          stack: errorStack,
+          documentId
+        })
         grokResponse = null
         continue
       }
     }
 
     if (!grokResponse || !grokResponse.ok) {
+      console.error('Grok API enhancement failed:', {
+        status: grokResponse?.status,
+        statusText: grokResponse?.statusText,
+        lastError,
+        documentId,
+        estimatedTokens,
+        contentLength: fullText.length
+      })
+      
+      // Check if all failures were due to token limits
+      const isTokenLimitError = lastError?.includes('Token limit exceeded') || 
+                                lastError?.includes('maximum prompt length') ||
+                                lastError?.includes('tokens')
+      
+      // Try to get more details from the error response
+      let errorDetails = lastError || 'All models failed'
+      if (grokResponse) {
+        try {
+          const errorText = await grokResponse.text()
+          const errorJson = JSON.parse(errorText).catch(() => null)
+          if (errorJson) {
+            errorDetails = errorJson.error?.message || errorJson.message || errorText.substring(0, 300)
+          } else {
+            errorDetails = errorText.substring(0, 300)
+          }
+        } catch {
+          // Use lastError if we can't parse
+        }
+      }
+      
+      // Provide user-friendly error message
+      let userMessage = 'Failed to enhance document with Grok API'
+      if (isTokenLimitError) {
+        userMessage = `Document is too large to enhance (${estimatedTokens} tokens). Please split the document into smaller sections or use a document with less content.`
+      }
+      
       return NextResponse.json({
         success: false,
-        message: 'Failed to enhance document with Grok API',
-        error: lastError || 'All models failed'
+        message: userMessage,
+        error: errorDetails,
+        status: grokResponse?.status,
+        estimatedTokens,
+        maxTokens: maxTokensForGrok4
       }, { status: 500 })
     }
 
-    const grokData = await grokResponse.json()
+    let grokData: any
+    try {
+      grokData = await grokResponse.json()
+    } catch (jsonError) {
+      console.error('Failed to parse Grok API response as JSON:', jsonError)
+      const responseText = await grokResponse.text().catch(() => 'Unable to read response')
+      console.error('Grok API response text (first 1000 chars):', responseText.substring(0, 1000))
+      return NextResponse.json({
+        success: false,
+        message: 'Invalid response format from Grok API',
+        error: 'JSON parse error',
+        responsePreview: responseText.substring(0, 500)
+      }, { status: 500 })
+    }
+
     const content = grokData.choices?.[0]?.message?.content
 
     if (!content) {
-      console.error('Grok API response:', JSON.stringify(grokData, null, 2))
+      console.error('Grok API response missing content:', {
+        response: JSON.stringify(grokData, null, 2),
+        choices: grokData.choices,
+        documentId
+      })
       return NextResponse.json({
         success: false,
-        message: 'No content received from Grok API'
+        message: 'No content received from Grok API',
+        error: 'Empty response',
+        response: grokData
       }, { status: 500 })
     }
 
@@ -346,14 +503,34 @@ Preserve all original sections and tables, but improve their titles and content 
     }
 
     // Update the document with enhanced content
-    const updated = await db
-      .update(documents)
-      .set({
-        parsedContent: enhancedContent,
-        updatedAt: new Date()
-      })
-      .where(eq(documents.id, documentId))
-      .returning()
+    let updated
+    try {
+      updated = await db
+        .update(documents)
+        .set({
+          parsedContent: enhancedContent,
+          updatedAt: new Date()
+        })
+        .where(eq(documents.id, documentId))
+        .returning()
+      
+      if (!updated || updated.length === 0) {
+        console.error('Failed to update document after enhancement:', documentId)
+        return NextResponse.json({
+          success: false,
+          message: 'Failed to save enhanced content to database',
+          error: 'Database update failed'
+        }, { status: 500 })
+      }
+    } catch (dbError) {
+      console.error('Database error updating document:', dbError)
+      const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to save enhanced content to database',
+        error: dbErrorMessage
+      }, { status: 500 })
+    }
 
     // Check usage limit before allowing enhancement (for owners and managers - count in owner's usage)
     if (session.user.role === 'owner' || session.user.role === 'manager') {
@@ -420,14 +597,27 @@ Preserve all original sections and tables, but improve their titles and content 
         document: updated[0],
         enhancedContent
       },
-      message: 'Document enhanced successfully with Grok API'
+      message: wasTruncated 
+        ? 'Document enhanced successfully (content was truncated due to size limits - only the first part was enhanced)'
+        : 'Document enhanced successfully with Grok API',
+      warning: wasTruncated ? 'Content was truncated due to size limits' : undefined
     })
   } catch (error) {
     console.error('Document enhancement API error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      documentId
+    })
+    
     return NextResponse.json({
       success: false,
       message: 'Failed to enhance document',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? errorStack : undefined
     }, { status: 500 })
   }
 }
