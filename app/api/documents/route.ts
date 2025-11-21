@@ -670,19 +670,26 @@ export async function POST(request: Request) {
             let inserted = false
             
             // Try to insert at specific position if available
+            // Position is relative to the original full text, need to map to sections
             if (img.position !== undefined && img.position >= 0) {
-              let currentPos = 0
+              // Calculate cumulative positions across all sections
+              let cumulativePos = 0
+              
               for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
                 const section = updatedParsedContent.sections[sectionIndex]
-                const sectionLength = section.content.length
+                // Include section title and newlines in position calculation
+                const sectionTitleLength = section.title ? section.title.length + 2 : 0 // +2 for \n\n
+                const sectionContentLength = section.content ? section.content.length : 0
+                const sectionTotalLength = sectionTitleLength + sectionContentLength
                 
-                if (img.position >= currentPos && img.position < currentPos + sectionLength) {
-                  // Insert image into this section at the specified position
-                  const relativePos = img.position - currentPos
+                // Check if image position falls within this section
+                if (img.position >= cumulativePos && img.position < cumulativePos + sectionTotalLength) {
+                  // Calculate relative position within section content (after title)
+                  const relativePos = Math.max(0, img.position - cumulativePos - sectionTitleLength)
                   const before = section.content.substring(0, relativePos)
                   const after = section.content.substring(relativePos)
                   
-                  console.log(`📸 Inserting image ${img.filename} at position ${img.position} (relative: ${relativePos}) in section ${sectionIndex}`)
+                  console.log(`📸 Inserting image ${img.filename} at position ${img.position} (section ${sectionIndex}, relative: ${relativePos})`)
                   
                   // Insert image markdown (with newlines for proper formatting)
                   updatedParsedContent.sections[sectionIndex].content = 
@@ -693,7 +700,12 @@ export async function POST(request: Request) {
                   break
                 }
                 
-                currentPos += sectionLength + 1 // +1 for newline between sections
+                // Move to next section (include newline separator)
+                cumulativePos += sectionTotalLength + 2 // +2 for \n\n between sections
+              }
+              
+              if (!inserted) {
+                console.warn(`⚠️ Could not find section for image "${img.filename}" at position ${img.position} (total cumulative: ${cumulativePos})`)
               }
             }
             
