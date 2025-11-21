@@ -194,17 +194,27 @@ export async function DELETE(
     }
 
     // Check if document's module is used in assignments - if so, block deletion
+    // Only check if document has a moduleId (documents can exist without modules)
     if (document.moduleId) {
-      const relatedAssignments = await db.select().from(assignments).where(eq(assignments.moduleId, document.moduleId))
-      
-      if (relatedAssignments.length > 0) {
-        return NextResponse.json({
-          success: false,
-          message: `Cannot delete document. It is used in ${relatedAssignments.length} assignment(s). Please delete the assignments first.`,
-          error: 'HAS_ASSIGNMENTS',
-          assignmentCount: relatedAssignments.length,
-          assignments: relatedAssignments
-        }, { status: 400 })
+      try {
+        const relatedAssignments = await db
+          .select({ id: assignments.id })
+          .from(assignments)
+          .where(eq(assignments.moduleId, document.moduleId))
+        
+        if (relatedAssignments.length > 0) {
+          console.log(`⚠️ Document ${id} cannot be deleted: used in ${relatedAssignments.length} assignment(s)`)
+          return NextResponse.json({
+            success: false,
+            message: `Cannot delete document. It is used in ${relatedAssignments.length} assignment(s). Please delete the assignments first.`,
+            error: 'HAS_ASSIGNMENTS',
+            assignmentCount: relatedAssignments.length
+          }, { status: 400 })
+        }
+      } catch (assignmentCheckError) {
+        console.error(`⚠️ Error checking assignments for document ${id}:`, assignmentCheckError)
+        // Don't block deletion if we can't check assignments - continue with deletion
+        console.warn(`⚠️ Continuing with deletion despite assignment check error`)
       }
     }
 
@@ -224,7 +234,7 @@ export async function DELETE(
       // Continue with deletion even if we can't fetch images
     }
 
-    // Delete images from Spaces (if they have storageKey)
+    // Delete images from Spaces (if they have storageKey) - non-blocking
     if (documentImagesList.length > 0) {
       console.log(`🗑️ Deleting ${documentImagesList.length} images from Spaces for document ${id}`)
       
@@ -251,31 +261,64 @@ export async function DELETE(
           }
         })
         
-        try {
-          await Promise.allSettled(deletePromises) // Use allSettled to continue even if some fail
+        // Don't await - let it run in background, document deletion should not wait
+        Promise.allSettled(deletePromises).then(() => {
           console.log(`✅ Finished deleting images from Spaces for document ${id}`)
-        } catch (error) {
+        }).catch((error) => {
           console.error(`⚠️ Error during Promise.allSettled for image deletion:`, error)
-          // Continue with document deletion even if image deletion fails
-        }
+        })
       }
     }
 
-    // Delete the document (cascade will delete documentImages from DB)
+    // Explicitly delete documentImages first (even though cascade should handle it)
+    // This ensures clean deletion and avoids any potential foreign key issues
+    if (documentImagesList.length > 0) {
+      console.log(`🗑️ Deleting ${documentImagesList.length} document images from database`)
+      try {
+        await db.delete(documentImages).where(eq(documentImages.documentId, id))
+        console.log(`✅ Document images deleted from database`)
+      } catch (imageDeleteError) {
+        console.warn(`⚠️ Failed to delete document images (will try cascade):`, imageDeleteError)
+        // Continue - cascade should handle it
+      }
+    }
+
+    // Delete the document
     console.log(`🗑️ Deleting document ${id} from database`)
     try {
-      await db.delete(documents).where(eq(documents.id, id))
-      console.log(`✅ Document ${id} deleted successfully`)
+      const deleteResult = await db.delete(documents).where(eq(documents.id, id))
+      console.log(`✅ Document ${id} delete query executed`)
+      
+      // Verify deletion by checking if document still exists
+      const verifyDeleted = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+      if (verifyDeleted.length > 0) {
+        console.error(`❌ Document ${id} still exists after deletion attempt`)
+        return NextResponse.json({
+          success: false,
+          message: 'Document deletion failed - document still exists',
+          error: 'DELETION_VERIFICATION_FAILED'
+        }, { status: 500 })
+      }
+      
+      console.log(`✅ Document ${id} deleted successfully and verified`)
     } catch (dbError) {
       console.error(`❌ Database error deleting document ${id}:`, dbError)
       const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
       
       // Check if it's a foreign key constraint error
-      if (dbErrorMessage.includes('foreign key') || dbErrorMessage.includes('constraint')) {
+      if (dbErrorMessage.includes('foreign key') || dbErrorMessage.includes('constraint') || dbErrorMessage.includes('23503')) {
+        // Try to get more details about what's blocking
+        const relatedAssignments = document.moduleId 
+          ? await db.select().from(assignments).where(eq(assignments.moduleId, document.moduleId))
+          : []
+        
         return NextResponse.json({
           success: false,
-          message: 'Cannot delete document. It is still referenced by other records.',
-          error: 'FOREIGN_KEY_CONSTRAINT'
+          message: relatedAssignments.length > 0
+            ? `Cannot delete document. It is used in ${relatedAssignments.length} assignment(s). Please delete the assignments first.`
+            : 'Cannot delete document. It is still referenced by other records.',
+          error: 'FOREIGN_KEY_CONSTRAINT',
+          assignmentCount: relatedAssignments.length
         }, { status: 400 })
       }
       

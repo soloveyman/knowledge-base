@@ -294,45 +294,64 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         }
       }
       
-      // Step 4: Convert HTML to text (simplified)
-      let workingText = htmlWithPlaceholders
-        .replace(/<p[^>]*>/gi, '\n\n')
-        .replace(/<\/p>/gi, '')
-        .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, content) => {
-          const t = content.replace(/<[^>]+>/g, '').trim()
-          return t ? `\n\n# ${t}\n\n` : '\n\n'
-        })
-        .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, content) => {
-          const t = content.replace(/<[^>]+>/g, '').trim()
-          return t ? `\n\n## ${t}\n\n` : '\n\n'
-        })
-        .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, content) => {
-          const t = content.replace(/<[^>]+>/g, '').trim()
-          return t ? `\n\n### ${t}\n\n` : '\n\n'
-        })
-        .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (_, content) => {
-          const t = content.replace(/<[^>]+>/g, '').trim()
-          return t ? `\n\n#### ${t}\n\n` : '\n\n'
-        })
-        .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (_, content) => {
-          const t = content.replace(/<[^>]+>/g, '').trim()
-          return t ? `\n\n##### ${t}\n\n` : '\n\n'
-        })
-        .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (_, content) => {
-          const t = content.replace(/<[^>]+>/g, '').trim()
-          return t ? `\n\n###### ${t}\n\n` : '\n\n'
-        })
-        .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\n{4,}/g, '\n\n\n')
-        .replace(/^\n+/, '')
-        .replace(/\n+$/, '')
+      // Step 4: Convert HTML to text (improved - extract all text before removing tags)
+      // Helper function to extract text from HTML recursively
+      const extractTextFromHtml = (html: string): string => {
+        // First decode HTML entities
+        let text = html
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&#160;/g, ' ')
+          .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Other entities
+        
+        // Extract text from all tags recursively - preserve text content
+        // Replace block elements with newlines first
+        text = text
+          .replace(/<p[^>]*>/gi, '\n\n')
+          .replace(/<\/p>/gi, '')
+          .replace(/<br[^>]*>/gi, '\n')
+          .replace(/<div[^>]*>/gi, '\n')
+          .replace(/<\/div>/gi, '')
+          .replace(/<h1[^>]*>/gi, '\n\n# ')
+          .replace(/<\/h1>/gi, '\n\n')
+          .replace(/<h2[^>]*>/gi, '\n\n## ')
+          .replace(/<\/h2>/gi, '\n\n')
+          .replace(/<h3[^>]*>/gi, '\n\n### ')
+          .replace(/<\/h3>/gi, '\n\n')
+          .replace(/<h4[^>]*>/gi, '\n\n#### ')
+          .replace(/<\/h4>/gi, '\n\n')
+          .replace(/<h5[^>]*>/gi, '\n\n##### ')
+          .replace(/<\/h5>/gi, '\n\n')
+          .replace(/<h6[^>]*>/gi, '\n\n###### ')
+          .replace(/<\/h6>/gi, '\n\n')
+          .replace(/<li[^>]*>/gi, '• ')
+          .replace(/<\/li>/gi, '\n')
+          .replace(/<ul[^>]*>/gi, '\n')
+          .replace(/<\/ul>/gi, '\n')
+          .replace(/<ol[^>]*>/gi, '\n')
+          .replace(/<\/ol>/gi, '\n')
+        
+        // Now remove all remaining tags (but keep their text content)
+        // Use a more careful approach: replace tags with spaces to preserve word boundaries
+        text = text.replace(/<[^>]+>/g, ' ')
+        
+        // Clean up multiple spaces and newlines
+        text = text
+          .replace(/[ \t]+/g, ' ') // Multiple spaces to single space
+          .replace(/\n{4,}/g, '\n\n\n') // Max 3 newlines
+          .replace(/[ \t]+\n/g, '\n') // Spaces before newlines
+          .replace(/\n[ \t]+/g, '\n') // Spaces after newlines
+          .replace(/^\n+/, '') // Leading newlines
+          .replace(/\n+$/, '') // Trailing newlines
+        
+        return text.trim()
+      }
+      
+      let workingText = extractTextFromHtml(htmlWithPlaceholders)
       
       // Step 5: Map placeholder positions to text positions and extract context
       for (const image of processedImages) {
@@ -365,21 +384,54 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
     } catch (mammothError) {
       console.warn('⚠️ Mammoth.js parsing failed, using JSZip fallback:', mammothError)
       
-      // Fallback: simple text extraction
+      // Fallback: improved text extraction from document.xml
       const uint8Array = new Uint8Array(buffer)
       const zip = await JSZip.loadAsync(uint8Array)
       const documentXml = await zip.file('word/document.xml')?.async('text')
       
       if (documentXml) {
+        // Extract text more carefully - preserve word boundaries
+        // First decode HTML entities
         text = documentXml
-          .replace(/<[^>]*>/g, ' ')
           .replace(/&nbsp;/g, ' ')
           .replace(/&amp;/g, '&')
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
           .replace(/&quot;/g, '"')
           .replace(/&#39;/g, "'")
-          .replace(/\s+/g, ' ')
+          .replace(/&#160;/g, ' ')
+          .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Other entities
+        
+        // Extract text from Word XML structure
+        // Word uses <w:t> tags for text content
+        const textMatches = documentXml.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/gi)
+        if (textMatches && textMatches.length > 0) {
+          // Extract text from <w:t> tags
+          text = textMatches
+            .map(match => {
+              const content = match.replace(/<w:t[^>]*>|<\/w:t>/gi, '')
+              return content
+            })
+            .join(' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&#160;/g, ' ')
+            .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+        } else {
+          // Fallback to simple tag removal if <w:t> tags not found
+          text = documentXml
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+        }
+        
+        // Clean up whitespace but preserve structure
+        text = text
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
           .trim()
       }
     }
@@ -742,26 +794,46 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   console.log('Line breaks in raw text:', (text.match(/\n/g) || []).length)
   
   // Additional cleaning to remove any remaining HTML/CSS artifacts
-  // Preserve structure and readability
+  // Preserve structure and readability - extract text from tags before removing them
   let cleanedText = text
-    // Remove any HTML tags (but preserve our custom formatting tags)
-    .replace(/<html[^>]*>/gi, '')
-    .replace(/<\/html>/gi, '')
-    .replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, '')
-    .replace(/<body[^>]*>/gi, '')
-    .replace(/<\/body>/gi, '')
-    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '') // Remove CSS
-    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '') // Remove JavaScript
-    // Only remove HTML tags, not our custom formatting tags like [BOLD], [ITALIC], etc.
-    .replace(/<(?![A-Z])[^>]*>/g, '') // Remove HTML tags but not our custom tags
-    // Decode HTML entities
+    // First decode HTML entities to preserve special characters
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove any other entities
+    .replace(/&#160;/g, ' ')
+    .replace(/&#32;/g, ' ')
+    .replace(/&#10;/g, '\n')
+    .replace(/&#13;/g, '\r')
+    // Decode numeric entities (common ones)
+    .replace(/&#(\d+);/g, (_, num) => {
+      const code = parseInt(num, 10)
+      return code >= 32 && code <= 126 ? String.fromCharCode(code) : ' '
+    })
+    // Remove script and style content (they don't contain visible text)
+    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '')
+    .replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, '')
+    // Remove HTML structure tags but preserve their text content
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '')
+    // Extract text from common HTML tags before removing them
+    // Replace block elements with newlines to preserve structure
+    .replace(/<p[^>]*>/gi, '\n\n')
+    .replace(/<\/p>/gi, '')
+    .replace(/<div[^>]*>/gi, '\n')
+    .replace(/<\/div>/gi, '')
+    .replace(/<br[^>]*>/gi, '\n')
+    // Remove all remaining HTML tags (but text inside should already be extracted)
+    // Use space replacement to preserve word boundaries
+    .replace(/<(?![A-Z])[^>]*>/g, ' ') // Remove HTML tags but not our custom tags like [BOLD]
+    .replace(/<\/[^>]*>/g, ' ') // Remove closing tags
+    // Remove any remaining entities (should be rare after decoding above)
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ')
     // Remove CSS property patterns (but be careful not to remove content)
     // Skip this - it's too aggressive and removes content
   

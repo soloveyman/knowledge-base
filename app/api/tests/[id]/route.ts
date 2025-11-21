@@ -345,7 +345,13 @@ export async function DELETE(
         console.log('Deleting valid question IDs:', validQuestionIds)
         // Delete questions one by one (Drizzle doesn't support IN with delete easily)
         for (const questionId of validQuestionIds) {
-          await db.delete(questions).where(eq(questions.id, questionId))
+          try {
+            await db.delete(questions).where(eq(questions.id, questionId))
+            console.log(`✅ Deleted question ${questionId}`)
+          } catch (error) {
+            console.warn(`⚠️ Failed to delete question ${questionId}:`, error)
+            // Continue with other questions
+          }
         }
       } else {
         console.log('No valid question IDs to delete (skipping mock question IDs)')
@@ -353,8 +359,37 @@ export async function DELETE(
     }
 
     // Delete the test
-    await db.delete(tests).where(eq(tests.id, id))
-    console.log('Test deleted successfully')
+    console.log(`🗑️ Deleting test ${id} from database`)
+    try {
+      await db.delete(tests).where(eq(tests.id, id))
+      console.log(`✅ Test ${id} delete query executed`)
+      
+      // Verify deletion
+      const verifyDeleted = await db.select().from(tests).where(eq(tests.id, id)).limit(1)
+      if (verifyDeleted.length > 0) {
+        console.error(`❌ Test ${id} still exists after deletion attempt`)
+        return NextResponse.json({
+          success: false,
+          message: 'Test deletion failed - test still exists',
+          error: 'DELETION_VERIFICATION_FAILED'
+        }, { status: 500 })
+      }
+      
+      console.log(`✅ Test ${id} deleted successfully and verified`)
+    } catch (dbError) {
+      console.error(`❌ Database error deleting test ${id}:`, dbError)
+      const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      
+      if (dbErrorMessage.includes('foreign key') || dbErrorMessage.includes('constraint') || dbErrorMessage.includes('23503')) {
+        return NextResponse.json({
+          success: false,
+          message: 'Cannot delete test. It is still referenced by other records.',
+          error: 'FOREIGN_KEY_CONSTRAINT'
+        }, { status: 400 })
+      }
+      
+      throw dbError
+    }
 
     return NextResponse.json({
       success: true,

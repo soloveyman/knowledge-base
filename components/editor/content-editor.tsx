@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DocumentRenderer } from "@/components/common/document-renderer"
 import { 
   Save, 
   Eye, 
@@ -187,46 +188,9 @@ export default function ContentEditor({
   }
 
   const renderPreview = () => {
-    // Simple markdown to HTML conversion (in production, use a proper markdown parser)
-    let html = content
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
-      .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-      .replace(/^- (.*$)/gim, '<li>$1</li>')
-    
-    // Handle images: ![alt](url) -> <img src="url" alt="alt" />
-    // Process in reverse order to preserve positions when replacing
-    const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
-    const imageMatches: Array<{ match: string; alt: string; src: string; index: number }> = []
-    let match
-    while ((match = imagePattern.exec(html)) !== null) {
-      imageMatches.push({
-        match: match[0],
-        alt: match[1] || '',
-        src: match[2],
-        index: match.index
-      })
-    }
-    
-    // Replace from end to start to preserve indices
-    for (let i = imageMatches.length - 1; i >= 0; i--) {
-      const { match, alt, src } = imageMatches[i]
-      const escapedAlt = alt.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-      // Don't escape external URLs (https://) - only escape data URLs if needed
-      // URLs should remain unescaped to work properly
-      const escapedSrc = src.startsWith('data:') ? src : src.replace(/"/g, '&quot;')
-      const imgTag = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
-      html = html.substring(0, imageMatches[i].index) + imgTag + html.substring(imageMatches[i].index + match.length)
-    }
-    
-    html = html.replace(/\n/g, '<br>')
-
-    return <div dangerouslySetInnerHTML={{ __html: html }} />
+    // Use DocumentRenderer for proper text recognition and formatting
+    // It handles [BOLD], [ITALIC] tags and other formatting from parsers
+    return <DocumentRenderer content={content} />
   }
 
   const toolbarButtons = [
@@ -251,7 +215,7 @@ export default function ContentEditor({
           <CardTitle>Content Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="prose max-w-none">
+          <div className="prose max-w-none max-h-[600px] overflow-y-auto overflow-x-hidden">
             {renderPreview()}
           </div>
         </CardContent>
@@ -362,7 +326,7 @@ export default function ContentEditor({
           </TabsContent>
 
           <TabsContent value="preview" className="space-y-4">
-            <div className="prose max-w-none p-4 border rounded-lg min-h-[400px]">
+            <div className="prose max-w-none p-4 border rounded-lg min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden">
               {renderPreview()}
             </div>
           </TabsContent>

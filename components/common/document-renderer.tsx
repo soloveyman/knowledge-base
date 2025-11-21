@@ -45,8 +45,8 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
     })())
   
   return (
-    <div className={`prose prose-slate dark:prose-invert max-w-none overflow-visible ${className}`}>
-      <div className="document-content space-y-6 overflow-visible">
+    <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
+      <div className="document-content space-y-6">
         {hasActualContent && <DocumentContent content={content} />}
         {tables && tables.length > 0 && (
           <div className={hasActualContent ? "mt-10 space-y-10" : "space-y-10"}>

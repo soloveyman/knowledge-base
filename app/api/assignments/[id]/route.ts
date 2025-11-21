@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, assignments, documents, modules, assignmentUsers } from '@/lib/db'
+import { db, assignments, documents, modules, assignmentUsers, progress, testAttempts } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 
 export async function GET(
@@ -222,8 +222,67 @@ export async function DELETE(
       }, { status: 404 })
     }
 
+    console.log(`🗑️ Deleting assignment ${id} and related records`)
+
+    // Explicitly delete related records first (even though cascade should handle it)
+    // This ensures clean deletion and avoids any potential foreign key issues
+    
+    // Delete assignment users
+    try {
+      await db.delete(assignmentUsers).where(eq(assignmentUsers.assignmentId, id))
+      console.log(`✅ Deleted assignment users for assignment ${id}`)
+    } catch (error) {
+      console.warn(`⚠️ Failed to delete assignment users (will try cascade):`, error)
+    }
+
+    // Delete progress records
+    try {
+      await db.delete(progress).where(eq(progress.assignmentId, id))
+      console.log(`✅ Deleted progress records for assignment ${id}`)
+    } catch (error) {
+      console.warn(`⚠️ Failed to delete progress (will try cascade):`, error)
+    }
+
+    // Delete test attempts
+    try {
+      await db.delete(testAttempts).where(eq(testAttempts.assignmentId, id))
+      console.log(`✅ Deleted test attempts for assignment ${id}`)
+    } catch (error) {
+      console.warn(`⚠️ Failed to delete test attempts (will try cascade):`, error)
+    }
+
     // Delete the assignment
-    await db.delete(assignments).where(eq(assignments.id, id))
+    console.log(`🗑️ Deleting assignment ${id} from database`)
+    try {
+      await db.delete(assignments).where(eq(assignments.id, id))
+      console.log(`✅ Assignment ${id} delete query executed`)
+      
+      // Verify deletion
+      const verifyDeleted = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1)
+      if (verifyDeleted.length > 0) {
+        console.error(`❌ Assignment ${id} still exists after deletion attempt`)
+        return NextResponse.json({
+          success: false,
+          message: 'Assignment deletion failed - assignment still exists',
+          error: 'DELETION_VERIFICATION_FAILED'
+        }, { status: 500 })
+      }
+      
+      console.log(`✅ Assignment ${id} deleted successfully and verified`)
+    } catch (dbError) {
+      console.error(`❌ Database error deleting assignment ${id}:`, dbError)
+      const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      
+      if (dbErrorMessage.includes('foreign key') || dbErrorMessage.includes('constraint') || dbErrorMessage.includes('23503')) {
+        return NextResponse.json({
+          success: false,
+          message: 'Cannot delete assignment. It is still referenced by other records.',
+          error: 'FOREIGN_KEY_CONSTRAINT'
+        }, { status: 400 })
+      }
+      
+      throw dbError
+    }
 
     return NextResponse.json({
       success: true,

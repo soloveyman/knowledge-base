@@ -141,22 +141,40 @@ export async function DELETE(
       }, { status: 404 })
     }
 
-    // Cascade delete related records
+    console.log(`🗑️ Deleting user ${id} and related records`)
+    
+    // Cascade delete related records - delete in order to avoid foreign key issues
     // Delete user's test attempts
-    await db.delete(testAttempts).where(eq(testAttempts.userId, id))
-    console.log('Deleted test attempts')
+    try {
+      await db.delete(testAttempts).where(eq(testAttempts.userId, id))
+      console.log('✅ Deleted test attempts')
+    } catch (error) {
+      console.warn('⚠️ Failed to delete test attempts:', error)
+    }
     
     // Delete user's assignment users
-    await db.delete(assignmentUsers).where(eq(assignmentUsers.userId, id))
-    console.log('Deleted assignment users')
+    try {
+      await db.delete(assignmentUsers).where(eq(assignmentUsers.userId, id))
+      console.log('✅ Deleted assignment users')
+    } catch (error) {
+      console.warn('⚠️ Failed to delete assignment users:', error)
+    }
     
     // Delete user's progress
-    await db.delete(progress).where(eq(progress.userId, id))
-    console.log('Deleted progress')
+    try {
+      await db.delete(progress).where(eq(progress.userId, id))
+      console.log('✅ Deleted progress')
+    } catch (error) {
+      console.warn('⚠️ Failed to delete progress:', error)
+    }
     
     // Delete user's group memberships
-    await db.delete(userGroupMembers).where(eq(userGroupMembers.userId, id))
-    console.log('Deleted group memberships')
+    try {
+      await db.delete(userGroupMembers).where(eq(userGroupMembers.userId, id))
+      console.log('✅ Deleted group memberships')
+    } catch (error) {
+      console.warn('⚠️ Failed to delete group memberships:', error)
+    }
     
     // Note: We're not deleting modules, questions, tests, assignments, documents
     // created by the user as they might be used by others.
@@ -168,8 +186,37 @@ export async function DELETE(
     // See app/api/documents/[id]/route.ts DELETE handler for proper image cleanup
 
     // Finally, delete the user
-    await db.delete(users).where(eq(users.id, id))
-    console.log('User deleted successfully')
+    console.log(`🗑️ Deleting user ${id} from database`)
+    try {
+      await db.delete(users).where(eq(users.id, id))
+      console.log(`✅ User ${id} delete query executed`)
+      
+      // Verify deletion
+      const verifyDeleted = await db.select().from(users).where(eq(users.id, id)).limit(1)
+      if (verifyDeleted.length > 0) {
+        console.error(`❌ User ${id} still exists after deletion attempt`)
+        return NextResponse.json({
+          success: false,
+          message: 'User deletion failed - user still exists',
+          error: 'DELETION_VERIFICATION_FAILED'
+        }, { status: 500 })
+      }
+      
+      console.log(`✅ User ${id} deleted successfully and verified`)
+    } catch (dbError) {
+      console.error(`❌ Database error deleting user ${id}:`, dbError)
+      const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      
+      if (dbErrorMessage.includes('foreign key') || dbErrorMessage.includes('constraint') || dbErrorMessage.includes('23503')) {
+        return NextResponse.json({
+          success: false,
+          message: 'Cannot delete user. They are still referenced by other records.',
+          error: 'FOREIGN_KEY_CONSTRAINT'
+        }, { status: 400 })
+      }
+      
+      throw dbError
+    }
 
     return NextResponse.json({
       success: true,
