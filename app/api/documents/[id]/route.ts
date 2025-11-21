@@ -74,6 +74,66 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+    
+    // Check if document exists
+    const existingDoc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
+    if (existingDoc.length === 0) {
+      return NextResponse.json({ success: false, message: 'Document not found' }, { status: 404 })
+    }
+
+    const body = await request.json()
+    const { parsedContent } = body
+
+    if (!parsedContent) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'parsedContent is required' 
+      }, { status: 400 })
+    }
+
+    // Update document with new parsedContent
+    // Note: This might still fail if parsedContent is too large, but we try
+    const updated = await db
+      .update(documents)
+      .set({
+        parsedContent,
+        updatedAt: new Date()
+      })
+      .where(eq(documents.id, id))
+      .returning()
+
+    if (updated.length === 0) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Failed to update document' 
+      }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { document: updated[0] }
+    })
+  } catch (error) {
+    console.error('PATCH document API error:', error)
+    return NextResponse.json({
+      success: false,
+      message: 'Failed to update document',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

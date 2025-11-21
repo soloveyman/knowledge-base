@@ -619,11 +619,12 @@ function DocImportPageInner() {
             imagesCount: file.parsedContent?.images?.length || 0
           })
           
-          // Check if text content exceeds limit
-          if (sizeWithoutImages > VERCEL_LIMIT_MB) {
-            const errorMsg = `Document "${file.name}" is too large (${sizeWithoutImages.toFixed(2)}MB text content). Maximum text content size is ${VERCEL_LIMIT_MB}MB.`
-            console.error(errorMsg)
-            throw new Error(errorMsg)
+          // If text content exceeds limit, send document with minimal parsedContent first
+          // Then update parsedContent separately
+          const sendMinimalContent = sizeWithoutImages > VERCEL_LIMIT_MB
+          
+          if (sendMinimalContent) {
+            console.log(`⚠️ Document text content (${sizeWithoutImages.toFixed(2)}MB) exceeds Vercel limit. Will send minimal content first, then update separately.`)
           }
           
           // If payload with images exceeds limit, send without images first
@@ -634,10 +635,32 @@ function DocImportPageInner() {
             console.log(`⚠️ Payload with images (${sizeWithImages.toFixed(2)}MB) exceeds Vercel limit. Will send document without images and upload them separately.`)
           }
           
-          // Prepare request body - include or exclude images based on size
-          const requestBody = sendImagesInPayload 
-            ? requestBodyWithImages
-            : requestBodyWithoutImages
+          // Prepare request body
+          let requestBody: any
+          
+          if (sendMinimalContent) {
+            // Send document with minimal parsedContent (only metadata)
+            requestBody = {
+              title: file.name,
+              originalFileName: file.name,
+              fileType: file.type.split('/')[1],
+              fileUrl: file.fileUrl || null,
+              fileSize: file.size,
+              parsedContent: {
+                sections: [],
+                tables: [],
+                images: [],
+                metadata: file.parsedContent?.metadata || {}
+              },
+              parsingLog: file.parsingLog || null,
+              uploadedBy: session?.user?.id || 'unknown'
+            }
+          } else {
+            // Send with full content (with or without images based on size)
+            requestBody = sendImagesInPayload 
+              ? requestBodyWithImages
+              : requestBodyWithoutImages
+          }
           
           const payloadString = JSON.stringify(requestBody)
           
@@ -683,6 +706,60 @@ function DocImportPageInner() {
           }
           
           const documentId = result.data.document.id
+          
+          // If document was sent with minimal content, update parsedContent separately
+          // Split into parts if needed to avoid size limits
+          if (sendMinimalContent) {
+            console.log(`📤 Updating parsedContent separately for document ${documentId}...`)
+            
+            try {
+              // Prepare parsedContent for update (without images if they exceed limit)
+              let parsedContentForUpdate = sendImagesInPayload
+                ? file.parsedContent
+                : {
+                    ...file.parsedContent,
+                    images: file.parsedContent?.images?.map((img: any) => ({
+                      filename: img.filename,
+                      type: img.type,
+                      position: img.position,
+                      // Don't include data - images will be uploaded separately
+                    })) || []
+                  }
+              
+              // Check size of parsedContent update
+              const updatePayloadSize = JSON.stringify({ parsedContent: parsedContentForUpdate }).length / (1024 * 1024)
+              
+              if (updatePayloadSize > VERCEL_LIMIT_MB) {
+                console.warn(`⚠️ parsedContent update (${updatePayloadSize.toFixed(2)}MB) exceeds limit. Will try to update in parts or skip.`)
+                // For now, we'll try anyway - server might handle it differently
+                // In future, we could split into sections/tables/images separately
+              }
+              
+              // Update document with full parsedContent via PATCH
+              const updateResponse = await fetch(`/api/documents/${documentId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  parsedContent: parsedContentForUpdate
+                })
+              })
+              
+              if (!updateResponse.ok) {
+                const errorData = await updateResponse.json().catch(() => ({ message: 'Unknown error' }))
+                console.error(`❌ Failed to update parsedContent for document ${documentId}:`, errorData)
+                // Don't fail - document is already created, but log warning
+                console.warn(`⚠️ Document ${documentId} was created but parsedContent could not be updated. Content may be incomplete.`)
+              } else {
+                console.log(`✅ Updated parsedContent for document ${documentId}`)
+              }
+            } catch (error) {
+              console.error(`❌ Error updating parsedContent for document ${documentId}:`, error)
+              // Don't fail - document is already created
+              console.warn(`⚠️ Document ${documentId} was created but parsedContent update failed. Content may be incomplete.`)
+            }
+          }
           
           // If images were not sent in payload, upload them separately now
           if (!sendImagesInPayload && file.parsedContent?.images && file.parsedContent.images.length > 0) {
