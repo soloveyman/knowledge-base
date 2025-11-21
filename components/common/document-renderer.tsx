@@ -60,6 +60,38 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
   )
 }
 
+// Helper function to extract clean display text from alt or src
+function getImageDisplayText(alt: string, src: string): string {
+  // If alt text exists and is reasonable, use it
+  if (alt && alt.trim().length > 0 && alt.length < 200) {
+    // Extract filename from alt if it looks like a path
+    const filenameMatch = alt.match(/([^/\\]+\.(png|jpg|jpeg|gif|webp|svg))$/i)
+    if (filenameMatch) {
+      return filenameMatch[1]
+    }
+    return alt.trim()
+  }
+  
+  // Try to extract filename from src path
+  if (src && !src.startsWith('data:')) {
+    const pathMatch = src.match(/([^/\\]+\.(png|jpg|jpeg|gif|webp|svg))$/i)
+    if (pathMatch) {
+      return pathMatch[1]
+    }
+    // If it's a relative path, extract the last part
+    if (src.includes('/') || src.includes('\\')) {
+      const parts = src.split(/[/\\]/)
+      const lastPart = parts[parts.length - 1]
+      if (lastPart && lastPart.length < 100) {
+        return lastPart
+      }
+    }
+  }
+  
+  // For data URLs or unknown sources, return generic text
+  return 'Image'
+}
+
 function DocumentContent({ content }: { content: string }) {
   // Преобразуем форматирование в markdown
   const markdown = convertToMarkdown(content)
@@ -309,7 +341,7 @@ function DocumentContent({ content }: { content: string }) {
           // 1. Empty data URLs (data:image/png;base64,)
           if (srcString.startsWith('data:') && (srcString.endsWith(',') || srcString.split(',').length === 1 || srcString.split(',')[1]?.trim().length === 0)) {
             // Show alt text instead of broken image
-            const displayText = alt || 'Image'
+            const displayText = getImageDisplayText(alt || '', srcString)
             return (
               <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground italic">
@@ -324,7 +356,7 @@ function DocumentContent({ content }: { content: string }) {
             // Check if it looks like a file path (contains slashes but not a valid URL)
             if (srcString.includes('/') || srcString.includes('\\')) {
               // Show alt text instead of broken image
-              const displayText = alt || srcString || 'Image'
+              const displayText = getImageDisplayText(alt || '', srcString)
               return (
                 <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground italic">
@@ -349,7 +381,7 @@ function DocumentContent({ content }: { content: string }) {
           
           // Final validation: if it's not a data URL or external URL, show alt text
           if (!isDataUrl && !isExternal) {
-            const displayText = alt || srcString || 'Image'
+            const displayText = getImageDisplayText(alt || '', srcString)
             return (
               <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground italic">
@@ -931,7 +963,7 @@ function ImageWithPlaceholder({
 
   // Show alt text if image failed to load
   if (hasError) {
-    const displayText = alt || 'Image'
+    const displayText = getImageDisplayText(alt || '', src)
     return (
       <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
         <p className="text-sm text-muted-foreground italic">

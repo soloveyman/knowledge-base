@@ -245,8 +245,59 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         console.log('⚠️ word/media folder not found in DOCX file')
       }
       
-      // Use Mammoth to convert DOCX to HTML
-      const result = await mammoth.convertToHtml({ arrayBuffer: buffer })
+      // Use Mammoth to convert DOCX to HTML with style mapping for headings
+      // Map Word heading styles to HTML headings
+      const styleMap = [
+        // Map built-in Word heading styles (case-insensitive matching)
+        "p[style-name='Heading 1'] => h1:fresh",
+        "p[style-name='Heading 2'] => h2:fresh",
+        "p[style-name='Heading 3'] => h3:fresh",
+        "p[style-name='Heading 4'] => h4:fresh",
+        "p[style-name='Heading 5'] => h5:fresh",
+        "p[style-name='Heading 6'] => h6:fresh",
+        // Map Russian heading styles
+        "p[style-name='Заголовок 1'] => h1:fresh",
+        "p[style-name='Заголовок 2'] => h2:fresh",
+        "p[style-name='Заголовок 3'] => h3:fresh",
+        "p[style-name='Заголовок 4'] => h4:fresh",
+        "p[style-name='Заголовок 5'] => h5:fresh",
+        "p[style-name='Заголовок 6'] => h6:fresh",
+        // Map common heading style variations (lowercase)
+        "p[style-name='heading 1'] => h1:fresh",
+        "p[style-name='heading 2'] => h2:fresh",
+        "p[style-name='heading 3'] => h3:fresh",
+        "p[style-name='heading 4'] => h4:fresh",
+        "p[style-name='heading 5'] => h5:fresh",
+        "p[style-name='heading 6'] => h6:fresh",
+        // Map by paragraph outline level (Word's built-in heading detection)
+        "p[style-name='Title'] => h1:fresh",
+        "p[style-name='Subtitle'] => h2:fresh",
+        // Map paragraphs with outline level (Word's built-in heading attribute)
+        "p[outline-level='1'] => h1:fresh",
+        "p[outline-level='2'] => h2:fresh",
+        "p[outline-level='3'] => h3:fresh",
+        "p[outline-level='4'] => h4:fresh",
+        "p[outline-level='5'] => h5:fresh",
+        "p[outline-level='6'] => h6:fresh",
+      ]
+      
+      const result = await mammoth.convertToHtml({ 
+        arrayBuffer: buffer,
+        styleMap: styleMap,
+        includeDefaultStyleMap: true // Include mammoth's default style mappings
+      })
+      
+      // Log messages to help debug heading detection
+      if (result.messages.length > 0) {
+        console.log('Mammoth conversion messages:')
+        result.messages.forEach(msg => {
+          if (msg.type === 'warning') {
+            console.warn('Mammoth warning:', msg.message)
+          } else {
+            console.log('Mammoth message:', msg.type, msg.message)
+          }
+        })
+      }
       
       console.log('Mammoth conversion completed')
       console.log('Messages:', result.messages.length)
@@ -351,14 +402,69 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         .replace(/<em[^>]*>(.*?)<\/em>/gi, '[ITALIC]$1[/ITALIC]')
         .replace(/<i[^>]*>(.*?)<\/i>/gi, '[ITALIC]$1[/ITALIC]')
       
-      // Step 4: Convert headings
+      // Step 4: Convert headings - extract text content properly
+      // First, log HTML to debug heading detection
+      const headingMatches = htmlWithPlaceholders.match(/<h[1-6][^>]*>.*?<\/h[1-6]>/gi)
+      if (headingMatches && headingMatches.length > 0) {
+        console.log(`📋 Found ${headingMatches.length} heading tags in HTML:`)
+        headingMatches.slice(0, 10).forEach((match, idx) => {
+          console.log(`  Heading ${idx + 1}: ${match.substring(0, 100)}`)
+        })
+      } else {
+        console.warn('⚠️ No heading tags (h1-h6) found in HTML. Checking for paragraphs with bold text that might be headings...')
+      }
+      
+      // Convert headings - use non-greedy matching and extract text properly
       workingText = workingText
-        .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '\n\n# $1\n\n')
-        .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '\n\n## $1\n\n')
-        .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '\n\n### $1\n\n')
-        .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '\n\n#### $1\n\n')
-        .replace(/<h5[^>]*>(.*?)<\/h5>/gi, '\n\n##### $1\n\n')
-        .replace(/<h6[^>]*>(.*?)<\/h6>/gi, '\n\n###### $1\n\n')
+        .replace(/<h1[^>]*>(.*?)<\/h1>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          console.log(`📋 H1 found: "${text}"`)
+          return text ? `\n\n# ${text}\n\n` : '\n\n'
+        })
+        .replace(/<h2[^>]*>(.*?)<\/h2>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          console.log(`📋 H2 found: "${text}"`)
+          return text ? `\n\n## ${text}\n\n` : '\n\n'
+        })
+        .replace(/<h3[^>]*>(.*?)<\/h3>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          console.log(`📋 H3 found: "${text}"`)
+          return text ? `\n\n### ${text}\n\n` : '\n\n'
+        })
+        .replace(/<h4[^>]*>(.*?)<\/h4>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          return text ? `\n\n#### ${text}\n\n` : '\n\n'
+        })
+        .replace(/<h5[^>]*>(.*?)<\/h5>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          return text ? `\n\n##### ${text}\n\n` : '\n\n'
+        })
+        .replace(/<h6[^>]*>(.*?)<\/h6>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          return text ? `\n\n###### ${text}\n\n` : '\n\n'
+        })
+      
+      // Fallback: Detect headings by formatting (bold paragraphs that are short and standalone)
+      // This handles cases where headings aren't properly styled in Word
+      workingText = workingText
+        .replace(/<p[^>]*><strong[^>]*>(.*?)<\/strong><\/p>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          // If it's a short line (likely a heading), convert to h2
+          if (text && text.length < 200 && !text.includes('\n')) {
+            console.log(`📋 Detected potential heading by formatting: "${text}"`)
+            return `\n\n## ${text}\n\n`
+          }
+          return match // Keep original if it doesn't look like a heading
+        })
+        .replace(/<p[^>]*><b[^>]*>(.*?)<\/b><\/p>/gis, (match, content) => {
+          const text = content.replace(/<[^>]+>/g, '').trim()
+          // If it's a short line (likely a heading), convert to h2
+          if (text && text.length < 200 && !text.includes('\n')) {
+            console.log(`📋 Detected potential heading by formatting: "${text}"`)
+            return `\n\n## ${text}\n\n`
+          }
+          return match // Keep original if it doesn't look like a heading
+        })
       
       // Step 5: Convert lists
       workingText = workingText
@@ -1155,9 +1261,39 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   let currentSection: { title: string; level: number; content: string; order: number } | null = null
   let sectionOrder = 1
   
+  // Extract images from text and save their positions BEFORE splitting into sections
+  // Keep images in text but track their positions for proper insertion into sections
+  const imageMarkdownPattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
+  const imagesInText: Array<{ filename: string; data: string; markdown: string; position: number }> = []
+  let imageMatch
+  const originalText = finalText // Keep original text with images
+  while ((imageMatch = imageMarkdownPattern.exec(originalText)) !== null) {
+    const markdown = imageMatch[0]
+    const filename = imageMatch[1] || 'image'
+    const dataUrl = imageMatch[2]
+    const position = imageMatch.index
+    
+    imagesInText.push({
+      filename,
+      data: dataUrl,
+      markdown,
+      position // Keep original position in text
+    })
+    
+    console.log(`📸 Found image "${filename}" at position ${position} in text`)
+  }
+  
+  // Sort images by position for easier insertion
+  imagesInText.sort((a, b) => a.position - b.position)
+  
+  // Split lines - images are still in the text, we'll extract them during section processing
+  const lines = originalText.split('\n')
+  
   // Improved heading detection and list preservation
+  let cumulativePos = 0 // Track cumulative position in original text
   for (const line of lines) {
     const trimmedLine = line.trim()
+    const lineLength = line.length + 1 // +1 for newline
     
     // Check for markdown-style headings (with #)
     if (trimmedLine.startsWith('#')) {
@@ -1181,6 +1317,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
           content: '',
           order: sectionOrder++
         }
+        cumulativePos += lineLength
       }
       // If it's an empty heading, continue adding content to current section (or create one if none exists)
       else if (!currentSection) {
@@ -1191,6 +1328,9 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
           content: '',
           order: sectionOrder++
         }
+        cumulativePos += lineLength
+      } else {
+        cumulativePos += lineLength
       }
       // Otherwise, just continue with current section (don't create a new one)
     }
@@ -1206,6 +1346,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         content: '',
         order: sectionOrder++
       }
+      cumulativePos += lineLength
     }
     // Check for all-caps headings (simple heuristic)
     else if (trimmedLine.length > 3 && trimmedLine === trimmedLine.toUpperCase() && !trimmedLine.includes('|')) {
@@ -1219,35 +1360,64 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         content: '',
         order: sectionOrder++
       }
+      cumulativePos += lineLength
     }
     // Regular content (preserve lists with markers like 1., 2., or •)
-    else if (currentSection) {
-      // Add content - preserve empty lines for paragraph breaks
-      if (trimmedLine.length === 0) {
-        // Empty line = paragraph break (add double newline)
-        currentSection.content += '\n\n'
-      } else {
-        // Check if this line is a list item
-        const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(trimmedLine)
-        
-        if (isListItem || trimmedLine.length > 0) {
-          currentSection.content += (currentSection.content ? '\n' : '') + line
-        }
-      }
-    }
     else {
       // If no section exists, create a default section for content without headings
       if (!currentSection) {
         currentSection = {
           title: fileName.replace(/\.[^/.]+$/, ''), // Use filename as title
           level: 1,
-          content: line,
+          content: '',
           order: sectionOrder++
         }
+      }
+      
+      // Check if there are images that should be inserted at this position
+      // Use original text position (with images) to match image positions
+      const lineStartPos = cumulativePos
+      const lineEndPos = cumulativePos + line.length
+      
+      // Find images that belong to this line position in original text
+      const imagesToInsert = imagesInText.filter(img => {
+        // Check if image position falls within this line's range in original text
+        return img.position >= lineStartPos && img.position < lineEndPos + 1
+      })
+      
+      // Insert images before this line if they belong here
+      if (imagesToInsert.length > 0) {
+        // Sort by position to maintain order
+        imagesToInsert.sort((a, b) => a.position - b.position)
+        imagesToInsert.forEach(img => {
+          // Check if image markdown is already in the section content (to avoid duplicates)
+          if (!currentSection!.content.includes(img.markdown)) {
+            currentSection!.content += (currentSection!.content.trim() ? '\n\n' : '') + img.markdown + '\n\n'
+            console.log(`📸 Inserted image "${img.filename}" into section at position ${img.position} (line ${lineStartPos}-${lineEndPos})`)
+          }
+        })
+      }
+      
+      // Add content - preserve empty lines for paragraph breaks
+      // Remove image markdown from line if present (we've already inserted it above)
+      let lineToAdd = line
+      imagesToInsert.forEach(img => {
+        lineToAdd = lineToAdd.replace(img.markdown, '').trim()
+      })
+      
+      if (trimmedLine.length === 0 || lineToAdd.length === 0) {
+        // Empty line = paragraph break (add double newline)
+        currentSection.content += '\n\n'
       } else {
-        // Preserve empty lines
-        const section = currentSection as { content: string }
-        if (trimmedLine.length === 0) {
+        // Check if this line is a list item
+        const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(lineToAdd.trim())
+        
+        if (isListItem || lineToAdd.length > 0) {
+          currentSection.content += (currentSection.content ? '\n' : '') + lineToAdd
+        }
+      }
+      cumulativePos += line.length + 1 // +1 for newline
+    }
           section.content += '\n\n'
         } else {
           section.content += (section.content ? '\n' : '') + line
