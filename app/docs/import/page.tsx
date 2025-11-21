@@ -756,7 +756,7 @@ function DocImportPageInner() {
                 const metadata = mergedContent.metadata || {}
                 
                 // Get current document content to merge incrementally
-                let currentContent = {
+                let currentContent: any = {
                   sections: [],
                   tables: [],
                   images: [],
