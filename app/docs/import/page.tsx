@@ -50,7 +50,7 @@ const ACCEPTED_FILE_TYPES = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx'
 }
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB (images are stored separately in Spaces, only text content is counted)
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB (images are stored separately in Spaces, only text content is counted)
 
 function DocImportPageInner() {
   const { data: session, status } = useSession()
