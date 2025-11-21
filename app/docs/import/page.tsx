@@ -610,19 +610,37 @@ function DocImportPageInner() {
                   base64Data = base64Data.split(',')[1]
                 }
                 
-                console.log(`📤 Uploading image ${index + 1}/${parsedContentWithUrls.images.length}: ${img.filename}`)
+                // Calculate approximate binary size (base64 is ~33% larger)
+                const approximateBinarySize = (base64Data.length * 3) / 4
+                const MAX_IMAGE_SIZE = 50 * 1024 * 1024 // 50MB
+                
+                if (approximateBinarySize > MAX_IMAGE_SIZE) {
+                  const sizeMB = (approximateBinarySize / (1024 * 1024)).toFixed(2)
+                  console.warn(`⚠️ Image ${img.filename} is too large (${sizeMB}MB), skipping`)
+                  throw new Error(`Image ${img.filename} is too large (${sizeMB}MB). Maximum size is ${MAX_IMAGE_SIZE / (1024 * 1024)}MB`)
+                }
+                
+                console.log(`📤 Uploading image ${index + 1}/${parsedContentWithUrls.images.length}: ${img.filename} (${(approximateBinarySize / (1024 * 1024)).toFixed(2)}MB)`)
+                
+                // Convert base64 to binary
+                const binaryString = atob(base64Data)
+                const bytes = new Uint8Array(binaryString.length)
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i)
+                }
+                const blob = new Blob([bytes], { type: img.type || 'image/png' })
+                
+                // Use FormData to upload binary data (no size penalty from base64 in JSON)
+                // FormData allows larger payloads than JSON
+                const formData = new FormData()
+                formData.append('file', blob, img.filename)
+                formData.append('filename', img.filename)
+                formData.append('folder', 'images') // Images folder, will be organized by documentId on server if needed
                 
                 const uploadResponse = await fetch('/api/images/upload', {
                   method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    base64Data,
-                    filename: img.filename,
-                    contentType: img.type || 'image/png',
-                    folder: 'images' // Images folder, will be organized by documentId on server if needed
-                  })
+                  // Don't set Content-Type header - browser will set it with boundary for FormData
+                  body: formData
                 })
                 
                 if (!uploadResponse.ok) {
