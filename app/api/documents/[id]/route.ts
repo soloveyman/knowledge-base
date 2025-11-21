@@ -139,6 +139,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('🗑️ DELETE request received for document')
+    
+    // Await params first to get the ID for logging
+    const { id } = await params
+    console.log('🗑️ DELETE request for document ID:', id)
+    
     // Check authentication
     const session = await auth()
     if (!session?.user?.id || !session?.user?.role) {
@@ -156,9 +162,8 @@ export async function DELETE(
       }, { status: 403 })
     }
 
-    const { id } = await params
-
     // Check if document exists and user has access
+    console.log('🔍 Checking if document exists:', id)
     const existingDocument = await db
       .select({ 
         document: documents,
@@ -169,12 +174,17 @@ export async function DELETE(
       .where(eq(documents.id, id))
       .limit(1)
 
+    console.log('🔍 Document query result:', existingDocument.length > 0 ? 'found' : 'not found')
+    
     if (existingDocument.length === 0 || !existingDocument[0].document) {
+      console.log('❌ Document not found:', id)
       return NextResponse.json({
         success: false,
         message: 'Document not found'
       }, { status: 404 })
     }
+    
+    console.log('✅ Document found, proceeding with deletion checks')
 
     const document = existingDocument[0].document
     const userRole = session.user.role
@@ -331,11 +341,23 @@ export async function DELETE(
       message: 'Document deleted successfully'
     })
   } catch (error) {
-    console.error('Delete document API error:', error)
+    console.error('❌ Delete document API error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : undefined
-    console.error('Error details:', { errorMessage, errorStack })
     
+    // Check if it's a params parsing error
+    if (errorMessage.includes('params') || errorMessage.includes('id')) {
+      console.error('⚠️ Possible params parsing error - this might indicate a routing issue')
+    }
+    
+    console.error('Error details:', { 
+      errorMessage, 
+      errorStack,
+      errorType: error instanceof Error ? error.constructor.name : typeof error
+    })
+    
+    // Don't return 404 for general errors - only return 404 if document not found
+    // If it's a params error, it's likely a routing issue, return 500
     return NextResponse.json({
       success: false,
       message: 'Failed to delete document',

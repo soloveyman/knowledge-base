@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+build import * as XLSX from 'xlsx'
 import * as mammoth from 'mammoth'
 import * as JSZip from 'jszip'
 
@@ -294,7 +294,28 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         }
       }
       
-      // Step 4: Convert HTML to text (improved - extract all text before removing tags)
+      // Step 4: Clean up HTML before extracting text - remove alt/title attributes and text directly adjacent to img tags
+      // Remove alt and title attributes from img tags (they can appear as text when extracted)
+      htmlWithPlaceholders = htmlWithPlaceholders.replace(
+        /<img[^>]*(alt|title)="[^"]*"[^>]*>/gi,
+        (match) => match.replace(/(alt|title)="[^"]*"/gi, '')
+      )
+      
+      // Remove text that appears immediately before or after img tags (likely alt text or image descriptions)
+      // This pattern matches text within the same tag/paragraph as the image
+      htmlWithPlaceholders = htmlWithPlaceholders.replace(
+        /([^<\n]{0,50})<img[^>]*>([^<\n]{0,50})/gi,
+        (match, before, after) => {
+          // Remove very short text fragments (1-2 words) that are likely alt text
+          const beforeWords = before.trim().split(/\s+/).filter((w: string) => w.length > 0)
+          const afterWords = after.trim().split(/\s+/).filter((w: string) => w.length > 0)
+          const keepBefore = beforeWords.length > 2 ? before : ''
+          const keepAfter = afterWords.length > 2 ? after : ''
+          return keepBefore + keepAfter
+        }
+      )
+      
+      // Step 5: Convert HTML to text (improved - extract all text before removing tags)
       // Helper function to extract text from HTML recursively
       const extractTextFromHtml = (html: string): string => {
         // First decode HTML entities
@@ -353,7 +374,45 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       let workingText = extractTextFromHtml(htmlWithPlaceholders)
       
-      // Step 5: Map placeholder positions to text positions and extract context
+      // Step 6: Clean up text around image placeholders - remove short text fragments that are likely image metadata
+      // Find all placeholders and remove very short text fragments (1-2 words) around them
+      const placeholderRegex = /\[IMG_\d+\]/g
+      let placeholderMatch
+      const placeholdersToClean: Array<{ placeholder: string; position: number }> = []
+      while ((placeholderMatch = placeholderRegex.exec(workingText)) !== null) {
+        placeholdersToClean.push({
+          placeholder: placeholderMatch[0],
+          position: placeholderMatch.index
+        })
+      }
+      
+      // Clean in reverse order to preserve positions
+      for (let i = placeholdersToClean.length - 1; i >= 0; i--) {
+        const { placeholder, position } = placeholdersToClean[i]
+        const beforeText = workingText.substring(Math.max(0, position - 40), position).trim()
+        const afterText = workingText.substring(position + placeholder.length, Math.min(workingText.length, position + placeholder.length + 40)).trim()
+        
+        // Remove short text fragments (likely alt text or image metadata) that are 1-2 words
+        const beforeWords = beforeText.split(/\s+/).filter(w => w.length > 0 && !/^[^\w\s]*$/.test(w))
+        const afterWords = afterText.split(/\s+/).filter(w => w.length > 0 && !/^[^\w\s]*$/.test(w))
+        
+        // If text before/after is very short (1-2 words), it's likely image metadata - remove it
+        if (beforeWords.length <= 2 && beforeWords.length > 0) {
+          const removeStart = Math.max(0, position - beforeText.length - 10)
+          workingText = workingText.substring(0, removeStart) + workingText.substring(position)
+          // Adjust positions for remaining placeholders
+          for (let j = i - 1; j >= 0; j--) {
+            if (placeholdersToClean[j].position > removeStart) {
+              placeholdersToClean[j].position -= (position - removeStart)
+            }
+          }
+        } else if (afterWords.length <= 2 && afterWords.length > 0) {
+          const removeEnd = position + placeholder.length + afterText.length + 10
+          workingText = workingText.substring(0, position + placeholder.length) + workingText.substring(removeEnd)
+        }
+      }
+      
+      // Step 7: Map placeholder positions to text positions and extract context
       for (const image of processedImages) {
         if (image.placeholder) {
           const placeholderPos = workingText.indexOf(image.placeholder)

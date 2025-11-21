@@ -714,7 +714,7 @@ function ManagerPageInner() {
       
       loadTab()
     }
-  }, [defaultTab, loadTabData, documents.length, savedTests.length, savedAssignments.length])
+  }, [defaultTab, loadTabData]) // Removed length dependencies to prevent constant reloads
 
   // Track if we've already processed the timestamp to prevent duplicate calls
   const processedTimestampRef = useRef<string | null>(null)
@@ -730,9 +730,10 @@ function ManagerPageInner() {
       
       // If we have a timestamp parameter, it means we're returning from a create/edit page
       // Force reload the appropriate tab to show newly saved/updated data
-      // Also reload if tab changed and we haven't loaded it yet
-      const shouldReload = (hasTimestamp && tab && timestamp !== processedTimestampRef.current) || 
-                          (tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current)
+      // Only reload if tab actually changed and we haven't loaded it yet, OR if we have a new timestamp
+      const hasNewTimestamp = hasTimestamp && tab && timestamp !== processedTimestampRef.current
+      const tabChanged = tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current
+      const shouldReload = hasNewTimestamp || tabChanged
       
       if (shouldReload) {
         if (hasTimestamp && timestamp !== processedTimestampRef.current) {
@@ -929,113 +930,115 @@ function ManagerPageInner() {
           // Execute the force reload
           forceReloadTab()
         } else {
-          console.log(`Manager: Tab changed to ${tab}, loading data...`)
-          // Reset last loaded tab ref to force reload even if same tab
-          lastLoadedTabRef.current = null
-          isLoadingRef.current = false
-        
-          // Use stale-while-revalidate for better UX (same as other tabs)
-          if (tab === 'docs') {
-            // Only show loading if we don't have cached data
-            if (documents.length === 0) {
-              setIsLoadingDocuments(true)
-            }
+          // Only reload if tab actually changed and we haven't loaded it yet
+          if (tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current) {
+            console.log(`Manager: Tab changed to ${tab}, loading data...`)
+            isLoadingRef.current = true
             
-            // Direct fetch for documents with stale-while-revalidate
-            fetch('/api/documents', { next: { revalidate: 30 } })
-              .then(res => res.json())
-              .then(result => {
-                if (result.success && result.data.documents) {
-                  const transformedDocs = result.data.documents.map((doc: {
-                    id: string
-                    originalFileName?: string
-                    title: string
-                    fileType?: string
-                    createdAt: string
-                    updatedAt?: string
-                    fileSize?: number
-                    status?: string
-                    parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-                  }) => ({
-                    id: doc.id,
-                    name: doc.originalFileName || doc.title,
-                    type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-                    uploadedAt: formatDateShort(doc.createdAt),
-                    size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-                    status: doc.status || 'ready',
-                    createdAt: doc.createdAt,
-                    updatedAt: doc.updatedAt,
-                    parsedContent: doc.parsedContent || null
-                  }))
-                  setDocumentsWithLog(transformedDocs)
-                  syncLocalStorageWithDatabase(transformedDocs)
-                  lastLoadedTabRef.current = tab
-                }
-                setIsLoadingDocuments(false)
-              })
-              .catch((error) => {
-                console.error('Error loading documents:', error)
-                setIsLoadingDocuments(false)
-              })
-          } else if (tab === 'tests') {
-          // Direct fetch for tests with stale-while-revalidate - fetch tests and documents in parallel
-          Promise.all([
-            fetch('/api/tests', { next: { revalidate: 30 } }),
-            fetch('/api/documents', { next: { revalidate: 30 } })
-          ])
-            .then(async ([testsResponse, documentsResponse]) => {
-              const [testsResult, documentsResult] = await Promise.all([
-                testsResponse.json(),
-                documentsResponse.json()
+            // Use stale-while-revalidate for better UX (same as other tabs)
+            if (tab === 'docs') {
+              // Only show loading if we don't have cached data
+              if (documents.length === 0) {
+                setIsLoadingDocuments(true)
+              }
+              
+              // Direct fetch for documents with stale-while-revalidate
+              fetch('/api/documents', { next: { revalidate: 30 } })
+                .then(res => res.json())
+                .then(result => {
+                  if (result.success && result.data.documents) {
+                    const transformedDocs = result.data.documents.map((doc: {
+                      id: string
+                      originalFileName?: string
+                      title: string
+                      fileType?: string
+                      createdAt: string
+                      updatedAt?: string
+                      fileSize?: number
+                      status?: string
+                      parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                    }) => ({
+                      id: doc.id,
+                      name: doc.originalFileName || doc.title,
+                      type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                      uploadedAt: formatDateShort(doc.createdAt),
+                      size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                      status: doc.status || 'ready',
+                      createdAt: doc.createdAt,
+                      updatedAt: doc.updatedAt,
+                      parsedContent: doc.parsedContent || null
+                    }))
+                    setDocumentsWithLog(transformedDocs)
+                    syncLocalStorageWithDatabase(transformedDocs)
+                    lastLoadedTabRef.current = tab
+                  }
+                  setIsLoadingDocuments(false)
+                  isLoadingRef.current = false
+                })
+                .catch((error) => {
+                  console.error('Error loading documents:', error)
+                  setIsLoadingDocuments(false)
+                  isLoadingRef.current = false
+                })
+            } else if (tab === 'tests') {
+              // Direct fetch for tests with stale-while-revalidate - fetch tests and documents in parallel
+              Promise.all([
+                fetch('/api/tests', { next: { revalidate: 30 } }),
+                fetch('/api/documents', { next: { revalidate: 30 } })
               ])
-              
-              // Build document map for sourceDocument lookup
-              const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-              if (documentsResult.success && documentsResult.data.documents) {
-                documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
-                  documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
-                })
-              }
-              
-              if (testsResult.success) {
-                const transformedTests = (testsResult.data.tests as Array<{
-                  id: string
-                  title: string
-                  type?: string | null
-                  difficulty?: string | null
-                  locale?: string | null
-                  questionIds?: string[] | null
-                  moduleId?: string | null
-                  createdAt: string
-                  createdBy: string
-                }>).map((test) => {
-                  const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
-                  let sourceDocument = 'Unknown'
-                  if (test.moduleId) {
-                    const doc = documentMap.get(test.moduleId)
-                    if (doc) {
-                      sourceDocument = doc.originalFileName || doc.title || 'Unknown'
-                    }
+                .then(async ([testsResponse, documentsResponse]) => {
+                  const [testsResult, documentsResult] = await Promise.all([
+                    testsResponse.json(),
+                    documentsResponse.json()
+                  ])
+                  
+                  // Build document map for sourceDocument lookup
+                  const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+                  if (documentsResult.success && documentsResult.data.documents) {
+                    documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+                      documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+                    })
                   }
-                  return {
-                    id: test.id,
-                    title: test.title,
-                    type: test.type || 'mcq',
-                    difficulty: test.difficulty || 'medium',
-                    locale: test.locale || 'en',
-                    questionCount,
-                    questions: [],
-                    sourceDocument,
-                    createdAt: test.createdAt,
-                    createdBy: test.createdBy
+                  
+                  if (testsResult.success) {
+                    const transformedTests = (testsResult.data.tests as Array<{
+                      id: string
+                      title: string
+                      type?: string | null
+                      difficulty?: string | null
+                      locale?: string | null
+                      questionIds?: string[] | null
+                      moduleId?: string | null
+                      createdAt: string
+                      createdBy: string
+                    }>).map((test) => {
+                      const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+                      let sourceDocument = 'Unknown'
+                      if (test.moduleId) {
+                        const doc = documentMap.get(test.moduleId)
+                        if (doc) {
+                          sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+                        }
+                      }
+                      return {
+                        id: test.id,
+                        title: test.title,
+                        type: test.type || 'mcq',
+                        difficulty: test.difficulty || 'medium',
+                        locale: test.locale || 'en',
+                        questionCount,
+                        questions: [],
+                        sourceDocument,
+                        createdAt: test.createdAt,
+                        createdBy: test.createdBy
+                      }
+                    })
+                    setSavedTestsWithLog(transformedTests)
+                    lastLoadedTabRef.current = tab
                   }
                 })
-                setSavedTestsWithLog(transformedTests)
-                lastLoadedTabRef.current = tab
-              }
-            })
-            .catch(console.error)
-          } else if (tab === 'assignments') {
+                .catch(console.error)
+            } else if (tab === 'assignments') {
             // Check sessionStorage first for pre-fetched data (after edit/create)
             const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
             if (pendingAssignments) {
@@ -1127,8 +1130,8 @@ function ManagerPageInner() {
       window.addEventListener('locationchange', handlePopState)
       
       // Also check periodically when we have a timestamp (fallback for mobile)
-      let intervalId: NodeJS.Timeout | null = null
       const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : searchParams
+      let intervalId: NodeJS.Timeout | null = null
       if (urlParams.has('_t') || searchParams.has('_t')) {
         // Check every 100ms for up to 2 seconds to catch URL updates
         let checks = 0
@@ -1142,12 +1145,18 @@ function ManagerPageInner() {
         }, 100)
       }
       
+      // Return cleanup function for useEffect
       return () => {
         window.removeEventListener('popstate', handlePopState)
         window.removeEventListener('locationchange', handlePopState)
-        if (intervalId) clearInterval(intervalId)
+        if (intervalId) {
+          clearInterval(intervalId)
+        }
       }
     }
+    
+    // Return empty cleanup if window is undefined
+    return () => {}
   }, [searchParams, loadTabData, defaultTab])
 
   // Reload data when page becomes visible (e.g., when returning from document viewer or test page)

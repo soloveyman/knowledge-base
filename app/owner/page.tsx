@@ -811,7 +811,7 @@ function OwnerPageInner() {
     }
     
     loadTab()
-  }, [defaultTab, loadTabData, documents.length, savedTests.length, savedAssignments.length, savedUsers.length])
+  }, [defaultTab, loadTabData]) // Removed length dependencies to prevent constant reloads
 
   // Track if we've already processed the timestamp to prevent duplicate calls
   const processedTimestampRef = useRef<string | null>(null)
@@ -828,9 +828,10 @@ function OwnerPageInner() {
       
       // If we have a timestamp parameter, it means we're returning from a create/edit page
       // Force reload the appropriate tab to show newly saved/updated data
-      // Also reload if tab changed and we haven't loaded it yet
-      const shouldReload = (hasTimestamp && tab && timestamp !== processedTimestampRef.current) || 
-                          (tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current)
+      // Only reload if tab actually changed and we haven't loaded it yet, OR if we have a new timestamp
+      const hasNewTimestamp = hasTimestamp && tab && timestamp !== processedTimestampRef.current
+      const tabChanged = tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current
+      const shouldReload = hasNewTimestamp || tabChanged
       
       if (shouldReload) {
         if (hasTimestamp && timestamp !== processedTimestampRef.current) {
@@ -1041,78 +1042,84 @@ function OwnerPageInner() {
           forceReloadTab()
         }
       } else {
-          console.log(`Owner: Tab changed to ${tab}, loading data...`)
-          // Reset last loaded tab ref to force reload even if same tab
-          lastLoadedTabRef.current = null
-          isLoadingRef.current = false
-        
-        // Use stale-while-revalidate for better UX (same as other tabs)
-        if (tab === 'docs') {
-          // Only show loading if we don't have cached data
-          if (documents.length === 0) {
-            setIsLoadingDocuments(true)
-          }
-          
-          fetch('/api/documents', { next: { revalidate: 30 } })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success && result.data.documents) {
-                const transformedDocs = result.data.documents.map((doc: {
-                  id: string
-                  originalFileName?: string
-                  title: string
-                  fileType?: string
-                  createdAt: string
-                  updatedAt?: string
-                  fileSize?: number
-                  status?: string
-                  moduleId?: string | null
-                  parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-                }) => ({
-                  id: doc.id,
-                  name: doc.originalFileName || doc.title,
-                  type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-                  uploadedAt: formatDateShort(doc.createdAt),
-                  size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-                  status: doc.status || 'ready',
-                  moduleId: doc.moduleId || null,
-                  createdAt: doc.createdAt,
-                  updatedAt: doc.updatedAt,
-                  parsedContent: doc.parsedContent || null
-                }))
-                setDocumentsWithLog(transformedDocs)
-                // Ensure localStorage is synced immediately
-                // Cast to Document[] type to match the utility function signature
-                syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
-                lastLoadedTabRef.current = tab
+          // Only reload if tab actually changed and we haven't loaded it yet
+          if (tab && tab !== lastLoadedTabRef.current && !isLoadingRef.current) {
+            console.log(`Owner: Tab changed to ${tab}, loading data...`)
+            isLoadingRef.current = true
+            
+            // Use stale-while-revalidate for better UX (same as other tabs)
+            if (tab === 'docs') {
+              // Only show loading if we don't have cached data
+              if (documents.length === 0) {
+                setIsLoadingDocuments(true)
               }
-              setIsLoadingDocuments(false)
-            })
-            .catch((error) => {
-              console.error('Error loading documents:', error)
-              setIsLoadingDocuments(false)
-            })
-        } else if (tab === 'users') {
-          // Direct fetch for users with cache-busting
-          fetch('/api/users', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success) {
-                // Filter out owner: exclude by both ID and role to ensure it works even if session is not ready
-                const currentUserId = session?.user?.id || ''
-                const filteredUsers = (result.data.users as SavedUser[]).filter(u => {
-                  // Exclude current user by ID
-                  if (currentUserId && u.id === currentUserId) return false
-                  // Also exclude users with owner role as a backup
-                  if (u.role === 'owner') return false
-                  return true
+              
+              fetch('/api/documents', { next: { revalidate: 30 } })
+                .then(res => res.json())
+                .then(result => {
+                  if (result.success && result.data.documents) {
+                    const transformedDocs = result.data.documents.map((doc: {
+                      id: string
+                      originalFileName?: string
+                      title: string
+                      fileType?: string
+                      createdAt: string
+                      updatedAt?: string
+                      fileSize?: number
+                      status?: string
+                      moduleId?: string | null
+                      parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                    }) => ({
+                      id: doc.id,
+                      name: doc.originalFileName || doc.title,
+                      type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                      uploadedAt: formatDateShort(doc.createdAt),
+                      size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                      status: doc.status || 'ready',
+                      moduleId: doc.moduleId || null,
+                      createdAt: doc.createdAt,
+                      updatedAt: doc.updatedAt,
+                      parsedContent: doc.parsedContent || null
+                    }))
+                    setDocumentsWithLog(transformedDocs)
+                    // Ensure localStorage is synced immediately
+                    // Cast to Document[] type to match the utility function signature
+                    syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                    lastLoadedTabRef.current = tab
+                  }
+                  setIsLoadingDocuments(false)
+                  isLoadingRef.current = false
                 })
-                setSavedUsers(filteredUsers)
-                lastLoadedTabRef.current = tab
-              }
-            })
-            .catch(console.error)
-        } else if (tab === 'tests') {
+                .catch((error) => {
+                  console.error('Error loading documents:', error)
+                  setIsLoadingDocuments(false)
+                  isLoadingRef.current = false
+                })
+            } else if (tab === 'users') {
+              // Direct fetch for users with cache-busting
+              fetch('/api/users', { cache: 'no-store' })
+                .then(res => res.json())
+                .then(result => {
+                  if (result.success) {
+                    // Filter out owner: exclude by both ID and role to ensure it works even if session is not ready
+                    const currentUserId = session?.user?.id || ''
+                    const filteredUsers = (result.data.users as SavedUser[]).filter(u => {
+                      // Exclude current user by ID
+                      if (currentUserId && u.id === currentUserId) return false
+                      // Also exclude users with owner role as a backup
+                      if (u.role === 'owner') return false
+                      return true
+                    })
+                    setSavedUsers(filteredUsers)
+                    lastLoadedTabRef.current = tab
+                  }
+                  isLoadingRef.current = false
+                })
+                .catch((error) => {
+                  console.error('Error loading users:', error)
+                  isLoadingRef.current = false
+                })
+            } else if (tab === 'tests') {
           // Direct fetch for tests with stale-while-revalidate - fetch tests and documents in parallel
           Promise.all([
             fetch('/api/tests', { next: { revalidate: 30 } }),
@@ -1168,9 +1175,13 @@ function OwnerPageInner() {
                 setSavedTestsWithLog(transformedTests)
                 lastLoadedTabRef.current = tab
               }
+              isLoadingRef.current = false
             })
-            .catch(console.error)
-        } else if (tab === 'assignments') {
+            .catch((error) => {
+              console.error('Error loading tests:', error)
+              isLoadingRef.current = false
+            })
+            } else if (tab === 'assignments') {
           // Check sessionStorage first for pre-fetched data (after edit/create)
           const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
           if (pendingAssignments) {
@@ -1226,23 +1237,32 @@ function OwnerPageInner() {
             }
           }
           
-          // Direct fetch for assignments with cache-busting
-          fetch('/api/assignments', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success) {
-                console.log('Owner: Loaded assignments from API:', result.data.assignments)
-                setSavedAssignmentsWithLog(result.data.assignments)
+              // Direct fetch for assignments with cache-busting
+              fetch('/api/assignments', { cache: 'no-store' })
+                .then(res => res.json())
+                .then(result => {
+                  if (result.success) {
+                    console.log('Owner: Loaded assignments from API:', result.data.assignments)
+                    setSavedAssignmentsWithLog(result.data.assignments)
+                    lastLoadedTabRef.current = tab
+                  }
+                  isLoadingRef.current = false
+                })
+                .catch((error) => {
+                  console.error('Error loading assignments:', error)
+                  isLoadingRef.current = false
+                })
+            } else {
+              // For other tabs (overview), use loadTabData with forceRefresh=true
+              loadTabData(tab, true, true).then(() => {
                 lastLoadedTabRef.current = tab
-              }
-            })
-            .catch(console.error)
-        } else {
-          // For other tabs (overview), use loadTabData with forceRefresh=true
-          loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
-          lastLoadedTabRef.current = tab
+                isLoadingRef.current = false
+              }).catch(() => {
+                isLoadingRef.current = false
+              })
+            }
+          }
         }
-      }
     } // Close checkAndReload function
     
     // Check immediately on mount and when searchParams change
