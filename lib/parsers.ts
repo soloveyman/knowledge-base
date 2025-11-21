@@ -1337,14 +1337,8 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       }
       
       // Add content as-is - images are already in the text at their correct positions
-      // Check if line contains image markdown
-      const hasImage = /!\[([^\]]*)\]\(data:[^)]+\)/.test(line)
-      
-      if (hasImage) {
-        // Line contains image - add it to section content
-        currentSection.content += (currentSection.content.trim() ? '\n\n' : '') + line + '\n\n'
-        console.log(`📸 Preserved image in line: ${line.substring(0, 100)}`)
-      } else if (trimmedLine.length === 0) {
+      // Just preserve the line with any images it contains
+      if (trimmedLine.length === 0) {
         // Empty line = paragraph break (add double newline)
         currentSection.content += '\n\n'
       } else {
