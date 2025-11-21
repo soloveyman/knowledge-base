@@ -1337,8 +1337,13 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       }
       
       // Add content as-is - images are already in the text at their correct positions
-      // Just preserve the line with any images it contains
-      if (trimmedLine.length === 0) {
+      // Check if line contains image markdown - always preserve these lines
+      const hasImageMarkdown = /!\[([^\]]*)\]\(data:[^)]+\)/.test(line)
+      
+      if (hasImageMarkdown) {
+        // Line contains image - always add it, even if it's the only content
+        currentSection.content += (currentSection.content.trim() ? '\n\n' : '') + line.trim() + '\n\n'
+      } else if (trimmedLine.length === 0) {
         // Empty line = paragraph break (add double newline)
         currentSection.content += '\n\n'
       } else {
@@ -1346,7 +1351,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(trimmedLine)
         
         if (isListItem || trimmedLine.length > 0) {
-          // Add line as-is (including any image markdown it contains)
+          // Add line as-is
           currentSection.content += (currentSection.content ? '\n' : '') + line
         }
       }
