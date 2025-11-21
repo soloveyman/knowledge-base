@@ -546,7 +546,7 @@ export function SignInForm() {
           </Button>
           </div>
           
-          <div className="text-center text-sm mt-6">
+          <div className="text-center text-sm mt-6 space-y-2">
             <button
               type="button"
               onClick={() => { 
@@ -559,6 +559,17 @@ export function SignInForm() {
             >
               {isRegister ? t('haveAccountSignIn') : t('noAccountSignUp')}
             </button>
+            <div className="text-xs text-muted-foreground">
+              By {isRegister ? 'signing up' : 'signing in'}, you agree to our{' '}
+              <a
+                href="/privacy"
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Privacy Policy
+              </a>
+            </div>
           </div>
         </CardContent>
       </Card>
