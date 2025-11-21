@@ -367,10 +367,10 @@ function DocumentContent({ content }: { content: string }) {
           }
           
           // Determine if image is small based on dimensions (if available)
-          const hasDimensions = imgWidth && imgHeight
-          const isSmallImage = hasDimensions && (imgWidth <= 256 || imgHeight <= 256)
-          const isQRCode = hasDimensions && isLikelyQRCode(imgWidth, imgHeight)
-          const isIcon = hasDimensions && isLikelyIcon(imgWidth, imgHeight)
+          const hasDimensions = imgWidth !== undefined && imgHeight !== undefined && imgWidth > 0 && imgHeight > 0
+          const isSmallImage = hasDimensions && (imgWidth! <= 256 || imgHeight! <= 256)
+          const isQRCode = hasDimensions && isLikelyQRCode(imgWidth!, imgHeight!)
+          const isIcon = hasDimensions && isLikelyIcon(imgWidth!, imgHeight!)
           
           // Special handling for small images (icons, QR codes, thumbnails)
           const containerClass = isSmallImage || isQRCode || isIcon
@@ -403,10 +403,13 @@ function DocumentContent({ content }: { content: string }) {
           
           // Fallback for unknown URL types (shouldn't happen, but just in case)
           // For external URLs, use Next.js Image component (if domain is configured)
-          const category = getImageSizeCategory(imgWidth, imgHeight)
+          // Use default dimensions if not provided
+          const fallbackWidth = imgWidth || 1200
+          const fallbackHeight = imgHeight || 800
+          const category = getImageSizeCategory(fallbackWidth, fallbackHeight)
           const optimizedProps = getOptimizedImageProps(category, {
-            width: imgWidth,
-            height: imgHeight,
+            width: fallbackWidth,
+            height: fallbackHeight,
             src: srcString,
             alt: alt || '',
             isDataUrl: false,
@@ -897,7 +900,7 @@ function ImageWithPlaceholder({
       setIsLoading(false)
     } else {
       // Try to load image to get dimensions (only for data URLs or if we need dimensions)
-      const img = new Image()
+      const img = document.createElement('img')
       img.onload = () => {
         setImageDimensions({ width: img.width, height: img.height })
         setAspectRatio(img.width / img.height)
