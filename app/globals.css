@@ -1265,26 +1265,17 @@ header[class*="sticky"] {
   }
 }
 
-@keyframes slide-in-from-right {
-  from {
-    transform: translateX(8px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+/* Disable all transitions/transforms on tab containers, keep only fade */
+[data-slot="tabs-content"],
+[data-slot="tabs-content"] > * {
+  transition: opacity 200ms ease-in-out !important;
+  transform: none !important;
+  will-change: opacity !important;
 }
 
-@keyframes slide-out-to-left {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(-8px);
-    opacity: 0;
-  }
+/* Prevent layout shifts and jumps */
+[data-slot="tabs-content"] {
+  contain: layout style paint !important;
 }
 
 .animate-in {
@@ -1301,14 +1292,6 @@ header[class*="sticky"] {
 
 .fade-out-0 {
   animation: fade-out 200ms ease-in-out;
-}
-
-.slide-in-from-right-2 {
-  animation: slide-in-from-right 200ms ease-in-out;
-}
-
-.slide-out-to-left-2 {
-  animation: slide-out-to-left 200ms ease-in-out;
 }
 
 /* Custom scrollbar styles - overlay scrollbars that don't break layout */
