@@ -281,11 +281,13 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         "p[outline-level='6'] => h6:fresh",
       ]
       
-      const result = await mammoth.convertToHtml({ 
-        arrayBuffer: buffer,
-        styleMap: styleMap,
-        includeDefaultStyleMap: true // Include mammoth's default style mappings
-      })
+      const result = await mammoth.convertToHtml(
+        { arrayBuffer: buffer },
+        { 
+          styleMap: styleMap,
+          includeDefaultStyleMap: true // Include mammoth's default style mappings
+        }
+      )
       
       // Log messages to help debug heading detection
       if (result.messages.length > 0) {
@@ -415,31 +417,32 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       }
       
       // Convert headings - use non-greedy matching and extract text properly
+      // Use [\s\S] instead of . with 's' flag for ES2017 compatibility
       workingText = workingText
-        .replace(/<h1[^>]*>(.*?)<\/h1>/gis, (match, content) => {
+        .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           console.log(`📋 H1 found: "${text}"`)
           return text ? `\n\n# ${text}\n\n` : '\n\n'
         })
-        .replace(/<h2[^>]*>(.*?)<\/h2>/gis, (match, content) => {
+        .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           console.log(`📋 H2 found: "${text}"`)
           return text ? `\n\n## ${text}\n\n` : '\n\n'
         })
-        .replace(/<h3[^>]*>(.*?)<\/h3>/gis, (match, content) => {
+        .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           console.log(`📋 H3 found: "${text}"`)
           return text ? `\n\n### ${text}\n\n` : '\n\n'
         })
-        .replace(/<h4[^>]*>(.*?)<\/h4>/gis, (match, content) => {
+        .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           return text ? `\n\n#### ${text}\n\n` : '\n\n'
         })
-        .replace(/<h5[^>]*>(.*?)<\/h5>/gis, (match, content) => {
+        .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           return text ? `\n\n##### ${text}\n\n` : '\n\n'
         })
-        .replace(/<h6[^>]*>(.*?)<\/h6>/gis, (match, content) => {
+        .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           return text ? `\n\n###### ${text}\n\n` : '\n\n'
         })
@@ -447,7 +450,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       // Fallback: Detect headings by formatting (bold paragraphs that are short and standalone)
       // This handles cases where headings aren't properly styled in Word
       workingText = workingText
-        .replace(/<p[^>]*><strong[^>]*>(.*?)<\/strong><\/p>/gis, (match, content) => {
+        .replace(/<p[^>]*><strong[^>]*>([\s\S]*?)<\/strong><\/p>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           // If it's a short line (likely a heading), convert to h2
           if (text && text.length < 200 && !text.includes('\n')) {
@@ -456,7 +459,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
           }
           return match // Keep original if it doesn't look like a heading
         })
-        .replace(/<p[^>]*><b[^>]*>(.*?)<\/b><\/p>/gis, (match, content) => {
+        .replace(/<p[^>]*><b[^>]*>([\s\S]*?)<\/b><\/p>/gi, (match, content) => {
           const text = content.replace(/<[^>]+>/g, '').trim()
           // If it's a short line (likely a heading), convert to h2
           if (text && text.length < 200 && !text.includes('\n')) {
@@ -1249,12 +1252,6 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     console.log('Line breaks after forcing:', (finalText.match(/\n/g) || []).length)
   }
   
-  // Split lines but PRESERVE empty lines (they represent paragraph breaks)
-  const lines = finalText.split('\n')
-  console.log('Lines after splitting:', lines.length)
-  console.log('Lines with empty lines preserved:', lines)
-  console.log('First few lines:', lines.slice(0, 5))
-  
   const sections: Array<{ title: string; level: number; content: string; order: number }> = []
   const tables: Array<{ title: string; headers: string[]; rows: string[][] }> = []
   
@@ -1288,6 +1285,9 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   
   // Split lines - images are still in the text, we'll extract them during section processing
   const lines = originalText.split('\n')
+  console.log('Lines after splitting:', lines.length)
+  console.log('Images found in text:', imagesInText.length)
+  console.log('First few lines:', lines.slice(0, 5))
   
   // Improved heading detection and list preservation
   let cumulativePos = 0 // Track cumulative position in original text
