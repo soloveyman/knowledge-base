@@ -174,23 +174,54 @@ export default function DocumentReaderPage() {
         console.log('Document tables:', document.parsedContent?.tables)
         
         let content = ''
+        // Track position mapping from original text (without headings) to combined content (with headings)
+        let positionMap: Array<{ originalStart: number; originalEnd: number; combinedStart: number; combinedEnd: number }> = []
         
         // Handle sections (for docx files) - include titles in content
         if (Array.isArray(document.parsedContent?.sections) && document.parsedContent!.sections.length > 0) {
+          let originalTextPos = 0 // Position in original text (without headings)
+          let combinedPos = 0 // Position in combined content (with headings)
+          
           content = document.parsedContent!.sections
-            .map((s: { title?: string; level?: number; content: string }) => {
+            .map((s: { title?: string; level?: number; content: string }, idx: number) => {
+              const titleText = s.title?.trim() || ''
+              const contentText = s.content?.trim() || ''
+              
+              // Track original text position (without headings)
+              const sectionOriginalStart = originalTextPos
+              const sectionOriginalEnd = originalTextPos + contentText.length
+              
               // Include section title as markdown heading if it exists
               let sectionContent = ''
-              if (s.title && s.title.trim()) {
+              if (titleText) {
                 const level = s.level || 2
                 const headingPrefix = '#'.repeat(Math.min(level, 6))
-                sectionContent = `${headingPrefix} ${s.title}\n\n`
+                sectionContent = `${headingPrefix} ${titleText}\n\n`
               }
               // Add section content
-              if (s.content && s.content.trim()) {
-                sectionContent += s.content
+              if (contentText) {
+                sectionContent += contentText
               }
-              return sectionContent.trim()
+              
+              const result = sectionContent.trim()
+              
+              // Update position mapping
+              if (contentText.length > 0) {
+                const sectionCombinedStart = combinedPos
+                const sectionCombinedEnd = combinedPos + result.length
+                
+                positionMap.push({
+                  originalStart: sectionOriginalStart,
+                  originalEnd: sectionOriginalEnd,
+                  combinedStart: sectionCombinedStart,
+                  combinedEnd: sectionCombinedEnd
+                })
+              }
+              
+              originalTextPos = sectionOriginalEnd
+              combinedPos += result.length + 2 // +2 for \n\n separator
+              
+              return result
             })
             .filter((c: string) => c && c.length > 0) // Filter out empty sections
             .join('\n\n')
@@ -201,16 +232,14 @@ export default function DocumentReaderPage() {
         // Extract tables separately (for xlsx files)
         const tables = document.parsedContent?.tables || []
         
-          // Extract images from parsedContent and embed them in content
-          // NOTE: Images may already be in sections from save process, so check first
-          const images = document.parsedContent?.images || []
-          
-          // Check if images are already in content (from save process)
-          const contentHasImages = content.includes('![') || content.includes('<img')
-          
-          if (images.length > 0 && !contentHasImages) {
-          console.log(`📸 Found ${images.length} images to display`)
-          
+        // Extract images from parsedContent and embed them in content
+        // NOTE: Images may already be in sections from save process, so check first
+        const images = document.parsedContent?.images || []
+        
+        // Check if images are already in content (from save process)
+        const contentHasImages = content.includes('![') || content.includes('<img')
+        
+        if (images.length > 0 && !contentHasImages) {
           // Sort images by position (if available) to insert them in order
           const sortedImages = [...images].sort((a, b) => {
             const posA = a.position ?? Infinity
@@ -222,9 +251,7 @@ export default function DocumentReaderPage() {
           const { getImageDataUrl } = await import('@/lib/image-loader')
           const imageDataPromises = sortedImages.map(async (img: any) => {
             // Early validation: skip images that clearly won't work
-            // Skip images with word/media paths in filename and no URL/imageId (legacy/corrupted data)
             if ((img.filename?.includes('word/media/') || img.filename?.includes('xl/media/')) && !img.url && !img.imageId) {
-              console.warn(`Skipping invalid image reference: ${img.filename} (no URL or imageId)`)
               return null
             }
             
@@ -232,87 +259,115 @@ export default function DocumentReaderPage() {
               const dataUrl = await getImageDataUrl(img)
               
               // Validate the dataUrl before returning
-              // Skip empty data URLs
               if (dataUrl.startsWith('data:') && (dataUrl.endsWith(',') || dataUrl.split(',').length === 1 || dataUrl.split(',')[1]?.trim().length === 0)) {
-                console.warn(`Skipping image ${img.filename}: empty data URL`)
                 return null
               }
               
-              // Skip invalid relative paths
               if (!dataUrl.startsWith('data:') && !dataUrl.startsWith('http://') && !dataUrl.startsWith('https://') && !dataUrl.startsWith('/')) {
                 if (dataUrl.includes('/') || dataUrl.includes('\\')) {
-                  console.warn(`Skipping image ${img.filename}: invalid relative path: ${dataUrl}`)
                   return null
                 }
               }
               
               return { ...img, dataUrl }
             } catch (error) {
-              console.error(`Failed to load image: ${img.filename}`, error)
-              // Skip image if it can't be loaded (don't show broken image)
               return null
             }
           })
           const imagesWithData = (await Promise.all(imageDataPromises)).filter((img): img is { filename: string; dataUrl: string; type: string; position?: number } => img !== null && img.dataUrl && img.dataUrl.trim().length > 0)
           
-          // Insert images at their positions or append at the end
-          // Separate images with valid positions from those without
-          const imagesWithPositions = imagesWithData.filter(img => 
-            img.position !== undefined && 
-            img.position > 0 && 
-            img.position <= content.length
-          )
-          const imagesWithoutPositions = imagesWithData.filter(img => 
-            !(img.position !== undefined && 
-              img.position > 0 && 
-              img.position <= content.length)
-          )
+          // Map image positions from original text to combined content
+          const mapPositionToCombined = (originalPos: number): number | null => {
+            // Find which section this position belongs to
+            for (const mapping of positionMap) {
+              if (originalPos >= mapping.originalStart && originalPos <= mapping.originalEnd) {
+                // Calculate relative position within section
+                const relativePos = originalPos - mapping.originalStart
+                // Map to combined position
+                const combinedPos = mapping.combinedStart + relativePos
+                return Math.min(combinedPos, mapping.combinedEnd)
+              }
+            }
+            // If position is beyond all sections, return end of content
+            if (originalPos > (positionMap[positionMap.length - 1]?.originalEnd || 0)) {
+              return content.length
+            }
+            return null
+          }
           
-          console.log(`📸 Image position analysis:`, {
-            total: imagesWithData.length,
-            withValidPositions: imagesWithPositions.length,
-            withoutPositions: imagesWithoutPositions.length,
-            contentLength: content.length
-          })
+          // Find best insertion point (after sentence/paragraph boundary)
+          const findInsertionPoint = (targetPos: number): number => {
+            if (targetPos >= content.length) return content.length
+            
+            // Try to find sentence boundary (., !, ? followed by space)
+            const afterPos = content.substring(targetPos, Math.min(targetPos + 200, content.length))
+            const sentenceEnd = afterPos.search(/[.!?]\s+/)
+            if (sentenceEnd !== -1) {
+              return targetPos + sentenceEnd + 2 // +2 for ". "
+            }
+            
+            // Try to find paragraph boundary (double newline)
+            const paraEnd = afterPos.search(/\n\n/)
+            if (paraEnd !== -1) {
+              return targetPos + paraEnd + 2
+            }
+            
+            // Try to find word boundary (space)
+            const wordEnd = afterPos.search(/\s/)
+            if (wordEnd !== -1) {
+              return targetPos + wordEnd + 1
+            }
+            
+            // Fallback to exact position
+            return targetPos
+          }
+          
+          // Separate images with valid positions from those without
+          const imagesWithPositions = imagesWithData
+            .map(img => {
+              if (img.position === undefined || img.position < 0) return null
+              const combinedPosition = mapPositionToCombined(img.position)
+              if (combinedPosition !== null && combinedPosition > 0) {
+                return { ...img, mappedPosition: combinedPosition }
+              }
+              return null
+            })
+            .filter((img): img is { filename: string; dataUrl: string; type: string; position?: number; mappedPosition: number } => img !== null)
+          const imagesWithoutPositions = imagesWithData.filter(img => 
+            !(img.position !== undefined && img.position > 0)
+          )
           
           let contentWithImages = content
           let offset = 0
           
-          // First, insert images with valid positions (sorted by position to maintain order)
-          const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => (a.position || 0) - (b.position || 0))
-          sortedImagesWithPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
+          // First, insert images with valid positions (sorted by mapped position to maintain order)
+          const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => a.mappedPosition - b.mappedPosition)
+          sortedImagesWithPositions.forEach((img) => {
             const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
-            const insertPos = Math.min(img.position! + offset, contentWithImages.length)
+            const bestInsertPos = findInsertionPoint(img.mappedPosition + offset)
+            const insertPos = Math.min(bestInsertPos, contentWithImages.length)
+            
             if (insertPos <= contentWithImages.length) {
               contentWithImages = 
                 contentWithImages.slice(0, insertPos) + 
                 imageMarkdown + 
                 contentWithImages.slice(insertPos)
               offset += imageMarkdown.length
-              console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (adjusted: ${insertPos})`)
             } else {
               // Position is out of bounds, append at the end
               contentWithImages += imageMarkdown
-              console.log(`📸 Appended image "${img.filename}" at the end (position ${insertPos} out of bounds)`)
             }
           })
           
           // Then, append images without positions at the end
           if (imagesWithoutPositions.length > 0) {
-            console.log(`📸 Appending ${imagesWithoutPositions.length} image(s) without valid positions at the end`)
             imagesWithoutPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
               const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
               contentWithImages += imageMarkdown
-              console.log(`📸 Appended image "${img.filename}" at the end (no valid position)`)
             })
           }
           
           content = contentWithImages
-          
-          // Debug: Check if images are in content
-          const imageCount = (content.match(/!\[.*?\]\([^)]+\)/gi) || []).length
-          console.log(`📸 Images in content string: ${imageCount}`)
-          console.log(`📸 Content includes image markdown: ${content.includes('![')}`)
         }
         
         // Fallback if no content

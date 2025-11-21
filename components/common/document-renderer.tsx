@@ -64,13 +64,6 @@ function DocumentContent({ content }: { content: string }) {
   // Преобразуем форматирование в markdown
   const markdown = convertToMarkdown(content)
   
-  // Debug: Log markdown preview
-  console.log('📄 Markdown preview (first 500 chars):', markdown.substring(0, 500))
-  console.log('📄 Markdown contains data URL images:', /!\[.*?\]\(data:/gi.test(markdown))
-  console.log('📄 Markdown contains external URL images:', /!\[.*?\]\(https?:\/\//gi.test(markdown))
-  const allImageMatches = markdown.match(/!\[.*?\]\([^)]+\)/gi)
-  console.log('📄 All image markdown found:', allImageMatches?.length || 0, allImageMatches?.map(m => m.substring(0, 80)) || [])
-  
   // Convert markdown images to HTML img tags (ReactMarkdown with rehypeRaw can handle HTML)
   // This avoids parsing issues with very long data URLs
   // Handle both data URLs and external URLs (S3/CDN)
@@ -85,14 +78,12 @@ function DocumentContent({ content }: { content: string }) {
     // Validate image source before processing
     // 1. Skip empty data URLs
     if (src.startsWith('data:') && (src.endsWith(',') || src.split(',').length === 1 || src.split(',')[1]?.trim().length === 0)) {
-      console.warn('Skipping empty data URL image:', { alt, src: src.substring(0, 50) })
       continue
     }
     
     // 2. Skip relative paths that aren't valid URLs (like word/media/image1.png)
     if (!src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('/')) {
       if (src.includes('/') || src.includes('\\')) {
-        console.warn('Skipping invalid relative path image:', { alt, src })
         continue
       }
     }
@@ -118,16 +109,7 @@ function DocumentContent({ content }: { content: string }) {
     // Note: data URLs must remain unescaped, but external URLs should be escaped
     const htmlImg = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
     processedMarkdown = processedMarkdown.replace(match, htmlImg)
-    console.log(`📸 Converted image ${i + 1}:`, {
-      alt,
-      srcType: src.startsWith('data:') ? 'data URL' : src.startsWith('http') ? 'external URL' : 'unknown',
-      srcLength: src.length,
-      srcPreview: src.substring(0, 50),
-      htmlImgPreview: htmlImg.substring(0, 100)
-    })
   }
-  
-  console.log(`📸 Converted ${imageMatches.length} markdown images to HTML img tags`)
   
   // Custom rehype plugin to preserve image src attributes (especially data URLs)
   const preserveImageSrc = () => {
@@ -139,10 +121,6 @@ function DocumentContent({ content }: { content: string }) {
           if (typeof src === 'string' && src.startsWith('data:')) {
             // Ensure src is preserved
             node.properties['data-original-src'] = src
-            console.log('📸 Preserved image src in rehype plugin:', {
-              srcLength: src.length,
-              srcPreview: src.substring(0, 50)
-            })
           }
         }
         if (node.children) {
@@ -329,40 +307,21 @@ function DocumentContent({ content }: { content: string }) {
             if (!actualSrc) {
               actualSrc = nodeProps['data-original-src'] as string | undefined
             }
-            // Log what we found
-            console.log('Extracted src from node:', { 
-              hasSrc: !!actualSrc,
-              srcLength: typeof actualSrc === 'string' ? actualSrc.length : 0,
-              srcPreview: typeof actualSrc === 'string' ? actualSrc.substring(0, 50) : 'N/A',
-              nodeProps: Object.keys(nodeProps),
-              srcType: typeof nodeProps.src,
-              srcValue: nodeProps.src ? (typeof nodeProps.src === 'string' ? nodeProps.src.substring(0, 50) : String(nodeProps.src).substring(0, 50)) : 'undefined',
-              altValue: nodeProps.alt
-            })
           }
           
           if (!actualSrc) {
-            const nodeProps = node?.properties as Record<string, unknown> | undefined
-            console.log('Image component: No src provided', { 
-              hasSrc: !!src,
-              hasNode: !!node,
-              hasNodeProps: !!node?.properties,
-              nodeProps: nodeProps ? Object.keys(nodeProps) : []
-            })
             return null
           }
           
           // Convert src to string if it's a Blob
           let srcString = typeof actualSrc === 'string' ? actualSrc : ''
           if (!srcString) {
-            console.log('Image component: src is not a string')
             return null
           }
           
           // Validate and filter out invalid image sources
           // 1. Empty data URLs (data:image/png;base64,)
           if (srcString.startsWith('data:') && (srcString.endsWith(',') || srcString.split(',').length === 1 || srcString.split(',')[1]?.trim().length === 0)) {
-            console.warn('Image component: Empty data URL detected, skipping:', { alt, src: srcString.substring(0, 50) })
             return null
           }
           
@@ -370,7 +329,6 @@ function DocumentContent({ content }: { content: string }) {
           if (!srcString.startsWith('data:') && !srcString.startsWith('http://') && !srcString.startsWith('https://') && !srcString.startsWith('/')) {
             // Check if it looks like a file path (contains slashes but not a valid URL)
             if (srcString.includes('/') || srcString.includes('\\')) {
-              console.warn('Image component: Invalid relative path detected, skipping:', { alt, src: srcString })
               return null
             }
           }
@@ -389,7 +347,6 @@ function DocumentContent({ content }: { content: string }) {
           
           // Final validation: if it's not a data URL or external URL, skip it
           if (!isDataUrl && !isExternal) {
-            console.warn('Image component: Invalid image source (not data URL or external URL), skipping:', { alt, src: srcString.substring(0, 100) })
             return null
           }
           
@@ -397,14 +354,23 @@ function DocumentContent({ content }: { content: string }) {
           let imgWidth = typeof width === 'number' ? width : typeof width === 'string' ? parseInt(width) : undefined
           let imgHeight = typeof height === 'number' ? height : typeof height === 'string' ? parseInt(height) : undefined
           
-          // If no dimensions provided, use defaults
-          if (!imgWidth || isNaN(imgWidth) || imgWidth <= 0) imgWidth = 1200
-          if (!imgHeight || isNaN(imgHeight) || imgHeight <= 0) imgHeight = 800
+          // If no dimensions provided, try to detect from image or use aspect ratio placeholder
+          // For data URLs, we'll load the image to get dimensions
+          // For external URLs, we'll use a placeholder aspect ratio
+          if (!imgWidth || isNaN(imgWidth) || imgWidth <= 0) {
+            // Use a reasonable default that won't cause layout shift
+            // We'll let the browser determine the actual size based on max-width constraints
+            imgWidth = undefined
+          }
+          if (!imgHeight || isNaN(imgHeight) || imgHeight <= 0) {
+            imgHeight = undefined
+          }
           
-          // For data URLs, try to detect dimensions from the image
-          const isSmallImage = imgWidth <= 256 || imgHeight <= 256
-          const isQRCode = isLikelyQRCode(imgWidth, imgHeight)
-          const isIcon = isLikelyIcon(imgWidth, imgHeight)
+          // Determine if image is small based on dimensions (if available)
+          const hasDimensions = imgWidth && imgHeight
+          const isSmallImage = hasDimensions && (imgWidth <= 256 || imgHeight <= 256)
+          const isQRCode = hasDimensions && isLikelyQRCode(imgWidth, imgHeight)
+          const isIcon = hasDimensions && isLikelyIcon(imgWidth, imgHeight)
           
           // Special handling for small images (icons, QR codes, thumbnails)
           const containerClass = isSmallImage || isQRCode || isIcon
@@ -422,32 +388,13 @@ function DocumentContent({ content }: { content: string }) {
             return (
               <div className={containerClass}>
                 <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
-                  <img
+                  <ImageWithPlaceholder
                     src={srcString}
                     alt={alt || ''}
                     width={imgWidth}
                     height={imgHeight}
                     className={imageClass}
                     loading={isSmallImage || isQRCode ? "eager" : "lazy"}
-                    style={{ maxWidth: '100%', height: 'auto' }}
-                    onError={(e) => {
-                      console.error('Image failed to load:', { 
-                        src: srcString.substring(0, 100), 
-                        alt,
-                        isExternal,
-                        isDataUrl
-                      })
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                    onLoad={() => {
-                      console.log('Image loaded successfully:', { 
-                        src: srcString.substring(0, 100), 
-                        alt,
-                        isExternal,
-                        isDataUrl
-                      })
-                    }}
                   />
                 </div>
               </div>
@@ -800,7 +747,6 @@ function convertToMarkdown(content: string): string {
     const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
     imagePlaceholders.push(fullMatch)
     images.push({ match: fullMatch, placeholder })
-    console.log(`📸 Preserved data URL image in markdown: ${fullMatch.substring(0, 100)}...`)
   }
   
   // Also handle regular URLs (non-data URLs) - must come after data URL matching
@@ -816,8 +762,6 @@ function convertToMarkdown(content: string): string {
       imagePlaceholders.push(fullMatch)
       images.push({ match: fullMatch, placeholder })
       const src = regularMatch[2]
-      const urlType = src.startsWith('http://') || src.startsWith('https://') ? 'external URL' : 'relative path'
-      console.log(`📸 Preserved ${urlType} image in markdown: ${fullMatch.substring(0, 100)}`)
     }
   }
   
@@ -834,7 +778,6 @@ function convertToMarkdown(content: string): string {
       const fixedMatch = fullMatch.replace(/\(([A-Za-z0-9+/=]+)\)$/, '(data:image/png;base64,$1)')
       imagePlaceholders.push(fixedMatch)
       images.push({ match: fullMatch, placeholder })
-      console.log(`📸 Preserved base64 image (fixed) in markdown: ${fullMatch.substring(0, 100)}...`)
     }
   }
   
@@ -843,7 +786,6 @@ function convertToMarkdown(content: string): string {
     md = md.replace(images[i].match, images[i].placeholder)
   }
   
-  console.log(`📸 Total images preserved: ${imagePlaceholders.length}`)
   
   // Remove empty formatting tags first (e.g., [BOLD][/BOLD] or [BOLD] [/BOLD])
   md = md.replace(/\[BOLD\]\s*\[\/BOLD\]/gi, '')
@@ -922,19 +864,94 @@ function convertToMarkdown(content: string): string {
   // Restore images
   imagePlaceholders.forEach((image, index) => {
     md = md.replace(`__IMAGE_PLACEHOLDER_${index}__`, image)
-    console.log(`📸 Restored image ${index + 1}/${imagePlaceholders.length}: ${image.substring(0, 100)}...`)
   })
   
-  // Debug: Check if images are in final markdown (both data URLs and external URLs)
-  const dataUrlImageCount = (md.match(/!\[.*?\]\(data:/gi) || []).length
-  const externalUrlImageCount = (md.match(/!\[.*?\]\(https?:\/\//gi) || []).length
-  const totalImageCount = (md.match(/!\[.*?\]\([^)]+\)/gi) || []).length
-  console.log(`📸 Images in final markdown: ${totalImageCount} total (${dataUrlImageCount} data URLs, ${externalUrlImageCount} external URLs)`)
-  
-  if (imagePlaceholders.length > 0 && totalImageCount !== imagePlaceholders.length) {
-    console.warn(`⚠️ Image count mismatch: ${imagePlaceholders.length} placeholders but ${totalImageCount} images in final markdown`)
-  }
-  
   return md
+}
+
+// Component for images with loading placeholder
+function ImageWithPlaceholder({ 
+  src, 
+  alt, 
+  width, 
+  height, 
+  className, 
+  loading 
+}: { 
+  src: string
+  alt: string
+  width?: number
+  height?: number
+  className?: string
+  loading?: 'lazy' | 'eager'
+}) {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [hasError, setHasError] = React.useState(false)
+  const [aspectRatio, setAspectRatio] = React.useState<number | null>(null)
+  const [imageDimensions, setImageDimensions] = React.useState<{ width: number; height: number } | null>(null)
+
+  // Try to get aspect ratio from image dimensions
+  React.useEffect(() => {
+    if (width && height) {
+      setAspectRatio(width / height)
+      setIsLoading(false)
+    } else {
+      // Try to load image to get dimensions (only for data URLs or if we need dimensions)
+      const img = new Image()
+      img.onload = () => {
+        setImageDimensions({ width: img.width, height: img.height })
+        setAspectRatio(img.width / img.height)
+        setIsLoading(false)
+      }
+      img.onerror = () => {
+        setHasError(true)
+        setIsLoading(false)
+      }
+      img.src = src
+    }
+  }, [src, width, height])
+
+  if (hasError) {
+    return null
+  }
+
+  // Use detected dimensions if available, otherwise use provided dimensions
+  const finalWidth = imageDimensions?.width || width
+  const finalHeight = imageDimensions?.height || height
+
+  return (
+    <div className="relative" style={aspectRatio ? { aspectRatio } : undefined}>
+      {isLoading && (
+        <div 
+          className="absolute inset-0 bg-muted animate-pulse rounded-lg"
+          style={{ 
+            aspectRatio: aspectRatio || 16/9,
+            minHeight: '200px'
+          }}
+        />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        width={finalWidth}
+        height={finalHeight}
+        className={className}
+        loading={loading}
+        style={{ 
+          maxWidth: '100%', 
+          height: 'auto',
+          opacity: isLoading ? 0 : 1,
+          transition: 'opacity 200ms ease-in-out'
+        }}
+        onError={() => {
+          setHasError(true)
+          setIsLoading(false)
+        }}
+        onLoad={() => {
+          setIsLoading(false)
+        }}
+      />
+    </div>
+  )
 }
 

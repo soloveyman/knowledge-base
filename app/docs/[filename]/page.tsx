@@ -403,78 +403,31 @@ export default function DocumentViewer() {
           })
           
           if (shouldInsertImages) {
-            console.log(`📸 Found ${images.length} images to display (not in content yet)`)
-            
-            // Find where to insert images - look for "1. General Principles" section
-            // Try multiple variations of the heading
-            const generalPrinciplesPatterns = [
-              /###\s+\[BOLD\]1\.\s+General\s+Principles\[\/BOLD\]/i,
-              /###\s+1\.\s+General\s+Principles/i,
-              /##\s+\[BOLD\]1\.\s+General\s+Principles\[\/BOLD\]/i,
-              /##\s+1\.\s+General\s+Principles/i,
-              /\[BOLD\]1\.\s+General\s+Principles\[\/BOLD\]/i,
-              /1\.\s+General\s+Principles/i
-            ]
-            
-            let insertPosition: number | null = null
-            
-            for (const pattern of generalPrinciplesPatterns) {
-              const match = content.match(pattern)
-              if (match && match.index !== undefined) {
-                // Find the end of the "1. General Principles" section
-                // Look for the next heading (## or ###) or end of content
-                const startPos = match.index + match[0].length
-                const afterHeading = content.substring(startPos)
-                
-                // Find the next heading or end of section
-                const nextHeadingMatch = afterHeading.match(/^([\s\S]*?)(?=\n\n(?:###|##|\[BOLD\]|$))/)
-                if (nextHeadingMatch) {
-                  // Insert after the section content
-                  insertPosition = startPos + nextHeadingMatch[1].length
-                  console.log(`📸 Found "1. General Principles" section, will insert image at position ${insertPosition}`)
-                  break
-                } else {
-                  // No next heading found, insert after the heading
-                  insertPosition = startPos
-                  console.log(`📸 Found "1. General Principles" heading, will insert image at position ${insertPosition}`)
-                  break
-                }
-              }
-            }
-            
-            // If we couldn't find the section, try to find it by searching for section index
-            if (insertPosition === null && document.parsedContent?.sections) {
-              const generalPrinciplesIndex = document.parsedContent.sections.findIndex(
-                (s: { title?: string }) => s.title && /1\.\s+General\s+Principles/i.test(s.title)
-              )
+            // Find best insertion point (after sentence/paragraph boundary)
+            const findInsertionPoint = (targetPos: number): number => {
+              if (targetPos >= content.length) return content.length
               
-              if (generalPrinciplesIndex !== -1) {
-                // Find where this section ends in the combined content
-                let currentPos = 0
-                for (let i = 0; i <= generalPrinciplesIndex; i++) {
-                  const section = document.parsedContent.sections[i]
-                  const titleText = section.title?.trim() || ''
-                  const contentText = section.content?.trim() || ''
-                  
-                  if (i === generalPrinciplesIndex) {
-                    // This is the General Principles section
-                    const level = section.level || 2
-                    const headingPrefix = '#'.repeat(Math.min(level, 6))
-                    const sectionContent = titleText ? `${headingPrefix} ${titleText}\n\n` : ''
-                    const fullSection = sectionContent + contentText
-                    insertPosition = currentPos + fullSection.length
-                    console.log(`📸 Found "1. General Principles" section by index, will insert image at position ${insertPosition}`)
-                    break
-                  } else {
-                    // Calculate position for previous sections
-                    const level = section.level || 2
-                    const headingPrefix = '#'.repeat(Math.min(level, 6))
-                    const sectionContent = titleText ? `${headingPrefix} ${titleText}\n\n` : ''
-                    const fullSection = sectionContent + contentText
-                    currentPos += fullSection.length + 2 // +2 for \n\n separator
-                  }
-                }
+              // Try to find sentence boundary (., !, ? followed by space)
+              const afterPos = content.substring(targetPos, Math.min(targetPos + 200, content.length))
+              const sentenceEnd = afterPos.search(/[.!?]\s+/)
+              if (sentenceEnd !== -1) {
+                return targetPos + sentenceEnd + 2 // +2 for ". "
               }
+              
+              // Try to find paragraph boundary (double newline)
+              const paraEnd = afterPos.search(/\n\n/)
+              if (paraEnd !== -1) {
+                return targetPos + paraEnd + 2
+              }
+              
+              // Try to find word boundary (space)
+              const wordEnd = afterPos.search(/\s/)
+              if (wordEnd !== -1) {
+                return targetPos + wordEnd + 1
+              }
+              
+              // Fallback to exact position
+              return targetPos
             }
             
             // Insert images - sort by position first, then insert at their actual positions
@@ -572,37 +525,30 @@ export default function DocumentViewer() {
             const sortedImagesWithPositions = [...imagesWithPositions].sort((a, b) => a.mappedPosition - b.mappedPosition)
             sortedImagesWithPositions.forEach((img) => {
               const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
-              const insertPos = Math.min(img.mappedPosition + offset, contentWithImages.length)
+              const bestInsertPos = findInsertionPoint(img.mappedPosition + offset)
+              const insertPos = Math.min(bestInsertPos, contentWithImages.length)
+              
               if (insertPos <= contentWithImages.length) {
                 contentWithImages = 
                   contentWithImages.slice(0, insertPos) + 
                   imageMarkdown + 
                   contentWithImages.slice(insertPos)
                 offset += imageMarkdown.length
-                console.log(`📸 Inserted image "${img.filename}" at original position ${img.position} (mapped to ${img.mappedPosition}, adjusted: ${insertPos}, content length: ${contentWithImages.length})`)
               } else {
                 // Position is out of bounds after previous insertions, append at the end
                 contentWithImages += imageMarkdown
-                console.log(`📸 Appended image "${img.filename}" at the end (position ${insertPos} out of bounds)`)
               }
             })
             
             // Then, append images without positions at the end (only if we have any)
             if (imagesWithoutPositions.length > 0) {
-              console.log(`📸 Appending ${imagesWithoutPositions.length} image(s) without valid positions at the end`)
               imagesWithoutPositions.forEach((img: { filename: string; dataUrl: string; type: string; position?: number }) => {
                 const imageMarkdown = `\n\n![${img.filename}](${img.dataUrl})\n\n`
                 contentWithImages += imageMarkdown
-                console.log(`📸 Appended image "${img.filename}" at the end (no valid position)`)
               })
             }
             
             content = contentWithImages
-            
-            // Debug: Check if images are in content
-            const imageCount = (content.match(/!\[.*?\]\([^)]+\)/gi) || []).length
-            console.log(`📸 Images in content string: ${imageCount}`)
-            console.log(`📸 Content includes image markdown: ${content.includes('![')}`)
           }
           
           // If no sections but we have tables, leave content empty (tables will be shown)
