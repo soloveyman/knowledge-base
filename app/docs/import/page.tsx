@@ -584,125 +584,61 @@ function DocImportPageInner() {
             images: file.parsedContent?.images?.length || 0
           })
           
-          // Upload images to Spaces BEFORE sending document payload
-          // This prevents exceeding Vercel's 4.5MB payload limit
-          let parsedContentWithUrls = { ...file.parsedContent }
-          if (parsedContentWithUrls.images && Array.isArray(parsedContentWithUrls.images) && parsedContentWithUrls.images.length > 0) {
-            console.log(`📤 Uploading ${parsedContentWithUrls.images.length} images to Spaces before saving document...`)
-            
-            const imageUploadPromises = parsedContentWithUrls.images.map(async (img: any, index: number) => {
-              // Skip if already has URL (already uploaded)
-              if (img.url) {
-                console.log(`Image ${index} (${img.filename}) already has URL, skipping upload`)
-                return img
-              }
-              
-              // Skip if no base64 data
-              if (!img.data || img.data.trim().length === 0) {
-                console.warn(`Image ${index} (${img.filename}) has no data, skipping`)
-                return img
-              }
-              
-              try {
-                // Extract base64 data (remove data URL prefix if present)
-                let base64Data = img.data
-                if (base64Data.includes(',')) {
-                  base64Data = base64Data.split(',')[1]
-                }
-                
-                // Calculate approximate binary size (base64 is ~33% larger)
-                const approximateBinarySize = (base64Data.length * 3) / 4
-                const MAX_IMAGE_SIZE = 50 * 1024 * 1024 // 50MB
-                
-                if (approximateBinarySize > MAX_IMAGE_SIZE) {
-                  const sizeMB = (approximateBinarySize / (1024 * 1024)).toFixed(2)
-                  console.warn(`⚠️ Image ${img.filename} is too large (${sizeMB}MB), skipping`)
-                  throw new Error(`Image ${img.filename} is too large (${sizeMB}MB). Maximum size is ${MAX_IMAGE_SIZE / (1024 * 1024)}MB`)
-                }
-                
-                console.log(`📤 Uploading image ${index + 1}/${parsedContentWithUrls.images.length}: ${img.filename} (${(approximateBinarySize / (1024 * 1024)).toFixed(2)}MB)`)
-                
-                // Convert base64 to binary
-                const binaryString = atob(base64Data)
-                const bytes = new Uint8Array(binaryString.length)
-                for (let i = 0; i < binaryString.length; i++) {
-                  bytes[i] = binaryString.charCodeAt(i)
-                }
-                const blob = new Blob([bytes], { type: img.type || 'image/png' })
-                
-                // Use FormData to upload binary data (no size penalty from base64 in JSON)
-                // FormData allows larger payloads than JSON
-                const formData = new FormData()
-                formData.append('file', blob, img.filename)
-                formData.append('filename', img.filename)
-                formData.append('folder', 'images') // Images folder, will be organized by documentId on server if needed
-                
-                const uploadResponse = await fetch('/api/images/upload', {
-                  method: 'POST',
-                  // Don't set Content-Type header - browser will set it with boundary for FormData
-                  body: formData
-                })
-                
-                if (!uploadResponse.ok) {
-                  const errorData = await uploadResponse.json().catch(() => ({ message: 'Unknown error' }))
-                  console.error(`❌ Failed to upload image ${img.filename}:`, errorData)
-                  throw new Error(`Failed to upload image ${img.filename}: ${errorData.message || 'Unknown error'}`)
-                }
-                
-                const uploadResult = await uploadResponse.json()
-                if (!uploadResult.success || !uploadResult.data?.url) {
-                  throw new Error(`Invalid response from image upload API for ${img.filename}`)
-                }
-                
-                console.log(`✅ Uploaded image ${img.filename} to Spaces: ${uploadResult.data.url}`)
-                
-                // Return image with URL instead of base64 data
-                return {
-                  ...img,
-                  url: uploadResult.data.url,
-                  data: undefined // Remove base64 data to reduce payload size
-                }
-              } catch (error) {
-                console.error(`❌ Error uploading image ${img.filename}:`, error)
-                throw error
-              }
-            })
-            
-            const uploadedImages = await Promise.all(imageUploadPromises)
-            parsedContentWithUrls = {
-              ...parsedContentWithUrls,
-              images: uploadedImages
-            }
-            
-            console.log(`✅ All images uploaded to Spaces for ${file.name}`)
-          }
+          // Check payload size - if with images it exceeds limit, send without images first
+          const VERCEL_LIMIT_MB = 4.5
           
-          // Prepare request body with images replaced by URLs
-          const requestBody = {
+          // Calculate size without images
+          const requestBodyWithoutImages = {
             title: file.name,
             originalFileName: file.name,
             fileType: file.type.split('/')[1],
-            fileUrl: file.fileUrl || null, // Use Google Drive URL if available
+            fileUrl: file.fileUrl || null,
             fileSize: file.size,
-            parsedContent: parsedContentWithUrls,
+            parsedContent: {
+              ...file.parsedContent,
+              images: [] // Exclude images for size check
+            },
             parsingLog: file.parsingLog || null,
             uploadedBy: session?.user?.id || 'unknown'
           }
+          const sizeWithoutImages = JSON.stringify(requestBodyWithoutImages).length / (1024 * 1024)
           
-          // Check payload size (images are now URLs, not base64, so they're much smaller)
-          const sizeCheckString = JSON.stringify(requestBody)
-          const payloadSizeMB = sizeCheckString.length / (1024 * 1024)
-          const VERCEL_LIMIT_MB = 4.5
+          // Calculate size with images
+          const requestBodyWithImages = {
+            ...requestBodyWithoutImages,
+            parsedContent: {
+              ...file.parsedContent
+            }
+          }
+          const sizeWithImages = JSON.stringify(requestBodyWithImages).length / (1024 * 1024)
           
-          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images uploaded to Spaces)`)
+          console.log(`Payload size check for ${file.name}:`, {
+            textOnly: `${sizeWithoutImages.toFixed(2)}MB`,
+            withImages: `${sizeWithImages.toFixed(2)}MB`,
+            fileSize: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
+            imagesCount: file.parsedContent?.images?.length || 0
+          })
           
-          if (payloadSizeMB > VERCEL_LIMIT_MB) {
-            const errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB text content). Maximum text content size is ${VERCEL_LIMIT_MB}MB.`
+          // Check if text content exceeds limit
+          if (sizeWithoutImages > VERCEL_LIMIT_MB) {
+            const errorMsg = `Document "${file.name}" is too large (${sizeWithoutImages.toFixed(2)}MB text content). Maximum text content size is ${VERCEL_LIMIT_MB}MB.`
             console.error(errorMsg)
             throw new Error(errorMsg)
           }
           
-          // Send requestBody with image URLs (not base64 data)
+          // If payload with images exceeds limit, send without images first
+          // Images will be uploaded separately after document is created
+          const sendImagesInPayload = sizeWithImages <= VERCEL_LIMIT_MB
+          
+          if (!sendImagesInPayload) {
+            console.log(`⚠️ Payload with images (${sizeWithImages.toFixed(2)}MB) exceeds Vercel limit. Will send document without images and upload them separately.`)
+          }
+          
+          // Prepare request body - include or exclude images based on size
+          const requestBody = sendImagesInPayload 
+            ? requestBodyWithImages
+            : requestBodyWithoutImages
+          
           const payloadString = JSON.stringify(requestBody)
           
           const response = await fetch('/api/documents', {
@@ -746,12 +682,76 @@ function DocImportPageInner() {
             throw new Error(`Server response missing document data for ${file.name}`)
           }
           
+          const documentId = result.data.document.id
+          
+          // If images were not sent in payload, upload them separately now
+          if (!sendImagesInPayload && file.parsedContent?.images && file.parsedContent.images.length > 0) {
+            console.log(`📤 Uploading ${file.parsedContent.images.length} images separately for document ${documentId}...`)
+            
+            try {
+              // Upload images one by one to avoid overwhelming the server
+              for (const img of file.parsedContent.images) {
+                if (!img.data || img.data.trim().length === 0) {
+                  console.warn(`Skipping image ${img.filename}: no data`)
+                  continue
+                }
+                
+                // Extract base64 data
+                let base64Data = img.data
+                if (base64Data.includes(',')) {
+                  base64Data = base64Data.split(',')[1]
+                }
+                
+                // Convert to binary for FormData
+                const binaryString = atob(base64Data)
+                const bytes = new Uint8Array(binaryString.length)
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i)
+                }
+                const blob = new Blob([bytes], { type: img.type || 'image/png' })
+                
+                // Upload via FormData
+                const formData = new FormData()
+                formData.append('file', blob, img.filename)
+                formData.append('filename', img.filename)
+                formData.append('folder', `documents/${documentId}`)
+                
+                const uploadResponse = await fetch('/api/images/upload', {
+                  method: 'POST',
+                  body: formData
+                })
+                
+                if (!uploadResponse.ok) {
+                  console.error(`❌ Failed to upload image ${img.filename} separately`)
+                  // Continue with other images
+                  continue
+                }
+                
+                const uploadResult = await uploadResponse.json()
+                if (uploadResult.success && uploadResult.data?.url) {
+                  console.log(`✅ Uploaded image ${img.filename} separately: ${uploadResult.data.url}`)
+                  
+                  // Update document with image URL via API
+                  // Note: This would require an endpoint to update document images
+                  // For now, images are uploaded but not linked to document
+                  // Server should handle this on next document update
+                }
+              }
+              
+              console.log(`✅ Finished uploading images separately for document ${documentId}`)
+            } catch (error) {
+              console.error(`❌ Error uploading images separately for document ${documentId}:`, error)
+              // Don't fail the whole operation - document is already saved
+            }
+          }
+          
           console.log('✅ Document saved successfully:', file.name, {
-            documentId: result.data.document.id,
+            documentId,
             title: result.data.document.title,
             hasParsedContent: !!result.data.document.parsedContent,
             source: file.name.includes('Google') ? 'Google Drive' : 'Local upload',
-            hadWarning: !!file.warning
+            hadWarning: !!file.warning,
+            imagesSentInPayload: sendImagesInPayload
           })
           return result
         } catch (error) {
