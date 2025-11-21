@@ -521,15 +521,25 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       })
       
       // Replace placeholders with markdown images in reverse order to preserve positions
+      // Use exact position replacement to maintain image positions in text
       placeholderPositions.sort((a, b) => b.pos - a.pos) // Sort by position descending
       placeholderPositions.forEach(({ index }) => {
         const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
         const image = imagePositions[index]?.image
         if (image) {
           // Replace placeholder with markdown image using data URL
-          const imageMarkdown = `![${image.filename}](${image.data})`
-          workingText = workingText.replace(placeholder, imageMarkdown)
-          console.log(`📸 Replaced placeholder [IMAGE_PLACEHOLDER_${index}] with markdown image for "${image.filename}"`)
+          // Add newlines around image to ensure it's on its own line and preserves position
+          const imageMarkdown = `\n\n![${image.filename}](${image.data})\n\n`
+          // Use exact position replacement to maintain order
+          const placeholderIndex = workingText.indexOf(placeholder)
+          if (placeholderIndex !== -1) {
+            workingText = workingText.substring(0, placeholderIndex) + 
+                         imageMarkdown + 
+                         workingText.substring(placeholderIndex + placeholder.length)
+            console.log(`📸 Replaced placeholder [IMAGE_PLACEHOLDER_${index}] with markdown image for "${image.filename}" at position ${placeholderIndex}`)
+          } else {
+            console.warn(`⚠️ Placeholder [IMAGE_PLACEHOLDER_${index}] not found in text`)
+          }
         } else {
           // If image not found, just remove placeholder
           workingText = workingText.replace(placeholder, '')
@@ -1337,12 +1347,19 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       }
       
       // Add content as-is - images are already in the text at their correct positions
-      // Check if line contains image markdown - always preserve these lines
+      // Check if line contains image markdown - always preserve these lines at their exact position
       const hasImageMarkdown = /!\[([^\]]*)\]\(data:[^)]+\)/.test(line)
       
       if (hasImageMarkdown) {
-        // Line contains image - always add it, even if it's the only content
-        currentSection.content += (currentSection.content.trim() ? '\n\n' : '') + line.trim() + '\n\n'
+        // Line contains image - preserve it exactly as it appears (may have newlines before/after)
+        // Don't add extra newlines, just preserve what's already there
+        if (currentSection.content.trim().length > 0 && !currentSection.content.endsWith('\n\n')) {
+          currentSection.content += '\n'
+        }
+        currentSection.content += line.trim()
+        if (!currentSection.content.endsWith('\n\n')) {
+          currentSection.content += '\n'
+        }
       } else if (trimmedLine.length === 0) {
         // Empty line = paragraph break (add double newline)
         currentSection.content += '\n\n'
