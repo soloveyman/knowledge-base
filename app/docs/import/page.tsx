@@ -584,32 +584,99 @@ function DocImportPageInner() {
             images: file.parsedContent?.images?.length || 0
           })
           
-          // Prepare request body
+          // Upload images to Spaces BEFORE sending document payload
+          // This prevents exceeding Vercel's 4.5MB payload limit
+          let parsedContentWithUrls = { ...file.parsedContent }
+          if (parsedContentWithUrls.images && Array.isArray(parsedContentWithUrls.images) && parsedContentWithUrls.images.length > 0) {
+            console.log(`📤 Uploading ${parsedContentWithUrls.images.length} images to Spaces before saving document...`)
+            
+            const imageUploadPromises = parsedContentWithUrls.images.map(async (img: any, index: number) => {
+              // Skip if already has URL (already uploaded)
+              if (img.url) {
+                console.log(`Image ${index} (${img.filename}) already has URL, skipping upload`)
+                return img
+              }
+              
+              // Skip if no base64 data
+              if (!img.data || img.data.trim().length === 0) {
+                console.warn(`Image ${index} (${img.filename}) has no data, skipping`)
+                return img
+              }
+              
+              try {
+                // Extract base64 data (remove data URL prefix if present)
+                let base64Data = img.data
+                if (base64Data.includes(',')) {
+                  base64Data = base64Data.split(',')[1]
+                }
+                
+                console.log(`📤 Uploading image ${index + 1}/${parsedContentWithUrls.images.length}: ${img.filename}`)
+                
+                const uploadResponse = await fetch('/api/images/upload', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    base64Data,
+                    filename: img.filename,
+                    contentType: img.type || 'image/png',
+                    folder: 'images' // Images folder, will be organized by documentId on server if needed
+                  })
+                })
+                
+                if (!uploadResponse.ok) {
+                  const errorData = await uploadResponse.json().catch(() => ({ message: 'Unknown error' }))
+                  console.error(`❌ Failed to upload image ${img.filename}:`, errorData)
+                  throw new Error(`Failed to upload image ${img.filename}: ${errorData.message || 'Unknown error'}`)
+                }
+                
+                const uploadResult = await uploadResponse.json()
+                if (!uploadResult.success || !uploadResult.data?.url) {
+                  throw new Error(`Invalid response from image upload API for ${img.filename}`)
+                }
+                
+                console.log(`✅ Uploaded image ${img.filename} to Spaces: ${uploadResult.data.url}`)
+                
+                // Return image with URL instead of base64 data
+                return {
+                  ...img,
+                  url: uploadResult.data.url,
+                  data: undefined // Remove base64 data to reduce payload size
+                }
+              } catch (error) {
+                console.error(`❌ Error uploading image ${img.filename}:`, error)
+                throw error
+              }
+            })
+            
+            const uploadedImages = await Promise.all(imageUploadPromises)
+            parsedContentWithUrls = {
+              ...parsedContentWithUrls,
+              images: uploadedImages
+            }
+            
+            console.log(`✅ All images uploaded to Spaces for ${file.name}`)
+          }
+          
+          // Prepare request body with images replaced by URLs
           const requestBody = {
             title: file.name,
             originalFileName: file.name,
             fileType: file.type.split('/')[1],
             fileUrl: file.fileUrl || null, // Use Google Drive URL if available
             fileSize: file.size,
-            parsedContent: file.parsedContent,
+            parsedContent: parsedContentWithUrls,
             parsingLog: file.parsingLog || null,
             uploadedBy: session?.user?.id || 'unknown'
           }
           
-          // Check payload size before sending (only text content, images are excluded as they go to Spaces)
-          // Create a copy of requestBody without images for size calculation
-          const requestBodyWithoutImages = {
-            ...requestBody,
-            parsedContent: {
-              ...requestBody.parsedContent,
-              images: [] // Exclude images from size calculation
-            }
-          }
-          const sizeCheckString = JSON.stringify(requestBodyWithoutImages)
+          // Check payload size (images are now URLs, not base64, so they're much smaller)
+          const sizeCheckString = JSON.stringify(requestBody)
           const payloadSizeMB = sizeCheckString.length / (1024 * 1024)
           const VERCEL_LIMIT_MB = 4.5
           
-          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images excluded from size calculation)`)
+          console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images uploaded to Spaces)`)
           
           if (payloadSizeMB > VERCEL_LIMIT_MB) {
             const errorMsg = `Document "${file.name}" is too large (${payloadSizeMB.toFixed(2)}MB text content). Maximum text content size is ${VERCEL_LIMIT_MB}MB.`
@@ -617,7 +684,7 @@ function DocImportPageInner() {
             throw new Error(errorMsg)
           }
           
-          // Send the original requestBody WITH images to the API
+          // Send requestBody with image URLs (not base64 data)
           const payloadString = JSON.stringify(requestBody)
           
           const response = await fetch('/api/documents', {

@@ -428,8 +428,72 @@ export async function POST(request: Request) {
 
       const results = await Promise.all(uploadPromises)
       uploadResults.push(...results)
+    }
 
-      // Update parsedContent.images with URLs from Spaces and insert into content
+    // Save images that already have URLs (uploaded on client side) to database
+    if (parsedContent?.images && Array.isArray(parsedContent.images)) {
+      const preUploadedImages: Array<{
+        originalIndex: number
+        url: string
+        storageKey: string | null
+        imageId: string | null
+      }> = []
+
+      for (let i = 0; i < parsedContent.images.length; i++) {
+        const img = parsedContent.images[i] as any
+        
+        // Skip if already processed in uploadResults
+        const alreadyProcessed = uploadResults.some(r => r.originalIndex === i)
+        if (alreadyProcessed) {
+          continue
+        }
+        
+        // If image has URL but wasn't uploaded here, save it to database
+        if (img.url && !img.imageId) {
+          try {
+            // Extract storage key from URL if possible
+            // URL format: https://endpoint/bucket/key or https://bucket.cdn/key
+            let storageKey: string | null = null
+            try {
+              const urlObj = new URL(img.url)
+              const pathParts = urlObj.pathname.split('/').filter(p => p)
+              if (pathParts.length >= 2) {
+                // Skip bucket name, get the rest as key
+                storageKey = pathParts.slice(1).join('/')
+              }
+            } catch {
+              // If URL parsing fails, leave storageKey as null
+            }
+            
+            const savedImage = await db.insert(documentImages).values({
+              documentId,
+              filename: img.filename || `image_${i + 1}.png`,
+              url: img.url,
+              storageKey,
+              type: img.type || 'image/png',
+              position: img.position
+            }).returning()
+            
+            console.log(`✅ Saved pre-uploaded image to database: ${savedImage[0].id} for ${img.filename}`)
+            
+            preUploadedImages.push({
+              originalIndex: i,
+              url: img.url,
+              storageKey,
+              imageId: savedImage[0].id
+            })
+          } catch (error) {
+            console.error(`❌ Failed to save pre-uploaded image ${img.filename} to database:`, error)
+            // Continue with other images
+          }
+        }
+      }
+      
+      // Add pre-uploaded images to uploadResults for consistent processing
+      uploadResults.push(...preUploadedImages)
+    }
+
+    // Update parsedContent.images with URLs from Spaces and insert into content
       if (parsedContent?.images && Array.isArray(parsedContent.images)) {
         const updatedParsedContent = JSON.parse(JSON.stringify(parsedContent))
         
