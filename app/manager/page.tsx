@@ -925,7 +925,7 @@ function ManagerPageInner() {
           } finally {
             isLoadingRef.current = false
           }
-        }
+          }
           
           // Execute the force reload
           forceReloadTab()
