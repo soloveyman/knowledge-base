@@ -62,6 +62,25 @@ interface MammothMessage {
   }
 }
 
+// Enhanced image interface with position and context
+export interface ParsedImage {
+  filename: string
+  data: string  // base64 encoded (temporary, will be replaced with S3 URL)
+  type: string
+  position: number  // Position in text (required)
+  htmlPosition?: number  // Position in HTML (for DOCX)
+  sectionIndex?: number  // Which section contains this image
+  paragraphIndex?: number  // Which paragraph in section
+  contextBefore?: string  // 50 chars before image
+  contextAfter?: string  // 50 chars after image
+  placeholder?: string  // Unique placeholder ID for replacement
+  // XLSX specific
+  cellRef?: string  // Cell reference (e.g., "A5")
+  sheetName?: string  // Sheet name (for XLSX)
+  rowIndex?: number  // Row index (for XLSX)
+  colIndex?: number  // Column index (for XLSX)
+}
+
 export interface ParsedContent {
   sections: Array<{
     title: string
@@ -74,12 +93,7 @@ export interface ParsedContent {
     headers: string[]
     rows: string[][]
   }>
-  images: Array<{
-    filename: string
-    data: string  // base64 encoded
-    type: string
-    position?: number
-  }>
+  images: ParsedImage[]
   metadata: {
     totalSections: number
     totalTables: number
@@ -89,6 +103,19 @@ export interface ParsedContent {
     parserVersion?: string
     cacheBusting?: boolean
   }
+}
+
+// Image replacement log for debugging
+export interface ImageReplacementLog {
+  imageId: string
+  filename: string
+  originalPosition: number
+  sectionIndex?: number
+  replacementType: 'placeholder' | 'data-url' | 'relative-path' | 'new-insertion'
+  success: boolean
+  error?: string
+  placeholder?: string
+  s3Url?: string
 }
 
 export class UnsupportedFileTypeError extends Error {
@@ -115,484 +142,239 @@ export class ParseError extends Error {
 export async function parseDocx(buffer: ArrayBuffer, options: {
   includeMetadata?: boolean
   normalizeWhitespace?: boolean
-} = {}): Promise<ParseResult & { images?: Array<{filename: string, data: string, type: string}> }> {
+} = {}): Promise<ParseResult & { images?: ParsedImage[] }> {
   try {
-    // Ensure we have a valid buffer
     if (!buffer || buffer.byteLength === 0) {
       throw new Error('Empty or invalid buffer provided')
     }
 
-    console.log('Buffer details:', {
-      byteLength: buffer.byteLength,
-      constructor: buffer.constructor.name,
-      isArrayBuffer: buffer instanceof ArrayBuffer
-    })
-
-    console.log('Parsing DOCX with Mammoth.js...')
+    console.log('📄 Parsing DOCX with Mammoth.js...')
     
     let text = ''
-    const images: Array<{filename: string, data: string, type: string}> = []
+    const images: ParsedImage[] = []
+    let imageCounter = 0
     
     try {
-      // First, extract images using JSZip (more reliable than Mammoth messages)
+      // Step 1: Extract images from DOCX archive (word/media/)
       const uint8Array = new Uint8Array(buffer)
       const zip = await JSZip.loadAsync(uint8Array)
       const mediaFolder = zip.folder('word/media')
       
       if (mediaFolder) {
-        console.log('Extracting images from word/media...')
-        // Get only files that are actually in word/media (not nested folders)
-        // and filter for image file extensions only
+        console.log('📸 Extracting images from word/media...')
         const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
         const mediaFiles = Object.keys(mediaFolder.files)
           .filter(filename => {
             const file = mediaFolder.files[filename]
-            // Only process files (not directories) that are directly in word/media
             if (file.dir) return false
-            // Check if it's an image file by extension
             const extension = filename.split('.').pop()?.toLowerCase()
             return extension && imageExtensions.includes(extension)
           })
         
-        console.log(`Found ${mediaFiles.length} image files in word/media folder:`, mediaFiles)
+        console.log(`📸 Found ${mediaFiles.length} image files`)
         
-        // Image size limits (warn about large high-res images)
-        const MAX_IMAGE_SIZE = 500 * 1024 // 500KB per image (recommended)
-        const WARNING_IMAGE_SIZE = 200 * 1024 // 200KB per image (warning threshold)
-        const MAX_TOTAL_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB total for all images
-        let totalImageSize = 0
-        const largeImages: string[] = []
+        const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB limit
         
         for (const filename of mediaFiles) {
           try {
-            // Get the file object directly from mediaFolder.files
             const fileEntry = mediaFolder.files[filename]
-            if (!fileEntry || fileEntry.dir) {
-              console.warn(`⚠️ Skipping ${filename} - not a file or is a directory`)
-              continue
-            }
+            if (!fileEntry || fileEntry.dir) continue
             
-            // Try to get file by full path first, then by relative path
             let imageBuffer: ArrayBuffer | undefined
             try {
               imageBuffer = await fileEntry.async('arraybuffer')
             } catch (fileError) {
-              // Try alternative: get file by full path from root zip
               const fullPath = `word/media/${filename}`
               const rootFile = zip.file(fullPath)
               if (rootFile) {
                 imageBuffer = await rootFile.async('arraybuffer')
-                console.log(`✅ Retrieved ${filename} using full path: ${fullPath}`)
               } else {
-                console.warn(`⚠️ Could not find file ${filename} in zip archive`)
                 throw fileError
               }
             }
             
-            if (imageBuffer && imageBuffer.byteLength > 0) {
-              const imageSizeKB = imageBuffer.byteLength / 1024
-              const imageSizeMB = imageBuffer.byteLength / (1024 * 1024)
-              
-              // Check for large high-resolution images
-              if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
-                largeImages.push(`${filename} (${imageSizeMB.toFixed(2)}MB)`)
-                // Don't warn - images are uploaded to Spaces, size is not an issue
-              }
-              
-              totalImageSize += imageBuffer.byteLength
-              
-              // Note: Large images will be uploaded to S3, not skipped
-              // We only skip if they exceed a very large limit (10MB) to prevent memory issues
-              const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB absolute limit
-              if (imageBuffer.byteLength > ABSOLUTE_MAX_SIZE) {
-                console.warn(`⚠️ Skipping image ${filename} - exceeds absolute limit (${imageSizeMB.toFixed(2)}MB). Maximum is ${(ABSOLUTE_MAX_SIZE / (1024 * 1024)).toFixed(2)}MB per image.`)
-                continue
-              }
-              
-              // Convert to base64 for transmission (will be uploaded to S3 on server)
+            if (imageBuffer && imageBuffer.byteLength > 0 && imageBuffer.byteLength <= ABSOLUTE_MAX_SIZE) {
               const base64 = Buffer.from(imageBuffer).toString('base64')
               const extension = filename.split('.').pop()?.toLowerCase() || 'png'
-              // Map common extensions to MIME types
               const mimeTypeMap: Record<string, string> = {
-                'png': 'image/png',
-                'jpg': 'image/jpeg',
-                'jpeg': 'image/jpeg',
-                'gif': 'image/gif',
-                'bmp': 'image/bmp',
-                'webp': 'image/webp',
-                'svg': 'image/svg+xml'
+                'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                'gif': 'image/gif', 'bmp': 'image/bmp', 'webp': 'image/webp', 'svg': 'image/svg+xml'
               }
               const mimeType = mimeTypeMap[extension] || `image/${extension}`
+              
+              const placeholder = `[IMG_${imageCounter++}]`
               images.push({
-                filename: filename,
+                filename,
                 data: `data:${mimeType};base64,${base64}`,
-                type: mimeType
+                type: mimeType,
+                position: -1, // Will be set after HTML parsing
+                placeholder
               })
-              console.log(`✅ Extracted image: ${filename} (${mimeType}, ${imageSizeKB.toFixed(2)}KB)`)
-            } else {
-              console.warn(`⚠️ Image buffer is null or empty for: ${filename}`)
+              console.log(`✅ Extracted image: ${filename} (${mimeType})`)
             }
           } catch (error) {
             console.warn(`❌ Failed to extract image ${filename}:`, error)
           }
         }
-        
-        // Don't warn about total image size - images are uploaded to Spaces, size is not an issue
-        
-        // Don't warn about large images - they're uploaded to Spaces, size is not an issue
-        console.log(`📸 Total images extracted from word/media: ${images.length}`)
-      } else {
-        console.log('⚠️ word/media folder not found in DOCX file')
       }
       
-      // Use Mammoth to convert DOCX to HTML with style mapping for headings
-      // Map Word heading styles to HTML headings
+      // Step 2: Convert DOCX to HTML using Mammoth (basic conversion)
       const styleMap = [
-        // Map built-in Word heading styles (case-insensitive matching)
         "p[style-name='Heading 1'] => h1:fresh",
         "p[style-name='Heading 2'] => h2:fresh",
         "p[style-name='Heading 3'] => h3:fresh",
         "p[style-name='Heading 4'] => h4:fresh",
         "p[style-name='Heading 5'] => h5:fresh",
         "p[style-name='Heading 6'] => h6:fresh",
-        // Map Russian heading styles
         "p[style-name='Заголовок 1'] => h1:fresh",
         "p[style-name='Заголовок 2'] => h2:fresh",
         "p[style-name='Заголовок 3'] => h3:fresh",
         "p[style-name='Заголовок 4'] => h4:fresh",
         "p[style-name='Заголовок 5'] => h5:fresh",
         "p[style-name='Заголовок 6'] => h6:fresh",
-        // Map common heading style variations (lowercase)
-        "p[style-name='heading 1'] => h1:fresh",
-        "p[style-name='heading 2'] => h2:fresh",
-        "p[style-name='heading 3'] => h3:fresh",
-        "p[style-name='heading 4'] => h4:fresh",
-        "p[style-name='heading 5'] => h5:fresh",
-        "p[style-name='heading 6'] => h6:fresh",
-        // Map by paragraph outline level (Word's built-in heading detection)
-        "p[style-name='Title'] => h1:fresh",
-        "p[style-name='Subtitle'] => h2:fresh",
-        // Note: outline-level is not supported by mammoth styleMap syntax
-        // We'll rely on style-name mappings and fallback detection instead
       ]
       
       const result = await mammoth.convertToHtml(
         { arrayBuffer: buffer },
-        { 
-          styleMap: styleMap,
-          includeDefaultStyleMap: true // Include mammoth's default style mappings
-        }
+        { styleMap, includeDefaultStyleMap: true }
       )
       
-      // Log messages to help debug heading detection
-      if (result.messages.length > 0) {
-        console.log('Mammoth conversion messages:')
-        result.messages.forEach(msg => {
-          if (msg.type === 'warning') {
-            console.warn('Mammoth warning:', msg.message)
-          } else {
-            console.log('Mammoth message:', msg.type, msg.message)
-          }
-        })
-      }
-      
-      console.log('Mammoth conversion completed')
-      console.log('Messages:', result.messages.length)
-      result.messages.forEach(msg => console.log('Message:', msg.type, msg.message))
-      
-      // Get the HTML text - keep it as HTML for proper formatting
       const htmlText = result.value
-      console.log('HTML text length:', htmlText.length)
-      console.log('First 200 chars of HTML:', htmlText.substring(0, 200))
+      console.log(`📄 HTML converted, length: ${htmlText.length}`)
       
-      // Extract images from HTML img tags that Mammoth created, with their positions
+      // Step 3: Extract images from HTML and replace with placeholders
+      // Find all img tags in HTML and match with extracted images
       const imgTagRegex = /<img[^>]+src="data:([^;]+);base64,([^"]+)"[^>]*>/gi
-      const imagePositions: Array<{ htmlPos: number; image: { filename: string; data: string; type: string } }> = []
-      let htmlImageCount = 0
+      const htmlImageMatches: Array<{ match: RegExpMatchArray; htmlPos: number; mimeType: string; base64Data: string }> = []
       
-      // First pass: collect all image matches with their HTML positions
-      const allMatches: Array<{ match: RegExpMatchArray; htmlPos: number }> = []
       let match
       while ((match = imgTagRegex.exec(htmlText)) !== null) {
-        allMatches.push({ match, htmlPos: match.index })
+        htmlImageMatches.push({
+          match,
+          htmlPos: match.index,
+          mimeType: match[1],
+          base64Data: match[2]
+        })
       }
       
-      // Process matches in reverse order to preserve positions when replacing
-      for (let i = allMatches.length - 1; i >= 0; i--) {
-        const { match, htmlPos } = allMatches[i]
-        const mimeType = match[1]
-        const base64Data = match[2]
-        // Check if we already have this image (avoid duplicates)
-        const existingImage = images.find(img => img.data.includes(base64Data.substring(0, 50)))
-        if (!existingImage) {
-          const imageData = {
-            filename: `image_${images.length + 1}.${mimeType.split('/')[1] || 'png'}`,
-            data: `data:${mimeType};base64,${base64Data}`,
-            type: mimeType
-          }
-          images.push(imageData)
-          imagePositions.push({ htmlPos, image: imageData })
-          htmlImageCount++
-          console.log(`✅ Extracted image from HTML: ${imageData.filename} (${mimeType}) at HTML position ${htmlPos}`)
-        }
-      }
-      
-      if (htmlImageCount > 0) {
-        console.log(`📸 Extracted ${htmlImageCount} additional images from HTML`)
-      }
-      console.log(`📸 Total images after HTML extraction: ${images.length}`)
-      
-      // Replace img tags with placeholders before converting to text
-      // This preserves position information
-      // Sort by HTML position (descending) to process from end to start
-      const sortedImagePositions = [...imagePositions].sort((a, b) => b.htmlPos - a.htmlPos)
-      
+      // Match HTML images with extracted images or create new ones
       let htmlWithPlaceholders = htmlText
-      for (let i = 0; i < sortedImagePositions.length; i++) {
-        const { htmlPos, image } = sortedImagePositions[i]
-        // Extract a portion of the base64 data to match the img tag
-        const base64Prefix = image.data.split(',')[1]?.substring(0, 50) || ''
+      const processedImages: ParsedImage[] = []
+      
+      // Process in reverse order to preserve positions
+      for (let i = htmlImageMatches.length - 1; i >= 0; i--) {
+        const { match, htmlPos, mimeType, base64Data } = htmlImageMatches[i]
+        const base64Prefix = base64Data.substring(0, 50)
         
-        // Try to find the img tag by matching the base64 data
-        // First try at the exact position
-        let beforeImg = htmlWithPlaceholders.substring(0, htmlPos)
-        let afterImg = htmlWithPlaceholders.substring(htmlPos)
-        let imgTagMatch = afterImg.match(/^<img[^>]+src="data:[^"]+"[^>]*>/i)
+        // Try to find matching image in extracted images
+        let image = images.find(img => img.data.includes(base64Prefix))
         
-        // If not found at exact position, search for img tag with matching base64 data
-        if (!imgTagMatch || !imgTagMatch[0].includes(base64Prefix)) {
-          // Search for img tag containing this base64 data
-          const imgTagRegex = new RegExp(`<img[^>]+src="data:[^"]*${base64Prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"]*"[^>]*>`, 'i')
-          const globalMatch = htmlWithPlaceholders.match(imgTagRegex)
-          if (globalMatch && globalMatch.index !== undefined) {
-            beforeImg = htmlWithPlaceholders.substring(0, globalMatch.index)
-            afterImg = htmlWithPlaceholders.substring(globalMatch.index)
-            imgTagMatch = afterImg.match(/^<img[^>]+src="data:[^"]+"[^>]*>/i)
-            console.log(`📸 Found img tag for "${image.filename}" at position ${globalMatch.index} (was looking for ${htmlPos})`)
+        if (!image) {
+          // Create new image from HTML
+          const placeholder = `[IMG_${imageCounter++}]`
+          image = {
+            filename: `image_${processedImages.length + 1}.${mimeType.split('/')[1] || 'png'}`,
+            data: `data:${mimeType};base64,${base64Data}`,
+            type: mimeType,
+            position: -1,
+            htmlPosition: htmlPos,
+            placeholder
           }
+          images.push(image)
         }
         
-        if (imgTagMatch) {
-          // Use the original index from imagePositions array as the placeholder index
-          const originalIndex = imagePositions.findIndex(ip => ip.image === image)
-          const placeholder = `[IMAGE_PLACEHOLDER_${originalIndex}]`
-          htmlWithPlaceholders = beforeImg + placeholder + afterImg.substring(imgTagMatch[0].length)
-          console.log(`📸 Replaced img tag with placeholder [IMAGE_PLACEHOLDER_${originalIndex}] for image "${image.filename}"`)
-        } else {
-          console.warn(`⚠️ Could not find img tag for image "${image.filename}" at HTML position ${htmlPos}`)
+        // Replace img tag with placeholder
+        if (image.placeholder) {
+          htmlWithPlaceholders = htmlWithPlaceholders.substring(0, htmlPos) + 
+            image.placeholder + 
+            htmlWithPlaceholders.substring(htmlPos + match[0].length)
+          image.htmlPosition = htmlPos
+          processedImages.push(image)
+          console.log(`📸 Replaced img tag with placeholder ${image.placeholder} at HTML position ${htmlPos}`)
         }
       }
       
-      // Convert HTML to plain text with formatting markers
-      // Process in order: first extract formatting markers, then structure
-      
-      // Step 1: Convert paragraph tags to double newlines for paragraph separation
-      let workingText = htmlWithPlaceholders.replace(/<p[^>]*>/gi, '\n\n')
-      
-      // Step 2: Convert closing paragraph tags
-      workingText = workingText.replace(/<\/p>/gi, '')
-      
-      // Step 3: Convert formatting tags (bold, italic) - preserve nested tags
-      workingText = workingText
-        .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '[BOLD]$1[/BOLD]')
-        .replace(/<b[^>]*>(.*?)<\/b>/gi, '[BOLD]$1[/BOLD]')
-        .replace(/<em[^>]*>(.*?)<\/em>/gi, '[ITALIC]$1[/ITALIC]')
-        .replace(/<i[^>]*>(.*?)<\/i>/gi, '[ITALIC]$1[/ITALIC]')
-      
-      // Step 4: Convert headings - extract text content properly
-      // First, log HTML to debug heading detection
-      const headingMatches = htmlWithPlaceholders.match(/<h[1-6][^>]*>.*?<\/h[1-6]>/gi)
-      if (headingMatches && headingMatches.length > 0) {
-        console.log(`📋 Found ${headingMatches.length} heading tags in HTML:`)
-        headingMatches.slice(0, 10).forEach((match, idx) => {
-          console.log(`  Heading ${idx + 1}: ${match.substring(0, 100)}`)
+      // Step 4: Convert HTML to text (simplified)
+      let workingText = htmlWithPlaceholders
+        .replace(/<p[^>]*>/gi, '\n\n')
+        .replace(/<\/p>/gi, '')
+        .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, content) => {
+          const t = content.replace(/<[^>]+>/g, '').trim()
+          return t ? `\n\n# ${t}\n\n` : '\n\n'
         })
-      } else {
-        console.warn('⚠️ No heading tags (h1-h6) found in HTML. Checking for paragraphs with bold text that might be headings...')
-      }
-      
-      // Convert headings - use non-greedy matching and extract text properly
-      // Use [\s\S] instead of . with 's' flag for ES2017 compatibility
-      workingText = workingText
-        .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          console.log(`📋 H1 found: "${text}"`)
-          return text ? `\n\n# ${text}\n\n` : '\n\n'
+        .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, content) => {
+          const t = content.replace(/<[^>]+>/g, '').trim()
+          return t ? `\n\n## ${t}\n\n` : '\n\n'
         })
-        .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          console.log(`📋 H2 found: "${text}"`)
-          return text ? `\n\n## ${text}\n\n` : '\n\n'
+        .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, content) => {
+          const t = content.replace(/<[^>]+>/g, '').trim()
+          return t ? `\n\n### ${t}\n\n` : '\n\n'
         })
-        .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          console.log(`📋 H3 found: "${text}"`)
-          return text ? `\n\n### ${text}\n\n` : '\n\n'
+        .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (_, content) => {
+          const t = content.replace(/<[^>]+>/g, '').trim()
+          return t ? `\n\n#### ${t}\n\n` : '\n\n'
         })
-        .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          return text ? `\n\n#### ${text}\n\n` : '\n\n'
+        .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (_, content) => {
+          const t = content.replace(/<[^>]+>/g, '').trim()
+          return t ? `\n\n##### ${t}\n\n` : '\n\n'
         })
-        .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          return text ? `\n\n##### ${text}\n\n` : '\n\n'
+        .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (_, content) => {
+          const t = content.replace(/<[^>]+>/g, '').trim()
+          return t ? `\n\n###### ${t}\n\n` : '\n\n'
         })
-        .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          return text ? `\n\n###### ${text}\n\n` : '\n\n'
-        })
-      
-      // Fallback: Detect headings by formatting (bold paragraphs that are short and standalone)
-      // This handles cases where headings aren't properly styled in Word
-      workingText = workingText
-        .replace(/<p[^>]*><strong[^>]*>([\s\S]*?)<\/strong><\/p>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          // If it's a short line (likely a heading), convert to h2
-          if (text && text.length < 200 && !text.includes('\n')) {
-            console.log(`📋 Detected potential heading by formatting: "${text}"`)
-            return `\n\n## ${text}\n\n`
-          }
-          return match // Keep original if it doesn't look like a heading
-        })
-        .replace(/<p[^>]*><b[^>]*>([\s\S]*?)<\/b><\/p>/gi, (match, content) => {
-          const text = content.replace(/<[^>]+>/g, '').trim()
-          // If it's a short line (likely a heading), convert to h2
-          if (text && text.length < 200 && !text.includes('\n')) {
-            console.log(`📋 Detected potential heading by formatting: "${text}"`)
-            return `\n\n## ${text}\n\n`
-          }
-          return match // Keep original if it doesn't look like a heading
-        })
-      
-      // Step 5: Convert lists
-      workingText = workingText
-        .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, '\n\n$1\n\n')
-        .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, '\n\n$1\n\n')
         .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
-      
-      // Step 6: Remove remaining HTML tags (but preserve placeholders)
-      // First, temporarily replace placeholders with a safe marker
-      const placeholderMap = new Map<string, string>()
-      imagePositions.forEach(({ image }, index) => {
-        const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
-        const safeMarker = `__PLACEHOLDER_${index}__`
-        placeholderMap.set(safeMarker, placeholder)
-        workingText = workingText.replace(new RegExp(placeholder.replace(/[\[\]]/g, '\\$&'), 'g'), safeMarker)
-      })
-      
-      // Now remove HTML tags
-      workingText = workingText.replace(/<[^>]*>/g, '')
-      
-      // Restore placeholders
-      placeholderMap.forEach((placeholder, safeMarker) => {
-        workingText = workingText.replace(new RegExp(safeMarker.replace(/[\[\]]/g, '\\$&'), 'g'), placeholder)
-      })
-      
-      // Step 7: Decode HTML entities
-      workingText = workingText
+        .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
+        .replace(/\n{4,}/g, '\n\n\n')
+        .replace(/^\n+/, '')
+        .replace(/\n+$/, '')
       
-      // Step 8: Clean up multiple newlines
-      workingText = workingText
-        .replace(/\n{4,}/g, '\n\n\n') // Max 3 newlines
-        .replace(/^\n+/, '') // Remove leading newlines
-        .replace(/\n+$/, '') // Remove trailing newlines
-      
-      // Step 9: Map image positions from HTML to text positions
-      // Find placeholder positions in the converted text, then remove them in reverse order
-      const placeholderPositions: Array<{ index: number; pos: number }> = []
-      imagePositions.forEach(({ image }, index) => {
-        const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
-        const placeholderPos = workingText.indexOf(placeholder)
-        if (placeholderPos !== -1) {
-          // Store the position in the image data
-          ;(image as any).textPosition = placeholderPos
-          placeholderPositions.push({ index, pos: placeholderPos })
-          console.log(`📸 Mapped image "${image.filename}" to text position ${placeholderPos}`)
-        } else {
-          // Placeholder not found - log warning but don't fail
-          console.warn(`⚠️ Placeholder [IMAGE_PLACEHOLDER_${index}] not found for image "${image.filename}"`)
-        }
-      })
-      
-      // Replace placeholders with markdown images in reverse order to preserve positions
-      // Use exact position replacement to maintain image positions in text
-      placeholderPositions.sort((a, b) => b.pos - a.pos) // Sort by position descending
-      placeholderPositions.forEach(({ index }) => {
-        const placeholder = `[IMAGE_PLACEHOLDER_${index}]`
-        const image = imagePositions[index]?.image
-        if (image) {
-          // Replace placeholder with markdown image using data URL
-          // Add newlines around image to ensure it's on its own line and preserves position
-          const imageMarkdown = `\n\n![${image.filename}](${image.data})\n\n`
-          // Use exact position replacement to maintain order
-          const placeholderIndex = workingText.indexOf(placeholder)
-          if (placeholderIndex !== -1) {
-            workingText = workingText.substring(0, placeholderIndex) + 
-                         imageMarkdown + 
-                         workingText.substring(placeholderIndex + placeholder.length)
-            console.log(`📸 Replaced placeholder [IMAGE_PLACEHOLDER_${index}] with markdown image for "${image.filename}" at position ${placeholderIndex}`)
-          } else {
-            console.warn(`⚠️ Placeholder [IMAGE_PLACEHOLDER_${index}] not found in text`)
+      // Step 5: Map placeholder positions to text positions and extract context
+      for (const image of processedImages) {
+        if (image.placeholder) {
+          const placeholderPos = workingText.indexOf(image.placeholder)
+          if (placeholderPos !== -1) {
+            image.position = placeholderPos
+            
+            // Extract context (50 chars before and after)
+            image.contextBefore = workingText.substring(Math.max(0, placeholderPos - 50), placeholderPos).trim()
+            image.contextAfter = workingText.substring(
+              placeholderPos + image.placeholder.length,
+              Math.min(workingText.length, placeholderPos + image.placeholder.length + 50)
+            ).trim()
+            
+            // Replace placeholder with markdown (temporary, will be replaced with S3 URL later)
+            const imageMarkdown = `\n\n![${image.filename}](${image.data})\n\n`
+            workingText = workingText.substring(0, placeholderPos) + 
+              imageMarkdown + 
+              workingText.substring(placeholderPos + image.placeholder.length)
+            
+            console.log(`📸 Mapped image "${image.filename}" to position ${placeholderPos} (context: "${image.contextBefore.substring(Math.max(0, image.contextBefore.length - 20))}...${image.contextAfter.substring(0, 20)}")`)
           }
-        } else {
-          // If image not found, just remove placeholder
-          workingText = workingText.replace(placeholder, '')
-          console.warn(`⚠️ Image not found for placeholder [IMAGE_PLACEHOLDER_${index}], removing placeholder`)
         }
-      })
+      }
       
       text = workingText.trim()
-      
-      console.log('Converted text length:', text.length)
-      console.log('First 200 chars:', text.substring(0, 200))
+      console.log(`📄 Text extracted, length: ${text.length}`)
       
     } catch (mammothError) {
-      console.log('Mammoth.js parsing failed, using JSZip fallback:', mammothError)
+      console.warn('⚠️ Mammoth.js parsing failed, using JSZip fallback:', mammothError)
       
-      // Fallback to JSZip-based parsing
+      // Fallback: simple text extraction
       const uint8Array = new Uint8Array(buffer)
-        const zip = await JSZip.loadAsync(uint8Array)
-        
-      // Extract images from JSZip
-        const mediaFolder = zip.folder('word/media')
-        if (mediaFolder) {
-        console.log('Extracting images from word/media (fallback)...')
-          const mediaFiles = Object.keys(mediaFolder.files).filter(filename => !mediaFolder.files[filename].dir)
-          
-          for (const filename of mediaFiles) {
-            try {
-              const imageBuffer = await mediaFolder.file(filename)?.async('arraybuffer')
-              if (imageBuffer) {
-                const base64 = Buffer.from(imageBuffer).toString('base64')
-                const extension = filename.split('.').pop()?.toLowerCase() || 'png'
-                const mimeType = `image/${extension}`
-                images.push({
-                  filename: filename,
-                  data: `data:${mimeType};base64,${base64}`,
-                  type: mimeType
-                })
-              console.log(`Extracted image (fallback): ${filename}`)
-              }
-            } catch (error) {
-              console.warn(`Failed to extract image ${filename}:`, error)
-            }
-          }
-        }
-        
-      // Extract text using JSZip
+      const zip = await JSZip.loadAsync(uint8Array)
       const documentXml = await zip.file('word/document.xml')?.async('text')
-        if (documentXml) {
-        // Simple text extraction from XML
+      
+      if (documentXml) {
         text = documentXml
           .replace(/<[^>]*>/g, ' ')
           .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
+          .replace(/&amp;/g, '&')
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
           .replace(/&quot;/g, '"')
@@ -600,8 +382,6 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
           .replace(/\s+/g, ' ')
           .trim()
       }
-      
-      console.log('Fallback text extracted, length:', text.length)
     }
     
     if (options.normalizeWhitespace) {
@@ -610,13 +390,21 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
 
     const metadata: ParseMetadata | undefined = options.includeMetadata ? {
       parsedAt: new Date(),
-      parserVersion: '4.0.0' // Updated version for Mammoth.js
+      parserVersion: '5.0.0' // New version with enhanced image handling
     } : undefined
     
-    // Return images if they were extracted
-    const result: ParseResult & { images?: Array<{filename: string, data: string, type: string}> } = { text, metadata }
+    // Ensure all images have required position (set to end if not found)
+    for (const image of images) {
+      if (image.position === -1) {
+        image.position = text.length
+        console.warn(`⚠️ Image "${image.filename}" position not found, set to end of text`)
+      }
+    }
+    
+    const result: ParseResult & { images?: ParsedImage[] } = { text, metadata }
     if (images.length > 0) {
       result.images = images
+      console.log(`📸 Returning ${images.length} images with positions and context`)
     }
 
     return result
@@ -630,407 +418,162 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
 export async function parseXlsx(buffer: ArrayBuffer, options: {
   includeMetadata?: boolean
   normalizeWhitespace?: boolean
-} = {}): Promise<ParseResult & { images?: Array<{filename: string, data: string, type: string}> }> {
+} = {}): Promise<ParseResult & { images?: ParsedImage[] }> {
   try {
-    // Convert ArrayBuffer to Uint8Array for xlsx
     const uint8Array = new Uint8Array(buffer)
+    const images: ParsedImage[] = []
+    let imageCounter = 0
     
-    // Extract images from XLSX (XLSX is a ZIP archive, images are in xl/media/)
-    const images: Array<{filename: string, data: string, type: string}> = []
-    
+    // Step 1: Extract images from XLSX archive (xl/media/)
     try {
       const zip = await JSZip.loadAsync(uint8Array)
       const mediaFolder = zip.folder('xl/media')
       
       if (mediaFolder) {
-        console.log('Extracting images from xl/media...')
-        // Get only files that are actually in xl/media (not nested folders)
-        // and filter for image file extensions only
+        console.log('📸 Extracting images from xl/media...')
         const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
         const mediaFiles = Object.keys(mediaFolder.files)
           .filter(filename => {
             const file = mediaFolder.files[filename]
-            // Only process files (not directories) that are directly in xl/media
             if (file.dir) return false
-            // Check if it's an image file by extension
             const extension = filename.split('.').pop()?.toLowerCase()
             return extension && imageExtensions.includes(extension)
           })
         
-        console.log(`Found ${mediaFiles.length} image files in xl/media folder:`, mediaFiles)
-        
-        // Image size limits (warn about large high-res images)
-        const MAX_IMAGE_SIZE = 500 * 1024 // 500KB per image (recommended)
-        const WARNING_IMAGE_SIZE = 200 * 1024 // 200KB per image (warning threshold)
-        const MAX_TOTAL_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB total for all images
-        let totalImageSize = 0
-        const largeImages: string[] = []
+        const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB limit
         
         for (const filename of mediaFiles) {
           try {
-            // Get the file object directly from mediaFolder.files
             const fileEntry = mediaFolder.files[filename]
-            if (!fileEntry || fileEntry.dir) {
-              console.warn(`⚠️ Skipping ${filename} - not a file or is a directory`)
-              continue
-            }
+            if (!fileEntry || fileEntry.dir) continue
             
-            // Try to get file by full path first, then by relative path
             let imageBuffer: ArrayBuffer | undefined
             try {
               imageBuffer = await fileEntry.async('arraybuffer')
             } catch (fileError) {
-              // Try alternative: get file by full path from root zip
               const fullPath = `xl/media/${filename}`
               const rootFile = zip.file(fullPath)
               if (rootFile) {
                 imageBuffer = await rootFile.async('arraybuffer')
-                console.log(`✅ Retrieved ${filename} using full path: ${fullPath}`)
               } else {
-                console.warn(`⚠️ Could not find file ${filename} in zip archive`)
                 throw fileError
               }
             }
             
-            if (imageBuffer && imageBuffer.byteLength > 0) {
-              const imageSizeKB = imageBuffer.byteLength / 1024
-              const imageSizeMB = imageBuffer.byteLength / (1024 * 1024)
-              
-              // Check for large high-resolution images
-              if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
-                largeImages.push(`${filename} (${imageSizeMB.toFixed(2)}MB)`)
-                // Don't warn - images are uploaded to Spaces, size is not an issue
-              }
-              
-              totalImageSize += imageBuffer.byteLength
-              
-              // Note: Large images will be uploaded to S3, not skipped
-              // We only skip if they exceed a very large limit (10MB) to prevent memory issues
-              const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB absolute limit
-              if (imageBuffer.byteLength > ABSOLUTE_MAX_SIZE) {
-                console.warn(`⚠️ Skipping image ${filename} - exceeds absolute limit (${imageSizeMB.toFixed(2)}MB). Maximum is ${(ABSOLUTE_MAX_SIZE / (1024 * 1024)).toFixed(2)}MB per image.`)
-                continue
-              }
-              
-              // Convert to base64 for transmission (will be uploaded to S3 on server)
+            if (imageBuffer && imageBuffer.byteLength > 0 && imageBuffer.byteLength <= ABSOLUTE_MAX_SIZE) {
               const base64 = Buffer.from(imageBuffer).toString('base64')
               const extension = filename.split('.').pop()?.toLowerCase() || 'png'
-              // Map common extensions to MIME types
               const mimeTypeMap: Record<string, string> = {
-                'png': 'image/png',
-                'jpg': 'image/jpeg',
-                'jpeg': 'image/jpeg',
-                'gif': 'image/gif',
-                'bmp': 'image/bmp',
-                'webp': 'image/webp',
-                'svg': 'image/svg+xml'
+                'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                'gif': 'image/gif', 'bmp': 'image/bmp', 'webp': 'image/webp', 'svg': 'image/svg+xml'
               }
               const mimeType = mimeTypeMap[extension] || `image/${extension}`
+              
+              const placeholder = `[IMG_${imageCounter++}]`
               images.push({
-                filename: filename,
+                filename,
                 data: `data:${mimeType};base64,${base64}`,
-                type: mimeType
+                type: mimeType,
+                position: -1, // Will be set based on cell position
+                placeholder
               })
-              console.log(`✅ Extracted image: ${filename} (${mimeType}, ${imageSizeKB.toFixed(2)}KB)`)
-            } else {
-              console.warn(`⚠️ Image buffer is null or empty for: ${filename}`)
+              console.log(`✅ Extracted image: ${filename} (${mimeType})`)
             }
           } catch (error) {
             console.warn(`❌ Failed to extract image ${filename}:`, error)
           }
         }
-        
-        // Don't warn about total image size - images are uploaded to Spaces, size is not an issue
-        
-        // Don't warn about large images - they're uploaded to Spaces, size is not an issue
-        console.log(`📸 Total images extracted from xl/media: ${images.length}`)
-      } else {
-        console.log('⚠️ xl/media folder not found in XLSX file')
       }
     } catch (zipError) {
       console.warn('⚠️ Failed to extract images from XLSX (non-fatal):', zipError)
-      // Continue parsing even if image extraction fails
     }
     
+    // Step 2: Parse XLSX workbook
     const workbook = XLSX.read(uint8Array, { type: 'array' })
     
     let text = ''
     const tables: Array<{ title: string; headers: string[]; rows: string[][] }> = []
     
-    // Process each worksheet
-    workbook.SheetNames.forEach(sheetName => {
+    // Step 3: Process each worksheet (simplified table extraction)
+    workbook.SheetNames.forEach((sheetName, sheetIndex) => {
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
       
       if (jsonData.length > 0) {
-        // Add sheet name as a section
         text += `\n## ${sheetName}\n\n`
-        
-        // Process rows
         const rows = jsonData as string[][]
         
-        // Helper function to filter empty rows
-        const filterEmptyRows = (rowsArray: string[][]) => {
-          return rowsArray.filter(row => 
+        // Try to map images to cells (simplified: assign to first sheet if multiple)
+        // In real XLSX, images are linked via drawing relationships, but we'll use a simple heuristic
+        if (images.length > 0 && sheetIndex === 0) {
+          // Distribute images across rows (simple heuristic)
+          const imagesPerRow = Math.ceil(images.length / Math.max(rows.length, 1))
+          images.forEach((img, imgIdx) => {
+            const rowIndex = Math.floor(imgIdx / imagesPerRow)
+            const colIndex = imgIdx % imagesPerRow
+            if (rowIndex < rows.length) {
+              img.sheetName = sheetName
+              img.rowIndex = rowIndex
+              img.colIndex = colIndex
+              // Generate cell reference (A=0, B=1, etc.)
+              const colLetter = String.fromCharCode(65 + (colIndex % 26))
+              img.cellRef = `${colLetter}${rowIndex + 1}`
+              console.log(`📸 Mapped image "${img.filename}" to cell ${img.cellRef} (row ${rowIndex}, col ${colIndex})`)
+            }
+          })
+        }
+        
+        // Simplified table extraction: first row as headers, rest as data
+        if (rows.length > 1) {
+          const headers = rows[0].map(h => String(h).trim())
+          const dataRows = rows.slice(1).filter(row => 
             row && row.some(cell => cell !== null && cell !== undefined && String(cell).trim().length > 0)
           )
-        }
-        
-        // Helper function to check if text looks like a table title
-        const isTableTitle = (text: string): boolean => {
-          if (!text || text.trim().length === 0) return false
           
-          const lower = text.toLowerCase()
-          const trimmed = text.trim()
-          
-          // Long text (likely a title)
-          if (trimmed.length > 80) return true
-          
-          // Common table title keywords (Russian and English)
-          const titleKeywords = [
-            'план', 'график', 'список', 'отчет', 'таблица', 'расписание',
-            'plan', 'schedule', 'list', 'report', 'table', 'chart',
-            'инструкция', 'руководство', 'правила', 'процедура',
-            'instruction', 'guide', 'rules', 'procedure',
-            'выполнение', 'контроль', 'проверка', 'отметка',
-            'execution', 'control', 'check', 'mark'
-          ]
-          
-          // Check for title patterns
-          if (titleKeywords.some(keyword => lower.includes(keyword))) {
-            // If it's long or contains multiple words, likely a title
-            if (trimmed.length > 30 || trimmed.split(/\s+/).length > 3) {
-              return true
-            }
+          if (dataRows.length > 0) {
+            // Normalize column count
+            const maxCols = Math.max(...dataRows.map(row => row.length), headers.length)
+            const normalizedHeaders = [...headers, ...Array(Math.max(0, maxCols - headers.length)).fill('')]
+            
+            tables.push({
+              title: sheetName,
+              headers: normalizedHeaders.slice(0, maxCols),
+              rows: dataRows.map(row => {
+                const normalized = [...row.map(cell => String(cell)), ...Array(Math.max(0, maxCols - row.length)).fill('')]
+                return normalized.slice(0, maxCols)
+              })
+            })
+            console.log(`📊 Created table "${sheetName}" with ${normalizedHeaders.length} columns and ${dataRows.length} rows`)
           }
-          
-          // All caps with multiple words (often titles)
-          if (trimmed === trimmed.toUpperCase() && trimmed.split(/\s+/).length >= 3) {
-            return true
-          }
-          
-          return false
         }
         
-        // Helper function to check if row looks like column headers
-        const isColumnHeaders = (row: string[]): boolean => {
-          if (!row || row.length === 0) return false
-          
-          // Check if cells look like headers (short, common header words)
-          const headerKeywords = [
-            'задача', 'сотрудник', 'отметка', 'контроль', '№', 'номер', 
-            'task', 'employee', 'name', 'description', 'дата', 'date', 
-            'время', 'time', 'имя', 'фамилия', 'должность', 'статус',
-            'firstname', 'lastname', 'position', 'status', 'role', 'роль'
-          ]
-          
-          const nonEmptyCells = row.filter(cell => {
-            const str = String(cell).trim()
-            return str.length > 0
-          })
-          
-          if (nonEmptyCells.length === 0) return false
-          
-          // Most cells should be short (headers are typically short)
-          const shortCells = nonEmptyCells.filter(cell => {
-            const str = String(cell).trim()
-            return str.length < 50 && str.length > 0
-          })
-          
-          // Check if cells contain header keywords or are very short
-          const hasHeaderKeywords = nonEmptyCells.some(cell => {
-            const str = String(cell).trim().toLowerCase()
-            return headerKeywords.some(keyword => str.includes(keyword))
-          })
-          
-          // Headers should be:
-          // 1. Mostly short cells (< 50 chars)
-          // 2. Contain header keywords OR all cells are reasonably short
-          // 3. Not contain quantities
-          const isShortEnough = (shortCells.length / nonEmptyCells.length) >= 0.6
-          const noQuantities = nonEmptyCells.every(cell => {
-            const str = String(cell).trim()
-            return !/^\d+(\.\d+)?\s*(ml|g|шт|гр|кг|л)$/i.test(str)
-          })
-          
-          return isShortEnough && noQuantities && (hasHeaderKeywords || nonEmptyCells.every(cell => String(cell).trim().length < 30))
-        }
-        
-        // Helper function to detect day of week headings (same as in parseTextToStructuredContent)
-        const isDayOfWeekRow = (row: string[]): boolean => {
-          if (!row || row.length === 0) return false
-          const firstCell = String(row[0] || '').trim()
-          if (!firstCell || firstCell.length < 3) return false
-          
-          const russianDays = [
-            'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье',
-            'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'
-          ]
-          const englishDays = [
-            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-            'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
-          ]
-          
-          const dayPattern = new RegExp(
-            `^(${[...russianDays, ...englishDays].join('|')})[:!.]?$`,
-            'i'
-          )
-          
-          return dayPattern.test(firstCell)
-        }
-        
-        // Detect multiple tables by days of week (split by day headings)
-        const dayRowIndices: number[] = []
-        rows.forEach((row, idx) => {
-          if (isDayOfWeekRow(row)) {
-            dayRowIndices.push(idx)
+        // Add text content from rows
+        rows.forEach((row, rowIdx) => {
+          const rowText = row.map(cell => String(cell).trim()).filter(cell => cell).join(' ')
+          if (rowText) {
+            text += rowText + '\n'
+            
+            // Check if any images should be inserted at this row position
+            images.forEach(img => {
+              if (img.rowIndex === rowIdx && img.sheetName === sheetName) {
+                // Insert image placeholder in text at this position
+                const placeholder = img.placeholder || `[IMG_${imageCounter++}]`
+                text += `\n${placeholder}\n`
+                img.position = text.length - placeholder.length - 1
+                console.log(`📸 Inserted image placeholder ${placeholder} at row ${rowIdx} in sheet "${sheetName}"`)
+              }
+            })
           }
         })
-        
-        // If we have multiple day sections, process each separately
-        if (dayRowIndices.length > 0) {
-          // Process each day section
-          for (let dayIdx = 0; dayIdx < dayRowIndices.length; dayIdx++) {
-            const dayRowIdx = dayRowIndices[dayIdx]
-            const nextDayRowIdx = dayIdx < dayRowIndices.length - 1 ? dayRowIndices[dayIdx + 1] : rows.length
-            const daySection = rows.slice(dayRowIdx, nextDayRowIdx)
-            
-            if (daySection.length === 0) continue
-            
-            const dayTitleRow = daySection[0] || []
-            const dayTitle = String(dayTitleRow[0] || '').trim()
-            let columnHeaders: string[] = []
-            let dataRows: string[][] = []
-            
-            // Look for headers in the section (usually row after day title)
-            if (daySection.length > 1) {
-              // Try to find headers in next few rows after day title
-              for (let i = 1; i < Math.min(daySection.length, 4); i++) {
-                const row = daySection[i] || []
-                if (isColumnHeaders(row)) {
-                  columnHeaders = row.map(h => String(h).trim())
-                  // Get all rows after headers as data
-                  dataRows = filterEmptyRows(daySection.slice(i + 1))
-                  break
-                }
-              }
-              
-              // If no headers found, check if first row after day title looks like data
-              // In this case, we'll create headers based on first data row length
-              if (columnHeaders.length === 0 && daySection.length > 1) {
-                // Find first non-empty row after day title
-                const firstDataRow = daySection.find((row, idx) => idx > 0 && row.some(cell => String(cell).trim().length > 0))
-                if (firstDataRow) {
-                  // Create empty headers matching the number of columns in data
-                  const numColumns = firstDataRow.length
-                  columnHeaders = Array(numColumns).fill('')
-                  dataRows = filterEmptyRows(daySection.slice(1))
-                }
-              }
-            }
-            
-            // Normalize headers to match data rows length
-            if (dataRows.length > 0) {
-              const maxCols = Math.max(...dataRows.map(row => row.length))
-              if (columnHeaders.length < maxCols) {
-                // Extend headers with empty strings to match data columns
-                columnHeaders = [...columnHeaders, ...Array(maxCols - columnHeaders.length).fill('')]
-              } else if (columnHeaders.length > maxCols) {
-                // Trim headers to match data columns
-                columnHeaders = columnHeaders.slice(0, maxCols)
-              }
-            }
-            
-            // Create table for this day section
-            if (dataRows.length > 0) {
-              tables.push({
-                title: dayTitle || `Day ${dayIdx + 1}`,
-                headers: columnHeaders,
-                rows: dataRows.map(row => row.map(cell => String(cell)))
-              })
-            }
-          }
-        } else {
-          // Original logic for single table per sheet
-          let tableTitle = sheetName // Default to sheet name
-          let columnHeaders: string[] = []
-          let dataRows: string[][] = []
-          
-          if (rows.length > 0) {
-            const firstRow = rows[0] || []
-            const firstRowText = firstRow.join(' ').trim()
-            
-            // Check if first row is a table title (long text, title keywords, spans many columns)
-            if (isTableTitle(firstRowText) || (firstRow.length === 1 && firstRowText.length > 50)) {
-              tableTitle = firstRowText
-              
-              // Check if second row (or next non-empty row) contains headers
-              if (rows.length > 1) {
-                for (let i = 1; i < Math.min(rows.length, 4); i++) {
-                  const row = rows[i] || []
-                  if (isColumnHeaders(row)) {
-                    columnHeaders = row.map(h => String(h).trim())
-                    dataRows = filterEmptyRows(rows.slice(i + 1))
-                    break
-                  }
-                }
-                
-                // If no headers found, create empty headers based on data
-                if (columnHeaders.length === 0 && dataRows.length === 0) {
-                  const firstDataRow = rows.find((row, idx) => idx > 0 && row.some(cell => String(cell).trim().length > 0))
-                  if (firstDataRow) {
-                    const numColumns = firstDataRow.length
-                    columnHeaders = Array(numColumns).fill('')
-                    dataRows = filterEmptyRows(rows.slice(1))
-                  }
-                }
-              }
-            } else if (isColumnHeaders(firstRow)) {
-              // First row is headers, no separate title
-              columnHeaders = firstRow.map(h => String(h).trim())
-              dataRows = filterEmptyRows(rows.slice(1))
-            } else {
-              // No clear title or headers, create empty headers based on data
-              if (rows.length > 0) {
-                const maxCols = Math.max(...rows.map(row => row.length))
-                columnHeaders = Array(maxCols).fill('')
-                dataRows = filterEmptyRows(rows)
-              }
-            }
-          }
-          
-          // Normalize headers to match data rows length
-          if (dataRows.length > 0) {
-            const maxCols = Math.max(...dataRows.map(row => row.length))
-            if (columnHeaders.length < maxCols) {
-              columnHeaders = [...columnHeaders, ...Array(maxCols - columnHeaders.length).fill('')]
-            } else if (columnHeaders.length > maxCols) {
-              columnHeaders = columnHeaders.slice(0, maxCols)
-            }
-          }
-          
-          // Final check: if we have headers and data, create table
-          const hasValidTable = columnHeaders.length > 0 && dataRows.length > 0
-          
-          // Create table if we have valid structure
-          if (hasValidTable) {
-            tables.push({
-              title: tableTitle,
-              headers: columnHeaders,
-              rows: dataRows.map(row => row.map(cell => String(cell)))
-            })
-          } else if (dataRows.length > 0) {
-            // Create table with data but no headers (but ensure headers array matches)
-            tables.push({
-              title: tableTitle,
-              headers: columnHeaders,
-              rows: dataRows.map(row => row.map(cell => String(cell)))
-            })
-          }
-        }
-        
-        // Add text content only if no table was created for this sheet
-        // (This is handled within the table creation logic above)
+      }
+    })
+    
+    // Set positions for images that weren't assigned to specific rows
+    let currentTextPos = text.length
+    images.forEach(img => {
+      if (img.position === -1) {
+        img.position = currentTextPos
+        currentTextPos += 100 // Space for image markdown
       }
     })
 
@@ -1040,8 +583,16 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
 
     const metadata: ParseMetadata | undefined = options.includeMetadata ? {
       parsedAt: new Date(),
-      parserVersion: '1.0.0'
+      parserVersion: '5.0.0' // New version with enhanced image handling
     } : undefined
+
+    // Ensure all images have required position
+    for (const image of images) {
+      if (image.position === -1) {
+        image.position = text.length
+        console.warn(`⚠️ Image "${image.filename}" position not found, set to end of text`)
+      }
+    }
 
     return {
       text,
@@ -1133,25 +684,33 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   
   // Merge images from document parsing (DOCX or XLSX) if they exist
   if ('images' in parseResult && parseResult.images && Array.isArray(parseResult.images) && parseResult.images.length > 0) {
-    console.log('Found images in parseResult:', parseResult.images.length)
-    structuredContent.images = parseResult.images.map((img, index) => {
-      // Use textPosition if available (from HTML parsing), otherwise use index
-      const position = (img as any).textPosition !== undefined 
-        ? (img as any).textPosition 
-        : (img.position !== undefined ? img.position : undefined)
+    console.log(`📸 Found ${parseResult.images.length} images in parseResult`)
+    structuredContent.images = parseResult.images.map((img) => {
+      // Ensure all required fields are present
       return {
-        filename: img.filename || `image_${index + 1}.png`,
+        filename: img.filename || `image_${img.placeholder || 'unknown'}.png`,
         data: img.data,
         type: img.type || 'image/png',
-        position: position
+        position: img.position !== undefined ? img.position : -1,
+        placeholder: img.placeholder,
+        htmlPosition: img.htmlPosition,
+        contextBefore: img.contextBefore,
+        contextAfter: img.contextAfter,
+        // XLSX specific
+        cellRef: img.cellRef,
+        sheetName: img.sheetName,
+        rowIndex: img.rowIndex,
+        colIndex: img.colIndex
       }
     })
-    console.log('Images added to structured content:', structuredContent.images.length)
+    console.log(`📸 Images added to structured content: ${structuredContent.images.length}`)
     structuredContent.images.forEach((img, idx) => {
-      console.log(`Image ${idx + 1}: ${img.filename}, position: ${img.position}`)
+      console.log(`  Image ${idx + 1}: ${img.filename}, position: ${img.position}, placeholder: ${img.placeholder || 'none'}`)
+      if (img.cellRef) {
+        console.log(`    Cell: ${img.cellRef} in sheet "${img.sheetName}"`)
+      }
     })
   } else {
-    // Ensure images array exists even if empty
     structuredContent.images = []
   }
   
@@ -1171,7 +730,7 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   structuredContent.metadata = {
     ...structuredContent.metadata,
     parseTimestamp,
-    parserVersion: '4.0.0', // Updated for Mammoth.js integration
+    parserVersion: '5.0.0', // Enhanced with position tracking, placeholders, context, and cell references
     cacheBusting: true,
     totalImages: structuredContent.images.length
   }
@@ -1477,4 +1036,83 @@ function isDayOfWeekHeading(line: string): boolean {
   }
   
   return false
+}
+
+/**
+ * Validates document structure after image replacement
+ * Checks that all images are properly placed and no data URLs remain
+ */
+export function validateDocumentStructure(
+  content: string, 
+  images: ParsedImage[]
+): { valid: boolean; errors: string[]; warnings: string[] } {
+  const errors: string[] = []
+  const warnings: string[] = []
+  
+  // Check 1: All images should have valid positions
+  images.forEach((img, idx) => {
+    if (img.position === undefined || img.position === -1) {
+      errors.push(`Image ${idx + 1} (${img.filename}) has invalid position`)
+    }
+  })
+  
+  // Check 2: No data URLs should remain in content (all should be replaced with S3 URLs)
+  const dataUrlPattern = /data:image\/[^)]+/g
+  const dataUrls = content.match(dataUrlPattern)
+  if (dataUrls && dataUrls.length > 0) {
+    warnings.push(`Found ${dataUrls.length} data URL(s) in content - should be replaced with S3 URLs`)
+  }
+  
+  // Check 3: All placeholders should be replaced
+  const placeholderPattern = /\[IMG_\d+\]/g
+  const placeholders = content.match(placeholderPattern)
+  if (placeholders && placeholders.length > 0) {
+    errors.push(`Found ${placeholders.length} unreplaced placeholder(s) in content`)
+  }
+  
+  // Check 4: Image count should match
+  const imageRefs = content.match(/!\[.*?\]\([^)]+\)/g) || []
+  if (imageRefs.length !== images.length) {
+    warnings.push(`Image count mismatch: ${imageRefs.length} image references in content vs ${images.length} images in array`)
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings
+  }
+}
+
+/**
+ * Creates a detailed log of image replacements for debugging
+ */
+export function createImageReplacementLog(
+  images: ParsedImage[],
+  replacements: Array<{
+    imageId: string
+    filename: string
+    originalPosition: number
+    sectionIndex?: number
+    replacementType: 'placeholder' | 'data-url' | 'relative-path' | 'new-insertion'
+    success: boolean
+    error?: string
+    placeholder?: string
+    s3Url?: string
+  }>
+): ImageReplacementLog[] {
+  return images.map((img, idx) => {
+    const replacement = replacements.find(r => r.imageId === img.placeholder || r.filename === img.filename)
+    
+    return {
+      imageId: img.placeholder || `img_${idx}`,
+      filename: img.filename,
+      originalPosition: img.position,
+      sectionIndex: img.sectionIndex,
+      replacementType: replacement?.replacementType || 'new-insertion',
+      success: replacement?.success ?? false,
+      error: replacement?.error,
+      placeholder: img.placeholder,
+      s3Url: replacement?.s3Url
+    }
+  })
 }
