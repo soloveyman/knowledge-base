@@ -162,6 +162,10 @@ export async function DELETE(
     // created by the user as they might be used by others.
     // If you want to delete those too, add them here.
     // For now, we'll just leave the createdBy field as a reference.
+    
+    // Note: Documents uploaded by this user are NOT deleted (they may be used by others)
+    // If documents were to be deleted, images would need to be deleted from Spaces first
+    // See app/api/documents/[id]/route.ts DELETE handler for proper image cleanup
 
     // Finally, delete the user
     await db.delete(users).where(eq(users.id, id))
