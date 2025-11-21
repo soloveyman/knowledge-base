@@ -999,14 +999,16 @@ function DocImportPageInner() {
             }
           }
           
-          // If images were not sent in payload, upload them separately now using presigned URLs
-          // This bypasses Vercel's body size limit by uploading directly to Spaces
+          // If images were not sent in payload, upload them separately now through backend API
+          // This avoids CORS issues by routing uploads through the backend instead of direct browser uploads
           if (!sendImagesInPayload && file.parsedContent?.images && file.parsedContent.images.length > 0) {
-            console.log(`📤 Uploading ${file.parsedContent.images.length} images directly to Spaces (presigned URLs) for document ${documentId}...`)
+            console.log(`📤 Uploading ${file.parsedContent.images.length} images through backend API for document ${documentId}...`)
             
             let uploadedCount = 0
             let skippedCount = 0
             let failedCount = 0
+            
+            const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB limit per image
             
             try {
               // Upload images one by one to avoid overwhelming the server
@@ -1018,76 +1020,63 @@ function DocImportPageInner() {
                 }
                 
                 try {
-                  // Step 1: Get presigned URL from server
-                  const presignedResponse = await fetch('/api/images/presigned-upload', {
+                  // Step 1: Convert base64 to binary to check size
+                  let base64Data = img.data
+                  if (base64Data.includes(',')) {
+                    base64Data = base64Data.split(',')[1]
+                  }
+                  
+                  // Estimate binary size (base64 is ~33% larger than binary)
+                  const estimatedSize = (base64Data.length * 3) / 4
+                  const sizeMB = estimatedSize / (1024 * 1024)
+                  
+                  // Check size limit before attempting upload
+                  if (estimatedSize > MAX_IMAGE_SIZE) {
+                    console.warn(`⚠️ Skipping image ${img.filename} - exceeds size limit (${sizeMB.toFixed(2)}MB). Maximum is ${MAX_IMAGE_SIZE / (1024 * 1024)}MB per image.`)
+                    skippedCount++
+                    continue
+                  }
+                  
+                  // Step 2: Upload through backend API (avoids CORS issues)
+                  const uploadResponse = await fetch('/api/images/upload', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                      base64Data: img.data, // Send full data URL including prefix
                       filename: img.filename,
                       contentType: img.type || 'image/png',
                       folder: `documents/${documentId}`
                     })
                   })
                   
-                  if (!presignedResponse.ok) {
-                    const errorText = await presignedResponse.text()
+                  if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text()
                     let errorData
                     try {
                       errorData = JSON.parse(errorText)
                     } catch {
-                      errorData = { message: errorText || presignedResponse.statusText }
+                      errorData = { message: errorText || uploadResponse.statusText }
                     }
-                    console.error(`❌ Failed to get presigned URL for ${img.filename}:`, {
-                      status: presignedResponse.status,
-                      statusText: presignedResponse.statusText,
-                      error: errorData
-                    })
-                    failedCount++
-                    continue
-                  }
-                  
-                  const presignedResult = await presignedResponse.json()
-                  if (!presignedResult.success || !presignedResult.data?.presignedUrl) {
-                    console.error(`❌ Invalid presigned URL response for ${img.filename}:`, presignedResult)
-                    failedCount++
-                    continue
-                  }
-                  
-                  const { presignedUrl, key, url } = presignedResult.data
-                  
-                  // Step 2: Convert base64 to binary
-                  let base64Data = img.data
-                  if (base64Data.includes(',')) {
-                    base64Data = base64Data.split(',')[1]
-                  }
-                  
-                  const binaryString = atob(base64Data)
-                  const bytes = new Uint8Array(binaryString.length)
-                  for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i)
-                  }
-                  
-                  // Step 3: Upload directly to Spaces using presigned URL (PUT method)
-                  const uploadResponse = await fetch(presignedUrl, {
-                    method: 'PUT',
-                    body: bytes,
-                    headers: {
-                      'Content-Type': img.type || 'image/png',
-                    }
-                  })
-                  
-                  if (!uploadResponse.ok) {
-                    const sizeMB = (bytes.length / (1024 * 1024)).toFixed(2)
                     console.error(`❌ Failed to upload ${img.filename} to Spaces:`, {
                       status: uploadResponse.status,
                       statusText: uploadResponse.statusText,
-                      size: `${sizeMB}MB`
+                      error: errorData,
+                      size: `${sizeMB.toFixed(2)}MB`
                     })
                     failedCount++
                     continue
                   }
                   
-                  console.log(`✅ Uploaded ${img.filename} directly to Spaces: ${url} (${(bytes.length / (1024 * 1024)).toFixed(2)}MB)`)
+                  const uploadResult = await uploadResponse.json()
+                  if (!uploadResult.success || !uploadResult.data?.url) {
+                    console.error(`❌ Invalid upload response for ${img.filename}:`, uploadResult)
+                    failedCount++
+                    continue
+                  }
+                  
+                  const { url, key } = uploadResult.data
+                  
+                  console.log(`✅ Uploaded ${img.filename} to Spaces: ${url} (${sizeMB.toFixed(2)}MB)`)
                   
                   // Save image info to database and update parsedContent
                   try {
@@ -1134,10 +1123,10 @@ function DocImportPageInner() {
                 }
               }
               
-              console.log(`✅ Finished uploading images directly to Spaces for document ${documentId}: ${uploadedCount} uploaded, ${skippedCount} skipped, ${failedCount} failed`)
+              console.log(`✅ Finished uploading images through backend API for document ${documentId}: ${uploadedCount} uploaded, ${skippedCount} skipped, ${failedCount} failed`)
               
               if (skippedCount > 0) {
-                console.warn(`⚠️ ${skippedCount} image(s) were skipped (no data)`)
+                console.warn(`⚠️ ${skippedCount} image(s) were skipped (no data or size limit exceeded)`)
               }
               if (failedCount > 0) {
                 console.warn(`⚠️ ${failedCount} image(s) failed to upload`)
