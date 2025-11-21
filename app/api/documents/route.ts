@@ -345,20 +345,21 @@ export async function POST(request: Request) {
     }
 
     // Upload all images to Spaces and update parsedContent with URLs
+    // Declare uploadResults outside if block so it's available everywhere
+    const uploadResults: Array<{
+      originalIndex: number
+      url: string | null
+      storageKey: string | null
+      imageId: string | null
+      error?: string
+    }> = []
+    
     if (imagesToUpload.length > 0) {
       console.log(`📤 Uploading ${imagesToUpload.length} images to Spaces...`)
       
       // Check Spaces configuration before attempting upload
       // Note: isSpacesConfigured is checked inside uploadImageToSpaces, but we log here for visibility
       console.log('📤 Checking Spaces configuration before upload...')
-      
-      const uploadResults: Array<{
-        originalIndex: number
-        url: string | null
-        storageKey: string | null
-        imageId: string | null
-        error?: string
-      }> = []
 
       // Upload images in parallel (but limit concurrency to avoid overwhelming Spaces)
       const uploadPromises = imagesToUpload.map(async (img) => {
@@ -494,7 +495,7 @@ export async function POST(request: Request) {
     }
 
     // Update parsedContent.images with URLs from Spaces and insert into content
-      if (parsedContent?.images && Array.isArray(parsedContent.images)) {
+    if (parsedContent?.images && Array.isArray(parsedContent.images)) {
         const updatedParsedContent = JSON.parse(JSON.stringify(parsedContent))
         
         // Map upload results by original index
@@ -724,15 +725,16 @@ export async function POST(request: Request) {
         })
       }
       
-      const successfulUploads = uploadResults.filter(r => r.url).length
-      const failedUploads = uploadResults.filter(r => !r.url).length
-      console.log(`✅ Processed ${uploadResults.length} images: ${successfulUploads} uploaded to Spaces, ${failedUploads} failed (base64 storage disabled)`)
-      if (failedUploads > 0) {
-        console.warn(`⚠️ ${failedUploads} image(s) failed to upload to S3 and were skipped (base64 storage is disabled)`)
+      if (uploadResults.length > 0) {
+        const successfulUploads = uploadResults.filter(r => r.url).length
+        const failedUploads = uploadResults.filter(r => !r.url).length
+        console.log(`✅ Processed ${uploadResults.length} images: ${successfulUploads} uploaded to Spaces, ${failedUploads} failed (base64 storage disabled)`)
+        if (failedUploads > 0) {
+          console.warn(`⚠️ ${failedUploads} image(s) failed to upload to S3 and were skipped (base64 storage is disabled)`)
+        }
+      } else {
+        console.log('📸 No images were processed')
       }
-    } else {
-      console.log('📸 No images to upload (imagesToUpload.length === 0)')
-    }
 
     // Update document with final parsedContent (with URLs)
     if (existingDocument.length > 0) {
