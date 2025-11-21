@@ -557,7 +557,7 @@ function DocImportPageInner() {
         console.log('ParsedContent tables:', file.parsedContent?.tables?.length || 0)
         console.log('ParsedContent images:', file.parsedContent?.images?.length || 0)
         if (file.parsedContent?.images && file.parsedContent.images.length > 0) {
-          console.log('Image positions:', file.parsedContent.images.map((img: any) => ({ filename: img.filename, position: img.position })))
+          console.log('Image positions:', file.parsedContent.images.map((img) => ({ filename: img.filename, position: img.position })))
         }
         
         try {
@@ -636,7 +636,17 @@ function DocImportPageInner() {
           }
           
           // Prepare request body
-          let requestBody: any
+          interface DocumentRequestBody {
+            title: string
+            originalFileName: string
+            fileType: string
+            fileUrl: string | null
+            fileSize: number
+            parsedContent: ParsedContent | { sections: []; tables: []; images: []; metadata: ParsedContent['metadata'] }
+            parsingLog: Array<{ level: string; message: string; timestamp?: string }> | null
+            uploadedBy: string
+          }
+          let requestBody: DocumentRequestBody
           
           if (sendMinimalContent) {
             // Send document with minimal parsedContent (only metadata)
@@ -718,18 +728,17 @@ function DocImportPageInner() {
               const getDocResult = await getDocResponse.json()
               const existingParsedContent = getDocResult.data?.document?.parsedContent || { sections: [], tables: [], images: [], metadata: {} }
               
-              // Prepare parsedContent for update (without images if they exceed limit)
-              const fullParsedContent = sendImagesInPayload
-                ? file.parsedContent
-                : {
-                    ...file.parsedContent,
-                    images: file.parsedContent?.images?.map((img: any) => ({
-                      filename: img.filename,
-                      type: img.type,
-                      position: img.position,
-                      // Don't include data - images will be uploaded separately
-                    })) || []
-                  }
+              // Prepare parsedContent for update (NEVER include base64 image data in metadata)
+              const fullParsedContent = {
+                ...file.parsedContent,
+                images: file.parsedContent?.images?.map((img) => ({
+                  filename: img.filename,
+                  type: img.type,
+                  position: img.position,
+                  // NEVER include data - images will be uploaded separately or skipped
+                  data: undefined
+                })) || []
+              }
               
               // Merge with existing content
               const mergedContent = {
@@ -756,11 +765,17 @@ function DocImportPageInner() {
                 const metadata = mergedContent.metadata || {}
                 
                 // Get current document content to merge incrementally
-                let currentContent: any = {
+                let currentContent: ParsedContent = {
                   sections: [],
                   tables: [],
                   images: [],
-                  metadata
+                  metadata: {
+                    totalSections: 0,
+                    totalTables: 0,
+                    wordCount: 0,
+                    totalImages: 0,
+                    ...metadata
+                  }
                 }
                 
                 // Update with metadata first (small)
@@ -777,11 +792,33 @@ function DocImportPageInner() {
                 }
                 
                 // Update sections incrementally - add one by one until we hit size limit
-                let accumulatedSections: any[] = []
+                let accumulatedSections: ParsedContent['sections'] = []
                 for (let i = 0; i < sections.length; i++) {
+                  const section = sections[i]
+                  
+                  // Check if single section is too large - if so, truncate content
+                  let sectionToAdd = section
+                  const singleSectionTest = {
+                    ...currentContent,
+                    sections: [...accumulatedSections, section]
+                  }
+                  const singleSectionSize = JSON.stringify({ parsedContent: singleSectionTest }).length / (1024 * 1024)
+                  
+                  if (singleSectionSize > VERCEL_LIMIT_MB * 0.9) {
+                    // Single section is too large - truncate its content
+                    const maxContentLength = 100000 // ~100KB per section to be safe
+                    if (section.content && section.content.length > maxContentLength) {
+                      console.warn(`⚠️ Section "${section.title || 'untitled'}" content too large (${(section.content.length / 1024).toFixed(2)}KB), truncating to ${(maxContentLength / 1024).toFixed(2)}KB`)
+                      sectionToAdd = {
+                        ...section,
+                        content: section.content.substring(0, maxContentLength) + '\n\n[... content truncated due to size limit ...]'
+                      }
+                    }
+                  }
+                  
                   const testContent = {
                     ...currentContent,
-                    sections: [...accumulatedSections, sections[i]]
+                    sections: [...accumulatedSections, sectionToAdd]
                   }
                   const testSize = JSON.stringify({ parsedContent: testContent }).length / (1024 * 1024)
                   
@@ -799,13 +836,20 @@ function DocImportPageInner() {
                       const getResponse = await fetch(`/api/documents/${documentId}`)
                       const getResult = await getResponse.json()
                       currentContent = getResult.data?.document?.parsedContent || currentContent
-                      accumulatedSections = [sections[i]] // Start new batch with current section
+                      accumulatedSections = [sectionToAdd] // Start new batch with current section
                     } else {
-                      console.warn(`⚠️ Failed to update sections batch, continuing...`)
-                      accumulatedSections.push(sections[i])
+                      console.warn(`⚠️ Failed to update sections batch, trying with smaller batch...`)
+                      // Try with just current section if batch failed
+                      if (accumulatedSections.length > 1) {
+                        accumulatedSections = [sectionToAdd]
+                      } else {
+                        // Even single section failed - skip it
+                        console.warn(`⚠️ Skipping section "${section.title || 'untitled'}" - too large even alone`)
+                        accumulatedSections = []
+                      }
                     }
                   } else {
-                    accumulatedSections.push(sections[i])
+                    accumulatedSections.push(sectionToAdd)
                   }
                 }
                 
@@ -846,11 +890,17 @@ function DocImportPageInner() {
                   }
                 }
                 
-                // Update images metadata (without data)
+                // Update images metadata (without data) - only if small enough
                 if (images.length > 0) {
-                  currentContent.images = images
-                  const imagesSize = JSON.stringify({ parsedContent: currentContent }).length / (1024 * 1024)
+                  // Images metadata should be small (no base64), but check anyway
+                  const imagesOnlyContent = {
+                    ...currentContent,
+                    images: images
+                  }
+                  const imagesSize = JSON.stringify({ parsedContent: imagesOnlyContent }).length / (1024 * 1024)
+                  
                   if (imagesSize < VERCEL_LIMIT_MB) {
+                    currentContent.images = images
                     const imagesResponse = await fetch(`/api/documents/${documentId}`, {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
@@ -858,9 +908,35 @@ function DocImportPageInner() {
                     })
                     if (imagesResponse.ok) {
                       console.log(`✅ Updated images metadata for document ${documentId}`)
+                      const getResponse = await fetch(`/api/documents/${documentId}`)
+                      const getResult = await getResponse.json()
+                      currentContent = getResult.data?.document?.parsedContent || currentContent
                     }
                   } else {
-                    console.warn(`⚠️ Images metadata too large to update (${imagesSize.toFixed(2)}MB)`)
+                    console.warn(`⚠️ Images metadata too large to update (${imagesSize.toFixed(2)}MB) - skipping images metadata`)
+                    // Try to add image references to sections content instead
+                    // This way images are at least mentioned in the document
+                    if (currentContent.sections && currentContent.sections.length > 0) {
+                      const imageReferences = images.map((img) => `![${img.filename}](image:${img.filename})`).join('\n')
+                      // Add to first section
+                      if (currentContent.sections[0].content) {
+                        currentContent.sections[0].content += '\n\n' + imageReferences
+                      } else {
+                        currentContent.sections[0].content = imageReferences
+                      }
+                      // Try to update with image references in content
+                      const withRefsSize = JSON.stringify({ parsedContent: currentContent }).length / (1024 * 1024)
+                      if (withRefsSize < VERCEL_LIMIT_MB) {
+                        const refsResponse = await fetch(`/api/documents/${documentId}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ parsedContent: currentContent })
+                        })
+                        if (refsResponse.ok) {
+                          console.log(`✅ Added image references to document content`)
+                        }
+                      }
+                    }
                   }
                 }
                 
@@ -1045,9 +1121,18 @@ function DocImportPageInner() {
       }
       
       // All files saved successfully
+      interface SaveResult {
+        data?: {
+          document?: {
+            id: string
+          }
+        }
+      }
       const savedDocumentIds = succeeded
-        .filter(r => r.status === 'fulfilled' && r.value?.data?.document?.id)
-        .map(r => (r.value as any).data.document.id)
+        .filter((r): r is PromiseFulfilledResult<SaveResult> => 
+          r.status === 'fulfilled' && !!r.value?.data?.document?.id
+        )
+        .map(r => r.value.data!.document!.id)
       
       console.log('✅ All documents saved successfully!', {
         total: succeeded.length,
