@@ -92,9 +92,54 @@ function getImageDisplayText(alt: string, src: string): string {
   return 'Image'
 }
 
+// Helper function to filter out undefined, null, and strange text
+function filterStrangeText(text: string): string {
+  if (!text || typeof text !== 'string') return ''
+  
+  // Remove common strange text patterns
+  const strangePatterns = [
+    /undefined/gi,
+    /null/gi,
+    /\[object\s+Object\]/gi,
+    /\[object\s+Array\]/gi,
+    /NaN/gi,
+    /Infinity/gi,
+    /true/gi, // Only if standalone (not part of words)
+    /false/gi, // Only if standalone
+  ]
+  
+  let filtered = text
+  
+  // Remove standalone "undefined", "null", etc. (not part of words)
+  filtered = filtered.replace(/\bundefined\b/gi, '')
+  filtered = filtered.replace(/\bnull\b/gi, '')
+  filtered = filtered.replace(/\bNaN\b/gi, '')
+  filtered = filtered.replace(/\bInfinity\b/gi, '')
+  filtered = filtered.replace(/\[object\s+Object\]/gi, '')
+  filtered = filtered.replace(/\[object\s+Array\]/gi, '')
+  
+  // Remove empty formatting tags that might contain undefined
+  filtered = filtered.replace(/\[BOLD\]\s*undefined\s*\[\/BOLD\]/gi, '')
+  filtered = filtered.replace(/\[ITALIC\]\s*undefined\s*\[\/ITALIC\]/gi, '')
+  filtered = filtered.replace(/\[CENTER\]\s*undefined\s*\[\/CENTER\]/gi, '')
+  filtered = filtered.replace(/\[RIGHT\]\s*undefined\s*\[\/RIGHT\]/gi, '')
+  filtered = filtered.replace(/\[JUSTIFY\]\s*undefined\s*\[\/JUSTIFY\]/gi, '')
+  
+  // Remove headings that only contain undefined/null
+  filtered = filtered.replace(/^#{1,6}\s+(undefined|null)\s*$/gim, '')
+  
+  // Clean up multiple consecutive newlines that might result from removals
+  filtered = filtered.replace(/\n{4,}/g, '\n\n\n')
+  
+  return filtered
+}
+
 function DocumentContent({ content }: { content: string }) {
+  // Filter out undefined and strange text before processing
+  const cleanedContent = filterStrangeText(content)
+  
   // Преобразуем форматирование в markdown
-  const markdown = convertToMarkdown(content)
+  const markdown = convertToMarkdown(cleanedContent)
   
   // Convert markdown images to HTML img tags (ReactMarkdown with rehypeRaw can handle HTML)
   // This avoids parsing issues with very long data URLs
@@ -172,58 +217,132 @@ function DocumentContent({ content }: { content: string }) {
       ]}
       components={{
         h1: ({ children }) => {
+          // Filter out undefined/null children
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          
+          if (filteredChildren.length === 0) return null
+          
           // Главный заголовок - самый крупный и выразительный
           return (
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mt-12 mb-8 text-foreground border-b-2 border-border pb-4 leading-tight tracking-tight">
-              {children}
+              {filteredChildren}
             </h1>
           )
         },
         h2: ({ children }) => {
-          // Подзаголовок первого уровня - крупный и четкий
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          if (filteredChildren.length === 0) return null
           return (
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-10 mb-6 text-foreground border-b border-border pb-3 leading-tight tracking-tight">
-              {children}
+              {filteredChildren}
             </h2>
           )
         },
         h3: ({ children }) => {
-          // Подзаголовок второго уровня - средний размер с акцентом
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          if (filteredChildren.length === 0) return null
           return (
             <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold mt-8 mb-5 text-foreground leading-tight tracking-tight">
-              {children}
+              {filteredChildren}
             </h3>
           )
         },
         h4: ({ children }) => {
-          // Подзаголовок третьего уровня - заметный, но не перегруженный
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          if (filteredChildren.length === 0) return null
           return (
             <h4 className="text-2xl sm:text-3xl lg:text-4xl font-semibold mt-7 mb-4 text-foreground leading-tight tracking-normal">
-              {children}
+              {filteredChildren}
             </h4>
           )
         },
         h5: ({ children }) => {
-          // Подзаголовок четвертого уровня - четкий акцент
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          if (filteredChildren.length === 0) return null
           return (
             <h5 className="text-xl sm:text-2xl lg:text-3xl font-semibold mt-6 mb-3 text-foreground/90 leading-tight tracking-normal">
-              {children}
+              {filteredChildren}
             </h5>
           )
         },
         h6: ({ children }) => {
-          // Подзаголовок пятого уровня - аккуратный выделенный текст
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          if (filteredChildren.length === 0) return null
           return (
             <h6 className="text-lg sm:text-xl lg:text-2xl font-semibold mt-5 mb-3 text-foreground/80 leading-tight tracking-normal">
-              {children}
+              {filteredChildren}
             </h6>
           )
         },
-        p: ({ children }) => (
-          <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground">
-            {children}
-          </p>
-        ),
+        p: ({ children }) => {
+          // Filter out undefined/null children
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          
+          // Don't render paragraph if all children were filtered out
+          if (filteredChildren.length === 0) return null
+          
+          return (
+            <p className="mb-5 text-base sm:text-lg leading-relaxed text-foreground">
+              {filteredChildren}
+            </p>
+          )
+        },
         ul: ({ children }) => {
           // Проверяем наличие эмодзи в элементах списка через строковое представление
           const childrenStr = String(children)
@@ -241,8 +360,21 @@ function DocumentContent({ content }: { content: string }) {
           </ol>
         ),
         li: ({ children }) => {
+          // Filter out undefined/null children
+          const filteredChildren = React.Children.toArray(children).filter(child => {
+            if (child === null || child === undefined) return false
+            if (typeof child === 'string') {
+              const trimmed = child.trim().toLowerCase()
+              return trimmed !== 'undefined' && trimmed !== 'null' && trimmed !== 'nan' && 
+                     trimmed !== 'infinity' && !trimmed.includes('[object')
+            }
+            return true
+          })
+          
+          if (filteredChildren.length === 0) return null
+          
           // Проверяем, начинается ли элемент с эмодзи
-          const childrenStr = String(children)
+          const childrenStr = String(filteredChildren)
           const emojiMatch = childrenStr.trim().match(/^([\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}✓✅🔴🍽️🍸👨‍🍳🏢🧼🚪📦🚚🔧📝💭])\s*(.+)$/u)
           
           // Для элементов с эмодзи: используем flex для правильного выравнивания на мобильных
@@ -258,7 +390,7 @@ function DocumentContent({ content }: { content: string }) {
           
           // Обычные элементы списка
           return (
-            <li className="leading-relaxed mb-1 pl-0 break-words">{children}</li>
+            <li className="leading-relaxed mb-1 pl-0 break-words">{filteredChildren}</li>
           )
         },
         strong: ({ children }) => (
@@ -504,6 +636,14 @@ function TableRenderer({ table }: {
   const isCellEmpty = (cell: string | null | undefined): boolean => {
     if (cell === null || cell === undefined) return true
     if (typeof cell !== 'string') return true
+    
+    // Check for strange text patterns
+    const cellLower = cell.toLowerCase().trim()
+    if (cellLower === 'undefined' || cellLower === 'null' || cellLower === 'nan' || 
+        cellLower === 'infinity' || cellLower.includes('[object') || cellLower === 'true' || cellLower === 'false') {
+      return true
+    }
+    
     // Удаляем все виды пробелов и невидимых символов
     const normalized = cell
       .replace(/\u00A0/g, ' ') // неразрывный пробел
@@ -513,6 +653,23 @@ function TableRenderer({ table }: {
       .replace(/\s+/g, ' ') // заменяем все пробельные символы на обычный пробел
       .trim()
     return normalized.length === 0
+  }
+  
+  // Helper function to clean cell content
+  const cleanCellContent = (cell: string | null | undefined): string => {
+    if (cell === null || cell === undefined) return ''
+    if (typeof cell !== 'string') return String(cell)
+    
+    // Filter out strange text
+    let cleaned = cell
+    cleaned = cleaned.replace(/\bundefined\b/gi, '')
+    cleaned = cleaned.replace(/\bnull\b/gi, '')
+    cleaned = cleaned.replace(/\bNaN\b/gi, '')
+    cleaned = cleaned.replace(/\bInfinity\b/gi, '')
+    cleaned = cleaned.replace(/\[object\s+Object\]/gi, '')
+    cleaned = cleaned.replace(/\[object\s+Array\]/gi, '')
+    
+    return cleaned.trim()
   }
 
   // Вспомогательная функция для проверки, пустой ли заголовок
@@ -570,14 +727,14 @@ function TableRenderer({ table }: {
 
   // Фильтруем заголовки - оставляем только для непустых колонок
   const filteredHeaders = table.headers 
-    ? nonEmptyColumnIndices.map(colIdx => table.headers[colIdx] || '')
+    ? nonEmptyColumnIndices.map(colIdx => cleanCellContent(table.headers[colIdx]))
     : []
 
   // Фильтруем строки - оставляем только ячейки из непустых колонок
   const filteredRowsData = filteredRows.map(row =>
     nonEmptyColumnIndices.map(colIdx => {
       const cell = row[colIdx]
-      return cell !== undefined && cell !== null ? String(cell) : ''
+      return cleanCellContent(cell)
     })
   )
 
@@ -770,6 +927,14 @@ function convertToMarkdown(content: string): string {
   if (!content) return ''
   
   let md = content
+  
+  // Remove undefined/null text before processing
+  md = md.replace(/\bundefined\b/gi, '')
+  md = md.replace(/\bnull\b/gi, '')
+  md = md.replace(/\bNaN\b/gi, '')
+  md = md.replace(/\bInfinity\b/gi, '')
+  md = md.replace(/\[object\s+Object\]/gi, '')
+  md = md.replace(/\[object\s+Array\]/gi, '')
   
   // Preserve images before processing - extract and restore them
   // Use a more robust approach that handles very long data URLs

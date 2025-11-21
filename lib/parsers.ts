@@ -2,6 +2,39 @@ import * as XLSX from 'xlsx'
 import * as mammoth from 'mammoth'
 import * as JSZip from 'jszip'
 
+// Cached regex patterns for performance
+const REGEX_CACHE = {
+  whitespace: /[ \t]+/g,
+  multipleNewlines: /\n{3,}/g,
+  crlf: /\r\n/g,
+  cr: /\r/g,
+  leadingNewlines: /^\n+/,
+  trailingNewlines: /\n+$/,
+  htmlEntities: /&(?:nbsp|amp|lt|gt|quot|#39|#160|#32|#10|#13|[a-zA-Z0-9#]+);/g,
+  numericEntities: /&#(\d+);/g,
+  htmlTags: /<[^>]+>/g,
+  imgTag: /<img[^>]+src="data:([^;]+);base64,([^"]+)"[^>]*>/gi,
+  placeholder: /\[IMG_\d+\]/g,
+  imageMarkdown: /!\[([^\]]*)\]\(data:[^)]+\)/,
+  dataUrl: /data:image\/[^)]+/g,
+  placeholderPattern: /\[IMG_\d+\]/g,
+  imageRef: /!\[.*?\]\([^)]+\)/g,
+} as const
+
+// HTML entity map for fast decoding
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&#160;': ' ',
+  '&#32;': ' ',
+  '&#10;': '\n',
+  '&#13;': '\r',
+}
+
 /**
  * Normalize whitespace in text while preserving structure and readability
  * - Collapses multiple spaces/tabs into single space
@@ -9,28 +42,27 @@ import * as JSZip from 'jszip'
  * - Handles special characters and formatting
  */
 function normalizeWhitespace(text: string): string {
-  return text
-    // Normalize tabs and multiple spaces to single space (within a line)
-    // Split by lines first to avoid breaking formatting tags
-    .split('\n')
-    .map(line => {
-      // Preserve empty lines (they're important for structure)
-      if (line.trim().length === 0) return ''
-      // Normalize spaces/tabs within the line, but preserve formatting tags
-      // Replace multiple spaces/tabs with single space, but be careful with tags
-      let normalized = line.replace(/[ \t]+/g, ' ')
-      // Trim leading/trailing spaces
-      return normalized.trim()
-    })
+  // Single pass: normalize line endings first
+  let normalized = text.replace(REGEX_CACHE.crlf, '\n').replace(REGEX_CACHE.cr, '\n')
+  
+  // Split once and process lines
+  const lines = normalized.split('\n')
+  const processedLines: string[] = []
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.trim().length === 0) {
+      processedLines.push('')
+    } else {
+      processedLines.push(line.replace(REGEX_CACHE.whitespace, ' ').trim())
+    }
+  }
+  
+  return processedLines
     .join('\n')
-    // Preserve paragraph breaks (2+ newlines)
-    .replace(/\n{3,}/g, '\n\n')
-    // Normalize single line breaks
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    // Final trim (but preserve structure)
-    .replace(/^\n+/, '')
-    .replace(/\n+$/, '')
+    .replace(REGEX_CACHE.multipleNewlines, '\n\n')
+    .replace(REGEX_CACHE.leadingNewlines, '')
+    .replace(REGEX_CACHE.trailingNewlines, '')
 }
 
 export interface ParseResult {
@@ -174,11 +206,16 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         console.log(`📸 Found ${mediaFiles.length} image files`)
         
         const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB limit
+        const mimeTypeMap: Record<string, string> = {
+          'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+          'gif': 'image/gif', 'bmp': 'image/bmp', 'webp': 'image/webp', 'svg': 'image/svg+xml'
+        }
         
-        for (const filename of mediaFiles) {
+        // Process images in parallel for better performance
+        const imagePromises = mediaFiles.map(async (filename) => {
           try {
             const fileEntry = mediaFolder.files[filename]
-            if (!fileEntry || fileEntry.dir) continue
+            if (!fileEntry || fileEntry.dir) return null
             
             let imageBuffer: ArrayBuffer | undefined
             try {
@@ -196,26 +233,27 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
             if (imageBuffer && imageBuffer.byteLength > 0 && imageBuffer.byteLength <= ABSOLUTE_MAX_SIZE) {
               const base64 = Buffer.from(imageBuffer).toString('base64')
               const extension = filename.split('.').pop()?.toLowerCase() || 'png'
-              const mimeTypeMap: Record<string, string> = {
-                'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
-                'gif': 'image/gif', 'bmp': 'image/bmp', 'webp': 'image/webp', 'svg': 'image/svg+xml'
-              }
               const mimeType = mimeTypeMap[extension] || `image/${extension}`
               
               const placeholder = `[IMG_${imageCounter++}]`
-              images.push({
+              const image: ParsedImage = {
                 filename,
                 data: `data:${mimeType};base64,${base64}`,
                 type: mimeType,
                 position: -1, // Will be set after HTML parsing
                 placeholder
-              })
+              }
               console.log(`✅ Extracted image: ${filename} (${mimeType})`)
+              return image
             }
           } catch (error) {
             console.warn(`❌ Failed to extract image ${filename}:`, error)
           }
-        }
+          return null
+        })
+        
+        const extractedImages = await Promise.all(imagePromises)
+        images.push(...extractedImages.filter((img): img is ParsedImage => img !== null))
       }
       
       // Step 2: Convert DOCX to HTML using Mammoth (basic conversion)
@@ -244,10 +282,12 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       // Step 3: Extract images from HTML and replace with placeholders
       // Find all img tags in HTML and match with extracted images
-      const imgTagRegex = /<img[^>]+src="data:([^;]+);base64,([^"]+)"[^>]*>/gi
       const htmlImageMatches: Array<{ match: RegExpMatchArray; htmlPos: number; mimeType: string; base64Data: string }> = []
       
-      let match
+      // Use matchAll for better performance (if available) or optimized exec
+      let match: RegExpExecArray | null
+      const imgTagRegex = REGEX_CACHE.imgTag
+      imgTagRegex.lastIndex = 0 // Reset regex state
       while ((match = imgTagRegex.exec(htmlText)) !== null) {
         htmlImageMatches.push({
           match,
@@ -266,8 +306,11 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         const { match, htmlPos, mimeType, base64Data } = htmlImageMatches[i]
         const base64Prefix = base64Data.substring(0, 50)
         
-        // Try to find matching image in extracted images
-        let image = images.find(img => img.data.includes(base64Prefix))
+        // Try to find matching image in extracted images (optimized: check data property directly)
+        let image = images.find(img => {
+          const imgData = img.data
+          return imgData && imgData.includes(base64Prefix)
+        })
         
         if (!image) {
           // Create new image from HTML
@@ -295,20 +338,26 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       }
       
       // Step 4: Clean up HTML before extracting text - remove alt/title attributes and text directly adjacent to img tags
+      // Optimized: combine regex operations where possible
       // Remove alt and title attributes from img tags (they can appear as text when extracted)
+      const altTitleRegex = /<img[^>]*(alt|title)="[^"]*"[^>]*>/gi
+      const altTitleAttrRegex = /(alt|title)="[^"]*"/gi
       htmlWithPlaceholders = htmlWithPlaceholders.replace(
-        /<img[^>]*(alt|title)="[^"]*"[^>]*>/gi,
-        (match) => match.replace(/(alt|title)="[^"]*"/gi, '')
+        altTitleRegex,
+        (match) => match.replace(altTitleAttrRegex, '')
       )
       
       // Remove text that appears immediately before or after img tags (likely alt text or image descriptions)
       // This pattern matches text within the same tag/paragraph as the image
+      const imgContextRegex = /([^<\n]{0,50})<img[^>]*>([^<\n]{0,50})/gi
       htmlWithPlaceholders = htmlWithPlaceholders.replace(
-        /([^<\n]{0,50})<img[^>]*>([^<\n]{0,50})/gi,
+        imgContextRegex,
         (match, before, after) => {
           // Remove very short text fragments (1-2 words) that are likely alt text
-          const beforeWords = before.trim().split(/\s+/).filter((w: string) => w.length > 0)
-          const afterWords = after.trim().split(/\s+/).filter((w: string) => w.length > 0)
+          const beforeTrimmed = before.trim()
+          const afterTrimmed = after.trim()
+          const beforeWords = beforeTrimmed ? beforeTrimmed.split(/\s+/) : []
+          const afterWords = afterTrimmed ? afterTrimmed.split(/\s+/) : []
           const keepBefore = beforeWords.length > 2 ? before : ''
           const keepAfter = afterWords.length > 2 ? after : ''
           return keepBefore + keepAfter
@@ -318,16 +367,16 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       // Step 5: Convert HTML to text (improved - extract all text before removing tags)
       // Helper function to extract text from HTML recursively
       const extractTextFromHtml = (html: string): string => {
-        // First decode HTML entities
-        let text = html
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&#160;/g, ' ')
-          .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Other entities
+        // Optimized HTML entity decoding - single pass
+        let text = html.replace(REGEX_CACHE.htmlEntities, (match) => {
+          return HTML_ENTITY_MAP[match] || ' '
+        })
+        
+        // Handle numeric entities
+        text = text.replace(REGEX_CACHE.numericEntities, (_, num) => {
+          const code = parseInt(num, 10)
+          return code >= 32 && code <= 126 ? String.fromCharCode(code) : ' '
+        })
         
         // Extract text from all tags recursively - preserve text content
         // Replace block elements with newlines first
@@ -358,7 +407,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         
         // Now remove all remaining tags (but keep their text content)
         // Use a more careful approach: replace tags with spaces to preserve word boundaries
-        text = text.replace(/<[^>]+>/g, ' ')
+        text = text.replace(REGEX_CACHE.htmlTags, ' ')
         
         // Clean up multiple spaces and newlines
         text = text
@@ -376,9 +425,10 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       // Step 6: Clean up text around image placeholders - remove short text fragments that are likely image metadata
       // Find all placeholders and remove very short text fragments (1-2 words) around them
-      const placeholderRegex = /\[IMG_\d+\]/g
-      let placeholderMatch
       const placeholdersToClean: Array<{ placeholder: string; position: number }> = []
+      const placeholderRegex = REGEX_CACHE.placeholder
+      placeholderRegex.lastIndex = 0
+      let placeholderMatch: RegExpExecArray | null
       while ((placeholderMatch = placeholderRegex.exec(workingText)) !== null) {
         placeholdersToClean.push({
           placeholder: placeholderMatch[0],
@@ -450,16 +500,14 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       if (documentXml) {
         // Extract text more carefully - preserve word boundaries
-        // First decode HTML entities
-        text = documentXml
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&#160;/g, ' ')
-          .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Other entities
+        // Optimized HTML entity decoding
+        text = documentXml.replace(REGEX_CACHE.htmlEntities, (match) => {
+          return HTML_ENTITY_MAP[match] || ' '
+        })
+        text = text.replace(REGEX_CACHE.numericEntities, (_, num) => {
+          const code = parseInt(num, 10)
+          return code >= 32 && code <= 126 ? String.fromCharCode(code) : ' '
+        })
         
         // Extract text from Word XML structure
         // Word uses <w:t> tags for text content
@@ -472,18 +520,15 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
               return content
             })
             .join(' ')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/&#160;/g, ' ')
-            .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+            .replace(REGEX_CACHE.htmlEntities, (match) => HTML_ENTITY_MAP[match] || ' ')
+            .replace(REGEX_CACHE.numericEntities, (_, num) => {
+              const code = parseInt(num, 10)
+              return code >= 32 && code <= 126 ? String.fromCharCode(code) : ' '
+            })
         } else {
           // Fallback to simple tag removal if <w:t> tags not found
           text = documentXml
-            .replace(/<[^>]*>/g, ' ')
+            .replace(REGEX_CACHE.htmlTags, ' ')
             .replace(/\s+/g, ' ')
         }
         
@@ -552,11 +597,16 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
           })
         
         const ABSOLUTE_MAX_SIZE = 10 * 1024 * 1024 // 10MB limit
+        const mimeTypeMap: Record<string, string> = {
+          'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+          'gif': 'image/gif', 'bmp': 'image/bmp', 'webp': 'image/webp', 'svg': 'image/svg+xml'
+        }
         
-        for (const filename of mediaFiles) {
+        // Process images in parallel for better performance
+        const imagePromises = mediaFiles.map(async (filename) => {
           try {
             const fileEntry = mediaFolder.files[filename]
-            if (!fileEntry || fileEntry.dir) continue
+            if (!fileEntry || fileEntry.dir) return null
             
             let imageBuffer: ArrayBuffer | undefined
             try {
@@ -574,26 +624,27 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
             if (imageBuffer && imageBuffer.byteLength > 0 && imageBuffer.byteLength <= ABSOLUTE_MAX_SIZE) {
               const base64 = Buffer.from(imageBuffer).toString('base64')
               const extension = filename.split('.').pop()?.toLowerCase() || 'png'
-              const mimeTypeMap: Record<string, string> = {
-                'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
-                'gif': 'image/gif', 'bmp': 'image/bmp', 'webp': 'image/webp', 'svg': 'image/svg+xml'
-              }
               const mimeType = mimeTypeMap[extension] || `image/${extension}`
               
               const placeholder = `[IMG_${imageCounter++}]`
-              images.push({
+              const image: ParsedImage = {
                 filename,
                 data: `data:${mimeType};base64,${base64}`,
                 type: mimeType,
                 position: -1, // Will be set based on cell position
                 placeholder
-              })
+              }
               console.log(`✅ Extracted image: ${filename} (${mimeType})`)
+              return image
             }
           } catch (error) {
             console.warn(`❌ Failed to extract image ${filename}:`, error)
           }
-        }
+          return null
+        })
+        
+        const extractedImages = await Promise.all(imagePromises)
+        images.push(...extractedImages.filter((img): img is ParsedImage => img !== null))
       }
     } catch (zipError) {
       console.warn('⚠️ Failed to extract images from XLSX (non-fatal):', zipError)
@@ -658,24 +709,32 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
           }
         }
         
-        // Add text content from rows
-        rows.forEach((row, rowIdx) => {
+        // Add text content from rows (optimized: use array join instead of string concatenation)
+        const textParts: string[] = []
+        let currentTextLength = text.length
+        for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+          const row = rows[rowIdx]
           const rowText = row.map(cell => String(cell).trim()).filter(cell => cell).join(' ')
           if (rowText) {
-            text += rowText + '\n'
+            textParts.push(rowText)
+            currentTextLength += rowText.length
             
             // Check if any images should be inserted at this row position
-            images.forEach(img => {
+            for (const img of images) {
               if (img.rowIndex === rowIdx && img.sheetName === sheetName) {
                 // Insert image placeholder in text at this position
                 const placeholder = img.placeholder || `[IMG_${imageCounter++}]`
-                text += `\n${placeholder}\n`
-                img.position = text.length - placeholder.length - 1
+                textParts.push(`\n${placeholder}\n`)
+                img.position = currentTextLength
+                currentTextLength += placeholder.length + 2 // +2 for newlines
                 console.log(`📸 Inserted image placeholder ${placeholder} at row ${rowIdx} in sheet "${sheetName}"`)
               }
-            })
+            }
+            textParts.push('\n')
+            currentTextLength += 1
           }
-        })
+        }
+        text += textParts.join('')
       }
     })
     
@@ -854,20 +913,10 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   
   // Additional cleaning to remove any remaining HTML/CSS artifacts
   // Preserve structure and readability - extract text from tags before removing them
+  // Optimized: single-pass HTML entity decoding
   let cleanedText = text
-    // First decode HTML entities to preserve special characters
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#160;/g, ' ')
-    .replace(/&#32;/g, ' ')
-    .replace(/&#10;/g, '\n')
-    .replace(/&#13;/g, '\r')
-    // Decode numeric entities (common ones)
-    .replace(/&#(\d+);/g, (_, num) => {
+    .replace(REGEX_CACHE.htmlEntities, (match) => HTML_ENTITY_MAP[match] || ' ')
+    .replace(REGEX_CACHE.numericEntities, (_, num) => {
       const code = parseInt(num, 10)
       return code >= 32 && code <= 126 ? String.fromCharCode(code) : ' '
     })
@@ -892,7 +941,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     .replace(/<(?![A-Z])[^>]*>/g, ' ') // Remove HTML tags but not our custom tags like [BOLD]
     .replace(/<\/[^>]*>/g, ' ') // Remove closing tags
     // Remove any remaining entities (should be rare after decoding above)
-    .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+    .replace(REGEX_CACHE.htmlEntities, ' ')
     // Remove CSS property patterns (but be careful not to remove content)
     // Skip this - it's too aggressive and removes content
   
@@ -1038,7 +1087,7 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       
       // Add content as-is - images are already in the text at their correct positions
       // Check if line contains image markdown - always preserve these lines at their exact position
-      const hasImageMarkdown = /!\[([^\]]*)\]\(data:[^)]+\)/.test(line)
+      const hasImageMarkdown = REGEX_CACHE.imageMarkdown.test(line)
       
       if (hasImageMarkdown) {
         // Line contains image - preserve it exactly as it appears (may have newlines before/after)
@@ -1188,21 +1237,19 @@ export function validateDocumentStructure(
   })
   
   // Check 2: No data URLs should remain in content (all should be replaced with S3 URLs)
-  const dataUrlPattern = /data:image\/[^)]+/g
-  const dataUrls = content.match(dataUrlPattern)
+  const dataUrls = content.match(REGEX_CACHE.dataUrl)
   if (dataUrls && dataUrls.length > 0) {
     warnings.push(`Found ${dataUrls.length} data URL(s) in content - should be replaced with S3 URLs`)
   }
   
   // Check 3: All placeholders should be replaced
-  const placeholderPattern = /\[IMG_\d+\]/g
-  const placeholders = content.match(placeholderPattern)
+  const placeholders = content.match(REGEX_CACHE.placeholderPattern)
   if (placeholders && placeholders.length > 0) {
     errors.push(`Found ${placeholders.length} unreplaced placeholder(s) in content`)
   }
   
   // Check 4: Image count should match
-  const imageRefs = content.match(/!\[.*?\]\([^)]+\)/g) || []
+  const imageRefs = content.match(REGEX_CACHE.imageRef) || []
   if (imageRefs.length !== images.length) {
     warnings.push(`Image count mismatch: ${imageRefs.length} image references in content vs ${images.length} images in array`)
   }
