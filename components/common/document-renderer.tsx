@@ -149,7 +149,7 @@ function DocumentContent({ content }: { content: string }) {
   
   // More robust pattern for data URLs - handle very long base64 strings
   // First, extract data URLs with multiline support
-  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s\n]+)\)/gs
+  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s\n]+)\)/g
   let dataUrlMatch
   const processedPositions = new Set<number>()
   
@@ -986,7 +986,7 @@ function convertToMarkdown(content: string): string {
   // - \( - opening parenthesis
   // - (data:[^)]+) - matches data:... but this might fail on very long strings
   // Better approach: match until we find the closing parenthesis, handling newlines
-  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/gs
+  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/g
   let match
   let lastIndex = 0
   while ((match = dataUrlPattern.exec(md)) !== null) {

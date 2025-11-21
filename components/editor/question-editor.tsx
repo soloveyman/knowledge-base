@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useTranslation } from "@/lib/translation-context"
 import { 
   Save, 
   Plus, 
@@ -56,6 +57,7 @@ export default function QuestionEditor({
   onCancel,
   readOnly = false 
 }: QuestionEditorProps) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState<Question>(question || {
     id: '',
     title: '',
@@ -238,11 +240,11 @@ export default function QuestionEditor({
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <input type="radio" name="preview-tf" disabled className="w-4 h-4" />
-              <span className="text-sm">True</span>
+              <span className="text-sm">{t('true')}</span>
             </div>
             <div className="flex items-center space-x-2">
               <input type="radio" name="preview-tf" disabled className="w-4 h-4" />
-              <span className="text-sm">False</span>
+              <span className="text-sm">{t('false')}</span>
             </div>
           </div>
         )}
@@ -343,7 +345,7 @@ export default function QuestionEditor({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="type">Question Type</Label>
+              <Label htmlFor="type">{t('questionType')}</Label>
               <Select
                 value={formData.type}
                 onValueChange={(value) => handleInputChange('type', value)}
@@ -352,15 +354,15 @@ export default function QuestionEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-                  <SelectItem value="true_false">True/False</SelectItem>
-                  <SelectItem value="text">Text Answer</SelectItem>
+                  <SelectItem value="multiple_choice">{t('multipleChoice')}</SelectItem>
+                  <SelectItem value="true_false">{t('trueFalse')}</SelectItem>
+                  <SelectItem value="text">{t('textAnswer')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="difficulty">Difficulty</Label>
+              <Label htmlFor="difficulty">{t('difficulty')}</Label>
               <Select
                 value={formData.difficulty}
                 onValueChange={(value) => handleInputChange('difficulty', value)}
@@ -369,9 +371,9 @@ export default function QuestionEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="easy">Easy</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="hard">Hard</SelectItem>
+                  <SelectItem value="easy">{t('easy')}</SelectItem>
+                  <SelectItem value="medium">{t('medium')}</SelectItem>
+                  <SelectItem value="hard">{t('hard')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

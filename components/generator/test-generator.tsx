@@ -363,7 +363,7 @@ export default function TestGenerator({
 
           {/* Question Types */}
           <div>
-            <Label className="text-base font-medium">Question Types</Label>
+            <Label className="text-base font-medium">{t('questionType')}</Label>
             <p className="text-sm text-gray-600 mb-3">
               Select which types of questions to generate
             </p>

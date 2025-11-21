@@ -580,8 +580,7 @@ export async function POST(request: Request) {
             // Get image metadata for context matching (if available)
             const imageMetadata = parsedContent.images?.find((parsedImg: any) => 
               parsedImg.filename === img.filename || 
-              parsedImg.filename?.endsWith(baseFilename) ||
-              parsedImg.placeholder === img.placeholder
+              parsedImg.filename?.endsWith(baseFilename)
             )
             const contextBefore = imageMetadata?.contextBefore || ''
             const contextAfter = imageMetadata?.contextAfter || ''
@@ -595,7 +594,7 @@ export async function POST(request: Request) {
               
               // Pattern 1: Match data URLs with improved regex for very long URLs
               // Use multiline mode and more robust pattern
-              const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s\n]+)\)/gs
+              const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s\n]+)\)/g
               let match
               const matches: Array<{ match: string; index: number; alt: string; contextScore: number }> = []
               
@@ -617,15 +616,15 @@ export async function POST(request: Request) {
                   
                   // Check if context matches (fuzzy match - check if key words are present)
                   if (contextBefore && beforeText) {
-                    const contextWords = contextBefore.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+                    const contextWords = contextBefore.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3)
                     const beforeWords = beforeText.toLowerCase().split(/\s+/)
-                    const matchingWords = contextWords.filter(w => beforeWords.some(bw => bw.includes(w) || w.includes(bw)))
+                    const matchingWords = contextWords.filter((w: string) => beforeWords.some((bw: string) => bw.includes(w) || w.includes(bw)))
                     contextScore += matchingWords.length / Math.max(contextWords.length, 1)
                   }
                   if (contextAfter && afterText) {
-                    const contextWords = contextAfter.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+                    const contextWords = contextAfter.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3)
                     const afterWords = afterText.toLowerCase().split(/\s+/)
-                    const matchingWords = contextWords.filter(w => afterWords.some(aw => aw.includes(w) || w.includes(aw)))
+                    const matchingWords = contextWords.filter((w: string) => afterWords.some((aw: string) => aw.includes(w) || w.includes(aw)))
                     contextScore += matchingWords.length / Math.max(contextWords.length, 1)
                   }
                 }
