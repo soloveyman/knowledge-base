@@ -1027,11 +1027,10 @@ function OwnerPageInner() {
               } else {
                 console.log('Owner: No pending assignments found in sessionStorage')
               }
-                }
-                // If no sessionStorage data or it's stale, load from API
-                await loadTabData('assignments', true, true) // forceRefresh = true
-                lastLoadedTabRef.current = tab
-              } else if (tab === 'tests') {
+              // If no sessionStorage data or it's stale, load from API
+              await loadTabData('assignments', true, true) // forceRefresh = true
+              lastLoadedTabRef.current = tab
+            } else if (tab === 'tests') {
                 // First, try sessionStorage for immediate display
                 if (typeof window !== 'undefined') {
                   const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
