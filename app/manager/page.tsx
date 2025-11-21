@@ -652,41 +652,69 @@ function ManagerPageInner() {
   // Always reload data when tab changes to ensure fresh data
   // This ensures fresh data after returning from import/edit pages
   useEffect(() => {
-    // Skip if this tab was already loaded and not forced (prevent duplicate loads)
-    if (lastLoadedTabRef.current === defaultTab && !isLoadingRef.current) {
-      return
-    }
-    
     // Skip if already loading
     if (isLoadingRef.current) {
       return
     }
     
-    isLoadingRef.current = true
-    lastLoadedTabRef.current = defaultTab
-    
-    const loadTab = async () => {
-      try {
-        if (defaultTab === 'docs') {
-          console.log('Manager: Docs tab activated, loading documents...')
-          await loadTabData('docs', true, false)
-        } else if (defaultTab === 'tests') {
-          console.log('Manager: Tests tab activated, loading tests...')
-          await loadTabData('tests', true, false)
-        } else if (defaultTab === 'assignments') {
-          console.log('Manager: Assignments tab activated, loading assignments...')
-          await loadTabData('assignments', true, false)
-        } else if (defaultTab === 'overview') {
-          console.log('Manager: Overview tab activated, loading data...')
-          await loadTabData('overview', true, false)
+    // Always load on first mount or if tab hasn't been loaded yet
+    if (lastLoadedTabRef.current === null || lastLoadedTabRef.current !== defaultTab) {
+      isLoadingRef.current = true
+      lastLoadedTabRef.current = defaultTab
+      
+      const loadTab = async () => {
+        try {
+          if (defaultTab === 'docs') {
+            console.log('Manager: Docs tab activated, loading documents...')
+            await loadTabData('docs', true, false)
+          } else if (defaultTab === 'tests') {
+            console.log('Manager: Tests tab activated, loading tests...')
+            await loadTabData('tests', true, false)
+          } else if (defaultTab === 'assignments') {
+            console.log('Manager: Assignments tab activated, loading assignments...')
+            await loadTabData('assignments', true, false)
+          } else if (defaultTab === 'overview') {
+            console.log('Manager: Overview tab activated, loading data...')
+            await loadTabData('overview', true, false)
+          }
+        } finally {
+          isLoadingRef.current = false
         }
-      } finally {
-        isLoadingRef.current = false
       }
+      
+      loadTab()
+      return
     }
     
-    loadTab()
-  }, [defaultTab, loadTabData])
+    // If tab was already loaded, check if we have data
+    // If no data, reload even if tab was loaded before
+    const hasData = defaultTab === 'docs' ? documents.length > 0 :
+                   defaultTab === 'tests' ? savedTests.length > 0 :
+                   defaultTab === 'assignments' ? savedAssignments.length > 0 : true
+    
+    if (!hasData) {
+      console.log(`Manager: ${defaultTab} tab has no data, reloading...`)
+      isLoadingRef.current = true
+      
+      const loadTab = async () => {
+        try {
+          if (defaultTab === 'docs') {
+            await loadTabData('docs', true, false)
+          } else if (defaultTab === 'tests') {
+            await loadTabData('tests', true, false)
+          } else if (defaultTab === 'assignments') {
+            await loadTabData('assignments', true, false)
+          } else if (defaultTab === 'overview') {
+            await loadTabData('overview', true, false)
+          }
+        } finally {
+          isLoadingRef.current = false
+        }
+      }
+      
+      loadTab()
+    }
+  }, [defaultTab, loadTabData, documents.length, savedTests.length, savedAssignments.length])
 
   // Track if we've already processed the timestamp to prevent duplicate calls
   const processedTimestampRef = useRef<string | null>(null)
@@ -712,55 +740,69 @@ function ManagerPageInner() {
           // Mark this timestamp as processed to prevent duplicate calls
           processedTimestampRef.current = timestamp
           
-          // First, check sessionStorage for pre-fetched data (faster than API call)
-          if (typeof window !== 'undefined') {
-            if (tab === 'docs') {
-              const pendingDocs = sessionStorage.getItem('pendingDocumentsRefresh')
-              if (pendingDocs) {
-                try {
-                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingDocs)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
-                    console.log('Manager: Using pre-fetched documents from sessionStorage, count:', data.length)
-                    const transformedDocs = data.map((doc: {
-                      id: string
-                      originalFileName?: string
-                      title: string
-                      fileType?: string
-                      createdAt: string
-                      updatedAt?: string
-                      fileSize?: number
-                      status?: string
-                      parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-                    }) => ({
-                      id: doc.id,
-                      name: doc.originalFileName || doc.title,
-                      type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-                      uploadedAt: formatDateShort(doc.createdAt),
-                      size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-                      status: doc.status || 'ready',
-                      createdAt: doc.createdAt,
-                      updatedAt: doc.updatedAt,
-                      parsedContent: doc.parsedContent || null
-                    }))
-                    setDocumentsWithLog(transformedDocs)
-                    syncLocalStorageWithDatabase(transformedDocs)
-                    sessionStorage.removeItem('pendingDocumentsRefresh')
-                    lastLoadedTabRef.current = tab
-                    return // Skip API call since we have the data
+          // Force reload the tab data (don't skip even if we have sessionStorage data)
+          // This ensures fresh data is always loaded after import
+          isLoadingRef.current = true
+          
+          const forceReloadTab = async () => {
+            try {
+              if (tab === 'docs') {
+                // First, try sessionStorage for immediate display
+                if (typeof window !== 'undefined') {
+                  const pendingDocs = sessionStorage.getItem('pendingDocumentsRefresh')
+                  if (pendingDocs) {
+                    try {
+                      const { data, timestamp: storedTimestamp } = JSON.parse(pendingDocs)
+                      // Only use if timestamp is recent (within last 30 seconds)
+                      if (Date.now() - storedTimestamp < 30000 && data && Array.isArray(data)) {
+                        console.log('Manager: Using pre-fetched documents from sessionStorage, count:', data.length)
+                        const transformedDocs = data.map((doc: {
+                          id: string
+                          originalFileName?: string
+                          title: string
+                          fileType?: string
+                          createdAt: string
+                          updatedAt?: string
+                          fileSize?: number
+                          status?: string
+                          parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                        }) => ({
+                          id: doc.id,
+                          name: doc.originalFileName || doc.title,
+                          type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                          uploadedAt: formatDateShort(doc.createdAt),
+                          size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                          status: doc.status || 'ready',
+                          createdAt: doc.createdAt,
+                          updatedAt: doc.updatedAt,
+                          parsedContent: doc.parsedContent || null
+                        }))
+                        setDocumentsWithLog(transformedDocs)
+                        syncLocalStorageWithDatabase(transformedDocs)
+                        sessionStorage.removeItem('pendingDocumentsRefresh')
+                        lastLoadedTabRef.current = tab
+                        isLoadingRef.current = false
+                        return // Skip API call since we have the data
+                      }
+                    } catch (error) {
+                      console.error('Failed to parse pending documents:', error)
+                    }
                   }
-                } catch (error) {
-                  console.error('Failed to parse pending documents:', error)
                 }
-              }
-            } else if (tab === 'tests') {
-              const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
-              if (pendingTests) {
-                try {
-                  const { tests, documents, timestamp: storedTimestamp, editedTestId } = JSON.parse(pendingTests)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && tests && documents) {
-                    console.log('Manager: Using pre-fetched tests from sessionStorage')
+                // If no sessionStorage data or it's stale, load from API
+                console.log('Manager: Loading documents from API after import...')
+                await loadTabData('docs', true, true) // forceRefresh = true
+                lastLoadedTabRef.current = tab
+              } else if (tab === 'tests') {
+                // First, try sessionStorage for immediate display
+                if (typeof window !== 'undefined') {
+                  const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
+                  if (pendingTests) {
+                    try {
+                      const { tests, documents, timestamp: storedTimestamp, editedTestId } = JSON.parse(pendingTests)
+                      // Only use if timestamp is recent (within last 30 seconds)
+                      if (Date.now() - storedTimestamp < 30000 && tests && documents) {
+                        console.log('Manager: Using pre-fetched tests from sessionStorage')
                     const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
                     documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
                       documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
@@ -834,13 +876,19 @@ function ManagerPageInner() {
                     
                     sessionStorage.removeItem('pendingTestsRefresh')
                     lastLoadedTabRef.current = tab
+                    isLoadingRef.current = false
                     return // Skip API call since we have the data
                   }
                 } catch (error) {
                   console.error('Failed to parse pending tests:', error)
                 }
               }
-            } else if (tab === 'assignments') {
+                // If no sessionStorage data or it's stale, load from API
+                await loadTabData('tests', true, true) // forceRefresh = true
+                lastLoadedTabRef.current = tab
+              } else if (tab === 'assignments') {
+                // First, try sessionStorage for immediate display
+                if (typeof window !== 'undefined') {
               const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
               if (pendingAssignments) {
                 try {
@@ -865,17 +913,27 @@ function ManagerPageInner() {
               } else {
                 console.log('Manager: No pending assignments found in sessionStorage')
               }
+                }
+                // If no sessionStorage data or it's stale, load from API
+                await loadTabData('assignments', true, true) // forceRefresh = true
+                lastLoadedTabRef.current = tab
+              }
             }
           }
+          
+          // Ensure loading state is cleared
+          isLoadingRef.current = false
+          
+          // Execute the force reload
+          forceReloadTab()
         } else {
           console.log(`Manager: Tab changed to ${tab}, loading data...`)
-        }
-        // Reset last loaded tab ref to force reload even if same tab
-        lastLoadedTabRef.current = null
-        isLoadingRef.current = false
+          // Reset last loaded tab ref to force reload even if same tab
+          lastLoadedTabRef.current = null
+          isLoadingRef.current = false
         
-        // Use stale-while-revalidate for better UX (same as other tabs)
-        if (tab === 'docs') {
+          // Use stale-while-revalidate for better UX (same as other tabs)
+          if (tab === 'docs') {
           // Only show loading if we don't have cached data
           if (documents.length === 0) {
             setIsLoadingDocuments(true)
@@ -1218,7 +1276,18 @@ function ManagerPageInner() {
     }
   }
 
+  // Track documents being deleted to prevent duplicate requests
+  const deletingDocumentsRef = useRef<Set<string>>(new Set())
+  
   const handleDeleteDocument = async (id: string) => {
+    // Prevent duplicate delete requests
+    if (deletingDocumentsRef.current.has(id)) {
+      console.log(`Document ${id} is already being deleted, skipping duplicate request`)
+      return
+    }
+    
+    deletingDocumentsRef.current.add(id)
+    
     // Optimistically remove from state immediately for instant UI update
     const previousDocuments = documents
     startTransition(() => {
@@ -1235,6 +1304,14 @@ function ManagerPageInner() {
       
       // Check response status before parsing JSON
       if (!response.ok) {
+        // 404 means document already deleted - treat as success (idempotent)
+        if (response.status === 404) {
+          console.log(`Document ${id} already deleted (404), treating as success`)
+          toast.success('Document deleted successfully')
+          deletingDocumentsRef.current.delete(id)
+          return
+        }
+        
         let errorMessage = 'Failed to delete document'
         try {
           const errorResult = await response.json()
@@ -1250,6 +1327,7 @@ function ManagerPageInner() {
         })
         console.error('Failed to delete document:', errorMessage)
         toast.error(errorMessage)
+        deletingDocumentsRef.current.delete(id)
         return
       }
       
@@ -1274,6 +1352,8 @@ function ManagerPageInner() {
       const errorMessage = error instanceof Error ? error.message : 'Error deleting document'
       console.error('Error deleting document:', error)
       toast.error(errorMessage)
+    } finally {
+      deletingDocumentsRef.current.delete(id)
     }
   }
 

@@ -370,9 +370,39 @@ export default function DocumentViewer() {
           const images = document.parsedContent?.images || []
           
           // Check if images are already in content (from save process)
-          const contentHasImages = content.includes('![') || content.includes('<img')
+          // Check for both markdown format and HTML img tags
+          const imageMarkdownCount = (content.match(/!\[.*?\]\([^)]+\)/gi) || []).length
+          const imageHtmlCount = (content.match(/<img[^>]+>/gi) || []).length
+          const contentHasImages = imageMarkdownCount > 0 || imageHtmlCount > 0
           
-          if (images.length > 0 && !contentHasImages) {
+          console.log(`📸 Image check:`, {
+            imagesInParsedContent: images.length,
+            imageMarkdownInContent: imageMarkdownCount,
+            imageHtmlInContent: imageHtmlCount,
+            contentHasImages,
+            contentLength: content.length,
+            contentPreview: content.substring(0, 500)
+          })
+          
+          // Also check if images are in sections (they might be there but not yet in combined content)
+          const imagesInSections = document.parsedContent?.sections?.some((s: any) => 
+            s.content && (s.content.includes('![') || s.content.includes('<img'))
+          ) || false
+          
+          console.log(`📸 Images in sections: ${imagesInSections}`)
+          
+          // If images exist but are not in content, insert them
+          // Also check if images have URLs (they should after upload to Spaces)
+          const imagesWithUrls = images.filter((img: any) => img.url || img.imageId)
+          const shouldInsertImages = imagesWithUrls.length > 0 && !contentHasImages && !imagesInSections
+          
+          console.log(`📸 Should insert images: ${shouldInsertImages}`, {
+            imagesWithUrls: imagesWithUrls.length,
+            contentHasImages,
+            imagesInSections
+          })
+          
+          if (shouldInsertImages) {
             console.log(`📸 Found ${images.length} images to display (not in content yet)`)
             
             // Find where to insert images - look for "1. General Principles" section

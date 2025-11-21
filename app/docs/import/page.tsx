@@ -229,30 +229,7 @@ function DocImportPageInner() {
               hasMetadata: !!parsedContent.metadata
             })
             
-            // Check for large images and warn user
-            const imageCount = parsedContent.images?.length || 0
-            let totalImageSize = 0
-            let largeImageCount = 0
-            if (parsedContent.images && parsedContent.images.length > 0) {
-              parsedContent.images.forEach((img: any) => {
-                const imgSize = img.data?.length || 0
-                totalImageSize += imgSize
-                // Check if image is > 200KB (warning threshold)
-                if (imgSize > 200 * 1024) {
-                  largeImageCount++
-                }
-              })
-            }
-            
-            const totalImageSizeMB = totalImageSize / (1024 * 1024)
-            const warningMessages: string[] = []
-            
-            if (largeImageCount > 0) {
-              warningMessages.push(`This document contains ${largeImageCount} large high-resolution image(s) (${totalImageSizeMB.toFixed(2)}MB total). Large images can cause upload failures. Consider compressing images before uploading.`)
-            } else if (imageCount > 0 && totalImageSizeMB > 1) {
-              warningMessages.push(`This document contains ${imageCount} image(s) totaling ${totalImageSizeMB.toFixed(2)}MB. Large images may cause upload issues.`)
-            }
-            
+            // Images are uploaded to Spaces, size warnings are not needed
             setFiles(prev => prev.map(f => {
               if (f.id === file.id) {
                 const updatedFile: UploadedFile = {
@@ -260,8 +237,8 @@ function DocImportPageInner() {
                   status: 'ready' as const,
                   progress: 100,
                   parsedContent: parsedContent,
-                  parsingLog: warningMessages.length > 0 ? warningMessages.map(msg => ({ level: 'warning', message: msg })) : [],
-                  warning: warningMessages.length > 0 ? warningMessages.join(' ') : undefined
+                  parsingLog: [],
+                  warning: undefined
                 }
                 console.log(`File ${fileObj.name} marked as ready:`, {
                   hasParsedContent: !!updatedFile.parsedContent,
@@ -274,9 +251,8 @@ function DocImportPageInner() {
               return f
             }))
             
-            // Show warning toast if large images detected
-            // Note: This is just a warning, the file will still be saved
-            if (warningMessages.length > 0) {
+            // No warnings needed - images are uploaded to Spaces
+            if (false) {
               console.warn(`⚠️ Warning for ${fileObj.name}:`, warningMessages.join(' '))
               console.log(`✅ File ${fileObj.name} is ready to save despite warning (status: ready, hasParsedContent: true)`)
             } else {

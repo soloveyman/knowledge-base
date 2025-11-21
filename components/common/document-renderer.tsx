@@ -925,9 +925,15 @@ function convertToMarkdown(content: string): string {
     console.log(`📸 Restored image ${index + 1}/${imagePlaceholders.length}: ${image.substring(0, 100)}...`)
   })
   
-  // Debug: Check if images are in final markdown
-  const imageCount = (md.match(/!\[.*?\]\(data:/gi) || []).length
-  console.log(`📸 Images in final markdown: ${imageCount}`)
+  // Debug: Check if images are in final markdown (both data URLs and external URLs)
+  const dataUrlImageCount = (md.match(/!\[.*?\]\(data:/gi) || []).length
+  const externalUrlImageCount = (md.match(/!\[.*?\]\(https?:\/\//gi) || []).length
+  const totalImageCount = (md.match(/!\[.*?\]\([^)]+\)/gi) || []).length
+  console.log(`📸 Images in final markdown: ${totalImageCount} total (${dataUrlImageCount} data URLs, ${externalUrlImageCount} external URLs)`)
+  
+  if (imagePlaceholders.length > 0 && totalImageCount !== imagePlaceholders.length) {
+    console.warn(`⚠️ Image count mismatch: ${imagePlaceholders.length} placeholders but ${totalImageCount} images in final markdown`)
+  }
   
   return md
 }

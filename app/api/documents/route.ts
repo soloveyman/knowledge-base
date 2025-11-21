@@ -622,16 +622,31 @@ export async function POST(request: Request) {
             }
           })
           
+          const actuallyInserted = imagesToInsertNew.filter((img, idx) => {
+            // Check if image was actually inserted
+            return updatedParsedContent.sections.some((section: any) => 
+              section.content.includes(`![${img.filename}](${img.url})`)
+            )
+          }).length
+          
           console.log(`📸 Content insertion complete. Summary:`, {
             totalImages: imagesToInsert.length,
             replaced: insertedImages.size,
-            inserted: imagesToInsertNew.filter((img, idx) => {
-              // Check if image was actually inserted
-              return updatedParsedContent.sections.some((section: any) => 
-                section.content.includes(`![${img.filename}](${img.url})`)
-              )
-            }).length,
-            skipped: imagesToInsert.length - insertedImages.size
+            inserted: actuallyInserted,
+            skipped: imagesToInsert.length - insertedImages.size,
+            sectionsWithImages: updatedParsedContent.sections.filter((s: any) => 
+              s.content && (s.content.includes('![') || s.content.includes('<img'))
+            ).length,
+            totalSections: updatedParsedContent.sections.length
+          })
+          
+          // Log each section to verify images are present
+          updatedParsedContent.sections.forEach((section: any, idx: number) => {
+            const hasImages = section.content && (section.content.includes('![') || section.content.includes('<img'))
+            if (hasImages) {
+              const imageCount = (section.content.match(/!\[.*?\]\([^)]+\)/gi) || []).length
+              console.log(`📸 Section ${idx} (${section.title || 'no title'}): ${imageCount} image(s)`)
+            }
           })
         }
         

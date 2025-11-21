@@ -196,9 +196,7 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
               // Check for large high-resolution images
               if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
                 largeImages.push(`${filename} (${imageSizeMB.toFixed(2)}MB)`)
-                console.warn(`⚠️ Large high-resolution image detected: ${filename} (${imageSizeMB.toFixed(2)}MB)`)
-              } else if (imageBuffer.byteLength > WARNING_IMAGE_SIZE) {
-                console.warn(`⚠️ Large image detected: ${filename} (${imageSizeKB.toFixed(2)}KB) - consider compressing`)
+                // Don't warn - images are uploaded to Spaces, size is not an issue
               }
               
               totalImageSize += imageBuffer.byteLength
@@ -239,15 +237,9 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
           }
         }
         
-        // Warn about total image size
-        const totalImageSizeMB = totalImageSize / (1024 * 1024)
-        if (totalImageSize > MAX_TOTAL_IMAGE_SIZE) {
-          console.warn(`⚠️ Total image size (${totalImageSizeMB.toFixed(2)}MB) exceeds recommended limit (${(MAX_TOTAL_IMAGE_SIZE / (1024 * 1024)).toFixed(2)}MB). This may cause upload issues.`)
-        }
+        // Don't warn about total image size - images are uploaded to Spaces, size is not an issue
         
-        if (largeImages.length > 0) {
-          console.warn(`⚠️ Found ${largeImages.length} large high-resolution image(s):`, largeImages)
-        }
+        // Don't warn about large images - they're uploaded to Spaces, size is not an issue
         console.log(`📸 Total images extracted from word/media: ${images.length}`)
       } else {
         console.log('⚠️ word/media folder not found in DOCX file')
@@ -593,9 +585,7 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
               // Check for large high-resolution images
               if (imageBuffer.byteLength > MAX_IMAGE_SIZE) {
                 largeImages.push(`${filename} (${imageSizeMB.toFixed(2)}MB)`)
-                console.warn(`⚠️ Large high-resolution image detected: ${filename} (${imageSizeMB.toFixed(2)}MB)`)
-              } else if (imageBuffer.byteLength > WARNING_IMAGE_SIZE) {
-                console.warn(`⚠️ Large image detected: ${filename} (${imageSizeKB.toFixed(2)}KB) - consider compressing`)
+                // Don't warn - images are uploaded to Spaces, size is not an issue
               }
               
               totalImageSize += imageBuffer.byteLength
@@ -636,15 +626,9 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
           }
         }
         
-        // Warn about total image size
-        const totalImageSizeMB = totalImageSize / (1024 * 1024)
-        if (totalImageSize > MAX_TOTAL_IMAGE_SIZE) {
-          console.warn(`⚠️ Total image size (${totalImageSizeMB.toFixed(2)}MB) exceeds recommended limit (${(MAX_TOTAL_IMAGE_SIZE / (1024 * 1024)).toFixed(2)}MB). This may cause upload issues.`)
-        }
+        // Don't warn about total image size - images are uploaded to Spaces, size is not an issue
         
-        if (largeImages.length > 0) {
-          console.warn(`⚠️ Found ${largeImages.length} large high-resolution image(s):`, largeImages)
-        }
+        // Don't warn about large images - they're uploaded to Spaces, size is not an issue
         console.log(`📸 Total images extracted from xl/media: ${images.length}`)
       } else {
         console.log('⚠️ xl/media folder not found in XLSX file')
