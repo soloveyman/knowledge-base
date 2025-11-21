@@ -423,16 +423,36 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
       
       let workingText = extractTextFromHtml(htmlWithPlaceholders)
       
-      // Step 6: Clean up text around image placeholders - remove short text fragments that are likely image metadata
+      // Step 6: Save placeholder positions BEFORE cleaning (critical for position tracking)
+      // Map each image to its placeholder position before any text modifications
+      const placeholderPositions = new Map<string, number>()
+      for (const image of processedImages) {
+        if (image.placeholder) {
+          const placeholderPos = workingText.indexOf(image.placeholder)
+          if (placeholderPos !== -1) {
+            placeholderPositions.set(image.placeholder, placeholderPos)
+            // Extract context BEFORE cleaning (more accurate)
+            image.contextBefore = workingText.substring(Math.max(0, placeholderPos - 50), placeholderPos).trim()
+            image.contextAfter = workingText.substring(
+              placeholderPos + image.placeholder.length,
+              Math.min(workingText.length, placeholderPos + image.placeholder.length + 50)
+            ).trim()
+          }
+        }
+      }
+      
+      // Step 6.5: Clean up text around image placeholders - remove short text fragments that are likely image metadata
       // Find all placeholders and remove very short text fragments (1-2 words) around them
-      const placeholdersToClean: Array<{ placeholder: string; position: number }> = []
+      const placeholdersToClean: Array<{ placeholder: string; position: number; originalPosition: number }> = []
       const placeholderRegex = REGEX_CACHE.placeholder
       placeholderRegex.lastIndex = 0
       let placeholderMatch: RegExpExecArray | null
       while ((placeholderMatch = placeholderRegex.exec(workingText)) !== null) {
+        const originalPos = placeholderPositions.get(placeholderMatch[0]) ?? placeholderMatch.index
         placeholdersToClean.push({
           placeholder: placeholderMatch[0],
-          position: placeholderMatch.index
+          position: placeholderMatch.index,
+          originalPosition: originalPos
         })
       }
       
@@ -462,19 +482,47 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         }
       }
       
-      // Step 7: Map placeholder positions to text positions and extract context
+      // Helper function to validate data URL
+      const isValidDataUrl = (dataUrl: string): boolean => {
+        if (!dataUrl || !dataUrl.startsWith('data:')) return false
+        const parts = dataUrl.split(',')
+        if (parts.length !== 2) return false
+        const base64Data = parts[1]
+        if (!base64Data || base64Data.trim().length === 0) return false
+        // Check if base64 data is valid (basic check)
+        if (base64Data.length < 100) return false // Too short to be a real image
+        return true
+      }
+      
+      // Step 7: Map placeholder positions to text positions and replace with markdown
+      // Use saved positions and track offset changes from cleaning
+      let textOffset = 0
+      const imagesToInsert: Array<{ image: ParsedImage; position: number }> = []
+      
       for (const image of processedImages) {
         if (image.placeholder) {
-          const placeholderPos = workingText.indexOf(image.placeholder)
+          // Try to find placeholder in current text
+          let placeholderPos = workingText.indexOf(image.placeholder)
+          
+          // If not found, use saved position and adjust for offset
+          if (placeholderPos === -1) {
+            const savedPos = placeholderPositions.get(image.placeholder)
+            if (savedPos !== undefined) {
+              // Estimate position after cleaning (approximate)
+              placeholderPos = Math.max(0, savedPos + textOffset)
+            }
+          }
+          
           if (placeholderPos !== -1) {
             image.position = placeholderPos
             
-            // Extract context (50 chars before and after)
-            image.contextBefore = workingText.substring(Math.max(0, placeholderPos - 50), placeholderPos).trim()
-            image.contextAfter = workingText.substring(
-              placeholderPos + image.placeholder.length,
-              Math.min(workingText.length, placeholderPos + image.placeholder.length + 50)
-            ).trim()
+            // Validate data URL before inserting
+            if (!isValidDataUrl(image.data)) {
+              console.warn(`⚠️ Invalid data URL for image "${image.filename}", skipping markdown insertion`)
+              // Still set position for fallback insertion later
+              imagesToInsert.push({ image, position: placeholderPos })
+              continue
+            }
             
             // Replace placeholder with markdown (temporary, will be replaced with S3 URL later)
             const imageMarkdown = `\n\n![${image.filename}](${image.data})\n\n`
@@ -482,7 +530,26 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
               imageMarkdown + 
               workingText.substring(placeholderPos + image.placeholder.length)
             
-            console.log(`📸 Mapped image "${image.filename}" to position ${placeholderPos} (context: "${image.contextBefore.substring(Math.max(0, image.contextBefore.length - 20))}...${image.contextAfter.substring(0, 20)}")`)
+            // Update offset for subsequent images
+            textOffset += imageMarkdown.length - image.placeholder.length
+            
+            console.log(`📸 Mapped image "${image.filename}" to position ${placeholderPos} (context: "${image.contextBefore?.substring(Math.max(0, (image.contextBefore?.length || 0) - 20)) || ''}...${image.contextAfter?.substring(0, 20) || ''}")`)
+          } else {
+            // Fallback: placeholder not found, mark for insertion at end of section
+            console.warn(`⚠️ Placeholder ${image.placeholder} not found for image "${image.filename}", will insert at end`)
+            imagesToInsert.push({ image, position: -1 })
+          }
+        }
+      }
+      
+      // Insert images that couldn't be placed (fallback to end of text)
+      if (imagesToInsert.length > 0) {
+        for (const { image, position } of imagesToInsert) {
+          if (position === -1 && isValidDataUrl(image.data)) {
+            const imageMarkdown = `\n\n![${image.filename}](${image.data})\n\n`
+            workingText += imageMarkdown
+            image.position = workingText.length - imageMarkdown.length
+            console.log(`📸 Inserted image "${image.filename}" at end (fallback), position: ${image.position}`)
           }
         }
       }

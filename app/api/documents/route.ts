@@ -568,6 +568,7 @@ export async function POST(request: Request) {
           
           // Step 1: Replace existing data URLs and relative paths in content with Spaces URLs
           // This handles images that were already in the content as data URLs or relative paths
+          // Improved matching using filename, position, and context for better accuracy
           imagesToInsert.forEach((img, imgIndex) => {
             const imageMarkdown = `![${img.filename}](${img.url})`
             console.log(`📸 Processing image ${imgIndex}: ${img.filename}, URL: ${img.url.substring(0, 100)}...`)
@@ -576,27 +577,77 @@ export async function POST(request: Request) {
             const baseFilename = img.filename.split('/').pop() || img.filename
             const filenameWithoutExt = baseFilename.replace(/\.[^/.]+$/, '')
             
+            // Get image metadata for context matching (if available)
+            const imageMetadata = parsedContent.images?.find((parsedImg: any) => 
+              parsedImg.filename === img.filename || 
+              parsedImg.filename?.endsWith(baseFilename) ||
+              parsedImg.placeholder === img.placeholder
+            )
+            const contextBefore = imageMetadata?.contextBefore || ''
+            const contextAfter = imageMetadata?.contextAfter || ''
+            const imagePosition = imageMetadata?.position
+            
             // Try to find and replace data URL or relative path for this image in content
             for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
               const section = updatedParsedContent.sections[sectionIndex]
               let newContent = section.content
               let foundMatch = false
               
-              // Pattern 1: Match data URLs: ![alt](data:...)
-              const dataUrlPattern = /!\[([^\]]*)\]\(data:[^)]+\)/g
+              // Pattern 1: Match data URLs with improved regex for very long URLs
+              // Use multiline mode and more robust pattern
+              const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s\n]+)\)/gs
               let match
-              const matches: string[] = []
+              const matches: Array<{ match: string; index: number; alt: string; contextScore: number }> = []
+              
+              // Reset regex lastIndex
+              dataUrlPattern.lastIndex = 0
               while ((match = dataUrlPattern.exec(section.content)) !== null) {
-                matches.push(match[0])
                 const altText = match[1] || ''
                 const filenameMatch = altText.includes(img.filename) || altText.includes(baseFilename) || altText === filenameWithoutExt
-                const isFirstUnmatched = matches.length === 1 && insertedImages.size === 0
                 
-                if (filenameMatch || isFirstUnmatched) {
-                  newContent = newContent.replace(match[0], imageMarkdown)
+                // Calculate context score (how well the surrounding text matches)
+                let contextScore = 0
+                if (contextBefore || contextAfter) {
+                  const matchIndex = match.index
+                  const beforeText = section.content.substring(Math.max(0, matchIndex - 50), matchIndex).trim()
+                  const afterText = section.content.substring(
+                    matchIndex + match[0].length,
+                    Math.min(section.content.length, matchIndex + match[0].length + 50)
+                  ).trim()
+                  
+                  // Check if context matches (fuzzy match - check if key words are present)
+                  if (contextBefore && beforeText) {
+                    const contextWords = contextBefore.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+                    const beforeWords = beforeText.toLowerCase().split(/\s+/)
+                    const matchingWords = contextWords.filter(w => beforeWords.some(bw => bw.includes(w) || w.includes(bw)))
+                    contextScore += matchingWords.length / Math.max(contextWords.length, 1)
+                  }
+                  if (contextAfter && afterText) {
+                    const contextWords = contextAfter.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+                    const afterWords = afterText.toLowerCase().split(/\s+/)
+                    const matchingWords = contextWords.filter(w => afterWords.some(aw => aw.includes(w) || w.includes(aw)))
+                    contextScore += matchingWords.length / Math.max(contextWords.length, 1)
+                  }
+                }
+                
+                matches.push({
+                  match: match[0],
+                  index: match.index,
+                  alt: altText,
+                  contextScore: filenameMatch ? 1.0 : contextScore
+                })
+              }
+              
+              // Sort matches by score (filename match = highest, then context score)
+              matches.sort((a, b) => b.contextScore - a.contextScore)
+              
+              // Try to replace the best match
+              for (const matchData of matches) {
+                if (!insertedImages.has(imgIndex)) {
+                  newContent = newContent.replace(matchData.match, imageMarkdown)
                   foundMatch = true
                   insertedImages.add(imgIndex)
-                  console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename} (match: ${filenameMatch ? 'filename' : 'first unmatched'})`)
+                  console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename} (score: ${matchData.contextScore.toFixed(2)})`)
                   break
                 }
               }
@@ -632,12 +683,12 @@ export async function POST(request: Request) {
                 }
               }
               
-              // Fallback: If we have data URLs but no match, replace the first one anyway
-              if (!foundMatch && matches.length > 0 && insertedImages.size === 0) {
-                newContent = section.content.replace(matches[0], imageMarkdown)
+              // Fallback: If we have data URLs but no match, replace the best one anyway
+              if (!foundMatch && matches.length > 0 && !insertedImages.has(imgIndex)) {
+                newContent = newContent.replace(matches[0].match, imageMarkdown)
                 foundMatch = true
                 insertedImages.add(imgIndex)
-                console.log(`📸 Replaced first data URL (no filename match) with Spaces URL for ${img.filename}`)
+                console.log(`📸 Replaced best data URL (fallback) with Spaces URL for ${img.filename}`)
               }
               
               if (foundMatch) {

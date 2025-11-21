@@ -145,20 +145,52 @@ function DocumentContent({ content }: { content: string }) {
   // This avoids parsing issues with very long data URLs
   // Handle both data URLs and external URLs (S3/CDN)
   let processedMarkdown = markdown
-  const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
   const imageMatches: Array<{ match: string; alt: string; src: string }> = []
-  let imageMatch
-  while ((imageMatch = imagePattern.exec(markdown)) !== null) {
-    const src = imageMatch[2]
-    const alt = imageMatch[1] || ''
-    
-    // Process all images - let the img component handler decide what to show
-    // Invalid images (empty data URLs, relative paths) will show alt text instead
-    imageMatches.push({
-      match: imageMatch[0],
-      alt: alt,
-      src: src
-    })
+  
+  // More robust pattern for data URLs - handle very long base64 strings
+  // First, extract data URLs with multiline support
+  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s\n]+)\)/gs
+  let dataUrlMatch
+  const processedPositions = new Set<number>()
+  
+  while ((dataUrlMatch = dataUrlPattern.exec(markdown)) !== null) {
+    const fullMatch = dataUrlMatch[0]
+    // Validate that match ends with closing parenthesis
+    if (fullMatch.endsWith(')')) {
+      const alt = dataUrlMatch[1] || ''
+      // Extract src - find the data: URL part
+      const srcMatch = fullMatch.match(/data:[^)]+/)
+      const src = srcMatch ? srcMatch[0] : ''
+      
+      if (src && src.length > 0) {
+        imageMatches.push({
+          match: fullMatch,
+          alt: alt,
+          src: src
+        })
+        processedPositions.add(dataUrlMatch.index)
+      }
+    }
+  }
+  
+  // Then, extract regular URLs (non-data URLs) - must come after data URL matching
+  const regularImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
+  let regularMatch
+  while ((regularMatch = regularImagePattern.exec(markdown)) !== null) {
+    // Skip if already processed as data URL
+    if (!processedPositions.has(regularMatch.index)) {
+      const src = regularMatch[2] || ''
+      const alt = regularMatch[1] || ''
+      
+      // Skip if it's a data URL (should have been caught above)
+      if (!src.startsWith('data:')) {
+        imageMatches.push({
+          match: regularMatch[0],
+          alt: alt,
+          src: src
+        })
+      }
+    }
   }
   
   // Replace markdown images with HTML img tags (in reverse order to preserve positions)
@@ -948,13 +980,50 @@ function convertToMarkdown(content: string): string {
   
   // First, try to match data URLs (they can be very long, so we need a more permissive pattern)
   // Match: ![alt](data:image/type;base64,verylongstring)
-  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
+  // Use multiline mode and more robust pattern to handle very long base64 strings
+  // Pattern explanation: 
+  // - !\[([^\]]*)\] - matches ![alt] where alt can be empty
+  // - \( - opening parenthesis
+  // - (data:[^)]+) - matches data:... but this might fail on very long strings
+  // Better approach: match until we find the closing parenthesis, handling newlines
+  const dataUrlPattern = /!\[([^\]]*)\]\((data:[^;]+;base64,[A-Za-z0-9+/=\s]+)\)/gs
   let match
+  let lastIndex = 0
   while ((match = dataUrlPattern.exec(md)) !== null) {
+    // Validate that we have a complete match (ends with closing paren)
     const fullMatch = match[0]
-    const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
-    imagePlaceholders.push(fullMatch)
-    images.push({ match: fullMatch, placeholder })
+    if (fullMatch.endsWith(')')) {
+      const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
+      imagePlaceholders.push(fullMatch)
+      images.push({ match: fullMatch, placeholder })
+    } else {
+      // Incomplete match, try to find the actual end
+      const startPos = match.index
+      const altText = match[1] || ''
+      const dataUrlStart = md.indexOf('data:', startPos)
+      if (dataUrlStart !== -1) {
+        // Find the closing parenthesis after data URL
+        let parenPos = dataUrlStart
+        let parenCount = 0
+        while (parenPos < md.length) {
+          if (md[parenPos] === '(') parenCount++
+          if (md[parenPos] === ')') {
+            parenCount--
+            if (parenCount === 0) {
+              const fullMatch = md.substring(startPos, parenPos + 1)
+              const placeholder = `__IMAGE_PLACEHOLDER_${imagePlaceholders.length}__`
+              imagePlaceholders.push(fullMatch)
+              images.push({ match: fullMatch, placeholder })
+              break
+            }
+          }
+          parenPos++
+        }
+      }
+    }
+    // Prevent infinite loop
+    if (match.index === lastIndex) break
+    lastIndex = match.index
   }
   
   // Also handle regular URLs (non-data URLs) - must come after data URL matching
