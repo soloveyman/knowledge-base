@@ -215,7 +215,7 @@ export default function ContentEditor({
           <CardTitle>Content Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="prose max-w-none max-h-[600px] overflow-y-auto overflow-x-hidden">
+          <div className="prose max-w-none overflow-x-hidden">
             {renderPreview()}
           </div>
         </CardContent>
@@ -326,7 +326,7 @@ export default function ContentEditor({
           </TabsContent>
 
           <TabsContent value="preview" className="space-y-4">
-            <div className="prose max-w-none p-4 border rounded-lg min-h-[400px] max-h-[600px] overflow-y-auto overflow-x-hidden">
+            <div className="prose max-w-none p-4 border rounded-lg overflow-x-hidden">
               {renderPreview()}
             </div>
           </TabsContent>
