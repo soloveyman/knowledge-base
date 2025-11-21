@@ -1418,12 +1418,6 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
       }
       cumulativePos += line.length + 1 // +1 for newline
     }
-          section.content += '\n\n'
-        } else {
-          section.content += (section.content ? '\n' : '') + line
-        }
-      }
-    }
   }
   
   // Add the last section
