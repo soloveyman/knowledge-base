@@ -75,27 +75,13 @@ function DocumentContent({ content }: { content: string }) {
     const src = imageMatch[2]
     const alt = imageMatch[1] || ''
     
-    // Validate image source before processing
-    // 1. Skip empty data URLs
-    if (src.startsWith('data:') && (src.endsWith(',') || src.split(',').length === 1 || src.split(',')[1]?.trim().length === 0)) {
-      continue
-    }
-    
-    // 2. Skip relative paths that aren't valid URLs (like word/media/image1.png)
-    if (!src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('/')) {
-      if (src.includes('/') || src.includes('\\')) {
-        continue
-      }
-    }
-    
-    // Only process if it's a data URL or external URL (skip if already processed)
-    if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
-      imageMatches.push({
-        match: imageMatch[0],
-        alt: alt,
-        src: src
-      })
-    }
+    // Process all images - let the img component handler decide what to show
+    // Invalid images (empty data URLs, relative paths) will show alt text instead
+    imageMatches.push({
+      match: imageMatch[0],
+      alt: alt,
+      src: src
+    })
   }
   
   // Replace markdown images with HTML img tags (in reverse order to preserve positions)
@@ -322,14 +308,30 @@ function DocumentContent({ content }: { content: string }) {
           // Validate and filter out invalid image sources
           // 1. Empty data URLs (data:image/png;base64,)
           if (srcString.startsWith('data:') && (srcString.endsWith(',') || srcString.split(',').length === 1 || srcString.split(',')[1]?.trim().length === 0)) {
-            return null
+            // Show alt text instead of broken image
+            const displayText = alt || 'Image'
+            return (
+              <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground italic">
+                  {displayText}
+                </p>
+              </div>
+            )
           }
           
           // 2. Relative paths that aren't valid (like word/media/image1.png)
           if (!srcString.startsWith('data:') && !srcString.startsWith('http://') && !srcString.startsWith('https://') && !srcString.startsWith('/')) {
             // Check if it looks like a file path (contains slashes but not a valid URL)
             if (srcString.includes('/') || srcString.includes('\\')) {
-              return null
+              // Show alt text instead of broken image
+              const displayText = alt || srcString || 'Image'
+              return (
+                <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground italic">
+                    {displayText}
+                  </p>
+                </div>
+              )
             }
           }
           
@@ -345,9 +347,16 @@ function DocumentContent({ content }: { content: string }) {
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
-          // Final validation: if it's not a data URL or external URL, skip it
+          // Final validation: if it's not a data URL or external URL, show alt text
           if (!isDataUrl && !isExternal) {
-            return null
+            const displayText = alt || srcString || 'Image'
+            return (
+              <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground italic">
+                  {displayText}
+                </p>
+              </div>
+            )
           }
           
           // Determine image dimensions
@@ -379,7 +388,7 @@ function DocumentContent({ content }: { content: string }) {
           
           const imageClass = className || (isSmallImage || isQRCode || isIcon
             ? "rounded border border-border max-w-full h-auto"
-            : "rounded-lg border border-border w-full h-auto max-w-4xl")
+            : "rounded-lg border border-border max-w-full h-auto")
           
           // Always use regular img tag for data URLs (Next.js Image doesn't support them)
           // For external URLs (S3/CDN), we can use either regular img or Next.js Image
@@ -387,7 +396,7 @@ function DocumentContent({ content }: { content: string }) {
           if (isDataUrl || isExternal) {
             return (
               <div className={containerClass}>
-                <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
+                <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full"} style={!isSmallImage && !isQRCode && !isIcon ? { maxWidth: '1200px', maxHeight: '500px' } : undefined}>
                   <ImageWithPlaceholder
                     src={srcString}
                     alt={alt || ''}
@@ -395,6 +404,8 @@ function DocumentContent({ content }: { content: string }) {
                     height={imgHeight}
                     className={imageClass}
                     loading={isSmallImage || isQRCode ? "eager" : "lazy"}
+                    maxWidth={1200}
+                    maxHeight={500}
                   />
                 </div>
               </div>
@@ -419,7 +430,7 @@ function DocumentContent({ content }: { content: string }) {
           
           return (
             <div className={containerClass}>
-              <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full max-w-4xl"}>
+              <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full"} style={!isSmallImage && !isQRCode && !isIcon ? { maxWidth: '1200px', maxHeight: '500px' } : undefined}>
                 <Image
                   {...optimizedProps}
                   className={imageClass}
@@ -879,7 +890,9 @@ function ImageWithPlaceholder({
   width, 
   height, 
   className, 
-  loading 
+  loading,
+  maxWidth,
+  maxHeight
 }: { 
   src: string
   alt: string
@@ -887,6 +900,8 @@ function ImageWithPlaceholder({
   height?: number
   className?: string
   loading?: 'lazy' | 'eager'
+  maxWidth?: number
+  maxHeight?: number
 }) {
   const [isLoading, setIsLoading] = React.useState(true)
   const [hasError, setHasError] = React.useState(false)
@@ -914,8 +929,16 @@ function ImageWithPlaceholder({
     }
   }, [src, width, height])
 
+  // Show alt text if image failed to load
   if (hasError) {
-    return null
+    const displayText = alt || 'Image'
+    return (
+      <div className="my-6 p-4 border border-dashed border-border rounded-lg bg-muted/50">
+        <p className="text-sm text-muted-foreground italic">
+          {displayText}
+        </p>
+      </div>
+    )
   }
 
   // Use detected dimensions if available, otherwise use provided dimensions
@@ -941,8 +964,11 @@ function ImageWithPlaceholder({
         className={className}
         loading={loading}
         style={{ 
-          maxWidth: '100%', 
+          maxWidth: maxWidth ? `${maxWidth}px` : '100%', 
+          maxHeight: maxHeight ? `${maxHeight}px` : 'none',
+          width: 'auto',
           height: 'auto',
+          objectFit: 'contain' as const,
           opacity: isLoading ? 0 : 1,
           transition: 'opacity 200ms ease-in-out'
         }}

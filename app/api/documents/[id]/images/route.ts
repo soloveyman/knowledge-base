@@ -113,35 +113,70 @@ export async function POST(
           // Track which images have been inserted to avoid duplicates
           const insertedImages = new Set<string>()
           
-          // Step 1: Replace existing data URLs in content with Spaces URLs
+          // Step 1: Replace existing data URLs and relative paths in content with Spaces URLs
           imagesToInsert.forEach((img) => {
             const imageMarkdown = `![${img.filename}](${img.url})`
             
-            // Try to find and replace data URL for this image in content
+            // Extract base filename (without path) for matching
+            const baseFilename = img.filename.split('/').pop() || img.filename
+            const filenameWithoutExt = baseFilename.replace(/\.[^/.]+$/, '')
+            
+            // Try to find and replace data URLs or relative paths for this image in content
             for (let sectionIndex = 0; sectionIndex < parsedContent.sections.length; sectionIndex++) {
               const section = parsedContent.sections[sectionIndex]
-              
-              // Look for data URL image markdown
-              const dataUrlPattern = /!\[([^\]]*)\]\(data:[^)]+\)/g
-              let match
+              let newContent = section.content
               let foundMatch = false
               
-              let newContent = section.content
+              // Pattern 1: Match data URLs: ![alt](data:...)
+              const dataUrlPattern = /!\[([^\]]*)\]\(data:[^)]+\)/g
+              let match
               while ((match = dataUrlPattern.exec(section.content)) !== null) {
                 const altText = match[1] || ''
-                const filenameMatch = altText.includes(img.filename) || altText === img.filename.replace(/\.[^/.]+$/, '')
+                const filenameMatch = altText.includes(img.filename) || altText.includes(baseFilename) || altText === filenameWithoutExt
                 
                 if (filenameMatch && !insertedImages.has(img.filename)) {
                   newContent = newContent.replace(match[0], imageMarkdown)
                   foundMatch = true
                   insertedImages.add(img.filename)
+                  console.log(`📸 Replaced data URL with Spaces URL for ${img.filename} in section ${sectionIndex}`)
                   break
+                }
+              }
+              
+              // Pattern 2: Match relative paths (word/media/image1.png, image_28.png, etc.)
+              // Only if we haven't found a match yet
+              if (!foundMatch) {
+                // Match any image markdown with relative path that contains the filename
+                const relativePathPattern = /!\[([^\]]*)\]\(([^)]+)\)/g
+                let relativeMatch
+                while ((relativeMatch = relativePathPattern.exec(section.content)) !== null) {
+                  const altText = relativeMatch[1] || ''
+                  const srcPath = relativeMatch[2] || ''
+                  
+                  // Check if this is a relative path (not data:, not http/https, not absolute /)
+                  const isRelativePath = !srcPath.startsWith('data:') && 
+                                        !srcPath.startsWith('http://') && 
+                                        !srcPath.startsWith('https://') && 
+                                        !srcPath.startsWith('/')
+                  
+                  if (isRelativePath) {
+                    // Check if filename matches (in alt text or in path)
+                    const filenameInAlt = altText.includes(img.filename) || altText.includes(baseFilename) || altText === filenameWithoutExt
+                    const filenameInPath = srcPath.includes(img.filename) || srcPath.includes(baseFilename) || srcPath.endsWith(baseFilename)
+                    
+                    if ((filenameInAlt || filenameInPath) && !insertedImages.has(img.filename)) {
+                      newContent = newContent.replace(relativeMatch[0], imageMarkdown)
+                      foundMatch = true
+                      insertedImages.add(img.filename)
+                      console.log(`📸 Replaced relative path "${srcPath}" with Spaces URL for ${img.filename} in section ${sectionIndex}`)
+                      break
+                    }
+                  }
                 }
               }
               
               if (foundMatch) {
                 parsedContent.sections[sectionIndex].content = newContent
-                console.log(`📸 Replaced data URL with Spaces URL for ${img.filename} in section ${sectionIndex}`)
                 break
               }
             }

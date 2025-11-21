@@ -566,54 +566,78 @@ export async function POST(request: Request) {
           // Track which images have been inserted to avoid duplicates
           const insertedImages = new Set<number>()
           
-          // Step 1: Replace existing data URLs in content with Spaces URLs
-          // This handles images that were already in the content as data URLs
+          // Step 1: Replace existing data URLs and relative paths in content with Spaces URLs
+          // This handles images that were already in the content as data URLs or relative paths
           imagesToInsert.forEach((img, imgIndex) => {
             const imageMarkdown = `![${img.filename}](${img.url})`
             console.log(`📸 Processing image ${imgIndex}: ${img.filename}, URL: ${img.url.substring(0, 100)}...`)
             
-            // Try to find and replace data URL for this image in content
+            // Extract base filename (without path) for matching
+            const baseFilename = img.filename.split('/').pop() || img.filename
+            const filenameWithoutExt = baseFilename.replace(/\.[^/.]+$/, '')
+            
+            // Try to find and replace data URL or relative path for this image in content
             for (let sectionIndex = 0; sectionIndex < updatedParsedContent.sections.length; sectionIndex++) {
               const section = updatedParsedContent.sections[sectionIndex]
-              
-              // Look for data URL image markdown that might match this image
-              // Pattern: ![alt](data:image/type;base64,...)
-              const dataUrlPattern = /!\[([^\]]*)\]\(data:[^)]+\)/g
-              let match
+              let newContent = section.content
               let foundMatch = false
               
-              // Create a new string with replacements
-              let newContent = section.content
+              // Pattern 1: Match data URLs: ![alt](data:...)
+              const dataUrlPattern = /!\[([^\]]*)\]\(data:[^)]+\)/g
+              let match
               const matches: string[] = []
               while ((match = dataUrlPattern.exec(section.content)) !== null) {
                 matches.push(match[0])
                 const altText = match[1] || ''
-                // Check if this might be the same image (by filename in alt)
-                // Also match if it's the first data URL and we haven't matched any images yet (more lenient)
-                const filenameMatch = altText.includes(img.filename) || altText === img.filename.replace(/\.[^/.]+$/, '')
+                const filenameMatch = altText.includes(img.filename) || altText.includes(baseFilename) || altText === filenameWithoutExt
                 const isFirstUnmatched = matches.length === 1 && insertedImages.size === 0
                 
                 if (filenameMatch || isFirstUnmatched) {
-                  // Replace this data URL with the Spaces URL (only first match)
                   newContent = newContent.replace(match[0], imageMarkdown)
                   foundMatch = true
                   insertedImages.add(imgIndex)
                   console.log(`📸 Replaced data URL with Spaces URL in section ${sectionIndex} for ${img.filename} (match: ${filenameMatch ? 'filename' : 'first unmatched'})`)
-                  console.log(`📸 Content before: ${section.content.substring(0, 200)}...`)
-                  console.log(`📸 Content after: ${newContent.substring(0, 200)}...`)
-                  break // Only replace first match
+                  break
                 }
               }
               
-              if (matches.length > 0 && !foundMatch) {
-                console.log(`📸 Found ${matches.length} data URL(s) in section ${sectionIndex} but none matched ${img.filename}`)
-                // If we have data URLs but no match, replace the first one anyway to ensure image is shown
-                if (matches.length > 0 && insertedImages.size === 0) {
-                  newContent = section.content.replace(matches[0], imageMarkdown)
-                  foundMatch = true
-                  insertedImages.add(imgIndex)
-                  console.log(`📸 Replaced first data URL (no filename match) with Spaces URL for ${img.filename}`)
+              // Pattern 2: Match relative paths (word/media/image1.png, image_28.png, etc.)
+              // Only if we haven't found a match yet
+              if (!foundMatch) {
+                const relativePathPattern = /!\[([^\]]*)\]\(([^)]+)\)/g
+                let relativeMatch
+                while ((relativeMatch = relativePathPattern.exec(section.content)) !== null) {
+                  const altText = relativeMatch[1] || ''
+                  const srcPath = relativeMatch[2] || ''
+                  
+                  // Check if this is a relative path (not data:, not http/https, not absolute /)
+                  const isRelativePath = !srcPath.startsWith('data:') && 
+                                        !srcPath.startsWith('http://') && 
+                                        !srcPath.startsWith('https://') && 
+                                        !srcPath.startsWith('/')
+                  
+                  if (isRelativePath) {
+                    // Check if filename matches (in alt text or in path)
+                    const filenameInAlt = altText.includes(img.filename) || altText.includes(baseFilename) || altText === filenameWithoutExt
+                    const filenameInPath = srcPath.includes(img.filename) || srcPath.includes(baseFilename) || srcPath.endsWith(baseFilename)
+                    
+                    if (filenameInAlt || filenameInPath) {
+                      newContent = newContent.replace(relativeMatch[0], imageMarkdown)
+                      foundMatch = true
+                      insertedImages.add(imgIndex)
+                      console.log(`📸 Replaced relative path "${srcPath}" with Spaces URL for ${img.filename} in section ${sectionIndex}`)
+                      break
+                    }
+                  }
                 }
+              }
+              
+              // Fallback: If we have data URLs but no match, replace the first one anyway
+              if (!foundMatch && matches.length > 0 && insertedImages.size === 0) {
+                newContent = section.content.replace(matches[0], imageMarkdown)
+                foundMatch = true
+                insertedImages.add(imgIndex)
+                console.log(`📸 Replaced first data URL (no filename match) with Spaces URL for ${img.filename}`)
               }
               
               if (foundMatch) {
