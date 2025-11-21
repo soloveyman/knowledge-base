@@ -272,13 +272,8 @@ export async function parseDocx(buffer: ArrayBuffer, options: {
         // Map by paragraph outline level (Word's built-in heading detection)
         "p[style-name='Title'] => h1:fresh",
         "p[style-name='Subtitle'] => h2:fresh",
-        // Map paragraphs with outline level (Word's built-in heading attribute)
-        "p[outline-level='1'] => h1:fresh",
-        "p[outline-level='2'] => h2:fresh",
-        "p[outline-level='3'] => h3:fresh",
-        "p[outline-level='4'] => h4:fresh",
-        "p[outline-level='5'] => h5:fresh",
-        "p[outline-level='6'] => h6:fresh",
+        // Note: outline-level is not supported by mammoth styleMap syntax
+        // We'll rely on style-name mappings and fallback detection instead
       ]
       
       const result = await mammoth.convertToHtml(
@@ -1258,39 +1253,12 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
   let currentSection: { title: string; level: number; content: string; order: number } | null = null
   let sectionOrder = 1
   
-  // Extract images from text and save their positions BEFORE splitting into sections
-  // Keep images in text but track their positions for proper insertion into sections
-  const imageMarkdownPattern = /!\[([^\]]*)\]\((data:[^)]+)\)/g
-  const imagesInText: Array<{ filename: string; data: string; markdown: string; position: number }> = []
-  let imageMatch
-  const originalText = finalText // Keep original text with images
-  while ((imageMatch = imageMarkdownPattern.exec(originalText)) !== null) {
-    const markdown = imageMatch[0]
-    const filename = imageMatch[1] || 'image'
-    const dataUrl = imageMatch[2]
-    const position = imageMatch.index
-    
-    imagesInText.push({
-      filename,
-      data: dataUrl,
-      markdown,
-      position // Keep original position in text
-    })
-    
-    console.log(`📸 Found image "${filename}" at position ${position} in text`)
-  }
-  
-  // Sort images by position for easier insertion
-  imagesInText.sort((a, b) => a.position - b.position)
-  
-  // Split lines - images are still in the text, we'll extract them during section processing
-  const lines = originalText.split('\n')
+  // Split lines - images are already in the text as markdown, just preserve them
+  const lines = finalText.split('\n')
   console.log('Lines after splitting:', lines.length)
-  console.log('Images found in text:', imagesInText.length)
   console.log('First few lines:', lines.slice(0, 5))
   
   // Improved heading detection and list preservation
-  let cumulativePos = 0 // Track cumulative position in original text
   for (const line of lines) {
     const trimmedLine = line.trim()
     const lineLength = line.length + 1 // +1 for newline
@@ -1317,7 +1285,6 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
           content: '',
           order: sectionOrder++
         }
-        cumulativePos += lineLength
       }
       // If it's an empty heading, continue adding content to current section (or create one if none exists)
       else if (!currentSection) {
@@ -1328,9 +1295,6 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
           content: '',
           order: sectionOrder++
         }
-        cumulativePos += lineLength
-      } else {
-        cumulativePos += lineLength
       }
       // Otherwise, just continue with current section (don't create a new one)
     }
@@ -1346,7 +1310,6 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         content: '',
         order: sectionOrder++
       }
-      cumulativePos += lineLength
     }
     // Check for all-caps headings (simple heuristic)
     else if (trimmedLine.length > 3 && trimmedLine === trimmedLine.toUpperCase() && !trimmedLine.includes('|')) {
@@ -1360,7 +1323,6 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         content: '',
         order: sectionOrder++
       }
-      cumulativePos += lineLength
     }
     // Regular content (preserve lists with markers like 1., 2., or •)
     else {
@@ -1374,49 +1336,26 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
         }
       }
       
-      // Check if there are images that should be inserted at this position
-      // Use original text position (with images) to match image positions
-      const lineStartPos = cumulativePos
-      const lineEndPos = cumulativePos + line.length
+      // Add content as-is - images are already in the text at their correct positions
+      // Check if line contains image markdown
+      const hasImage = /!\[([^\]]*)\]\(data:[^)]+\)/.test(line)
       
-      // Find images that belong to this line position in original text
-      const imagesToInsert = imagesInText.filter(img => {
-        // Check if image position falls within this line's range in original text
-        return img.position >= lineStartPos && img.position < lineEndPos + 1
-      })
-      
-      // Insert images before this line if they belong here
-      if (imagesToInsert.length > 0) {
-        // Sort by position to maintain order
-        imagesToInsert.sort((a, b) => a.position - b.position)
-        imagesToInsert.forEach(img => {
-          // Check if image markdown is already in the section content (to avoid duplicates)
-          if (!currentSection!.content.includes(img.markdown)) {
-            currentSection!.content += (currentSection!.content.trim() ? '\n\n' : '') + img.markdown + '\n\n'
-            console.log(`📸 Inserted image "${img.filename}" into section at position ${img.position} (line ${lineStartPos}-${lineEndPos})`)
-          }
-        })
-      }
-      
-      // Add content - preserve empty lines for paragraph breaks
-      // Remove image markdown from line if present (we've already inserted it above)
-      let lineToAdd = line
-      imagesToInsert.forEach(img => {
-        lineToAdd = lineToAdd.replace(img.markdown, '').trim()
-      })
-      
-      if (trimmedLine.length === 0 || lineToAdd.length === 0) {
+      if (hasImage) {
+        // Line contains image - add it to section content
+        currentSection.content += (currentSection.content.trim() ? '\n\n' : '') + line + '\n\n'
+        console.log(`📸 Preserved image in line: ${line.substring(0, 100)}`)
+      } else if (trimmedLine.length === 0) {
         // Empty line = paragraph break (add double newline)
         currentSection.content += '\n\n'
       } else {
         // Check if this line is a list item
-        const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(lineToAdd.trim())
+        const isListItem = /^\s*(\d+\.|•|-|\*)\s/.test(trimmedLine)
         
-        if (isListItem || lineToAdd.length > 0) {
-          currentSection.content += (currentSection.content ? '\n' : '') + lineToAdd
+        if (isListItem || trimmedLine.length > 0) {
+          // Add line as-is (including any image markdown it contains)
+          currentSection.content += (currentSection.content ? '\n' : '') + line
         }
       }
-      cumulativePos += line.length + 1 // +1 for newline
     }
   }
   
