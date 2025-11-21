@@ -587,6 +587,24 @@ function DocImportPageInner() {
           // Check payload size - if with images it exceeds limit, send without images first
           const VERCEL_LIMIT_MB = 4.5
           
+          // Transform parsingLog to ensure required fields
+          const transformParsingLog = (log: UploadedFile['parsingLog']): Array<{
+            level: string
+            message: string
+            timestamp?: string
+          }> | null => {
+            if (!log || !Array.isArray(log)) return null
+            return log
+              .filter((entry): entry is { level: string; message: string; timestamp?: string } => 
+                typeof entry?.level === 'string' && typeof entry?.message === 'string'
+              )
+              .map(entry => ({
+                level: entry.level,
+                message: entry.message,
+                timestamp: entry.timestamp
+              }))
+          }
+          
           // Calculate size without images
           const requestBodyWithoutImages = {
             title: file.name,
@@ -598,7 +616,7 @@ function DocImportPageInner() {
               ...file.parsedContent,
               images: [] // Exclude images for size check
             },
-            parsingLog: file.parsingLog || null,
+            parsingLog: transformParsingLog(file.parsingLog),
             uploadedBy: session?.user?.id || 'unknown'
           }
           const sizeWithoutImages = JSON.stringify(requestBodyWithoutImages).length / (1024 * 1024)
@@ -644,13 +662,13 @@ function DocImportPageInner() {
             fileSize: number
             parsedContent: ParsedContent | { sections: []; tables: []; images: []; metadata: ParsedContent['metadata'] }
             parsingLog: Array<{
-              level?: string
-              message?: string
+              level: string
+              message: string
               timestamp?: string
-              [key: string]: unknown
             }> | null
             uploadedBy: string
           }
+          
           let requestBody: DocumentRequestBody
           
           if (sendMinimalContent) {
@@ -667,7 +685,7 @@ function DocImportPageInner() {
                 images: [],
                 metadata: file.parsedContent?.metadata || {}
               },
-              parsingLog: file.parsingLog || null,
+              parsingLog: transformParsingLog(file.parsingLog),
               uploadedBy: session?.user?.id || 'unknown'
             }
           } else {
@@ -736,13 +754,15 @@ function DocImportPageInner() {
               // Prepare parsedContent for update (NEVER include base64 image data in metadata)
               const fullParsedContent = {
                 ...file.parsedContent,
-                images: file.parsedContent?.images?.map((img) => ({
-                  filename: img.filename,
-                  type: img.type,
-                  position: img.position,
-                  // NEVER include data - images will be uploaded separately or skipped
-                  data: undefined
-                })) || []
+                images: file.parsedContent?.images?.map((img) => {
+                  // Omit data property - images will be uploaded separately
+                  const { data, ...imageWithoutData } = img
+                  return {
+                    filename: imageWithoutData.filename,
+                    type: imageWithoutData.type,
+                    position: imageWithoutData.position
+                  }
+                }) || []
               }
               
               // Merge with existing content
@@ -898,14 +918,21 @@ function DocImportPageInner() {
                 // Update images metadata (without data) - only if small enough
                 if (images.length > 0) {
                   // Images metadata should be small (no base64), but check anyway
+                  // Add empty data to satisfy type, API will ignore it for updates
+                  const imagesWithEmptyData: ParsedContent['images'] = images.map(img => ({
+                    filename: img.filename,
+                    type: img.type,
+                    position: img.position,
+                    data: '' // Empty string to satisfy type, API ignores for PATCH updates
+                  }))
                   const imagesOnlyContent = {
                     ...currentContent,
-                    images: images
+                    images: imagesWithEmptyData
                   }
                   const imagesSize = JSON.stringify({ parsedContent: imagesOnlyContent }).length / (1024 * 1024)
                   
                   if (imagesSize < VERCEL_LIMIT_MB) {
-                    currentContent.images = images
+                    currentContent.images = imagesWithEmptyData
                     const imagesResponse = await fetch(`/api/documents/${documentId}`, {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
