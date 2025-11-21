@@ -1003,11 +1003,19 @@ function DocImportPageInner() {
           if (!sendImagesInPayload && file.parsedContent?.images && file.parsedContent.images.length > 0) {
             console.log(`📤 Uploading ${file.parsedContent.images.length} images separately for document ${documentId}...`)
             
+            // Vercel body size limit is ~4.5MB, use 4MB to be safe
+            const VERCEL_BODY_SIZE_LIMIT = 4 * 1024 * 1024 // 4MB
+            
+            let uploadedCount = 0
+            let skippedCount = 0
+            let failedCount = 0
+            
             try {
               // Upload images one by one to avoid overwhelming the server
               for (const img of file.parsedContent.images) {
                 if (!img.data || img.data.trim().length === 0) {
-                  console.warn(`Skipping image ${img.filename}: no data`)
+                  console.warn(`⚠️ Skipping image ${img.filename}: no data`)
+                  skippedCount++
                   continue
                 }
                 
@@ -1015,6 +1023,18 @@ function DocImportPageInner() {
                 let base64Data = img.data
                 if (base64Data.includes(',')) {
                   base64Data = base64Data.split(',')[1]
+                }
+                
+                // Calculate binary size from base64 (base64 is ~33% larger than binary)
+                const binarySize = (base64Data.length * 3) / 4
+                
+                // Check size before attempting upload
+                if (binarySize > VERCEL_BODY_SIZE_LIMIT) {
+                  const sizeMB = (binarySize / (1024 * 1024)).toFixed(2)
+                  const limitMB = (VERCEL_BODY_SIZE_LIMIT / (1024 * 1024)).toFixed(2)
+                  console.warn(`⚠️ Skipping image ${img.filename} - exceeds Vercel limit (${sizeMB}MB). Maximum is ${limitMB}MB per image.`)
+                  skippedCount++
+                  continue
                 }
                 
                 // Convert to binary for FormData
@@ -1025,35 +1045,78 @@ function DocImportPageInner() {
                 }
                 const blob = new Blob([bytes], { type: img.type || 'image/png' })
                 
+                // Double-check blob size matches calculated size
+                if (blob.size > VERCEL_BODY_SIZE_LIMIT) {
+                  const sizeMB = (blob.size / (1024 * 1024)).toFixed(2)
+                  const limitMB = (VERCEL_BODY_SIZE_LIMIT / (1024 * 1024)).toFixed(2)
+                  console.warn(`⚠️ Skipping image ${img.filename} - blob size exceeds Vercel limit (${sizeMB}MB). Maximum is ${limitMB}MB per image.`)
+                  skippedCount++
+                  continue
+                }
+                
                 // Upload via FormData
                 const formData = new FormData()
                 formData.append('file', blob, img.filename)
                 formData.append('filename', img.filename)
                 formData.append('folder', `documents/${documentId}`)
                 
-                const uploadResponse = await fetch('/api/images/upload', {
-                  method: 'POST',
-                  body: formData
-                })
-                
-                if (!uploadResponse.ok) {
-                  console.error(`❌ Failed to upload image ${img.filename} separately`)
-                  // Continue with other images
-                  continue
-                }
-                
-                const uploadResult = await uploadResponse.json()
-                if (uploadResult.success && uploadResult.data?.url) {
-                  console.log(`✅ Uploaded image ${img.filename} separately: ${uploadResult.data.url}`)
+                try {
+                  const uploadResponse = await fetch('/api/images/upload', {
+                    method: 'POST',
+                    body: formData
+                  })
                   
-                  // Update document with image URL via API
-                  // Note: This would require an endpoint to update document images
-                  // For now, images are uploaded but not linked to document
-                  // Server should handle this on next document update
+                  if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text()
+                    let errorData
+                    try {
+                      errorData = JSON.parse(errorText)
+                    } catch {
+                      errorData = { message: errorText || uploadResponse.statusText }
+                    }
+                    
+                    if (uploadResponse.status === 413) {
+                      const sizeMB = (blob.size / (1024 * 1024)).toFixed(2)
+                      console.warn(`⚠️ Skipping image ${img.filename} - server returned 413 (Content Too Large). Size: ${sizeMB}MB`)
+                      skippedCount++
+                    } else {
+                      console.error(`❌ Failed to upload image ${img.filename} separately:`, {
+                        status: uploadResponse.status,
+                        statusText: uploadResponse.statusText,
+                        error: errorData
+                      })
+                      failedCount++
+                    }
+                    continue
+                  }
+                  
+                  const uploadResult = await uploadResponse.json()
+                  if (uploadResult.success && uploadResult.data?.url) {
+                    console.log(`✅ Uploaded image ${img.filename} separately: ${uploadResult.data.url}`)
+                    uploadedCount++
+                    
+                    // Update document with image URL via API
+                    // Note: This would require an endpoint to update document images
+                    // For now, images are uploaded but not linked to document
+                    // Server should handle this on next document update
+                  } else {
+                    console.error(`❌ Image upload returned success=false for ${img.filename}:`, uploadResult)
+                    failedCount++
+                  }
+                } catch (uploadError) {
+                  console.error(`❌ Error uploading image ${img.filename}:`, uploadError)
+                  failedCount++
                 }
               }
               
-              console.log(`✅ Finished uploading images separately for document ${documentId}`)
+              console.log(`✅ Finished uploading images separately for document ${documentId}: ${uploadedCount} uploaded, ${skippedCount} skipped (too large), ${failedCount} failed`)
+              
+              if (skippedCount > 0) {
+                console.warn(`⚠️ ${skippedCount} image(s) were skipped because they exceed the ${(VERCEL_BODY_SIZE_LIMIT / (1024 * 1024)).toFixed(0)}MB size limit`)
+              }
+              if (failedCount > 0) {
+                console.warn(`⚠️ ${failedCount} image(s) failed to upload`)
+              }
             } catch (error) {
               console.error(`❌ Error uploading images separately for document ${documentId}:`, error)
               // Don't fail the whole operation - document is already saved
