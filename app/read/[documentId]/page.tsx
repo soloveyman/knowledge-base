@@ -585,7 +585,7 @@ export default function DocumentReaderPage() {
       <main className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 md:py-8 lg:py-10">
         <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
           {/* Document Content */}
-          <Card>
+          <Card className="overflow-visible">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -596,7 +596,7 @@ export default function DocumentReaderPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6 lg:p-8">
+            <CardContent className="p-4 sm:p-6 lg:p-8 overflow-visible">
               {documentData.type === 'PDF' ? (
                 <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
                   <iframe 

@@ -166,7 +166,9 @@ Your task:
 7. Maintain the original hierarchy and order
 8. IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content. Images will be preserved separately.
 
-Return ONLY a valid JSON object with this exact structure:
+CRITICAL: Return ONLY a valid JSON object. Do NOT include any markdown code blocks, explanations, or additional text. Return ONLY the raw JSON object.
+
+The JSON must have this exact structure:
 {
   "sections": [
     {
@@ -189,9 +191,15 @@ Return ONLY a valid JSON object with this exact structure:
     "wordCount": 0,
     "totalImages": 0,
     "enhancedBy": "grok",
-    "enhancementTimestamp": ${Date.now()}
+    "enhancementTimestamp": 0
   }
 }
+
+IMPORTANT: 
+- Return ONLY the JSON object, nothing else
+- Do NOT wrap it in markdown code blocks (no \`\`\`json)
+- Do NOT add any explanations or text before or after the JSON
+- Start your response with { and end with }
 
 Preserve all original sections and tables, but improve their titles and content quality. 
 - Fix ALL spelling mistakes and grammar errors while maintaining the original meaning
@@ -254,7 +262,38 @@ Preserve all original sections and tables, but improve their titles and content 
     // Parse the enhanced content
     let enhancedContent: ParsedContent
     try {
-      enhancedContent = JSON.parse(content)
+      // Extract JSON from content - Grok might wrap it in markdown code blocks or add extra text
+      let jsonContent = content.trim()
+      
+      // Remove markdown code blocks if present
+      const codeBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim()
+      }
+      
+      // Try to find JSON object in the content (handle cases where there's text before/after)
+      // Find the first { and then find the matching closing }
+      const firstBrace = jsonContent.indexOf('{')
+      if (firstBrace !== -1) {
+        let braceCount = 0
+        let endBrace = firstBrace
+        for (let i = firstBrace; i < jsonContent.length; i++) {
+          if (jsonContent[i] === '{') braceCount++
+          if (jsonContent[i] === '}') braceCount--
+          if (braceCount === 0) {
+            endBrace = i
+            break
+          }
+        }
+        if (braceCount === 0) {
+          jsonContent = jsonContent.substring(firstBrace, endBrace + 1)
+        }
+      }
+      
+      // Log the extracted content for debugging (first 500 chars)
+      console.log('Extracted JSON content (first 500 chars):', jsonContent.substring(0, 500))
+      
+      enhancedContent = JSON.parse(jsonContent)
       
       // Validate structure
       if (!enhancedContent.sections || !Array.isArray(enhancedContent.sections)) {
@@ -289,12 +328,20 @@ Preserve all original sections and tables, but improve their titles and content 
       ;(enhancedContent.metadata as any).enhancedBy = 'grok'
       ;(enhancedContent.metadata as any).enhancementTimestamp = Date.now()
     } catch (parseError) {
-      console.error('Failed to parse Grok enhancement response:', content.substring(0, 500))
+      console.error('Failed to parse Grok enhancement response')
+      console.error('Full content length:', content.length)
+      console.error('Content (first 1000 chars):', content.substring(0, 1000))
+      console.error('Content (last 500 chars):', content.substring(Math.max(0, content.length - 500)))
       console.error('Parse error:', parseError)
+      console.error('Parse error details:', parseError instanceof Error ? {
+        message: parseError.message,
+        stack: parseError.stack
+      } : parseError)
       return NextResponse.json({
         success: false,
         message: 'Invalid JSON response from Grok API',
-        error: parseError instanceof Error ? parseError.message : 'Parse error'
+        error: parseError instanceof Error ? parseError.message : 'Parse error',
+        contentPreview: content.substring(0, 500)
       }, { status: 500 })
     }
 
