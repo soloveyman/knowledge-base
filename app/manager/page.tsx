@@ -882,47 +882,49 @@ function ManagerPageInner() {
                 } catch (error) {
                   console.error('Failed to parse pending tests:', error)
                 }
-              }
-                // If no sessionStorage data or it's stale, load from API
-                await loadTabData('tests', true, true) // forceRefresh = true
-                lastLoadedTabRef.current = tab
-              } else if (tab === 'assignments') {
-                // First, try sessionStorage for immediate display
-                if (typeof window !== 'undefined') {
-              const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
-              if (pendingAssignments) {
-                try {
-                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
-                    console.log('Manager: Using pre-fetched assignments from sessionStorage, count:', data.length)
-                    setSavedAssignmentsWithLog(data)
-                    sessionStorage.removeItem('pendingAssignmentsRefresh')
-                    lastLoadedTabRef.current = tab
-                    return // Skip API call since we have the data
-                  } else {
-                    console.log('Manager: Pending assignments data invalid or expired:', { 
-                      hasData: !!data, 
-                      isArray: Array.isArray(data),
-                      age: Date.now() - storedTimestamp 
-                    })
                   }
-                } catch (error) {
-                  console.error('Failed to parse pending assignments:', error)
                 }
-              } else {
-                console.log('Manager: No pending assignments found in sessionStorage')
-              }
+              // If no sessionStorage data or it's stale, load from API
+              await loadTabData('tests', true, true) // forceRefresh = true
+              lastLoadedTabRef.current = tab
+            } else if (tab === 'assignments') {
+              // First, try sessionStorage for immediate display
+              if (typeof window !== 'undefined') {
+                const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
+                if (pendingAssignments) {
+                  try {
+                    const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
+                    // Only use if timestamp is recent (within last 10 seconds)
+                    if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                      console.log('Manager: Using pre-fetched assignments from sessionStorage, count:', data.length)
+                      setSavedAssignmentsWithLog(data)
+                      sessionStorage.removeItem('pendingAssignmentsRefresh')
+                      lastLoadedTabRef.current = tab
+                      return // Skip API call since we have the data
+                    } else {
+                      console.log('Manager: Pending assignments data invalid or expired:', { 
+                        hasData: !!data, 
+                        isArray: Array.isArray(data),
+                        age: Date.now() - storedTimestamp 
+                      })
+                    }
+                  } catch (error) {
+                    console.error('Failed to parse pending assignments:', error)
+                  }
+                } else {
+                  console.log('Manager: No pending assignments found in sessionStorage')
                 }
-                // If no sessionStorage data or it's stale, load from API
-                await loadTabData('assignments', true, true) // forceRefresh = true
-                lastLoadedTabRef.current = tab
               }
+              // If no sessionStorage data or it's stale, load from API
+              await loadTabData('assignments', true, true) // forceRefresh = true
+              lastLoadedTabRef.current = tab
             }
+          } catch (error) {
+            console.error('Error in forceReloadTab:', error)
+          } finally {
+            isLoadingRef.current = false
           }
-          
-          // Ensure loading state is cleared
-          isLoadingRef.current = false
+        }
           
           // Execute the force reload
           forceReloadTab()
@@ -934,48 +936,48 @@ function ManagerPageInner() {
         
           // Use stale-while-revalidate for better UX (same as other tabs)
           if (tab === 'docs') {
-          // Only show loading if we don't have cached data
-          if (documents.length === 0) {
-            setIsLoadingDocuments(true)
-          }
-          
-          // Direct fetch for documents with stale-while-revalidate
-          fetch('/api/documents', { next: { revalidate: 30 } })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success && result.data.documents) {
-                const transformedDocs = result.data.documents.map((doc: {
-                  id: string
-                  originalFileName?: string
-                  title: string
-                  fileType?: string
-                  createdAt: string
-                  updatedAt?: string
-                  fileSize?: number
-                  status?: string
-                  parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
-                }) => ({
-                  id: doc.id,
-                  name: doc.originalFileName || doc.title,
-                  type: doc.fileType?.toUpperCase() || 'UNKNOWN',
-                  uploadedAt: formatDateShort(doc.createdAt),
-                  size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
-                  status: doc.status || 'ready',
-                  createdAt: doc.createdAt,
-                  updatedAt: doc.updatedAt,
-                  parsedContent: doc.parsedContent || null
-                }))
-                setDocumentsWithLog(transformedDocs)
-                syncLocalStorageWithDatabase(transformedDocs)
-                lastLoadedTabRef.current = tab
-              }
-              setIsLoadingDocuments(false)
-            })
-            .catch((error) => {
-              console.error('Error loading documents:', error)
-              setIsLoadingDocuments(false)
-            })
-        } else if (tab === 'tests') {
+            // Only show loading if we don't have cached data
+            if (documents.length === 0) {
+              setIsLoadingDocuments(true)
+            }
+            
+            // Direct fetch for documents with stale-while-revalidate
+            fetch('/api/documents', { next: { revalidate: 30 } })
+              .then(res => res.json())
+              .then(result => {
+                if (result.success && result.data.documents) {
+                  const transformedDocs = result.data.documents.map((doc: {
+                    id: string
+                    originalFileName?: string
+                    title: string
+                    fileType?: string
+                    createdAt: string
+                    updatedAt?: string
+                    fileSize?: number
+                    status?: string
+                    parsedContent?: { metadata?: { enhancedBy?: string; enhancementTimestamp?: number } } | null
+                  }) => ({
+                    id: doc.id,
+                    name: doc.originalFileName || doc.title,
+                    type: doc.fileType?.toUpperCase() || 'UNKNOWN',
+                    uploadedAt: formatDateShort(doc.createdAt),
+                    size: doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown',
+                    status: doc.status || 'ready',
+                    createdAt: doc.createdAt,
+                    updatedAt: doc.updatedAt,
+                    parsedContent: doc.parsedContent || null
+                  }))
+                  setDocumentsWithLog(transformedDocs)
+                  syncLocalStorageWithDatabase(transformedDocs)
+                  lastLoadedTabRef.current = tab
+                }
+                setIsLoadingDocuments(false)
+              })
+              .catch((error) => {
+                console.error('Error loading documents:', error)
+                setIsLoadingDocuments(false)
+              })
+          } else if (tab === 'tests') {
           // Direct fetch for tests with stale-while-revalidate - fetch tests and documents in parallel
           Promise.all([
             fetch('/api/tests', { next: { revalidate: 30 } }),
@@ -1033,77 +1035,78 @@ function ManagerPageInner() {
               }
             })
             .catch(console.error)
-        } else if (tab === 'assignments') {
-          // Check sessionStorage first for pre-fetched data (after edit/create)
-          const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
-          if (pendingAssignments) {
-            try {
-              const { data, timestamp: storedTimestamp, editedAssignmentId } = JSON.parse(pendingAssignments)
-              // Only use if timestamp is recent (within last 10 seconds)
-              if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
-                console.log('Manager: Using pre-fetched assignments from sessionStorage, count:', data.length)
-                
-                // If this is an edit operation, preserve the order by updating only the edited assignment
-                if (editedAssignmentId && savedAssignments.length > 0) {
-                  // Find the updated assignment in the new data
-                  const updatedAssignment = data.find((a: SavedAssignment) => a.id === editedAssignmentId)
-                  if (updatedAssignment) {
-                    // Update only the edited assignment in the existing list, preserving order
-                    setSavedAssignments(prevAssignments => {
-                      const assignmentIndex = prevAssignments.findIndex(a => a.id === editedAssignmentId)
-                      if (assignmentIndex !== -1) {
-                        // Update the assignment at its original position
-                        const newAssignments = [...prevAssignments]
-                        newAssignments[assignmentIndex] = updatedAssignment
-                        // Also update localStorage
-                        if (typeof window !== 'undefined') {
-                          try {
-                            localStorage.setItem('manager-assignments', JSON.stringify(newAssignments))
-                          } catch (error) {
-                            console.error('Error saving assignments to localStorage:', error)
+          } else if (tab === 'assignments') {
+            // Check sessionStorage first for pre-fetched data (after edit/create)
+            const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
+            if (pendingAssignments) {
+              try {
+                const { data, timestamp: storedTimestamp, editedAssignmentId } = JSON.parse(pendingAssignments)
+                // Only use if timestamp is recent (within last 10 seconds)
+                if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                  console.log('Manager: Using pre-fetched assignments from sessionStorage, count:', data.length)
+                  
+                  // If this is an edit operation, preserve the order by updating only the edited assignment
+                  if (editedAssignmentId && savedAssignments.length > 0) {
+                    // Find the updated assignment in the new data
+                    const updatedAssignment = data.find((a: SavedAssignment) => a.id === editedAssignmentId)
+                    if (updatedAssignment) {
+                      // Update only the edited assignment in the existing list, preserving order
+                      setSavedAssignments(prevAssignments => {
+                        const assignmentIndex = prevAssignments.findIndex(a => a.id === editedAssignmentId)
+                        if (assignmentIndex !== -1) {
+                          // Update the assignment at its original position
+                          const newAssignments = [...prevAssignments]
+                          newAssignments[assignmentIndex] = updatedAssignment
+                          // Also update localStorage
+                          if (typeof window !== 'undefined') {
+                            try {
+                              localStorage.setItem('manager-assignments', JSON.stringify(newAssignments))
+                            } catch (error) {
+                              console.error('Error saving assignments to localStorage:', error)
+                            }
                           }
+                          return newAssignments
                         }
-                        return newAssignments
-                      }
-                      // If not found, fall back to full replacement
-                      return data
-                    })
+                        // If not found, fall back to full replacement
+                        return data
+                      })
+                    } else {
+                      // Updated assignment not found, use full replacement
+                      setSavedAssignmentsWithLog(data)
+                    }
                   } else {
-                    // Updated assignment not found, use full replacement
+                    // New assignment or no existing assignments, use full replacement
                     setSavedAssignmentsWithLog(data)
                   }
+                  
+                  sessionStorage.removeItem('pendingAssignmentsRefresh')
+                  lastLoadedTabRef.current = tab
+                  return // Skip API call since we have the data
                 } else {
-                  // New assignment or no existing assignments, use full replacement
-                  setSavedAssignmentsWithLog(data)
+                  sessionStorage.removeItem('pendingAssignmentsRefresh') // Clean up expired data
                 }
-                
-                sessionStorage.removeItem('pendingAssignmentsRefresh')
-                lastLoadedTabRef.current = tab
-                return // Skip API call since we have the data
-              } else {
-                sessionStorage.removeItem('pendingAssignmentsRefresh') // Clean up expired data
+              } catch (error) {
+                console.error('Failed to parse pending assignments:', error)
+                sessionStorage.removeItem('pendingAssignmentsRefresh') // Clean up corrupted data
               }
-            } catch (error) {
-              console.error('Failed to parse pending assignments:', error)
-              sessionStorage.removeItem('pendingAssignmentsRefresh') // Clean up corrupted data
             }
+            
+            // Direct fetch for assignments with cache-busting
+            fetch('/api/assignments', { cache: 'no-store' })
+              .then(res => res.json())
+              .then(result => {
+                if (result.success) {
+                  console.log('Manager: Loaded assignments from API:', result.data.assignments)
+                  setSavedAssignmentsWithLog(result.data.assignments)
+                  lastLoadedTabRef.current = tab
+                }
+              })
+              .catch(console.error)
+          } else {
+            // For other tabs (overview), use loadTabData with forceRefresh=true
+            loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
+            lastLoadedTabRef.current = tab
           }
-          
-          // Direct fetch for assignments with cache-busting
-          fetch('/api/assignments', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success) {
-                console.log('Manager: Loaded assignments from API:', result.data.assignments)
-                setSavedAssignmentsWithLog(result.data.assignments)
-                lastLoadedTabRef.current = tab
-              }
-            })
-            .catch(console.error)
-        } else {
-          // For other tabs (overview), use loadTabData with forceRefresh=true
-          loadTabData(tab, true, true) // Use preserveData=true to avoid flickering, forceRefresh=true for fresh data
-          lastLoadedTabRef.current = tab
         }
       }
     } // Close checkAndReload function

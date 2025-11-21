@@ -252,12 +252,7 @@ function DocImportPageInner() {
             }))
             
             // No warnings needed - images are uploaded to Spaces
-            if (false) {
-              console.warn(`⚠️ Warning for ${fileObj.name}:`, warningMessages.join(' '))
-              console.log(`✅ File ${fileObj.name} is ready to save despite warning (status: ready, hasParsedContent: true)`)
-            } else {
-              console.log(`✅ File ${fileObj.name} is ready to save (no warnings)`)
-            }
+            console.log(`✅ File ${fileObj?.name} is ready to save (no warnings)`)
           } catch (parseError) {
             console.error('Parse error:', parseError)
             setFiles(prev => prev.map(f => 

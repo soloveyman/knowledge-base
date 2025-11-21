@@ -817,6 +817,7 @@ function OwnerPageInner() {
   const processedTimestampRef = useRef<string | null>(null)
   
   // Reload data when returning from edit/create pages (detected via URL parameters)
+  const userId = session?.user?.id
   useEffect(() => {
     const checkAndReload = () => {
       // Check window.location.search first for immediate detection (works before searchParams updates)
@@ -893,196 +894,142 @@ function OwnerPageInner() {
                 await loadTabData('docs', true, true) // forceRefresh = true
                 lastLoadedTabRef.current = tab
               } else if (tab === 'users') {
-              const pendingUsers = sessionStorage.getItem('pendingUsersRefresh')
-              if (pendingUsers) {
-                try {
-                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingUsers)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data) {
-                    console.log('Owner: Using pre-fetched users from sessionStorage')
-                    const currentUserId = session?.user?.id || ''
-                    const filteredUsers = (data as SavedUser[]).filter(u => {
-                      if (currentUserId && u.id === currentUserId) return false
-                      if (u.role === 'owner') return false
-                      return true
-                    })
-                    setSavedUsers(filteredUsers)
-                    sessionStorage.removeItem('pendingUsersRefresh')
-                    lastLoadedTabRef.current = tab
-                    return // Skip API call since we have the data
+                const pendingUsers = sessionStorage.getItem('pendingUsersRefresh')
+                if (pendingUsers) {
+                  try {
+                    const { data, timestamp: storedTimestamp } = JSON.parse(pendingUsers)
+                    // Only use if timestamp is recent (within last 10 seconds)
+                    if (Date.now() - storedTimestamp < 10000 && data) {
+                      console.log('Owner: Using pre-fetched users from sessionStorage')
+                      const currentUserId = session?.user?.id || ''
+                      const filteredUsers = (data as SavedUser[]).filter(u => {
+                        if (currentUserId && u.id === currentUserId) return false
+                        if (u.role === 'owner') return false
+                        return true
+                      })
+                      setSavedUsers(filteredUsers)
+                      sessionStorage.removeItem('pendingUsersRefresh')
+                      lastLoadedTabRef.current = tab
+                      return // Skip API call since we have the data
+                    }
+                  } catch (error) {
+                    console.error('Failed to parse pending users:', error)
                   }
-                } catch (error) {
-                  console.error('Failed to parse pending users:', error)
                 }
-              }
-            } else if (tab === 'tests') {
-              const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
-              if (pendingTests) {
-                try {
-                  const { tests, documents, timestamp: storedTimestamp, editedTestId } = JSON.parse(pendingTests)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && tests && documents) {
-                    console.log('Owner: Using pre-fetched tests from sessionStorage')
-                    const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-                    documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
-                      documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
-                    })
-                    const transformedTests = (tests as Array<{
-                      id: string
-                      title: string
-                      type?: string | null
-                      difficulty?: string | null
-                      locale?: string | null
-                      questionIds?: string[] | null
-                      moduleId?: string | null
-                      createdAt: string
-                      createdBy: string
-                    }>).map((test) => {
-                      const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
-                      let sourceDocument = 'Unknown'
-                      if (test.moduleId) {
-                        const doc = documentMap.get(test.moduleId)
-                        if (doc) {
-                          sourceDocument = doc.originalFileName || doc.title || 'Unknown'
-                        }
-                      }
-                      return {
-                        id: test.id,
-                        title: test.title,
-                        type: test.type || 'mcq',
-                        difficulty: test.difficulty || 'medium',
-                        locale: test.locale || 'en',
-                        questionCount,
-                        questions: [],
-                        sourceDocument,
-                        createdAt: test.createdAt,
-                        createdBy: test.createdBy
-                      }
-                    })
-                    
-                    // If this is an edit operation, preserve the order by updating only the edited test
-                    if (editedTestId && savedTests.length > 0) {
-                      // Find the updated test in the new data
-                      const updatedTest = transformedTests.find(t => t.id === editedTestId)
-                      if (updatedTest) {
-                        // Update only the edited test in the existing list, preserving order
-                        setSavedTests(prevTests => {
-                          const testIndex = prevTests.findIndex(t => t.id === editedTestId)
-                          if (testIndex !== -1) {
-                            // Update the test at its original position
-                            const newTests = [...prevTests]
-                            newTests[testIndex] = updatedTest
-                            // Also update localStorage
-                            if (typeof window !== 'undefined') {
-                              try {
-                                localStorage.setItem('owner-tests', JSON.stringify(newTests))
-                              } catch (error) {
-                                console.error('Error saving tests to localStorage:', error)
-                              }
-                            }
-                            return newTests
+              } else if (tab === 'tests') {
+                const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
+                if (pendingTests) {
+                  try {
+                    const { tests, documents, timestamp: storedTimestamp, editedTestId } = JSON.parse(pendingTests)
+                    // Only use if timestamp is recent (within last 10 seconds)
+                    if (Date.now() - storedTimestamp < 10000 && tests && documents) {
+                      console.log('Owner: Using pre-fetched tests from sessionStorage')
+                      const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+                      documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+                        documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+                      })
+                      const transformedTests = (tests as Array<{
+                        id: string
+                        title: string
+                        type?: string | null
+                        difficulty?: string | null
+                        locale?: string | null
+                        questionIds?: string[] | null
+                        moduleId?: string | null
+                        createdAt: string
+                        createdBy: string
+                      }>).map((test) => {
+                        const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+                        let sourceDocument = 'Unknown'
+                        if (test.moduleId) {
+                          const doc = documentMap.get(test.moduleId)
+                          if (doc) {
+                            sourceDocument = doc.originalFileName || doc.title || 'Unknown'
                           }
-                          // If not found, fall back to full replacement
-                          return transformedTests
-                        })
+                        }
+                        return {
+                          id: test.id,
+                          title: test.title,
+                          type: test.type || 'mcq',
+                          difficulty: test.difficulty || 'medium',
+                          locale: test.locale || 'en',
+                          questionCount,
+                          questions: [],
+                          sourceDocument,
+                          createdAt: test.createdAt,
+                          createdBy: test.createdBy
+                        }
+                      })
+                      
+                      // If this is an edit operation, preserve the order by updating only the edited test
+                      if (editedTestId && savedTests.length > 0) {
+                        // Find the updated test in the new data
+                        const updatedTest = transformedTests.find(t => t.id === editedTestId)
+                        if (updatedTest) {
+                          // Update only the edited test in the existing list, preserving order
+                          setSavedTests(prevTests => {
+                            const testIndex = prevTests.findIndex(t => t.id === editedTestId)
+                            if (testIndex !== -1) {
+                              // Update the test at its original position
+                              const newTests = [...prevTests]
+                              newTests[testIndex] = updatedTest
+                              // Also update localStorage
+                              if (typeof window !== 'undefined') {
+                                try {
+                                  localStorage.setItem('owner-tests', JSON.stringify(newTests))
+                                } catch (error) {
+                                  console.error('Error saving tests to localStorage:', error)
+                                }
+                              }
+                              return newTests
+                            }
+                            // If not found, fall back to full replacement
+                            return transformedTests
+                          })
+                        } else {
+                          // Updated test not found, use full replacement
+                          setSavedTestsWithLog(transformedTests)
+                        }
                       } else {
-                        // Updated test not found, use full replacement
+                        // New test or no existing tests, use full replacement
                         setSavedTestsWithLog(transformedTests)
                       }
+                      
+                      sessionStorage.removeItem('pendingTestsRefresh')
+                      lastLoadedTabRef.current = tab
+                      return // Skip API call since we have the data
+                    }
+                  } catch (error) {
+                    console.error('Failed to parse pending tests:', error)
+                  }
+                }
+              } else if (tab === 'assignments') {
+                const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
+                if (pendingAssignments) {
+                  try {
+                    const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
+                    // Only use if timestamp is recent (within last 10 seconds)
+                    if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
+                      console.log('Owner: Using pre-fetched assignments from sessionStorage, count:', data.length)
+                      setSavedAssignmentsWithLog(data)
+                      sessionStorage.removeItem('pendingAssignmentsRefresh')
+                      lastLoadedTabRef.current = tab
+                      return // Skip API call since we have the data
                     } else {
-                      // New test or no existing tests, use full replacement
-                      setSavedTestsWithLog(transformedTests)
+                      console.log('Owner: Pending assignments data invalid or expired:', { 
+                        hasData: !!data, 
+                        isArray: Array.isArray(data),
+                        age: Date.now() - storedTimestamp 
+                      })
                     }
-                    
-                    sessionStorage.removeItem('pendingTestsRefresh')
-                    lastLoadedTabRef.current = tab
-                    return // Skip API call since we have the data
+                  } catch (error) {
+                    console.error('Failed to parse pending assignments:', error)
                   }
-                } catch (error) {
-                  console.error('Failed to parse pending tests:', error)
-                }
-              }
-            } else if (tab === 'assignments') {
-              const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
-              if (pendingAssignments) {
-                try {
-                  const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
-                  // Only use if timestamp is recent (within last 10 seconds)
-                  if (Date.now() - storedTimestamp < 10000 && data && Array.isArray(data)) {
-                    console.log('Owner: Using pre-fetched assignments from sessionStorage, count:', data.length)
-                    setSavedAssignmentsWithLog(data)
-                    sessionStorage.removeItem('pendingAssignmentsRefresh')
-                    lastLoadedTabRef.current = tab
-                    return // Skip API call since we have the data
-                  } else {
-                    console.log('Owner: Pending assignments data invalid or expired:', { 
-                      hasData: !!data, 
-                      isArray: Array.isArray(data),
-                      age: Date.now() - storedTimestamp 
-                    })
-                  }
-                } catch (error) {
-                  console.error('Failed to parse pending assignments:', error)
-                }
-              } else {
-                console.log('Owner: No pending assignments found in sessionStorage')
-              }
-              // If no sessionStorage data or it's stale, load from API
-              await loadTabData('assignments', true, true) // forceRefresh = true
-              lastLoadedTabRef.current = tab
-            } else if (tab === 'tests') {
-                // First, try sessionStorage for immediate display
-                if (typeof window !== 'undefined') {
-                  const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
-                  if (pendingTests) {
-                    try {
-                      const { tests, documents, timestamp: storedTimestamp, editedTestId } = JSON.parse(pendingTests)
-                      // Only use if timestamp is recent (within last 30 seconds)
-                      if (Date.now() - storedTimestamp < 30000 && tests && documents) {
-                        console.log('Owner: Using pre-fetched tests from sessionStorage')
-                        // ... existing test transformation code ...
-                        sessionStorage.removeItem('pendingTestsRefresh')
-                        lastLoadedTabRef.current = tab
-                        isLoadingRef.current = false
-                        return
-                      }
-                    } catch (error) {
-                      console.error('Failed to parse pending tests:', error)
-                    }
-                  }
+                } else {
+                  console.log('Owner: No pending assignments found in sessionStorage')
                 }
                 // If no sessionStorage data or it's stale, load from API
-                await loadTabData('tests', true, true) // forceRefresh = true
-                lastLoadedTabRef.current = tab
-              } else if (tab === 'users') {
-                // First, try sessionStorage for immediate display
-                if (typeof window !== 'undefined') {
-                  const pendingUsers = sessionStorage.getItem('pendingUsersRefresh')
-                  if (pendingUsers) {
-                    try {
-                      const { data, timestamp: storedTimestamp } = JSON.parse(pendingUsers)
-                      // Only use if timestamp is recent (within last 30 seconds)
-                      if (Date.now() - storedTimestamp < 30000 && data) {
-                        console.log('Owner: Using pre-fetched users from sessionStorage')
-                        const currentUserId = session?.user?.id || ''
-                        const filteredUsers = (data as SavedUser[]).filter(u => {
-                          if (currentUserId && u.id === currentUserId) return false
-                          if (u.role === 'owner') return false
-                          return true
-                        })
-                        setSavedUsers(filteredUsers)
-                        sessionStorage.removeItem('pendingUsersRefresh')
-                        lastLoadedTabRef.current = tab
-                        isLoadingRef.current = false
-                        return
-                      }
-                    } catch (error) {
-                      console.error('Failed to parse pending users:', error)
-                    }
-                  }
-                }
-                // If no sessionStorage data or it's stale, load from API
-                await loadTabData('users', true, true) // forceRefresh = true
+                await loadTabData('assignments', true, true) // forceRefresh = true
                 lastLoadedTabRef.current = tab
               }
             } finally {
@@ -1092,7 +1039,8 @@ function OwnerPageInner() {
           
           // Execute the force reload
           forceReloadTab()
-        } else {
+        }
+      } else {
           console.log(`Owner: Tab changed to ${tab}, loading data...`)
           // Reset last loaded tab ref to force reload even if same tab
           lastLoadedTabRef.current = null
@@ -1301,8 +1249,11 @@ function OwnerPageInner() {
     checkAndReload()
     
     // Also listen for navigation events to catch immediate changes
+    let intervalId: NodeJS.Timeout | null = null
+    let handlePopState: (() => void) | null = null
+    
     if (typeof window !== 'undefined') {
-      const handlePopState = () => {
+      handlePopState = () => {
         // Immediate check without delay for faster updates
         // Use a small delay to ensure URL has updated
         setTimeout(checkAndReload, 50)
@@ -1313,7 +1264,6 @@ function OwnerPageInner() {
       window.addEventListener('locationchange', handlePopState)
       
       // Also check periodically when we have a timestamp (fallback for mobile)
-      let intervalId: NodeJS.Timeout | null = null
       const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : searchParams
       if (urlParams.has('_t') || searchParams.has('_t')) {
         // Check every 100ms for up to 2 seconds to catch URL updates
@@ -1327,14 +1277,16 @@ function OwnerPageInner() {
           checkAndReload()
         }, 100)
       }
-      
-      return () => {
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined' && handlePopState) {
         window.removeEventListener('popstate', handlePopState)
         window.removeEventListener('locationchange', handlePopState)
         if (intervalId) clearInterval(intervalId)
       }
     }
-  }, [searchParams, loadTabData, session?.user?.id, defaultTab])
+  }, [searchParams, loadTabData, userId, defaultTab])
 
   // Reload data when tab changes to settings
   useEffect(() => {
