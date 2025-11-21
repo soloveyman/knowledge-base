@@ -217,7 +217,9 @@ export default function ContentEditor({
     for (let i = imageMatches.length - 1; i >= 0; i--) {
       const { match, alt, src } = imageMatches[i]
       const escapedAlt = alt.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-      const escapedSrc = src.replace(/"/g, '&quot;')
+      // Don't escape external URLs (https://) - only escape data URLs if needed
+      // URLs should remain unescaped to work properly
+      const escapedSrc = src.startsWith('data:') ? src : src.replace(/"/g, '&quot;')
       const imgTag = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
       html = html.substring(0, imageMatches[i].index) + imgTag + html.substring(imageMatches[i].index + match.length)
     }

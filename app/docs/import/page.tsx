@@ -598,8 +598,8 @@ function DocImportPageInner() {
               images: [] // Exclude images from size calculation
             }
           }
-          const payloadString = JSON.stringify(requestBodyWithoutImages)
-          const payloadSizeMB = payloadString.length / (1024 * 1024)
+          const sizeCheckString = JSON.stringify(requestBodyWithoutImages)
+          const payloadSizeMB = sizeCheckString.length / (1024 * 1024)
           const VERCEL_LIMIT_MB = 4.5
           
           console.log(`Payload size for ${file.name}: ${payloadSizeMB.toFixed(2)}MB (file: ${(file.size / (1024 * 1024)).toFixed(2)}MB, images excluded from size calculation)`)
@@ -609,6 +609,9 @@ function DocImportPageInner() {
             console.error(errorMsg)
             throw new Error(errorMsg)
           }
+          
+          // Send the original requestBody WITH images to the API
+          const payloadString = JSON.stringify(requestBody)
           
           const response = await fetch('/api/documents', {
             method: 'POST',
