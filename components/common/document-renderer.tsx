@@ -125,7 +125,7 @@ function DocumentContent({ content }: { content: string }) {
     const escapedSrc = src.startsWith('data:') ? src : src.replace(/"/g, '&quot;')
     // Use HTML img tag instead of markdown syntax
     // Note: data URLs must remain unescaped, but external URLs should be escaped
-    const htmlImg = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
+    const htmlImg = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6 mx-auto block" style="max-width: 100%; height: auto;" loading="lazy" />`
     processedMarkdown = processedMarkdown.replace(match, htmlImg)
   }
   
@@ -428,7 +428,7 @@ function DocumentContent({ content }: { content: string }) {
           if (isDataUrl || isExternal) {
             return (
               <div className={containerClass}>
-                <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full"} style={!isSmallImage && !isQRCode && !isIcon ? { maxWidth: '1200px', maxHeight: '500px' } : undefined}>
+                <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full mx-auto"} style={!isSmallImage && !isQRCode && !isIcon ? { maxWidth: '1200px', maxHeight: '500px' } : undefined}>
                   <ImageWithPlaceholder
                     src={srcString}
                     alt={alt || ''}
@@ -462,7 +462,7 @@ function DocumentContent({ content }: { content: string }) {
           
           return (
             <div className={containerClass}>
-              <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full"} style={!isSmallImage && !isQRCode && !isIcon ? { maxWidth: '1200px', maxHeight: '500px' } : undefined}>
+              <div className={isSmallImage || isQRCode || isIcon ? "relative" : "relative w-full mx-auto"} style={!isSmallImage && !isQRCode && !isIcon ? { maxWidth: '1200px', maxHeight: '500px' } : undefined}>
                 <Image
                   {...optimizedProps}
                   className={imageClass}

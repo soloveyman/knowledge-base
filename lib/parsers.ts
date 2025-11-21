@@ -1061,10 +1061,10 @@ export async function parseDocument(file: File): Promise<ParsedContent> {
   const parseTimestamp = Date.now()
   console.log('Parse timestamp (cache-busting):', parseTimestamp)
   
-  // Validate file size (100MB limit - images are stored separately in Spaces, only text content is counted)
-  const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+  // Validate file size (20MB limit - images are stored separately in Spaces, only text content is counted)
+  const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
   if (file.size > MAX_FILE_SIZE) {
-    throw new ParseError(`File size exceeds 100MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
+    throw new ParseError(`File size exceeds 20MB limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`)
   }
   
   const buffer = await file.arrayBuffer()
