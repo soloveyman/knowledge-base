@@ -188,7 +188,7 @@ export default function ContentEditor({
 
   const renderPreview = () => {
     // Simple markdown to HTML conversion (in production, use a proper markdown parser)
-    const html = content
+    let html = content
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -198,7 +198,31 @@ export default function ContentEditor({
       .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
       .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
       .replace(/^- (.*$)/gim, '<li>$1</li>')
-      .replace(/\n/g, '<br>')
+    
+    // Handle images: ![alt](url) -> <img src="url" alt="alt" />
+    // Process in reverse order to preserve positions when replacing
+    const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g
+    const imageMatches: Array<{ match: string; alt: string; src: string; index: number }> = []
+    let match
+    while ((match = imagePattern.exec(html)) !== null) {
+      imageMatches.push({
+        match: match[0],
+        alt: match[1] || '',
+        src: match[2],
+        index: match.index
+      })
+    }
+    
+    // Replace from end to start to preserve indices
+    for (let i = imageMatches.length - 1; i >= 0; i--) {
+      const { match, alt, src } = imageMatches[i]
+      const escapedAlt = alt.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      const escapedSrc = src.replace(/"/g, '&quot;')
+      const imgTag = `<img src="${escapedSrc}" alt="${escapedAlt}" class="rounded-lg border border-border w-full h-auto max-w-4xl my-6" style="max-width: 100%; height: auto;" loading="lazy" />`
+      html = html.substring(0, imageMatches[i].index) + imgTag + html.substring(imageMatches[i].index + match.length)
+    }
+    
+    html = html.replace(/\n/g, '<br>')
 
     return <div dangerouslySetInnerHTML={{ __html: html }} />
   }
