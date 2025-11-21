@@ -713,8 +713,13 @@ function DocImportPageInner() {
             console.log(`📤 Updating parsedContent separately for document ${documentId}...`)
             
             try {
+              // Get existing document to merge with
+              const getDocResponse = await fetch(`/api/documents/${documentId}`)
+              const getDocResult = await getDocResponse.json()
+              const existingParsedContent = getDocResult.data?.document?.parsedContent || { sections: [], tables: [], images: [], metadata: {} }
+              
               // Prepare parsedContent for update (without images if they exceed limit)
-              let parsedContentForUpdate = sendImagesInPayload
+              const fullParsedContent = sendImagesInPayload
                 ? file.parsedContent
                 : {
                     ...file.parsedContent,
@@ -726,37 +731,162 @@ function DocImportPageInner() {
                     })) || []
                   }
               
-              // Check size of parsedContent update
-              const updatePayloadSize = JSON.stringify({ parsedContent: parsedContentForUpdate }).length / (1024 * 1024)
-              
-              if (updatePayloadSize > VERCEL_LIMIT_MB) {
-                console.warn(`⚠️ parsedContent update (${updatePayloadSize.toFixed(2)}MB) exceeds limit. Will try to update in parts or skip.`)
-                // For now, we'll try anyway - server might handle it differently
-                // In future, we could split into sections/tables/images separately
+              // Merge with existing content
+              const mergedContent = {
+                ...fullParsedContent,
+                sections: fullParsedContent.sections || existingParsedContent.sections || [],
+                tables: fullParsedContent.tables || existingParsedContent.tables || [],
+                images: fullParsedContent.images || existingParsedContent.images || [],
+                metadata: {
+                  ...existingParsedContent.metadata,
+                  ...fullParsedContent.metadata
+                }
               }
               
-              // Update document with full parsedContent via PATCH
-              const updateResponse = await fetch(`/api/documents/${documentId}`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  parsedContent: parsedContentForUpdate
-                })
-              })
+              // Check size and split into parts if needed
+              const updatePayloadSize = JSON.stringify({ parsedContent: mergedContent }).length / (1024 * 1024)
               
-              if (!updateResponse.ok) {
-                const errorData = await updateResponse.json().catch(() => ({ message: 'Unknown error' }))
-                console.error(`❌ Failed to update parsedContent for document ${documentId}:`, errorData)
-                // Don't fail - document is already created, but log warning
-                console.warn(`⚠️ Document ${documentId} was created but parsedContent could not be updated. Content may be incomplete.`)
+              if (updatePayloadSize > VERCEL_LIMIT_MB) {
+                console.log(`⚠️ parsedContent (${updatePayloadSize.toFixed(2)}MB) exceeds limit. Splitting into parts...`)
+                
+                // Split sections into chunks with size checking
+                const sections = mergedContent.sections || []
+                const tables = mergedContent.tables || []
+                const images = mergedContent.images || []
+                const metadata = mergedContent.metadata || {}
+                
+                // Get current document content to merge incrementally
+                let currentContent = {
+                  sections: [],
+                  tables: [],
+                  images: [],
+                  metadata
+                }
+                
+                // Update with metadata first (small)
+                const metadataPayload = JSON.stringify({ parsedContent: currentContent }).length / (1024 * 1024)
+                if (metadataPayload < VERCEL_LIMIT_MB) {
+                  const metadataResponse = await fetch(`/api/documents/${documentId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parsedContent: currentContent })
+                  })
+                  if (metadataResponse.ok) {
+                    console.log(`✅ Updated metadata for document ${documentId}`)
+                  }
+                }
+                
+                // Update sections incrementally - add one by one until we hit size limit
+                let accumulatedSections: any[] = []
+                for (let i = 0; i < sections.length; i++) {
+                  const testContent = {
+                    ...currentContent,
+                    sections: [...accumulatedSections, sections[i]]
+                  }
+                  const testSize = JSON.stringify({ parsedContent: testContent }).length / (1024 * 1024)
+                  
+                  if (testSize > VERCEL_LIMIT_MB * 0.9 && accumulatedSections.length > 0) {
+                    // Current batch is too large, send what we have
+                    currentContent.sections = accumulatedSections
+                    const batchResponse = await fetch(`/api/documents/${documentId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ parsedContent: currentContent })
+                    })
+                    if (batchResponse.ok) {
+                      console.log(`✅ Updated sections batch (${accumulatedSections.length} sections) for document ${documentId}`)
+                      // Get updated content for next batch
+                      const getResponse = await fetch(`/api/documents/${documentId}`)
+                      const getResult = await getResponse.json()
+                      currentContent = getResult.data?.document?.parsedContent || currentContent
+                      accumulatedSections = [sections[i]] // Start new batch with current section
+                    } else {
+                      console.warn(`⚠️ Failed to update sections batch, continuing...`)
+                      accumulatedSections.push(sections[i])
+                    }
+                  } else {
+                    accumulatedSections.push(sections[i])
+                  }
+                }
+                
+                // Send remaining sections
+                if (accumulatedSections.length > 0) {
+                  currentContent.sections = [...(currentContent.sections || []), ...accumulatedSections]
+                  const finalSectionsResponse = await fetch(`/api/documents/${documentId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parsedContent: currentContent })
+                  })
+                  if (finalSectionsResponse.ok) {
+                    console.log(`✅ Updated final sections batch (${accumulatedSections.length} sections) for document ${documentId}`)
+                    const getResponse = await fetch(`/api/documents/${documentId}`)
+                    const getResult = await getResponse.json()
+                    currentContent = getResult.data?.document?.parsedContent || currentContent
+                  }
+                }
+                
+                // Update tables (usually small)
+                if (tables.length > 0) {
+                  currentContent.tables = [...(currentContent.tables || []), ...tables]
+                  const tablesSize = JSON.stringify({ parsedContent: currentContent }).length / (1024 * 1024)
+                  if (tablesSize < VERCEL_LIMIT_MB) {
+                    const tablesResponse = await fetch(`/api/documents/${documentId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ parsedContent: currentContent })
+                    })
+                    if (tablesResponse.ok) {
+                      console.log(`✅ Updated tables for document ${documentId}`)
+                      const getResponse = await fetch(`/api/documents/${documentId}`)
+                      const getResult = await getResponse.json()
+                      currentContent = getResult.data?.document?.parsedContent || currentContent
+                    }
+                  } else {
+                    console.warn(`⚠️ Tables too large to update (${tablesSize.toFixed(2)}MB)`)
+                  }
+                }
+                
+                // Update images metadata (without data)
+                if (images.length > 0) {
+                  currentContent.images = images
+                  const imagesSize = JSON.stringify({ parsedContent: currentContent }).length / (1024 * 1024)
+                  if (imagesSize < VERCEL_LIMIT_MB) {
+                    const imagesResponse = await fetch(`/api/documents/${documentId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ parsedContent: currentContent })
+                    })
+                    if (imagesResponse.ok) {
+                      console.log(`✅ Updated images metadata for document ${documentId}`)
+                    }
+                  } else {
+                    console.warn(`⚠️ Images metadata too large to update (${imagesSize.toFixed(2)}MB)`)
+                  }
+                }
+                
+                console.log(`✅ Finished updating parsedContent in parts for document ${documentId}`)
               } else {
-                console.log(`✅ Updated parsedContent for document ${documentId}`)
+                // Size is OK, update in one go
+                const updateResponse = await fetch(`/api/documents/${documentId}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    parsedContent: mergedContent
+                  })
+                })
+                
+                if (!updateResponse.ok) {
+                  const errorData = await updateResponse.json().catch(() => ({ message: 'Unknown error' }))
+                  console.error(`❌ Failed to update parsedContent for document ${documentId}:`, errorData)
+                  console.warn(`⚠️ Document ${documentId} was created but parsedContent could not be updated. Content may be incomplete.`)
+                } else {
+                  console.log(`✅ Updated parsedContent for document ${documentId}`)
+                }
               }
             } catch (error) {
               console.error(`❌ Error updating parsedContent for document ${documentId}:`, error)
-              // Don't fail - document is already created
               console.warn(`⚠️ Document ${documentId} was created but parsedContent update failed. Content may be incomplete.`)
             }
           }
