@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions, assignments, assignmentUsers, testAttempts } from '@/lib/db'
-import { eq } from 'drizzle-orm'
+import { db, tests, questions, assignments, assignmentUsers, testAttempts, users } from '@/lib/db'
+import { eq, and, inArray } from 'drizzle-orm'
+import { auth, hasPermission } from '@/lib/auth'
 
 export async function GET(
   request: Request,
@@ -161,18 +162,69 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permissions
+    if (!hasPermission(session.user.role, 'TESTS', 'update')) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Forbidden - you do not have permission to update tests' 
+      }, { status: 403 })
+    }
+
     const { id } = await params
     const body = await request.json()
     
     console.log('PUT request for test ID:', id)
     console.log('Update data:', body)
 
-    // Check if test exists - select only id to avoid column errors
-    const existingTest = await db
-      .select({ id: tests.id })
-      .from(tests)
-      .where(eq(tests.id, id))
-      .limit(1)
+    // Check if test exists and user has access
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+    
+    let existingTest
+    if (userRole === 'super-admin') {
+      // Super-admin can update any test
+      existingTest = await db
+        .select({ id: tests.id, createdBy: tests.createdBy })
+        .from(tests)
+        .where(eq(tests.id, id))
+        .limit(1)
+    } else {
+      // Others can only update tests from their tenant
+      if (!tenantId) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden - you can only update tests from your business'
+        }, { status: 403 })
+      }
+      
+      // Get tenant user IDs
+      const tenantUsers = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.businessId, tenantId))
+      const tenantUserIds = tenantUsers.map(u => u.id)
+      
+      if (tenantUserIds.length === 0) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden - you can only update tests from your business'
+        }, { status: 403 })
+      }
+      
+      existingTest = await db
+        .select({ id: tests.id, createdBy: tests.createdBy })
+        .from(tests)
+        .where(and(
+          eq(tests.id, id),
+          inArray(tests.createdBy, tenantUserIds)
+        ))
+        .limit(1)
+    }
     
     if (existingTest.length === 0) {
       return NextResponse.json({
@@ -265,6 +317,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permissions
+    if (!hasPermission(session.user.role, 'TESTS', 'delete')) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Forbidden - you do not have permission to delete tests' 
+      }, { status: 403 })
+    }
+
     const { id } = await params
     console.log('=== DELETE API Debug ===')
     console.log('Request URL:', request.url)
@@ -272,21 +337,65 @@ export async function DELETE(
     console.log('ID type:', typeof id)
     console.log('ID length:', id?.length)
 
-    // Check if test exists - select id and questionIds for deletion
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+
+    // Check if test exists and user has access - select id and questionIds for deletion
     let questionIds: string[] = []
     try {
-      const existingTest = await db
-        .select({
-          id: tests.id,
-          questionIds: tests.questionIds
-        })
-        .from(tests)
-        .where(eq(tests.id, id))
-        .limit(1)
+      let existingTest
+      if (userRole === 'super-admin') {
+        // Super-admin can delete any test
+        existingTest = await db
+          .select({
+            id: tests.id,
+            questionIds: tests.questionIds,
+            createdBy: tests.createdBy
+          })
+          .from(tests)
+          .where(eq(tests.id, id))
+          .limit(1)
+      } else {
+        // Others can only delete tests from their tenant
+        if (!tenantId) {
+          return NextResponse.json({
+            success: false,
+            message: 'Forbidden - you can only delete tests from your business'
+          }, { status: 403 })
+        }
+        
+        // Get tenant user IDs
+        const tenantUsers = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.businessId, tenantId))
+        const tenantUserIds = tenantUsers.map(u => u.id)
+        
+        if (tenantUserIds.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: 'Forbidden - you can only delete tests from your business'
+          }, { status: 403 })
+        }
+        
+        existingTest = await db
+          .select({
+            id: tests.id,
+            questionIds: tests.questionIds,
+            createdBy: tests.createdBy
+          })
+          .from(tests)
+          .where(and(
+            eq(tests.id, id),
+            inArray(tests.createdBy, tenantUserIds)
+          ))
+          .limit(1)
+      }
+      
       console.log('Found test:', existingTest)
       
       if (existingTest.length === 0) {
-        console.log('Test not found in database')
+        console.log('Test not found in database or access denied')
         return NextResponse.json({
           success: false,
           message: 'Test not found'

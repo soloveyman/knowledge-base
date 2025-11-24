@@ -80,16 +80,48 @@ export async function PATCH(
 ) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permissions
+    if (!hasPermission(session.user.role, 'MATERIALS', 'update')) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Forbidden - you do not have permission to update documents' 
+      }, { status: 403 })
     }
 
     const { id } = await params
     
-    // Check if document exists
-    const existingDoc = await db.select().from(documents).where(eq(documents.id, id)).limit(1)
-    if (existingDoc.length === 0) {
+    // Check if document exists and user has access
+    const existingDoc = await db
+      .select({ 
+        document: documents,
+        uploaderBusinessId: users.businessId 
+      })
+      .from(documents)
+      .leftJoin(users, eq(documents.uploadedBy, users.id))
+      .where(eq(documents.id, id))
+      .limit(1)
+    
+    if (existingDoc.length === 0 || !existingDoc[0].document) {
       return NextResponse.json({ success: false, message: 'Document not found' }, { status: 404 })
+    }
+
+    // Check tenant isolation: super-admin can update any, others can only update their tenant's documents
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+    if (userRole !== 'super-admin') {
+      const uploaderBusinessId = existingDoc[0].uploaderBusinessId
+      const isOwner = existingDoc[0].document.uploadedBy === session.user.id
+      
+      if (!isOwner && uploaderBusinessId !== tenantId) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden - you can only update documents from your business'
+        }, { status: 403 })
+      }
     }
 
     const body = await request.json()
@@ -112,6 +144,13 @@ export async function PATCH(
       })
       .where(eq(documents.id, id))
       .returning()
+    
+    if (updated.length === 0) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Failed to update document' 
+      }, { status: 500 })
+    }
 
     if (updated.length === 0) {
       return NextResponse.json({ 

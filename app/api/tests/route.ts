@@ -301,8 +301,17 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permissions
+    const { hasPermission } = await import('@/lib/auth')
+    if (!hasPermission(session.user.role, 'TESTS', 'create')) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Forbidden - you do not have permission to create tests' 
+      }, { status: 403 })
     }
     // Parse request body with error handling for large payloads
     let body

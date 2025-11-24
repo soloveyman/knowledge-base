@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db, assignments, documents, modules, assignmentUsers, progress, testAttempts } from '@/lib/db'
+import { db, assignments, documents, modules, assignmentUsers, progress, testAttempts, users } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
+import { auth, hasPermission } from '@/lib/auth'
 
 export async function GET(
   request: Request,
@@ -45,6 +46,19 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permissions
+    if (!hasPermission(session.user.role, 'ASSIGNMENTS', 'update')) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Forbidden - you do not have permission to update assignments' 
+      }, { status: 403 })
+    }
+
     const { id } = await params
     const body = await request.json()
     console.log('Assignment API: Updating assignment', id, 'with data:', body)
@@ -211,10 +225,52 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permissions
+    if (!hasPermission(session.user.role, 'ASSIGNMENTS', 'delete')) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Forbidden - you do not have permission to delete assignments' 
+      }, { status: 403 })
+    }
+
     const { id } = await params
 
-    // Check if assignment exists
-    const existingAssignment = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1)
+    // Check if assignment exists and user has access
+    const userRole = session.user.role
+    const tenantId = session.user.businessId
+    
+    let existingAssignment
+    if (userRole === 'super-admin') {
+      // Super-admin can delete any assignment
+      existingAssignment = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1)
+    } else {
+      // Others can only delete assignments from their tenant
+      if (!tenantId) {
+        return NextResponse.json({
+          success: false,
+          message: 'Forbidden - you can only delete assignments from your business'
+        }, { status: 403 })
+      }
+      
+      // Fetch assignments scoped to tenant via the assigner
+      const rows = await db
+        .select({ assignment: assignments, assignerBusinessId: users.businessId })
+        .from(assignments)
+        .leftJoin(users, eq(assignments.assignedBy, users.id))
+        .where(and(
+          eq(assignments.id, id),
+          eq(users.businessId, tenantId)
+        ))
+        .limit(1)
+      
+      existingAssignment = rows.length > 0 ? [rows[0].assignment] : []
+    }
+    
     if (existingAssignment.length === 0) {
       return NextResponse.json({
         success: false,
