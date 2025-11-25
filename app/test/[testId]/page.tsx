@@ -201,14 +201,26 @@ export default function TestPage() {
     if (!testData) return
 
     let correctAnswers = 0
-    testData.questions.forEach(question => {
+    let totalQuestionsWithAnswers = 0 // Count only questions with correct_answer defined
+    
+    testData.questions.forEach((question, index) => {
       const userAnswer = answers[question.id]
       
       // Skip if question has no correct answer defined
-      if (!question.correct_answer) return
+      if (!question.correct_answer) {
+        console.log(`Question ${index + 1} (${question.id}): Skipped - no correct_answer`)
+        return
+      }
+      
+      totalQuestionsWithAnswers++ // Count this question
       
       // If user didn't answer, it's incorrect (don't increment correctAnswers)
-      if (!userAnswer) return
+      if (!userAnswer) {
+        console.log(`Question ${index + 1} (${question.id}): Incorrect - no user answer`)
+        return
+      }
+      
+      let isCorrect = false
       
       // Handle text/complete questions differently
       if (question.type === 'complete' || question.type === 'text') {
@@ -226,7 +238,13 @@ export default function TestPage() {
         const normalizedCorrectAnswer = normalizeText(question.correct_answer || '')
         
         if (normalizedUserAnswer === normalizedCorrectAnswer) {
+          isCorrect = true
           correctAnswers++
+        } else {
+          console.log(`Question ${index + 1} (${question.id}): Text answer incorrect`, {
+            user: normalizedUserAnswer,
+            correct: normalizedCorrectAnswer
+          })
         }
       } 
       // Handle multiple choice and true/false questions
@@ -283,7 +301,16 @@ export default function TestPage() {
           const sameCount = correctAnswerLetters.length === userAnswers.length
           
           if (allCorrectSelected && noIncorrectSelected && sameCount) {
+            isCorrect = true
             correctAnswers++
+          } else {
+            console.log(`Question ${index + 1} (${question.id}): Multi-choice answer incorrect`, {
+              userAnswers,
+              correctAnswers: correctAnswerLetters,
+              allCorrectSelected,
+              noIncorrectSelected,
+              sameCount
+            })
           }
         }
         // Handle single choice multiple choice and true/false
@@ -340,15 +367,40 @@ export default function TestPage() {
           // Compare normalized answers
           const userAnswerStr = Array.isArray(userAnswer) ? userAnswer[0] : userAnswer
           if (correctAnswerLetter && userAnswerStr && userAnswerStr.toLowerCase() === correctAnswerLetter.toLowerCase()) {
+            isCorrect = true
             correctAnswers++
+          } else {
+            console.log(`Question ${index + 1} (${question.id}): Single-choice answer incorrect`, {
+              userAnswer: userAnswerStr,
+              correctAnswerLetter,
+              questionType: question.type,
+              correctAnswer: question.correct_answer,
+              choices: question.choices
+            })
           }
         }
       }
+      
+      if (isCorrect) {
+        console.log(`Question ${index + 1} (${question.id}): ✓ Correct`)
+      }
     })
 
-    const percentage = testData.questions.length > 0 
-      ? Math.round((correctAnswers / testData.questions.length) * 100)
+    // Calculate percentage based on questions with correct answers defined
+    // If no questions have correct answers, use total questions as fallback
+    const totalQuestions = totalQuestionsWithAnswers > 0 ? totalQuestionsWithAnswers : testData.questions.length
+    const percentage = totalQuestions > 0 
+      ? Math.round((correctAnswers / totalQuestions) * 100)
       : 0
+    
+    console.log('Score calculation:', {
+      correctAnswers,
+      totalQuestionsWithAnswers,
+      totalQuestions,
+      allQuestions: testData.questions.length,
+      percentage
+    })
+    
     setScore(percentage)
     setCorrectAnswersCount(correctAnswers)
     setShowResults(true)
