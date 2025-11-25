@@ -1420,7 +1420,7 @@ function OwnerPageInner() {
 
     try {
       setEnhancingDocId(id)
-      toast.loading('Enhancing document with Grok API...', { id: 'enhance' })
+      toast.loading(t('enhancingDocument') || 'Enhancing document with Grok API...', { id: 'enhance' })
       
       const response = await fetch(`/api/documents/${id}/enhance`, {
         method: 'POST',
@@ -1444,18 +1444,18 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Document enhanced successfully!', { id: 'enhance' })
+        toast.success(t('documentEnhancedSuccessfully'), { id: 'enhance' })
         // Reload documents to show updated content - use preserveData=true to avoid flicker
         // loadData's finally block will clear loading states
         await loadData(true)
       } else {
         console.error('Failed to enhance document:', result.message)
-        toast.error(result.message || 'Failed to enhance document', { id: 'enhance' })
+        toast.error(result.message || t('failedToEnhanceDocument'), { id: 'enhance' })
       }
     } catch (error) {
       console.error('Error enhancing document:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      toast.error(`Error enhancing document: ${errorMessage}`, { id: 'enhance' })
+      toast.error(`${t('errorEnhancingDocument')}: ${errorMessage}`, { id: 'enhance' })
       // Ensure loading state is cleared on error (loadData might not have been called)
       setIsLoadingDocuments(false)
     } finally {
@@ -1491,7 +1491,7 @@ function OwnerPageInner() {
         // 404 means document already deleted - treat as success (idempotent)
         if (response.status === 404) {
           console.log(`Document ${id} already deleted (404), treating as success`)
-          toast.success('Document deleted successfully')
+          toast.success(t('documentDeletedSuccessfully'))
           deletingDocumentsRef.current.delete(id)
           return
         }
@@ -1508,7 +1508,7 @@ function OwnerPageInner() {
         // Revert on error - restore previous state
         setDocumentsWithLog(previousDocuments)
         console.error('Failed to delete document:', errorMessage)
-        toast.error(errorMessage)
+        toast.error(errorMessage || t('failedToDeleteDocument'))
         deletingDocumentsRef.current.delete(id)
         return
       }
@@ -1522,14 +1522,14 @@ function OwnerPageInner() {
         // Revert on error - restore previous state
         setDocumentsWithLog(previousDocuments)
         console.error('Failed to delete document:', result.message)
-        toast.error(result.message || 'Failed to delete document')
+        toast.error(result.message || t('failedToDeleteDocument'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       setDocumentsWithLog(previousDocuments)
       const errorMessage = error instanceof Error ? error.message : 'Error deleting document'
       console.error('Error deleting document:', error)
-      toast.error(errorMessage)
+      toast.error(errorMessage || t('errorDeletingDocument'))
     } finally {
       deletingDocumentsRef.current.delete(id)
     }
@@ -1570,19 +1570,19 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Test deleted successfully')
+        toast.success(t('testDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state
         setSavedTestsWithLog(previousTests)
         console.error('Failed to delete test:', result.message)
-        toast.error(result.message || 'Failed to delete test')
+        toast.error(result.message || t('failedToDeleteTest'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       setSavedTestsWithLog(previousTests)
       console.error('Error deleting test:', error)
-      toast.error('Error deleting test')
+      toast.error(t('errorDeletingTest'))
     }
   }
 
@@ -1611,19 +1611,19 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Assignment deleted successfully')
+        toast.success(t('assignmentDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state
         setSavedAssignmentsWithLog(previousAssignments)
         console.error('Failed to delete assignment:', result.message)
-        toast.error(result.message || 'Failed to delete assignment')
+        toast.error(result.message || t('failedToDeleteAssignment'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       setSavedAssignmentsWithLog(previousAssignments)
       console.error('Error deleting assignment:', error)
-      toast.error('Error deleting assignment')
+      toast.error(t('errorDeletingAssignment'))
     }
   }
 
@@ -1673,19 +1673,19 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('User deleted successfully')
+        toast.success(t('userDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state
         setSavedUsers(previousUsers)
         console.error('Failed to delete user:', result.message)
-        toast.error(result.message || 'Failed to delete user')
+        toast.error(result.message || t('failedToDeleteUser'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       setSavedUsers(previousUsers)
       console.error('Error deleting user:', error)
-      toast.error('Error deleting user')
+      toast.error(t('errorDeletingUser'))
     }
   }
 

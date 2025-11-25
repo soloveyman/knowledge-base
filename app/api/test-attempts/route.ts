@@ -121,11 +121,15 @@ export async function GET(request: NextRequest) {
           { status: 403 }
         )
       }
-      attempts = await db.select().from(testAttempts)
-        .where(and(
-          eq(testAttempts.userId, userId),
-          eq(testAttempts.testId, testId)
-        ))
+      attempts = await db
+        .select()
+        .from(testAttempts)
+        .where(
+          and(
+            eq(testAttempts.userId, userId),
+            eq(testAttempts.testId, testId)
+          )
+        )
     } else if (userId) {
       // Only userId filter - check permission if viewing other user's attempts
       if (userId !== session.user.id && !canViewOtherUsers) {
@@ -161,6 +165,33 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    return handleApiError(error, 'Failed to fetch test attempts', 500)
+    // Extract underlying database error if available
+    let dbError: string | undefined
+    if (error instanceof Error) {
+      // Drizzle errors often have the original error in cause or message
+      const errorMessage = error.message
+      const errorCause = (error as any).cause
+      
+      // Try to extract PostgreSQL error details
+      if (errorCause instanceof Error) {
+        dbError = errorCause.message
+      } else if (errorMessage.includes('relation') || errorMessage.includes('column')) {
+        dbError = errorMessage
+      }
+      
+      // Log full error details for debugging
+      console.error('Database query error details:', {
+        message: error.message,
+        cause: errorCause,
+        stack: error.stack,
+        originalError: error,
+      })
+    }
+    
+    return handleApiError(
+      error,
+      dbError ? `Database error: ${dbError}` : 'Failed to fetch test attempts',
+      500
+    )
   }
 }

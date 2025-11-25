@@ -98,19 +98,34 @@ export function handleApiError(
 ): NextResponse<ApiError> {
   const errorMessage = error instanceof Error ? error.message : String(error)
   const errorStack = error instanceof Error ? error.stack : undefined
+  
+  // Extract underlying database error if available (Drizzle wraps PostgreSQL errors)
+  let dbError: string | undefined
+  if (error instanceof Error) {
+    const cause = (error as any).cause
+    if (cause instanceof Error) {
+      dbError = cause.message
+    }
+    // Check for common PostgreSQL error patterns
+    if (errorMessage.includes('relation') || errorMessage.includes('column') || errorMessage.includes('does not exist')) {
+      dbError = errorMessage
+    }
+  }
 
   // Log full error details server-side
   console.error(`API Error [${statusCode}]:`, {
     message: errorMessage,
+    dbError,
     stack: errorStack,
     name: error instanceof Error ? error.name : typeof error,
+    cause: error instanceof Error ? (error as any).cause : undefined,
   })
 
   return NextResponse.json(
     {
       success: false,
       message: defaultMessage,
-      error: errorMessage,
+      error: dbError || errorMessage,
       // Only include stack trace in development
       details: process.env.NODE_ENV === 'development' ? errorStack : undefined,
     },
