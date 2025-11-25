@@ -71,7 +71,7 @@ interface User {
   email: string
   role: string
   job: string
-  department: string
+  department?: string
 }
 
 interface Document {

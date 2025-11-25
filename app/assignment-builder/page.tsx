@@ -192,7 +192,7 @@ export default async function AssignmentBuilderPage({ searchParams }: Assignment
     email: user.email || '',
     role: user.role || 'employee',
     job: user.job || '',
-    // Note: department field doesn't exist in schema, but interface allows it as optional
+    department: undefined // Department doesn't exist in schema
   })) : []
   
   // Transform documents to match Document interface (convert null to undefined)

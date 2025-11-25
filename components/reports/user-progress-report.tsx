@@ -18,6 +18,16 @@ import {
   Calendar
 } from "lucide-react"
 
+// Recursive type for answer values (can be nested objects/arrays)
+type AnswerValue = 
+  | string 
+  | number 
+  | boolean 
+  | null 
+  | undefined 
+  | AnswerValue[] 
+  | { [key: string]: AnswerValue }
+
 interface User {
   id: string
   name: string
@@ -572,7 +582,6 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   }
 
   // Format answer for display with translations
-  type AnswerValue = string | number | boolean | null | undefined | AnswerValue[] | Record<string, AnswerValue>
   const formatAnswer = (answer: AnswerValue): string => {
     // Handle null/undefined
     if (answer === null || answer === undefined) {
