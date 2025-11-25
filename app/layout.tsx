@@ -58,6 +58,12 @@ const graphikMono = localFont({
 export const metadata: Metadata = {
   title: "Uppstaff | AI Training & Knowledge Platform",
   description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time — fast, transparent, and secure.",
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
 };
 
 export default function RootLayout({

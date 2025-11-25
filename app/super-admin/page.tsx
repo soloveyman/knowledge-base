@@ -8,7 +8,6 @@ import { PlansSection } from "./plans-section"
 import { SuperAdminClient } from "./super-admin-client"
 
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 // Loading component for stats
 function StatsLoading() {

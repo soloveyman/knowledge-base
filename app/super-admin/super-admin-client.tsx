@@ -80,7 +80,16 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
 
   const loadOwnersData = async () => {
     try {
-      const response = await fetch('/api/super-admin/subscriptions', { cache: 'no-store' });
+      // Add timeout for mobile devices with slow connections
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch('/api/super-admin/subscriptions', { 
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -94,8 +103,13 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
         throw new Error(result.message || 'Failed to load owners data');
       }
     } catch (error) {
-      console.error('Failed to load owners data:', error);
-      toast.error('Failed to refresh owners data. Please try again.');
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('Request timeout:', error);
+        toast.error('Request timed out. Please check your connection and try again.');
+      } else {
+        console.error('Failed to load owners data:', error);
+        toast.error('Failed to refresh owners data. Please try again.');
+      }
     }
   };
 

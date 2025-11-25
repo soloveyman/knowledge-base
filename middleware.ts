@@ -46,13 +46,13 @@ export async function middleware(request: NextRequest) {
   }
   
   // Public routes that don't require authentication
-  const publicRoutes = ['/auth/signin', '/auth/callback', '/api/auth', '/privacy', '/terms']
+  const publicRoutes = ['/', '/auth/signin', '/auth/callback', '/api/auth', '/privacy', '/terms']
   
   // Check if the current path is public
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
   
   if (isPublicRoute) {
-    // If already authenticated, avoid staying on auth pages
+    // If already authenticated, redirect to appropriate dashboard
     const token = await getToken({ 
       req: request,
       secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development"
@@ -62,6 +62,7 @@ export async function middleware(request: NextRequest) {
       if (userRole === 'super-admin') return NextResponse.redirect(new URL('/super-admin', request.url))
       if (userRole === 'owner') return NextResponse.redirect(new URL('/owner', request.url))
       if (userRole === 'manager') return NextResponse.redirect(new URL('/manager', request.url))
+      if (userRole === 'employee') return NextResponse.redirect(new URL('/employee', request.url))
       // Default to owner dashboard if role is missing/unknown
       return NextResponse.redirect(new URL('/owner', request.url))
     }
@@ -73,21 +74,6 @@ export async function middleware(request: NextRequest) {
     req: request,
     secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development"
   })
-  
-  // Handle root path redirect for authenticated users
-  if (pathname === '/') {
-    const userRole = (token?.role as string | undefined)?.toLowerCase()
-    if (userRole === 'super-admin') {
-      return NextResponse.redirect(new URL('/super-admin', request.url))
-    } else if (userRole === 'owner') {
-      return NextResponse.redirect(new URL('/owner', request.url))
-    } else if (userRole === 'manager') {
-      return NextResponse.redirect(new URL('/manager', request.url))
-    } else {
-      // Default to owner if role missing/unknown
-      return NextResponse.redirect(new URL('/owner', request.url))
-    }
-  }
   
   // Soft-role routing only on root; otherwise allow and let pages handle auth
   const userRole = token?.role as string | undefined
