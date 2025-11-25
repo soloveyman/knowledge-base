@@ -131,6 +131,32 @@ export async function GET() {
       }
     })
   } catch (error) {
+    console.error('GET /api/documents error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Check for "too many clients" error
+    const isTooManyClients = errorMessage.includes('too many clients') || 
+                            (error instanceof Error && (error as any).cause?.message?.includes('too many clients'));
+    
+    console.error('GET /api/documents error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      name: error instanceof Error ? error.name : typeof error,
+      cause: error instanceof Error ? (error as any).cause : undefined,
+      isTooManyClients
+    });
+    
+    // Return more specific error for connection pool exhaustion
+    if (isTooManyClients) {
+      return NextResponse.json({
+        success: false,
+        message: 'Database connection limit reached. Please try again in a moment.',
+        error: 'DATABASE_CONNECTION_LIMIT',
+        retryAfter: 5
+      }, { status: 503 });
+    }
+    
     return handleApiError(error, 'Failed to fetch documents', 500)
   }
 }

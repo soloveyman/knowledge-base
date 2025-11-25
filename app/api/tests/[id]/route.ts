@@ -148,11 +148,38 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Get test API error:', error)
+    console.error('Get test API error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorName = error instanceof Error ? error.name : typeof error;
+    
+    // Check for "too many clients" error
+    const isTooManyClients = errorMessage.includes('too many clients') || 
+                            (error instanceof Error && (error as any).cause?.message?.includes('too many clients'));
+    
+    console.error('Get test API error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      name: errorName,
+      cause: error instanceof Error ? (error as any).cause : undefined,
+      testId: id,
+      isTooManyClients
+    });
+    
+    // Return more specific error for connection pool exhaustion
+    if (isTooManyClients) {
+      return NextResponse.json({
+        success: false,
+        message: 'Database connection limit reached. Please try again in a moment.',
+        error: 'DATABASE_CONNECTION_LIMIT',
+        retryAfter: 5
+      }, { status: 503 });
+    }
+    
     return NextResponse.json({
       success: false,
       message: 'Failed to get test',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: errorMessage
     }, { status: 500 })
   }
 }

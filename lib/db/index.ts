@@ -30,14 +30,33 @@ function getPool(): Pool {
     // - Pro: ~100 connections
     // - Enterprise: Custom
     // Pool size accounts for: max connections per instance × concurrent instances
+    // IMPORTANT: With multiple serverless instances, total connections = max × instances
+    // For Railway Hobby (20 connections), we need very conservative pool sizes
     const isVercel = !!process.env.VERCEL
+    const isProduction = process.env.NODE_ENV === 'production'
+    
+    // Very conservative pool sizes to avoid "too many clients" error
+    // Railway Hobby: ~20 connections total
+    // Local PostgreSQL default: ~100 connections, but can be lower
+    // If we have 4-5 serverless instances, each should use max 3-4 connections
+    const maxConnections = isProduction 
+      ? (isVercel ? 3 : 5) // Production: very conservative
+      : (isLocalhost ? 3 : (isVercel ? 5 : 10)) // Local: very conservative, others: more generous
+    
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: isVercel ? 5 : 10, // Smaller pool for Vercel (more instances = more total connections)
-      idleTimeoutMillis: 30000, // 30 seconds
-      connectionTimeoutMillis: 10000, // 10 seconds
+      max: maxConnections,
+      idleTimeoutMillis: isLocalhost ? 5000 : 10000, // 5s for local, 10s for remote - more aggressive to free connections faster
+      connectionTimeoutMillis: 5000, // 5 seconds - fail fast if can't connect
       // Allow pool to create connections on demand (better for serverless)
       min: 0, // Start with 0, create connections as needed
+      // Close idle connections more aggressively
+      allowExitOnIdle: true, // Allow process to exit when pool is idle
+      // Force close connections that are idle too long
+      ...(isLocalhost && {
+        // For localhost, be even more aggressive
+        statement_timeout: 30000, // 30 seconds max query time
+      })
       // SSL for production and Railway (Railway uses SSL)
       // Also enable SSL if connection string contains 'railway.app' (connecting to Railway from anywhere)
       // Disable SSL for local Docker connections (localhost)
@@ -58,17 +77,50 @@ function getPool(): Pool {
     // Handle pool errors
     pool.on('error', (err) => {
       console.error('Unexpected database pool error:', err);
+      
+      // Log pool state for "too many clients" errors
+      if (err.message && err.message.includes('too many clients')) {
+        console.error('⚠️ Database connection pool exhausted!', {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount,
+          max: pool.options.max,
+          min: pool.options.min
+        });
+      }
     });
 
     // Handle connection events for monitoring
-    if (process.env.DEBUG_DB === 'true') {
-      pool.on('connect', () => {
-        console.log('[DB Pool] New client connected');
+    const shouldLog = process.env.DEBUG_DB === 'true' || process.env.NODE_ENV === 'production'
+    if (shouldLog) {
+      pool.on('connect', (client) => {
+        console.log('[DB Pool] New client connected', {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount
+        });
       });
 
       pool.on('remove', () => {
-        console.log('[DB Pool] Client removed');
+        console.log('[DB Pool] Client removed', {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount
+        });
       });
+      
+      // Log pool state periodically in production (every 5 minutes)
+      if (process.env.NODE_ENV === 'production') {
+        setInterval(() => {
+          console.log('[DB Pool] State:', {
+            totalCount: pool.totalCount,
+            idleCount: pool.idleCount,
+            waitingCount: pool.waitingCount,
+            max: pool.options.max,
+            min: pool.options.min
+          });
+        }, 5 * 60 * 1000); // Every 5 minutes
+      }
     }
 
     // Graceful shutdown handler

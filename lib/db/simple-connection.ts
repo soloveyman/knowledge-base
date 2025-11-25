@@ -15,15 +15,47 @@ function getPool(): Pool {
       throw new Error('DATABASE_URL environment variable is required');
     }
 
-    // Create the database connection pool
+    // Create the database connection pool with same conservative settings as main pool
+    const isVercel = !!process.env.VERCEL
+    const isProduction = process.env.NODE_ENV === 'production'
+    const isLocalhost = process.env.DATABASE_URL?.includes('localhost') || 
+                       process.env.DATABASE_URL?.includes('127.0.0.1')
+    
+    const maxConnections = isProduction 
+      ? (isVercel ? 3 : 5) // Production: very conservative
+      : (isLocalhost ? 3 : (isVercel ? 5 : 10)) // Local: very conservative, others: more generous
+    
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      max: maxConnections,
+      idleTimeoutMillis: isLocalhost ? 5000 : 10000, // 5s for local, 10s for remote - more aggressive to free connections faster
+      connectionTimeoutMillis: 5000, // 5 seconds - fail fast if can't connect
+      min: 0, // Start with 0, create connections as needed
+      allowExitOnIdle: true, // Allow process to exit when pool is idle
       // SSL for Railway or production
       ssl:
-        process.env.NODE_ENV === 'production' ||
-        process.env.DATABASE_URL.includes('railway.app')
+        !isLocalhost && (
+          process.env.NODE_ENV === 'production' ||
+          process.env.DATABASE_URL.includes('railway.app')
+        )
           ? { rejectUnauthorized: false }
           : false,
+    });
+    
+    // Handle pool errors
+    pool.on('error', (err) => {
+      console.error('Unexpected database pool error (simple-connection):', err);
+      
+      // Log pool state for "too many clients" errors
+      if (err.message && err.message.includes('too many clients')) {
+        console.error('⚠️ Database connection pool exhausted (simple-connection)!', {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount,
+          max: pool.options.max,
+          min: pool.options.min
+        });
+      }
     });
   }
   return pool;
