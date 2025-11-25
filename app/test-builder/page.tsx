@@ -853,7 +853,7 @@ export default function TestBuilderPage() {
 
     try {
       if (isEditMode && editingTestId) {
-        // Update existing test
+        // Update existing test - include updated question data
         const response = await fetch(`/api/tests/${editingTestId}`, {
           method: 'PUT',
           headers: {
@@ -863,6 +863,7 @@ export default function TestBuilderPage() {
             title: `${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'} - Test`,
             description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
             questionIds: generatedQuestions.map(q => q.id),
+            questions: generatedQuestions, // Send updated question data
             type: testConfig.type,
             difficulty: testConfig.difficulty,
             locale: testConfig.locale,

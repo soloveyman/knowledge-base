@@ -44,6 +44,8 @@ export const createTestSchema = z.object({
 export const updateTestSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional().nullable(),
+  questionIds: z.array(z.string().uuid()).optional(),
+  questions: z.array(questionSchema).optional(),
   type: z.string().optional().nullable(),
   difficulty: z.enum(['easy', 'medium', 'hard']).optional().nullable(),
   locale: z.string().length(2).optional().nullable(),

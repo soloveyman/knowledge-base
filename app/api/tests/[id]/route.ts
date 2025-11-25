@@ -245,7 +245,104 @@ export async function PUT(
       .limit(1)
     
     const currentQuestionIds = (currentTest[0]?.questionIds as string[]) || []
-    const newQuestionIds = body.questionIds || currentQuestionIds
+    
+    // Update questions first if provided (before updating test)
+    const updatedQuestionIds: string[] = []
+    if (body.questions && Array.isArray(body.questions) && body.questions.length > 0) {
+      try {
+        console.log('Updating questions for test:', id)
+        const { questionSchema } = await import('@/lib/schemas/tests')
+        
+        // Process and update each question
+        for (const q of body.questions) {
+          // Validate question data
+          const validatedQuestion = questionSchema.parse(q)
+          
+          // Get correct answer - prioritize correct_answer over correctAnswer
+          const correctAnswerValue = validatedQuestion.correct_answer ?? validatedQuestion.correctAnswer ?? ''
+          
+          // Validate correct answer for multiple choice questions
+          let finalCorrectAnswer = correctAnswerValue
+          if (validatedQuestion.type === 'mcq' && validatedQuestion.choices && validatedQuestion.choices.length > 0) {
+            // If correct answer is a number string (index), validate it
+            if (/^\d+$/.test(correctAnswerValue)) {
+              const index = parseInt(correctAnswerValue, 10)
+              if (index < 0 || index >= validatedQuestion.choices.length) {
+                console.warn(`Question ${q.id}: Invalid correct_answer index ${index}, using first option (0)`)
+                finalCorrectAnswer = '0'
+              } else {
+                finalCorrectAnswer = correctAnswerValue
+              }
+            } else if (correctAnswerValue && !/^[A-Z]$/.test(correctAnswerValue)) {
+              // If it's not a letter (A-D), try to find it in choices
+              const choiceIndex = validatedQuestion.choices.findIndex(
+                choice => choice.trim().toLowerCase() === correctAnswerValue.trim().toLowerCase()
+              )
+              if (choiceIndex >= 0) {
+                finalCorrectAnswer = String(choiceIndex)
+              } else {
+                console.warn(`Question ${q.id}: Could not find correct answer "${correctAnswerValue}" in choices, using first option (0)`)
+                finalCorrectAnswer = '0'
+              }
+            }
+          }
+          
+          // Prepare question update data
+          const questionUpdateData = {
+            title: validatedQuestion.prompt || validatedQuestion.title || 'Untitled Question',
+            content: validatedQuestion.prompt || validatedQuestion.content || '',
+            type: validatedQuestion.type === 'mcq' ? 'multiple_choice' : 
+                  validatedQuestion.type === 'tf' ? 'true_false' : 
+                  validatedQuestion.type === 'complete' ? 'text' : 'multiple_choice',
+            options: validatedQuestion.choices || null,
+            correctAnswer: finalCorrectAnswer,
+            explanation: validatedQuestion.explanation || '',
+            updatedAt: new Date()
+          }
+          
+          // Check if question exists (has id and it's a valid UUID)
+          if (q.id && typeof q.id === 'string' && q.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+            // Update existing question
+            try {
+              await db.update(questions)
+                .set(questionUpdateData)
+                .where(eq(questions.id, q.id))
+              updatedQuestionIds.push(q.id)
+              console.log(`✅ Updated question ${q.id}`)
+            } catch (updateError) {
+              console.warn(`⚠️ Failed to update question ${q.id}, trying to create new:`, updateError)
+              // If update fails (question doesn't exist), create new
+              const newQuestion = await db.insert(questions).values({
+                ...questionUpdateData,
+                createdBy: session.user.id
+              }).returning()
+              updatedQuestionIds.push(newQuestion[0].id)
+              console.log(`✅ Created new question ${newQuestion[0].id}`)
+            }
+          } else {
+            // Create new question (no valid ID provided)
+            const newQuestion = await db.insert(questions).values({
+              ...questionUpdateData,
+              createdBy: session.user.id
+            }).returning()
+            updatedQuestionIds.push(newQuestion[0].id)
+            console.log(`✅ Created new question ${newQuestion[0].id}`)
+          }
+        }
+        
+        console.log(`✅ Updated ${body.questions.length} question(s)`)
+      } catch (questionError) {
+        console.error('Error updating questions:', questionError)
+        // Don't throw - allow test update to succeed even if question update fails
+        // Questions can be updated separately if needed
+      }
+    }
+    
+    // Determine final questionIds: use updated question IDs if questions were updated, otherwise use provided or current
+    const finalQuestionIds = updatedQuestionIds.length > 0 
+      ? updatedQuestionIds 
+      : (body.questionIds || currentQuestionIds)
+    const newQuestionIds = finalQuestionIds
     
     // Check if questions changed (need to reset results)
     const questionsChanged = JSON.stringify(currentQuestionIds.sort()) !== JSON.stringify(Array.isArray(newQuestionIds) ? newQuestionIds.sort() : [])
@@ -271,7 +368,10 @@ export async function PUT(
     
     if (body.title !== undefined) updateData.title = body.title
     if (body.description !== undefined) updateData.description = body.description
-    if (body.questionIds !== undefined) updateData.questionIds = body.questionIds
+    // Use finalQuestionIds if questions were updated or questionIds were provided
+    if (updatedQuestionIds.length > 0 || body.questionIds !== undefined) {
+      updateData.questionIds = finalQuestionIds
+    }
     if (body.passingScore !== undefined) updateData.passingScore = body.passingScore
     if (body.timeLimit !== undefined) updateData.timeLimit = body.timeLimit
     if (body.maxAttempts !== undefined) updateData.maxAttempts = body.maxAttempts
@@ -319,7 +419,8 @@ export async function PUT(
     // Reset results if questions changed or important fields changed
     const importantFieldsChanged = questionsChanged || 
       (body.passingScore !== undefined && body.passingScore !== currentTest[0]?.passingScore) ||
-      (body.timeLimit !== undefined && body.timeLimit !== currentTest[0]?.timeLimit)
+      (body.timeLimit !== undefined && body.timeLimit !== currentTest[0]?.timeLimit) ||
+      (body.questions && Array.isArray(body.questions) && body.questions.length > 0) // Questions were updated
     
     if (importantFieldsChanged) {
       console.log('Test questions or important fields changed, resetting results')
