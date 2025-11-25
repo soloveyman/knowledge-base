@@ -841,12 +841,21 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                   
                                                   // Handle text/complete questions
                                                   if (question.type === 'complete' || question.type === 'text') {
+                                                    // Normalize text for comparison: case-insensitive, collapse whitespace
+                                                    // toLowerCase() works correctly with Cyrillic characters
+                                                    const normalizeText = (text: string): string => {
+                                                      return text
+                                                        .toLowerCase() // Works correctly with Cyrillic (а, б, в, etc.)
+                                                        .trim()
+                                                        .replace(/\s+/g, ' ') // Collapse multiple spaces to single space
+                                                    }
+                                                    
                                                     // For text questions, userAnswer should be a string
                                                     const userAnswerStr = Array.isArray(userAnswerValue) 
                                                       ? userAnswerValue.join(' ').trim() 
                                                       : (typeof userAnswerValue === 'string' ? userAnswerValue.trim() : '')
-                                                    const normalizedUser = userAnswerStr.toLowerCase()
-                                                    const normalizedCorrect = correctAnswer.toLowerCase().trim()
+                                                    const normalizedUser = normalizeText(userAnswerStr)
+                                                    const normalizedCorrect = normalizeText(correctAnswer || '')
                                                     return normalizedUser === normalizedCorrect
                                                   }
                                                   

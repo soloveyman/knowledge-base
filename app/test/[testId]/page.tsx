@@ -212,10 +212,18 @@ export default function TestPage() {
       
       // Handle text/complete questions differently
       if (question.type === 'complete' || question.type === 'text') {
-        // For text questions, compare answers case-insensitively after trimming
+        // For text questions, compare answers case-insensitively after trimming and normalizing whitespace
+        // toLowerCase() works correctly with Cyrillic characters
+        const normalizeText = (text: string): string => {
+          return text
+            .toLowerCase() // Works correctly with Cyrillic (а, б, в, etc.)
+            .trim()
+            .replace(/\s+/g, ' ') // Collapse multiple spaces to single space
+        }
+        
         const userAnswerStr = Array.isArray(userAnswer) ? userAnswer.join(' ').trim() : (userAnswer || '').trim()
-        const normalizedUserAnswer = userAnswerStr.toLowerCase()
-        const normalizedCorrectAnswer = question.correct_answer.trim().toLowerCase()
+        const normalizedUserAnswer = normalizeText(userAnswerStr)
+        const normalizedCorrectAnswer = normalizeText(question.correct_answer || '')
         
         if (normalizedUserAnswer === normalizedCorrectAnswer) {
           correctAnswers++
