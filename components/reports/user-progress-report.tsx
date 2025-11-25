@@ -8,6 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useTranslation } from "@/lib/translation-context"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { formatDateShort } from "@/lib/date-format"
+import { useSession } from "next-auth/react"
 import { 
   CheckCircle, 
   Clock, 
@@ -86,12 +87,39 @@ interface AttemptStats {
   averageScore: number | null
 }
 
+interface TestAttempt {
+  id: string
+  testId: string
+  userId: string
+  answers: Record<string, string>
+  score: number | null
+  status: string
+  completedAt: string | null
+}
+
+interface Question {
+  id: string
+  content?: string
+  title?: string
+  type?: string
+  correctAnswer?: string | null
+}
+
 export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
   const [attemptStats, setAttemptStats] = useState<Record<string, Record<string, AttemptStats>>>({})
   const [userAttemptScores, setUserAttemptScores] = useState<Record<string, number[]>>({})
-  const { t } = useTranslation()
+  const [testAnswers, setTestAnswers] = useState<Record<string, Record<string, TestAttempt[]>>>({})
+  const [testQuestions, setTestQuestions] = useState<Record<string, Question[]>>({})
+  const { data: session } = useSession()
+  const { t, language } = useTranslation()
   const translateBadge = useBadgeTranslation()
+  
+  // Check if current user is owner or manager
+  const canViewAnswers = session?.user?.role === 'owner' || session?.user?.role === 'manager'
+  
+  // Map language to locale for date formatting
+  const dateLocale = language === 'ru' ? 'ru-RU' : 'en-US'
 
   // Load all test attempts for each user across all their assignments (parallelized)
   // Use cache-busting to ensure fresh data
@@ -270,6 +298,154 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     loadAttemptStats()
   }, [loadAttemptStats])
 
+  // Load test answers for each employee's completed tests (only for owner/manager)
+  const loadTestAnswers = useCallback(async () => {
+    if (!canViewAnswers) return
+    
+    const answersByAssignment: Record<string, Record<string, TestAttempt[]>> = {}
+    
+    // Collect all fetch promises upfront for parallel execution
+    const fetchPromises: Array<{ assignmentId: string; userId: string; testId: string; promise: Promise<Response> }> = []
+    
+    for (const assignment of assignments) {
+      if (!assignment.testId) continue
+      
+      answersByAssignment[assignment.id] = {}
+      
+      for (const user of users) {
+        if (user.role !== 'employee') continue
+        
+        fetchPromises.push({
+          assignmentId: assignment.id,
+          userId: user.id,
+          testId: assignment.testId,
+          promise: fetch(`/api/test-attempts?userId=${user.id}&testId=${assignment.testId}&_t=${Date.now()}`, {
+            cache: 'no-store'
+          })
+        })
+      }
+    }
+    
+    // Execute all fetches in parallel
+    const responses = await Promise.allSettled(fetchPromises.map(f => f.promise))
+    
+    // Process results in parallel
+    await Promise.all(responses.map(async (result, index) => {
+      const { assignmentId, userId, testId } = fetchPromises[index]
+      
+      if (result.status === 'fulfilled') {
+        try {
+          const apiResult = await result.value.json()
+          
+          if (apiResult.success && apiResult.data.attempts) {
+            const attempts = apiResult.data.attempts as TestAttempt[]
+            // Only get completed attempts with answers
+            const completedAttempts = attempts.filter((a: TestAttempt) => 
+              a.status === 'completed' && a.answers && Object.keys(a.answers).length > 0
+            )
+            
+            // Sort by completedAt (most recent first) and take only the latest attempt
+            const latestAttempt = completedAttempts
+              .sort((a, b) => {
+                const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0
+                const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0
+                return dateB - dateA // Descending order (newest first)
+              })[0] // Take only the first (latest) attempt
+            
+            if (latestAttempt) {
+              if (!answersByAssignment[assignmentId]) {
+                answersByAssignment[assignmentId] = {}
+              }
+              answersByAssignment[assignmentId][userId] = [latestAttempt]
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing answers for assignment ${assignmentId}, user ${userId}:`, error)
+        }
+      } else {
+        console.error(`Error loading answers for assignment ${assignmentId}, user ${userId}:`, result.reason)
+      }
+    }))
+    
+    setTestAnswers(answersByAssignment)
+  }, [assignments, users, canViewAnswers])
+
+  useEffect(() => {
+    if (canViewAnswers) {
+      loadTestAnswers()
+    }
+  }, [loadTestAnswers, canViewAnswers])
+
+  // Load questions for all unique testIds from assignments
+  const loadTestQuestions = useCallback(async () => {
+    if (!canViewAnswers) return
+    
+    // Get all unique testIds from assignments
+    const uniqueTestIds = [...new Set(assignments
+      .filter(a => a.testId)
+      .map(a => a.testId)
+      .filter(Boolean) as string[]
+    )]
+    
+    if (uniqueTestIds.length === 0) return
+    
+    const questionsByTest: Record<string, Question[]> = {}
+    
+    // Load questions for each test in parallel
+    const fetchPromises = uniqueTestIds.map(async (testId) => {
+      try {
+        const response = await fetch(`/api/tests/${testId}?_t=${Date.now()}`, {
+          cache: 'no-store'
+        })
+        const result = await response.json()
+        
+        if (result.success && result.data.questions) {
+          questionsByTest[testId] = result.data.questions.map((q: any) => ({
+            id: q.id,
+            content: q.content || q.title || '',
+            title: q.title || q.content || '',
+            type: q.type,
+            correctAnswer: q.correctAnswer || q.correct_answer || null
+          }))
+        }
+      } catch (error) {
+        console.error(`Error loading questions for test ${testId}:`, error)
+      }
+    })
+    
+    await Promise.all(fetchPromises)
+    setTestQuestions(questionsByTest)
+  }, [assignments, canViewAnswers])
+
+  useEffect(() => {
+    if (canViewAnswers) {
+      loadTestQuestions()
+    }
+  }, [loadTestQuestions, canViewAnswers])
+
+  // Reload answers when page becomes visible
+  useEffect(() => {
+    if (!canViewAnswers) return
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadTestAnswers()
+      }
+    }
+
+    const handleFocus = () => {
+      loadTestAnswers()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loadTestAnswers, canViewAnswers])
+
   // Reload stats when page becomes visible (e.g., when returning from test page)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -385,7 +561,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   }
 
   const formatDate = (dateString: string) => {
-    return formatDateShort(dateString)
+    return formatDateShort(dateString, dateLocale)
   }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -393,6 +569,59 @@ export default function UserProgressReport({ users, assignments, modules = [], t
     const due = new Date(dueDate)
     const now = new Date()
     return due < now && status !== 'completed' && status !== 'passed'
+  }
+
+  // Format answer for display with translations
+  const formatAnswer = (answer: any): string => {
+    // Handle null/undefined
+    if (answer === null || answer === undefined) {
+      return '-'
+    }
+    
+    // Handle boolean values
+    if (typeof answer === 'boolean') {
+      return answer ? t('true') : t('false')
+    }
+    
+    // Handle strings (including boolean strings)
+    if (typeof answer === 'string') {
+      const normalized = answer.trim().toLowerCase()
+      // Translate boolean strings
+      if (normalized === 'true' || normalized === 'верно' || normalized === 'да') {
+        return t('true')
+      }
+      if (normalized === 'false' || normalized === 'неверно' || normalized === 'нет') {
+        return t('false')
+      }
+      return answer
+    }
+    
+    // Handle arrays
+    if (Array.isArray(answer)) {
+      if (answer.length === 0) return '-'
+      return answer.map(item => formatAnswer(item)).join(', ')
+    }
+    
+    // Handle objects - try to extract meaningful values
+    if (typeof answer === 'object') {
+      try {
+        // If it's an array-like object, convert to array
+        if (Array.isArray(answer)) {
+          return answer.map(item => formatAnswer(item)).join(', ')
+        }
+        // For simple objects, extract values
+        const values = Object.values(answer).filter(v => v !== null && v !== undefined)
+        if (values.length > 0) {
+          return values.map(v => formatAnswer(v)).join(', ')
+        }
+        return JSON.stringify(answer)
+      } catch {
+        return String(answer)
+      }
+    }
+    
+    // For numbers and other types
+    return String(answer)
   }
 
   if (userProgress.length === 0) {
@@ -489,6 +718,9 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                       const actualDescription = assignment.description || assignment.title || assignment.name || t('assignmentDescriptionDefault')
                       
                       const stats = attemptStats[assignment.id]?.[progress.user.id]
+                      const userAnswers = canViewAnswers && assignment.testId 
+                        ? testAnswers[assignment.id]?.[progress.user.id] || []
+                        : []
                       
                       return (
                       <div key={assignment.id} className="p-4 border rounded-3xl bg-card">
@@ -526,6 +758,93 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                 </div>
                               )}
                             </div>
+                            
+                            {/* Show test answers for owner/manager (only latest attempt) */}
+                            {canViewAnswers && userAnswers.length > 0 && (() => {
+                              const latestAttempt = userAnswers[0] // Already filtered to latest attempt
+                              const accordionValue = `answers-${assignment.id}-${progress.user.id}`
+                              
+                              return (
+                                <div className="mt-4 pt-4 border-t">
+                                  <Accordion type="single" collapsible className="w-full">
+                                    <AccordionItem value={accordionValue} className="border-none">
+                                      <AccordionTrigger 
+                                        value={accordionValue}
+                                        className="py-2 hover:no-underline [&>svg]:shrink-0"
+                                      >
+                                        <div className="flex items-center justify-between w-full pr-4">
+                                          <div className="text-sm font-medium text-foreground">
+                                            Ответы сотрудника (последняя попытка):
+                                          </div>
+                                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            {latestAttempt.completedAt && (
+                                              <span>{formatDate(latestAttempt.completedAt)}</span>
+                                            )}
+                                            {latestAttempt.score !== null && (
+                                              <Badge variant={latestAttempt.score >= 70 ? "default" : "destructive"} className="text-xs">
+                                                {latestAttempt.score}%
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </AccordionTrigger>
+                                      <AccordionContent value={accordionValue} className="pt-2 [&>div]:px-0">
+                                        <div className="bg-muted/50 rounded-lg p-3 space-y-2.5">
+                                          {Object.entries(latestAttempt.answers).map(([questionId, answer], answerIndex) => {
+                                            // Find question text by questionId
+                                            const questions = assignment.testId ? testQuestions[assignment.testId] || [] : []
+                                            const question = questions.find(q => q.id === questionId)
+                                            const questionText = question?.content || question?.title || `Ответ #${answerIndex + 1}`
+                                            
+                                            // Check if answer is correct
+                                            const isCorrect = question?.correctAnswer 
+                                              ? (() => {
+                                                  const correctAnswer = question.correctAnswer
+                                                  const userAnswer = typeof answer === 'string' ? answer.trim() : String(answer)
+                                                  
+                                                  // Normalize for comparison (case-insensitive, handle boolean strings)
+                                                  const normalize = (val: string) => val.toLowerCase().trim()
+                                                  const normalizedCorrect = normalize(correctAnswer)
+                                                  const normalizedUser = normalize(userAnswer)
+                                                  
+                                                  // Direct comparison
+                                                  if (normalizedCorrect === normalizedUser) return true
+                                                  
+                                                  // Handle boolean values
+                                                  if ((normalizedCorrect === 'true' && normalizedUser === 'true') ||
+                                                      (normalizedCorrect === 'false' && normalizedUser === 'false')) {
+                                                    return true
+                                                  }
+                                                  
+                                                  return false
+                                                })()
+                                              : null // Unknown if no correct answer available
+                                            
+                                            // Determine color based on correctness
+                                            const answerColorClass = isCorrect === true
+                                              ? 'text-green-600 dark:text-green-400 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30'
+                                              : isCorrect === false
+                                              ? 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30'
+                                              : 'text-muted-foreground border-primary/30 bg-background/50'
+                                            
+                                            return (
+                                              <div key={questionId} className="text-sm">
+                                                <div className="font-medium text-foreground mb-1.5">
+                                                  {questionText}:
+                                                </div>
+                                                <div className={`pl-3 border-l-2 rounded-r py-1.5 px-2 ${answerColorClass}`}>
+                                                  {formatAnswer(answer)}
+                                                </div>
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      </AccordionContent>
+                                    </AccordionItem>
+                                  </Accordion>
+                                </div>
+                              )
+                            })()}
                           </div>
                           <div className="flex flex-row md:flex-col md:text-right gap-3 md:gap-0">
                             {actualStatus === 'completed' && (() => {

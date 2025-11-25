@@ -89,24 +89,49 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const testId = searchParams.get('testId')
     const userId = searchParams.get('userId')
+    const userRole = session.user.role
+
+    // Check if user is owner or manager - they can view any user's attempts
+    // Employees can only view their own attempts
+    const canViewOtherUsers = userRole === 'owner' || userRole === 'manager'
 
     let attempts
     
     if (userId && testId) {
-      // Both filters
+      // Both filters - check permission if viewing other user's attempts
+      if (userId !== session.user.id && !canViewOtherUsers) {
+        return NextResponse.json(
+          { success: false, message: 'Forbidden' },
+          { status: 403 }
+        )
+      }
       attempts = await db.select().from(testAttempts)
         .where(and(
           eq(testAttempts.userId, userId),
           eq(testAttempts.testId, testId)
         ))
     } else if (userId) {
-      // Only userId filter
+      // Only userId filter - check permission if viewing other user's attempts
+      if (userId !== session.user.id && !canViewOtherUsers) {
+        return NextResponse.json(
+          { success: false, message: 'Forbidden' },
+          { status: 403 }
+        )
+      }
       attempts = await db.select().from(testAttempts)
         .where(eq(testAttempts.userId, userId))
     } else if (testId) {
-      // Only testId filter
-      attempts = await db.select().from(testAttempts)
-        .where(eq(testAttempts.testId, testId))
+      // Only testId filter - owner/manager can see all, employee only their own
+      if (canViewOtherUsers) {
+        attempts = await db.select().from(testAttempts)
+          .where(eq(testAttempts.testId, testId))
+      } else {
+        attempts = await db.select().from(testAttempts)
+          .where(and(
+            eq(testAttempts.testId, testId),
+            eq(testAttempts.userId, session.user.id)
+          ))
+      }
     } else {
       // No filters - get all for current user
       attempts = await db.select().from(testAttempts)
