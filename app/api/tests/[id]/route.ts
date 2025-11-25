@@ -7,8 +7,10 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let id: string | undefined
   try {
-    const { id } = await params
+    const resolvedParams = await params
+    id = resolvedParams.id
     const { searchParams } = new URL(request.url)
     const checkDependencies = searchParams.get('checkDependencies') === 'true'
     
