@@ -49,7 +49,7 @@ export async function POST(request: Request) {
           type: "mcq",
           prompt: "What is the main topic of this document?",
           choices: ["Menu items", "Pricing", "Restaurant hours", "Contact information"],
-          correct_answer: "0",
+          correct_answer: "1",
           explanation: "The document contains menu items and pricing information."
         },
         {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           type: "mcq",
           prompt: "What type of cuisine is featured in this menu?",
           choices: ["Italian", "Russian", "Mixed", "Fast food"],
-          correct_answer: "2",
+          correct_answer: "3",
           explanation: "The menu contains a mix of different cuisines and styles."
         }
       ]
@@ -123,8 +123,8 @@ export async function POST(request: Request) {
             Requirements:
             - Questions should test understanding of the content
             - CRITICAL: Generate questions of type "${grokParams?.type || 'mcq'}" ONLY:
-              * If type is "mcq": Generate ONLY multiple choice questions (single answer) with exactly 4 choices each
-              * If type is "mcq_multi": Generate ONLY multiple choice questions (multiple answers allowed) with exactly 4 choices each
+              * If type is "mcq": Generate ONLY multiple choice questions (single answer) with exactly 4 choices each. Use correct_answer as a single index: "1", "2", "3", or "4"
+              * If type is "mcq_multi": Generate ONLY multiple choice questions (multiple answers allowed) with exactly 4 choices each. Use correct_answer as comma-separated indices: "1,2", "1,3,4", "2,3", etc. (at least 2 correct answers required)
               * If type is "tf": Generate ONLY true/false questions
               * If type is "complete": Generate ONLY fill-in-the-blank questions (text completion)
               * If type is "mixed": Generate a MIX of question types (multiple choice, true/false, and fill-in-the-blank)
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
                 "type": "mcq|tf|complete",
                 "prompt": "Question text",
                 "choices": ["option1", "option2", "option3", "option4"], // Required for mcq/mcq_multi, omit for tf/complete
-                "correct_answer": "0|1|2|3|true|false|answer_text",
+                "correct_answer": "1|2|3|4|1,2|1,3|2,3|1,2,3|true|false|answer_text", // CRITICAL: Use 1-based indices (1, 2, 3, 4). For mcq_multi use comma-separated: "1,2" or "1,3,4". For mcq use single: "1" or "2". NOT 0-based (0, 1, 2, 3)
                 "explanation": "Why this answer is correct"
               }
             ]`
@@ -253,11 +253,24 @@ export async function POST(request: Request) {
       explanation?: string
     }
     
-    // Add unique IDs to questions and log correct answers
+    // Add unique IDs to questions and convert 0-based indices to 1-based
     const questionsWithIds = generatedQuestions.map((q: GeneratedQuestionItem, index: number) => {
+      let correctAnswer = q.correct_answer
+      
+      // Convert 0-based indices (0, 1, 2, 3) to 1-based (1, 2, 3, 4)
+      if (correctAnswer && /^\d+$/.test(correctAnswer)) {
+        const numericAnswer = parseInt(correctAnswer, 10)
+        // If it's a 0-based index (0-3), convert to 1-based (1-4)
+        if (numericAnswer >= 0 && numericAnswer <= 3 && q.choices && q.choices.length > numericAnswer) {
+          correctAnswer = String(numericAnswer + 1)
+          console.log(`Question ${index}: Converted 0-based index ${numericAnswer} to 1-based index ${correctAnswer}`)
+        }
+      }
+      
       const questionWithId = {
         ...q,
-        id: q.id || `q_${Date.now()}_${index}`
+        id: q.id || `q_${Date.now()}_${index}`,
+        correct_answer: correctAnswer
       }
       
       // Log correct answer for debugging

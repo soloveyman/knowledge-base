@@ -67,7 +67,7 @@ export default function TestPage() {
   const [testData, setTestData] = useState<TestData | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
   const [correctAnswersCount, setCorrectAnswersCount] = useState(0)
@@ -105,9 +105,14 @@ export default function TestPage() {
             explanation?: string | null
           }) => {
             // Convert database type to frontend type
+            // Check if question has multiple correct answers (comma-separated indices or letters)
             let questionType = 'mcq'
-            if (q.type === 'multiple_choice') questionType = 'mcq'
-            else if (q.type === 'true_false') questionType = 'tf'
+            const correctAnswer = q.correctAnswer || ''
+            const hasMultipleAnswers = /[,;]/.test(correctAnswer) || /^[A-Z,;]+$/.test(correctAnswer.trim())
+            
+            if (q.type === 'multiple_choice') {
+              questionType = hasMultipleAnswers ? 'mcq_multi' : 'mcq'
+            } else if (q.type === 'true_false') questionType = 'tf'
             else if (q.type === 'text') questionType = 'complete'
             
             // Log loaded correct answers to verify updates are being loaded
@@ -147,10 +152,30 @@ export default function TestPage() {
   }, [session, status, router, testId])
 
   const handleAnswerSelect = (questionId: string, answer: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: answer
-    }))
+    setAnswers(prev => {
+      const currentAnswer = prev[questionId]
+      const question = testData?.questions.find(q => q.id === questionId)
+      const isMultiChoice = question?.type === 'mcq_multi'
+      
+      if (isMultiChoice) {
+        // For multiple choice, toggle the answer
+        const currentAnswers = Array.isArray(currentAnswer) ? currentAnswer : (currentAnswer ? [currentAnswer] : [])
+        const newAnswers = currentAnswers.includes(answer)
+          ? currentAnswers.filter(a => a !== answer) // Remove if already selected
+          : [...currentAnswers, answer] // Add if not selected
+        
+        return {
+          ...prev,
+          [questionId]: newAnswers.length > 0 ? newAnswers : []
+        }
+      } else {
+        // For single choice, replace the answer
+        return {
+          ...prev,
+          [questionId]: answer
+        }
+      }
+    })
   }
 
   const handleTextAnswerChange = (questionId: string, answer: string) => {
@@ -197,58 +222,117 @@ export default function TestPage() {
       } 
       // Handle multiple choice and true/false questions
       else {
-        // Normalize correct answer to letter format (A, B, C, D) or true/false
-        let correctAnswerLetter: string | null = null
-        
-        // If correct_answer is already a letter (A, B, C, D)
-        if (/^[A-Z]$/.test(question.correct_answer)) {
-          correctAnswerLetter = question.correct_answer.toUpperCase()
-        } 
-        // If correct_answer is a numeric index (1, 2, 3, 4) - 1-based
-        // Also handle legacy 0-based indices (0, 1, 2, 3) for backward compatibility
-        else if (/^\d+$/.test(question.correct_answer)) {
-          const index = parseInt(question.correct_answer, 10)
-          if (question.choices) {
-            let zeroBasedIndex: number
-            // Handle 1-based indices (1, 2, 3, 4) - new format
-            if (index >= 1 && index <= question.choices.length) {
-              zeroBasedIndex = index - 1
+        // Handle multiple choice with multiple answers
+        if (question.type === 'mcq_multi') {
+          // Parse correct answers (can be comma/space separated: "1,2,3" or "A,B,C" or "1 2 3")
+          const correctAnswerStr = question.correct_answer.trim()
+          const correctAnswerParts = correctAnswerStr.split(/[,;\s]+/).filter(p => p.length > 0)
+          
+          // Convert correct answers to letters (A, B, C, D)
+          const correctAnswerLetters: string[] = []
+          for (const part of correctAnswerParts) {
+            let letter: string | null = null
+            
+            // If it's already a letter (A, B, C, D)
+            if (/^[A-Z]$/i.test(part)) {
+              letter = part.toUpperCase()
             }
-            // Handle legacy 0-based indices (0, 1, 2, 3) - old format for backward compatibility
-            else if (index === 0 && question.choices.length > 0) {
-              zeroBasedIndex = 0
+            // If it's a numeric index (1, 2, 3, 4) - 1-based
+            else if (/^\d+$/.test(part)) {
+              const index = parseInt(part, 10)
+              if (question.choices && index >= 1 && index <= question.choices.length) {
+                const zeroBasedIndex = index - 1
+                letter = String.fromCharCode(65 + zeroBasedIndex)
+              }
             }
-            else {
-              zeroBasedIndex = -1 // Invalid
+            // If it matches one of the choice texts
+            else if (question.choices) {
+              const choiceIndex = question.choices.findIndex(
+                choice => choice.trim().toLowerCase() === part.trim().toLowerCase()
+              )
+              if (choiceIndex >= 0) {
+                letter = String.fromCharCode(65 + choiceIndex)
+              }
             }
             
-            if (zeroBasedIndex >= 0 && zeroBasedIndex < question.choices.length) {
-              correctAnswerLetter = String.fromCharCode(65 + zeroBasedIndex)
+            if (letter) {
+              correctAnswerLetters.push(letter)
             }
           }
-        }
-        // If correct_answer matches one of the choice texts, find its index
-        else if (question.choices && question.correct_answer) {
-          const correctAnswerText = question.correct_answer
-          const choiceIndex = question.choices.findIndex(
-            choice => choice.trim().toLowerCase() === correctAnswerText.trim().toLowerCase()
-          )
-          if (choiceIndex >= 0) {
-            correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+          
+          // Get user answers
+          const userAnswers = Array.isArray(userAnswer) 
+            ? userAnswer.map(a => a.toUpperCase())
+            : (userAnswer ? [userAnswer.toUpperCase()] : [])
+          
+          // Check if all correct answers are selected and no incorrect ones
+          const correctAnswersSet = new Set(correctAnswerLetters)
+          const userAnswersSet = new Set(userAnswers)
+          
+          const allCorrectSelected = correctAnswerLetters.every(letter => userAnswersSet.has(letter))
+          const noIncorrectSelected = userAnswers.every(letter => correctAnswersSet.has(letter))
+          const sameCount = correctAnswerLetters.length === userAnswers.length
+          
+          if (allCorrectSelected && noIncorrectSelected && sameCount) {
+            correctAnswers++
           }
         }
-        // Handle true/false questions
-        else if (question.type === 'tf') {
-          // Normalize true/false values
-          const normalizedCorrect = question.correct_answer.trim().toLowerCase()
-          if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
-            correctAnswerLetter = normalizedCorrect
+        // Handle single choice multiple choice and true/false
+        else {
+          // Normalize correct answer to letter format (A, B, C, D) or true/false
+          let correctAnswerLetter: string | null = null
+          
+          // If correct_answer is already a letter (A, B, C, D)
+          if (/^[A-Z]$/.test(question.correct_answer)) {
+            correctAnswerLetter = question.correct_answer.toUpperCase()
+          } 
+          // If correct_answer is a numeric index (1, 2, 3, 4) - 1-based
+          // Also handle legacy 0-based indices (0, 1, 2, 3) for backward compatibility
+          else if (/^\d+$/.test(question.correct_answer)) {
+            const index = parseInt(question.correct_answer, 10)
+            if (question.choices) {
+              let zeroBasedIndex: number
+              // Handle 1-based indices (1, 2, 3, 4) - new format
+              if (index >= 1 && index <= question.choices.length) {
+                zeroBasedIndex = index - 1
+              }
+              // Handle legacy 0-based indices (0, 1, 2, 3) - old format for backward compatibility
+              else if (index === 0 && question.choices.length > 0) {
+                zeroBasedIndex = 0
+              }
+              else {
+                zeroBasedIndex = -1 // Invalid
+              }
+              
+              if (zeroBasedIndex >= 0 && zeroBasedIndex < question.choices.length) {
+                correctAnswerLetter = String.fromCharCode(65 + zeroBasedIndex)
+              }
+            }
           }
-        }
-        
-        // Compare normalized answers
-        if (correctAnswerLetter && userAnswer.toLowerCase() === correctAnswerLetter.toLowerCase()) {
-          correctAnswers++
+          // If correct_answer matches one of the choice texts, find its index
+          else if (question.choices && question.correct_answer) {
+            const correctAnswerText = question.correct_answer
+            const choiceIndex = question.choices.findIndex(
+              choice => choice.trim().toLowerCase() === correctAnswerText.trim().toLowerCase()
+            )
+            if (choiceIndex >= 0) {
+              correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+            }
+          }
+          // Handle true/false questions
+          else if (question.type === 'tf') {
+            // Normalize true/false values
+            const normalizedCorrect = question.correct_answer.trim().toLowerCase()
+            if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
+              correctAnswerLetter = normalizedCorrect
+            }
+          }
+          
+          // Compare normalized answers
+          const userAnswerStr = Array.isArray(userAnswer) ? userAnswer[0] : userAnswer
+          if (correctAnswerLetter && userAnswerStr && userAnswerStr.toLowerCase() === correctAnswerLetter.toLowerCase()) {
+            correctAnswers++
+          }
         }
       }
     })
@@ -502,12 +586,13 @@ export default function TestPage() {
               }}
             />
 
-            {/* Multiple choice questions */}
+            {/* Multiple choice questions (single answer) */}
             {currentQ.type === 'mcq' && currentQ.choices && currentQ.choices.length > 0 && (
               <div className="space-y-3">
                 {currentQ.choices.map((choice, index) => {
                   const letter = String.fromCharCode(65 + index)
-                  const isSelected = answers[currentQ.id] === letter
+                  const currentAnswer = answers[currentQ.id]
+                  const isSelected = currentAnswer === letter
                   
                   return (
                     <button
@@ -528,6 +613,46 @@ export default function TestPage() {
                           {letter}
                         </div>
                         <span className="flex-1 break-word leading-relaxed">{choice}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Multiple choice questions (multiple answers) */}
+            {currentQ.type === 'mcq_multi' && currentQ.choices && currentQ.choices.length > 0 && (
+              <div className="space-y-3">
+                {currentQ.choices.map((choice, index) => {
+                  const letter = String.fromCharCode(65 + index)
+                  const currentAnswer = answers[currentQ.id]
+                  const selectedAnswers = Array.isArray(currentAnswer) ? currentAnswer : (currentAnswer ? [currentAnswer] : [])
+                  const isSelected = selectedAnswers.includes(letter)
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleAnswerSelect(currentQ.id, letter)}
+                      className={`w-full p-4 text-left border rounded-3xl transition-colors ${
+                        isSelected
+                          ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300'
+                          : 'border-border hover:border-accent hover:bg-accent'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-6 h-6 rounded border-2 flex items-center justify-center text-sm font-medium shrink-0 ${
+                          isSelected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border'
+                        }`}>
+                          {isSelected ? '✓' : ''}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="text-sm font-medium">{letter}.</span>
+                          </div>
+                          <span className="break-word leading-relaxed">{choice}</span>
+                        </div>
                       </div>
                     </button>
                   )

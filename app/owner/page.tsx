@@ -2090,7 +2090,6 @@ function OwnerPageInner() {
               onDeleteAssignment={handleDeleteAssignment}
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}
-              onResetAssignment={handleResetAssignment}
               isLoading={isLoadingAssignments}
               hideEmptyState={(() => {
                 const hasTimestamp = searchParams.has('_t')
