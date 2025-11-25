@@ -56,7 +56,7 @@ function getPool(): Pool {
       ...(isLocalhost && {
         // For localhost, be even more aggressive
         statement_timeout: 30000, // 30 seconds max query time
-      })
+      }),
       // SSL for production and Railway (Railway uses SSL)
       // Also enable SSL if connection string contains 'railway.app' (connecting to Railway from anywhere)
       // Disable SSL for local Docker connections (localhost)
