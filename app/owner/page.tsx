@@ -177,6 +177,7 @@ interface SavedDocument {
       enhancementTimestamp?: number
     }
   } | null
+  [key: string]: unknown // Index signature for syncLocalStorageWithDatabase
 }
 
 function OwnerPageInner() {

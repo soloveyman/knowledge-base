@@ -547,12 +547,13 @@ export async function POST(request: Request) {
             const filenameWithoutExt = baseFilename.replace(/\.[^/.]+$/, '')
             
             // Get image metadata for context matching (if available)
-            const imageMetadata = parsedContent.images?.find((parsedImg: any) => 
+            const imageMetadata = parsedContent.images?.find((parsedImg) => 
               parsedImg.filename === img.filename || 
               parsedImg.filename?.endsWith(baseFilename)
             )
-            const contextBefore = imageMetadata?.contextBefore || ''
-            const contextAfter = imageMetadata?.contextAfter || ''
+            // Extract context from metadata if it exists
+            const contextBefore = (imageMetadata && 'contextBefore' in imageMetadata) ? String(imageMetadata.contextBefore) : ''
+            const contextAfter = (imageMetadata && 'contextAfter' in imageMetadata) ? String(imageMetadata.contextAfter) : ''
             const imagePosition = imageMetadata?.position
             
             // Try to find and replace data URL or relative path for this image in content
@@ -773,10 +774,10 @@ export async function POST(request: Request) {
         parsedContent = updatedParsedContent
         
         console.log(`📸 Final parsedContent.images summary:`, {
-          totalImages: parsedContent.images.length,
-          imagesWithUrl: parsedContent.images.filter((img: any) => img.url).length,
-          imagesWithImageId: parsedContent.images.filter((img: any) => img.imageId).length,
-          imagesWithData: parsedContent.images.filter((img: any) => img.data).length
+          totalImages: parsedContent.images?.length || 0,
+          imagesWithUrl: parsedContent.images?.filter((img) => img.url).length || 0,
+          imagesWithImageId: parsedContent.images?.filter((img) => 'imageId' in img && img.imageId).length || 0,
+          imagesWithData: parsedContent.images?.filter((img) => img.data).length || 0
         })
       }
       

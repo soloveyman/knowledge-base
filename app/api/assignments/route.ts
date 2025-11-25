@@ -214,11 +214,14 @@ export async function POST(request: Request) {
     console.log('Checking for existing assignments...')
 
     // Check for existing assignments with same module and test
+    const whereConditions = [eq(assignments.moduleId, moduleId)]
+    if (testId) {
+      whereConditions.push(eq(assignments.testId, testId))
+    } else {
+      whereConditions.push(eq(assignments.testId, null as unknown as string))
+    }
     const existingAssignments = await db.select().from(assignments)
-      .where(and(
-        eq(assignments.moduleId, moduleId),
-        eq(assignments.testId, testId)
-      ))
+      .where(and(...whereConditions))
 
     let assignmentId: string | undefined
 

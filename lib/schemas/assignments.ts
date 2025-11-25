@@ -13,7 +13,14 @@ export const createAssignmentSchema = z.object({
   ]),
   title: z.string().max(200).optional(),
   description: z.string().max(1000).optional(),
-  dueDate: z.string().datetime().optional().nullable(), // ISO 8601 datetime string
+  dueDate: z.string().refine(
+    (val) => {
+      if (!val) return true
+      const date = new Date(val)
+      return !isNaN(date.getTime())
+    },
+    { message: 'Invalid date format' }
+  ).optional().nullable(), // Accepts ISO 8601 datetime strings (e.g., from .toISOString())
   status: z.enum(['pending', 'in_progress', 'completed', 'overdue']).optional(),
   allowRetake: z.boolean().optional(),
   maxAttempts: z.number().int().positive().optional(),
@@ -22,7 +29,14 @@ export const createAssignmentSchema = z.object({
 export const updateAssignmentSchema = z.object({
   title: z.string().max(200).optional(),
   description: z.string().max(1000).optional(),
-  dueDate: z.string().datetime().optional().nullable(),
+  dueDate: z.string().refine(
+    (val) => {
+      if (!val) return true
+      const date = new Date(val)
+      return !isNaN(date.getTime())
+    },
+    { message: 'Invalid date format' }
+  ).optional().nullable(), // Accepts ISO 8601 datetime strings (e.g., from .toISOString())
   status: z.enum(['pending', 'in_progress', 'completed', 'overdue']).optional(),
   allowRetake: z.boolean().optional(),
   maxAttempts: z.number().int().positive().optional(),

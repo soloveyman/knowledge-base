@@ -336,18 +336,8 @@ export async function POST(request: Request) {
     })
 
     let finalQuestionIds: string[] = questionIds || []
-    type SavedQuestion = {
-      id: string
-      title: string
-      content: string
-      type: string
-      options: string[] | null
-      correctAnswer: string | null
-      explanation: string | null
-      difficulty: string
-      moduleId: string | null
-      createdBy: string
-    }
+    // Use Drizzle's inferred type for questions
+    type SavedQuestion = typeof questionsTable.$inferSelect
     let savedQuestions: SavedQuestion[] = []
 
     // If questions are provided, save them to database first

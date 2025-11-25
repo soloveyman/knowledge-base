@@ -3,6 +3,7 @@ import { db, documents, usage, users } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
+import { handleApiError } from '@/lib/api-helpers'
 
 /**
  * Get owner ID for usage counting - if user is owner, return their ID,

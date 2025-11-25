@@ -30,7 +30,7 @@ const parsedContentSchema = z.object({
   sections: z.array(sectionSchema),
   tables: z.array(tableSchema).optional(),
   images: z.array(imageSchema).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
 export const createDocumentSchema = z.object({
