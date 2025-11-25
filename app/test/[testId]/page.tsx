@@ -648,12 +648,7 @@ export default function TestPage() {
                         }`}>
                           {isSelected ? '✓' : ''}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="text-sm font-medium">{letter}.</span>
-                          </div>
-                          <span className="break-word leading-relaxed">{choice}</span>
-                        </div>
+                        <span className="flex-1 break-word leading-relaxed">{choice}</span>
                       </div>
                     </button>
                   )

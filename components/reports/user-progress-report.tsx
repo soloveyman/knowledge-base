@@ -113,6 +113,8 @@ interface Question {
   title?: string
   type?: string
   correctAnswer?: string | null
+  options?: string[] | null
+  choices?: string[] | null
 }
 
 export default function UserProgressReport({ users, assignments, modules = [], tests = [] }: UserProgressReportProps) {
@@ -432,7 +434,9 @@ export default function UserProgressReport({ users, assignments, modules = [], t
             content: q.content || q.title || '',
             title: q.title || q.content || '',
             type: q.type,
-            correctAnswer: q.correctAnswer || q.correct_answer || null
+            correctAnswer: q.correctAnswer || q.correct_answer || null,
+            options: q.options || null,
+            choices: q.options || q.choices || null
           }))
         }
       } catch (error) {
@@ -827,23 +831,105 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                             const isCorrect = question?.correctAnswer 
                                               ? (() => {
                                                   const correctAnswer = question.correctAnswer
-                                                  const userAnswer = typeof answer === 'string' ? answer.trim() : String(answer)
+                                                  const userAnswer = typeof answer === 'string' ? answer.trim() : (Array.isArray(answer) ? answer.join(',') : String(answer))
+                                                  const choices = question.choices || question.options || []
                                                   
-                                                  // Normalize for comparison (case-insensitive, handle boolean strings)
-                                                  const normalize = (val: string) => val.toLowerCase().trim()
-                                                  const normalizedCorrect = normalize(correctAnswer)
-                                                  const normalizedUser = normalize(userAnswer)
-                                                  
-                                                  // Direct comparison
-                                                  if (normalizedCorrect === normalizedUser) return true
-                                                  
-                                                  // Handle boolean values
-                                                  if ((normalizedCorrect === 'true' && normalizedUser === 'true') ||
-                                                      (normalizedCorrect === 'false' && normalizedUser === 'false')) {
-                                                    return true
+                                                  // Handle text/complete questions
+                                                  if (question.type === 'complete' || question.type === 'text' || question.type === 'text') {
+                                                    const normalizedUser = userAnswer.toLowerCase().trim()
+                                                    const normalizedCorrect = correctAnswer.toLowerCase().trim()
+                                                    return normalizedUser === normalizedCorrect
                                                   }
                                                   
-                                                  return false
+                                                  // Handle multiple choice with multiple answers (mcq_multi)
+                                                  if (question.type === 'mcq_multi' || /[,;]/.test(correctAnswer)) {
+                                                    // Parse correct answers (comma/space separated: "1,2,3" or "A,B,C")
+                                                    const correctAnswerParts = correctAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
+                                                    const correctAnswerLetters: string[] = []
+                                                    
+                                                    for (const part of correctAnswerParts) {
+                                                      let letter: string | null = null
+                                                      
+                                                      // If it's already a letter (A, B, C, D)
+                                                      if (/^[A-Z]$/i.test(part)) {
+                                                        letter = part.toUpperCase()
+                                                      }
+                                                      // If it's a numeric index (1, 2, 3, 4) - 1-based
+                                                      else if (/^\d+$/.test(part) && choices.length > 0) {
+                                                        const index = parseInt(part, 10)
+                                                        if (index >= 1 && index <= choices.length) {
+                                                          const zeroBasedIndex = index - 1
+                                                          letter = String.fromCharCode(65 + zeroBasedIndex)
+                                                        }
+                                                      }
+                                                      
+                                                      if (letter) {
+                                                        correctAnswerLetters.push(letter)
+                                                      }
+                                                    }
+                                                    
+                                                    // Get user answers
+                                                    const userAnswerParts = userAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
+                                                    const userAnswerLetters = userAnswerParts.map(a => a.toUpperCase())
+                                                    
+                                                    // Check if all correct answers are selected and no incorrect ones
+                                                    const correctAnswersSet = new Set(correctAnswerLetters)
+                                                    const userAnswersSet = new Set(userAnswerLetters)
+                                                    
+                                                    const allCorrectSelected = correctAnswerLetters.every(letter => userAnswersSet.has(letter))
+                                                    const noIncorrectSelected = userAnswerLetters.every(letter => correctAnswersSet.has(letter))
+                                                    const sameCount = correctAnswerLetters.length === userAnswerLetters.length
+                                                    
+                                                    return allCorrectSelected && noIncorrectSelected && sameCount
+                                                  }
+                                                  
+                                                  // Handle single choice multiple choice and true/false
+                                                  // Normalize correct answer to letter format (A, B, C, D) or true/false
+                                                  let correctAnswerLetter: string | null = null
+                                                  
+                                                  // If correct_answer is already a letter (A, B, C, D)
+                                                  if (/^[A-Z]$/i.test(correctAnswer)) {
+                                                    correctAnswerLetter = correctAnswer.toUpperCase()
+                                                  } 
+                                                  // If correct_answer is a numeric index (1, 2, 3, 4) - 1-based
+                                                  else if (/^\d+$/.test(correctAnswer) && choices.length > 0) {
+                                                    const index = parseInt(correctAnswer, 10)
+                                                    // Handle 1-based indices (1, 2, 3, 4) - new format
+                                                    if (index >= 1 && index <= choices.length) {
+                                                      const zeroBasedIndex = index - 1
+                                                      correctAnswerLetter = String.fromCharCode(65 + zeroBasedIndex)
+                                                    }
+                                                    // Handle legacy 0-based indices (0, 1, 2, 3) - old format for backward compatibility
+                                                    else if (index === 0 && choices.length > 0) {
+                                                      correctAnswerLetter = String.fromCharCode(65 + 0)
+                                                    }
+                                                  }
+                                                  // If correct_answer matches one of the choice texts, find its index
+                                                  else if (choices.length > 0 && correctAnswer) {
+                                                    const choiceIndex = choices.findIndex(
+                                                      (choice: string) => choice.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+                                                    )
+                                                    if (choiceIndex >= 0) {
+                                                      correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+                                                    }
+                                                  }
+                                                  // Handle true/false questions
+                                                  else if (question.type === 'tf' || question.type === 'true_false') {
+                                                    const normalizedCorrect = correctAnswer.trim().toLowerCase()
+                                                    if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
+                                                      correctAnswerLetter = normalizedCorrect
+                                                    }
+                                                  }
+                                                  
+                                                  // Compare normalized answers
+                                                  if (correctAnswerLetter) {
+                                                    const normalizedUser = userAnswer.toUpperCase()
+                                                    return normalizedUser === correctAnswerLetter.toUpperCase()
+                                                  }
+                                                  
+                                                  // Fallback: direct string comparison
+                                                  const normalize = (val: string) => val.toLowerCase().trim()
+                                                  return normalize(correctAnswer) === normalize(userAnswer)
                                                 })()
                                               : null // Unknown if no correct answer available
                                             
