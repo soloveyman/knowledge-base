@@ -16,10 +16,28 @@ export async function POST(request: Request) {
     }
 
     const { params, context } = validation.data
+    
+    // Map unsupported types to supported ones for Grok API
+    // Grok API currently supports: mcq, mcq_multi, tf, complete
+    // For other types, we'll generate mixed questions
+    const grokSupportedTypes = ['mcq', 'mcq_multi', 'tf', 'complete'] as const
+    const effectiveType = grokSupportedTypes.includes(params.type as any) 
+      ? params.type 
+      : 'mixed' // For cloze, match, order - generate mixed
+    
+    const grokParams = {
+      ...params,
+      type: effectiveType as 'mcq' | 'mcq_multi' | 'tf' | 'complete'
+    }
+    
     console.log('Generate test request:', { 
       params, 
+      effectiveType,
       contextTextLength: context?.text?.length || 0,
-      hasApiKey: !!process.env.GROK_API_KEY
+      hasApiKey: !!process.env.GROK_API_KEY,
+      requestedType: params?.type,
+      requestedDifficulty: params?.difficulty,
+      requestedLocale: params?.locale
     })
 
     // Check if Grok API key is available
@@ -100,14 +118,20 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: `You are an expert test generator. Generate ${params?.count || 5} high-quality questions based on the provided content. 
+            content: `You are an expert test generator. Generate ${grokParams?.count || 5} high-quality questions based on the provided content. 
             
             Requirements:
             - Questions should test understanding of the content
-            - Include multiple choice, true/false, and fill-in-the-blank questions
+            - CRITICAL: Generate questions of type "${grokParams?.type || 'mcq'}" ONLY:
+              * If type is "mcq": Generate ONLY multiple choice questions (single answer) with exactly 4 choices each
+              * If type is "mcq_multi": Generate ONLY multiple choice questions (multiple answers allowed) with exactly 4 choices each
+              * If type is "tf": Generate ONLY true/false questions
+              * If type is "complete": Generate ONLY fill-in-the-blank questions (text completion)
+              * If type is "mixed": Generate a MIX of question types (multiple choice, true/false, and fill-in-the-blank)
+              * DO NOT mix question types unless type is "mixed" - all questions must be of the specified type
             - Provide clear explanations for answers
-            - Difficulty level: ${params?.difficulty || 'medium'}
-            - CRITICAL LANGUAGE REQUIREMENT: Generate ALL questions in ${params?.locale === 'ru' ? 'Russian (Русский)' : 'English'}. The document language is ${params?.locale === 'ru' ? 'Russian' : 'English'}, so ALL questions, answers, choices, and explanations MUST be in ${params?.locale === 'ru' ? 'Russian' : 'English'}. DO NOT translate or mix languages. Preserve the original document's language.
+            - Difficulty level: ${grokParams?.difficulty || 'medium'}
+            - CRITICAL LANGUAGE REQUIREMENT: Generate ALL questions in ${grokParams?.locale === 'ru' ? 'Russian (Русский)' : 'English'}. The document language is ${grokParams?.locale === 'ru' ? 'Russian' : 'English'}, so ALL questions, answers, choices, and explanations MUST be in ${grokParams?.locale === 'ru' ? 'Russian' : 'English'}. DO NOT translate or mix languages. Preserve the original document's language.
             - IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content.
             
             Return ONLY a valid JSON array with this exact format:
@@ -116,7 +140,7 @@ export async function POST(request: Request) {
                 "id": "unique_id",
                 "type": "mcq|tf|complete",
                 "prompt": "Question text",
-                "choices": ["option1", "option2", "option3", "option4"],
+                "choices": ["option1", "option2", "option3", "option4"], // Required for mcq/mcq_multi, omit for tf/complete
                 "correct_answer": "0|1|2|3|true|false|answer_text",
                 "explanation": "Why this answer is correct"
               }
@@ -251,7 +275,9 @@ export async function POST(request: Request) {
       success: true,
       data: {
         questions: questionsWithIds,
-        totalGenerated: questionsWithIds.length
+        totalGenerated: questionsWithIds.length,
+        requestedType: params.type, // Return original requested type
+        effectiveType: effectiveType // Return effective type used for generation
       },
       provider: "grok"
     })

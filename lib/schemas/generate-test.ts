@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const testParamsSchema = z.object({
   count: z.number().int().min(1).max(50),
-  type: z.enum(['mcq', 'mcq_multi', 'tf', 'complete']),
+  type: z.enum(['mcq', 'mcq_multi', 'tf', 'complete', 'cloze', 'match', 'order', 'mixed']),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   locale: z.string().length(2).optional(), // ISO 639-1 language code
 })

@@ -333,6 +333,9 @@ export async function POST(request: Request) {
       moduleId,
       questionIdsCount: questionIds?.length,
       questionsCount: questions?.length,
+      type,
+      difficulty,
+      locale
     })
 
     let finalQuestionIds: string[] = questionIds || []

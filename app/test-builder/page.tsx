@@ -205,12 +205,16 @@ export default function TestBuilderPage() {
         console.log('Test Builder: Questions count:', questions.length)
         
         // Load test configuration - use saved test data
+        // IMPORTANT: Use test.type from database, not from questions (questions can be mixed)
         const loadedConfig = {
           count: test.questionIds?.length || 5,
-          type: test.type || (questions.length > 0 ? questions[0].type || 'mcq' : 'mcq'),
-          difficulty: test.difficulty || (questions.length > 0 ? questions[0].difficulty || 'medium' : 'medium'),
+          type: test.type || 'mcq', // Use test type from DB, default to 'mcq' if not set
+          difficulty: test.difficulty || 'medium',
           locale: test.locale || 'en'
         }
+        
+        console.log('Test Builder: Loaded config:', loadedConfig)
+        console.log('Test Builder: Test type from DB:', test.type)
         
         // Update validation values for test config - documentId will be set when document loads
         validation.setValue('count', loadedConfig.count)
