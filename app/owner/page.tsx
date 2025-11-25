@@ -1516,7 +1516,7 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Document deleted successfully')
+        toast.success(t('documentDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state

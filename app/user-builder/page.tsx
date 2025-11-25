@@ -212,7 +212,7 @@ export default function UserBuilderPage() {
           throw new Error(result.message || 'Failed to update user')
         }
 
-        toast.success('User updated successfully!')
+        toast.success(t('userUpdatedSuccessfully'))
       } else {
         // Create new user via API
         const response = await fetch('/api/users', {

@@ -238,7 +238,7 @@ export default function SubscriptionManager({
         
         // Show success message if returning from checkout
         if (data.currentSubscription && checkoutSuccess === 'success') {
-          toast.success('Subscription activated successfully!')
+          toast.success(t('subscriptionActivatedSuccessfully'))
           // Clear checkout parameter from URL after a delay to allow user to see the update
           setTimeout(() => {
             const params = new URLSearchParams(searchParams.toString())

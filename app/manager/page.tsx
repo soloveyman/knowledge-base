@@ -1273,7 +1273,7 @@ function ManagerPageInner() {
       
       startTransition(() => {
         if (result.success) {
-          toast.success('Document enhanced successfully!', { id: 'enhance' })
+          toast.success(t('documentEnhancedSuccessfully'), { id: 'enhance' })
           // Reload documents to show updated content
           loadData(false)
         } else {
@@ -1320,7 +1320,7 @@ function ManagerPageInner() {
         // 404 means document already deleted - treat as success (idempotent)
         if (response.status === 404) {
           console.log(`Document ${id} already deleted (404), treating as success`)
-          toast.success('Document deleted successfully')
+          toast.success(t('documentDeletedSuccessfully'))
           deletingDocumentsRef.current.delete(id)
           return
         }
@@ -1347,7 +1347,7 @@ function ManagerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Document deleted successfully')
+        toast.success(t('documentDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state
@@ -1420,7 +1420,7 @@ function ManagerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Test deleted successfully')
+        toast.success(t('testDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state
@@ -1463,7 +1463,7 @@ function ManagerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success('Assignment deleted successfully')
+        toast.success(t('assignmentDeletedSuccessfully'))
         // No need to reload - state already updated
       } else {
         // Revert on error - restore previous state

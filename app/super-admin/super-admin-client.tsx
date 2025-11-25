@@ -132,7 +132,7 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
       const result = await response.json();
 
       if (result.success) {
-        toast.success(`Plan changed to ${result.data.planDisplayName}`, { id: 'change-plan' });
+        toast.success(t('planChangedSuccessfully').replace('{planName}', result.data.planDisplayName), { id: 'change-plan' });
         // Reload owners data to reflect the change
         loadOwnersData();
       } else {

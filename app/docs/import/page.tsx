@@ -435,7 +435,7 @@ function DocImportPageInner() {
       
       console.log('[Google Drive] File added to processing queue')
       
-      toast.success('File imported from Google Drive', {
+      toast.success(t('fileImportedFromGoogleDrive'), {
         description: `${file.name} is being processed. Please wait for processing to complete, then click "Save Documents".`,
         duration: 5000
       })
@@ -1284,7 +1284,7 @@ function DocImportPageInner() {
       })
       
       // Show success toast BEFORE redirect (with longer duration to ensure visibility)
-      toast.success('Documents saved successfully', {
+      toast.success(t('documentsSavedSuccessfully'), {
         description: `${succeeded.length} document(s) have been saved and will appear in your documents list`,
         duration: 4000
       })

@@ -893,7 +893,7 @@ export default function TestBuilderPage() {
           throw new Error('Failed to update test')
         }
 
-        toast.success(`Test updated successfully! ${generatedQuestions.length} questions updated.`)
+        toast.success(`${t('testUpdatedSuccessfully')} ${generatedQuestions.length} ${t('questionsGeneratedSuccessfully')}`)
         
         // Fetch tests and documents immediately after update to refresh the list
         try {
@@ -966,7 +966,7 @@ export default function TestBuilderPage() {
           throw new Error(errorMessage)
         }
 
-        toast.success(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
+        toast.success(`${t('testSavedSuccessfully')} ${generatedQuestions.length} ${t('questionsGeneratedSuccessfully')}`)
         
         // Fetch tests and documents immediately after save to ensure they're in the database
         // Store in sessionStorage so owner/manager page can use it immediately

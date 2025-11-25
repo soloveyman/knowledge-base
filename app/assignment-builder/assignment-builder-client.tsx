@@ -239,9 +239,9 @@ export default function AssignmentBuilderClient({
         const removedCount = result.data?.removedCount || 0
         
         if (addedCount > 0 || removedCount > 0) {
-          toast.success(result.message || 'Assignment updated successfully')
+          toast.success(result.message || t('assignmentUpdatedSuccessfully'))
         } else {
-          toast.success('Assignment updated successfully')
+          toast.success(t('assignmentUpdatedSuccessfully'))
         }
         
         // Fetch assignments immediately after update to refresh the list
@@ -294,9 +294,9 @@ export default function AssignmentBuilderClient({
         const skippedCount = result.data?.skippedCount || 0
         
         if (skippedCount > 0) {
-          toast.success(`Created ${assignmentCount} new assignment(s). ${skippedCount} user(s) already had this assignment.`)
+          toast.success(t('assignmentsCreatedSuccessfully').replace('{count}', String(assignmentCount)).replace('{skipped}', String(skippedCount)))
         } else {
-          toast.success(`Successfully created ${assignmentCount} assignment(s)!`)
+          toast.success(t('assignmentCreatedSuccess').replace('{count}', String(assignmentCount)))
         }
         
         // Fetch assignments immediately after save
