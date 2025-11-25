@@ -101,7 +101,7 @@ interface TestAttempt {
   id: string
   testId: string
   userId: string
-  answers: Record<string, string>
+  answers: Record<string, string | string[]>
   score: number | null
   status: string
   completedAt: string | null
@@ -831,7 +831,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                             const isCorrect = question?.correctAnswer 
                                               ? (() => {
                                                   const correctAnswer = question.correctAnswer
-                                                  const userAnswer = typeof answer === 'string' ? answer.trim() : (Array.isArray(answer) ? answer.join(',') : String(answer))
+                                                  const userAnswerValue: string | string[] = answer
+                                                  const userAnswer = typeof userAnswerValue === 'string' 
+                                                    ? userAnswerValue.trim() 
+                                                    : (Array.isArray(userAnswerValue) 
+                                                        ? userAnswerValue.join(',') 
+                                                        : String(userAnswerValue))
                                                   const choices = question.choices || question.options || []
                                                   
                                                   // Handle text/complete questions
