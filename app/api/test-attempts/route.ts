@@ -22,12 +22,11 @@ export async function POST(request: NextRequest) {
       return validation.response
     }
 
-    const { testId, assignmentId, answers, timeSpent } = validation.data
+    const { testId, assignmentId, answers, timeSpent, score } = validation.data
 
-    // Calculate score from answers (this should be done client-side, but we'll handle it here as fallback)
-    // For now, we'll set score to null and let the client calculate it
-    // In a real implementation, you'd validate answers against the test questions
-    const score: number | null = null // Should be calculated from answers
+    // Use score from client (already calculated client-side)
+    // Score is validated to be 0-100 in the schema
+    const finalScore: number | null = score ?? null
 
     // Insert test attempt
     const result = await db.insert(testAttempts).values({
@@ -35,7 +34,7 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       assignmentId: assignmentId || null,
       answers: answers || {},
-      score: score,
+      score: finalScore,
       timeSpent: timeSpent || 0,
       status: 'completed',
       completedAt: new Date()
@@ -48,9 +47,8 @@ export async function POST(request: NextRequest) {
       : await db.select().from(assignments).where(eq(assignments.testId, testId))
     
     if (assignmentsWithTest.length > 0) {
-      // Determine status based on score (failed if under 70%)
-      // Note: score calculation should happen before this, but we'll use null as placeholder
-      const assignmentStatus = score !== null && score >= 70 ? 'completed' : 'completed' // Default to completed for now
+      // Determine status based on score (failed if under 70%, completed if 70% or higher)
+      const assignmentStatus = finalScore !== null && finalScore >= 70 ? 'completed' : 'failed'
       
       // Update the assignment_user status for this user
       // Note: testScore is stored in testAttempts, not assignmentUsers

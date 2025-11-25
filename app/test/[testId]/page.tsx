@@ -174,7 +174,12 @@ export default function TestPage() {
     let correctAnswers = 0
     testData.questions.forEach(question => {
       const userAnswer = answers[question.id]
-      if (!userAnswer || !question.correct_answer) return
+      
+      // Skip if question has no correct answer defined
+      if (!question.correct_answer) return
+      
+      // If user didn't answer, it's incorrect (don't increment correctAnswers)
+      if (!userAnswer) return
       
       // Handle text/complete questions differently
       if (question.type === 'complete' || question.type === 'text') {
