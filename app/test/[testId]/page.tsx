@@ -213,7 +213,8 @@ export default function TestPage() {
       // Handle text/complete questions differently
       if (question.type === 'complete' || question.type === 'text') {
         // For text questions, compare answers case-insensitively after trimming
-        const normalizedUserAnswer = userAnswer.trim().toLowerCase()
+        const userAnswerStr = Array.isArray(userAnswer) ? userAnswer.join(' ').trim() : (userAnswer || '').trim()
+        const normalizedUserAnswer = userAnswerStr.toLowerCase()
         const normalizedCorrectAnswer = question.correct_answer.trim().toLowerCase()
         
         if (normalizedUserAnswer === normalizedCorrectAnswer) {
