@@ -233,10 +233,28 @@ export async function PUT(
       }, { status: 404 })
     }
 
+    // Get current test data to compare questionIds and important fields
+    const currentTest = await db
+      .select({ 
+        questionIds: tests.questionIds,
+        passingScore: tests.passingScore,
+        timeLimit: tests.timeLimit
+      })
+      .from(tests)
+      .where(eq(tests.id, id))
+      .limit(1)
+    
+    const currentQuestionIds = (currentTest[0]?.questionIds as string[]) || []
+    const newQuestionIds = body.questionIds || currentQuestionIds
+    
+    // Check if questions changed (need to reset results)
+    const questionsChanged = JSON.stringify(currentQuestionIds.sort()) !== JSON.stringify(Array.isArray(newQuestionIds) ? newQuestionIds.sort() : [])
+    
     // Prepare update data
     const updateData: {
       title?: string
       description?: string | null
+      questionIds?: string[]
       type?: string | null
       difficulty?: string | null
       locale?: string | null
@@ -253,6 +271,7 @@ export async function PUT(
     
     if (body.title !== undefined) updateData.title = body.title
     if (body.description !== undefined) updateData.description = body.description
+    if (body.questionIds !== undefined) updateData.questionIds = body.questionIds
     if (body.passingScore !== undefined) updateData.passingScore = body.passingScore
     if (body.timeLimit !== undefined) updateData.timeLimit = body.timeLimit
     if (body.maxAttempts !== undefined) updateData.maxAttempts = body.maxAttempts
@@ -282,6 +301,7 @@ export async function PUT(
         }
         if (updateData.title !== undefined) fallbackUpdateData.title = updateData.title
         if (updateData.description !== undefined) fallbackUpdateData.description = updateData.description
+        if (updateData.questionIds !== undefined) fallbackUpdateData.questionIds = updateData.questionIds
         if (updateData.passingScore !== undefined) fallbackUpdateData.passingScore = updateData.passingScore
         if (updateData.timeLimit !== undefined) fallbackUpdateData.timeLimit = updateData.timeLimit
         if (updateData.maxAttempts !== undefined) fallbackUpdateData.maxAttempts = updateData.maxAttempts
@@ -293,6 +313,43 @@ export async function PUT(
           .where(eq(tests.id, id))
       } else {
         throw updateError
+      }
+    }
+
+    // Reset results if questions changed or important fields changed
+    const importantFieldsChanged = questionsChanged || 
+      (body.passingScore !== undefined && body.passingScore !== currentTest[0]?.passingScore) ||
+      (body.timeLimit !== undefined && body.timeLimit !== currentTest[0]?.timeLimit)
+    
+    if (importantFieldsChanged) {
+      console.log('Test questions or important fields changed, resetting results')
+      
+      // Delete all test attempts for this test
+      try {
+        await db.delete(testAttempts).where(eq(testAttempts.testId, id))
+        console.log(`✅ Reset test attempts for test ${id}`)
+      } catch (error) {
+        console.warn(`⚠️ Failed to reset test attempts:`, error)
+      }
+      
+      // Reset assignment statuses for all assignments using this test
+      try {
+        const relatedAssignments = await db.select({ id: assignments.id })
+          .from(assignments)
+          .where(eq(assignments.testId, id))
+        
+        for (const assignment of relatedAssignments) {
+          await db.update(assignmentUsers)
+            .set({
+              status: 'pending',
+              completedAt: null,
+              updatedAt: new Date()
+            })
+            .where(eq(assignmentUsers.assignmentId, assignment.id))
+        }
+        console.log(`✅ Reset assignment statuses for ${relatedAssignments.length} assignment(s)`)
+      } catch (error) {
+        console.warn(`⚠️ Failed to reset assignment statuses:`, error)
       }
     }
 

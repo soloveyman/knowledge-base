@@ -40,15 +40,29 @@ export async function POST(request: NextRequest) {
       completedAt: new Date()
     }).returning()
 
-    // Update the user's assignment status based on score
+    // Update the user's assignment status based on best score
     // First, find the assignment that contains this test
     const assignmentsWithTest = assignmentId
       ? await db.select().from(assignments).where(eq(assignments.id, assignmentId))
       : await db.select().from(assignments).where(eq(assignments.testId, testId))
     
     if (assignmentsWithTest.length > 0) {
-      // Determine status based on score (failed if under 70%, completed if 70% or higher)
-      const assignmentStatus = finalScore !== null && finalScore >= 70 ? 'completed' : 'failed'
+      // Get all attempts for this user and test to find the best score
+      const allUserAttempts = await db.select()
+        .from(testAttempts)
+        .where(and(
+          eq(testAttempts.testId, testId),
+          eq(testAttempts.userId, session.user.id),
+          eq(testAttempts.status, 'completed')
+        ))
+      
+      // Find the best score (highest)
+      const bestScore = allUserAttempts.length > 0
+        ? Math.max(...allUserAttempts.map(a => a.score ?? 0))
+        : finalScore ?? 0
+      
+      // Determine status based on best score (failed if under 70%, completed if 70% or higher)
+      const assignmentStatus = bestScore >= 70 ? 'completed' : 'failed'
       
       // Update the assignment_user status for this user
       // Note: testScore is stored in testAttempts, not assignmentUsers

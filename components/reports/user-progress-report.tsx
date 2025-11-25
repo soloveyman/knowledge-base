@@ -354,19 +354,33 @@ export default function UserProgressReport({ users, assignments, modules = [], t
               a.status === 'completed' && a.answers && Object.keys(a.answers).length > 0
             )
             
-            // Sort by completedAt (most recent first) and take only the latest attempt
-            const latestAttempt = completedAttempts
-              .sort((a, b) => {
-                const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0
-                const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0
-                return dateB - dateA // Descending order (newest first)
-              })[0] // Take only the first (latest) attempt
+            // Find the best attempt (highest score)
+            // If scores are equal, prefer the most recent one
+            const bestAttempt = completedAttempts.length > 0
+              ? completedAttempts.reduce((best, current) => {
+                  const bestScore = best.score ?? 0
+                  const currentScore = current.score ?? 0
+                  
+                  // If current has higher score, it's better
+                  if (currentScore > bestScore) {
+                    return current
+                  }
+                  // If scores are equal, prefer the most recent
+                  if (currentScore === bestScore) {
+                    const bestDate = best.completedAt ? new Date(best.completedAt).getTime() : 0
+                    const currentDate = current.completedAt ? new Date(current.completedAt).getTime() : 0
+                    return currentDate > bestDate ? current : best
+                  }
+                  // Otherwise keep the best
+                  return best
+                })
+              : null
             
-            if (latestAttempt) {
+            if (bestAttempt) {
               if (!answersByAssignment[assignmentId]) {
                 answersByAssignment[assignmentId] = {}
               }
-              answersByAssignment[assignmentId][userId] = [latestAttempt]
+              answersByAssignment[assignmentId][userId] = [bestAttempt]
             }
           }
         } catch (error) {
@@ -769,9 +783,9 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                               )}
                             </div>
                             
-                            {/* Show test answers for owner/manager (only latest attempt) */}
+                            {/* Show test answers for owner/manager (best attempt) */}
                             {canViewAnswers && userAnswers.length > 0 && (() => {
-                              const latestAttempt = userAnswers[0] // Already filtered to latest attempt
+                              const bestAttempt = userAnswers[0] // Already filtered to best attempt
                               const accordionValue = `answers-${assignment.id}-${progress.user.id}`
                               
                               return (
@@ -784,15 +798,15 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                       >
                                         <div className="flex items-center justify-between w-full pr-4">
                                           <div className="text-sm font-medium text-foreground">
-                                            Ответы сотрудника (последняя попытка):
+                                            Ответы сотрудника (лучшая попытка):
                                           </div>
                                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            {latestAttempt.completedAt && (
-                                              <span>{formatDate(latestAttempt.completedAt)}</span>
+                                            {bestAttempt.completedAt && (
+                                              <span>{formatDate(bestAttempt.completedAt)}</span>
                                             )}
-                                            {latestAttempt.score !== null && (
-                                              <Badge variant={latestAttempt.score >= 70 ? "default" : "destructive"} className="text-xs">
-                                                {latestAttempt.score}%
+                                            {bestAttempt.score !== null && (
+                                              <Badge variant={bestAttempt.score >= 70 ? "default" : "destructive"} className="text-xs">
+                                                {bestAttempt.score}%
                                               </Badge>
                                             )}
                                           </div>
@@ -800,7 +814,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                       </AccordionTrigger>
                                       <AccordionContent value={accordionValue} className="pt-2 [&>div]:px-0">
                                         <div className="bg-muted/50 rounded-lg p-3 space-y-2.5">
-                                          {Object.entries(latestAttempt.answers).map(([questionId, answer], answerIndex) => {
+                                          {Object.entries(bestAttempt.answers).map(([questionId, answer], answerIndex) => {
                                             // Find question text by questionId
                                             const questions = assignment.testId ? testQuestions[assignment.testId] || [] : []
                                             const question = questions.find(q => q.id === questionId)

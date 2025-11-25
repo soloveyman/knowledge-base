@@ -105,6 +105,12 @@ export async function PUT(
       }, { status: 404 })
     }
 
+    const oldTestId = existingAssignment[0].testId
+    const newTestId = testId !== undefined ? (testId || null) : oldTestId
+    
+    // Check if testId changed (need to reset results)
+    const testIdChanged = oldTestId !== newTestId
+
     // Update assignment dueDate, title, description, and testId
     const updateFields: {
       updatedAt: Date
@@ -130,6 +136,33 @@ export async function PUT(
       await db.update(assignments)
         .set(updateFields)
         .where(eq(assignments.id, id))
+    }
+
+    // Reset results if testId changed
+    if (testIdChanged) {
+      console.log('Assignment testId changed, resetting results')
+      
+      // Delete all test attempts for this assignment
+      try {
+        await db.delete(testAttempts).where(eq(testAttempts.assignmentId, id))
+        console.log(`✅ Reset test attempts for assignment ${id}`)
+      } catch (error) {
+        console.warn(`⚠️ Failed to reset test attempts:`, error)
+      }
+      
+      // Reset assignment statuses for all users
+      try {
+        await db.update(assignmentUsers)
+          .set({
+            status: 'pending',
+            completedAt: null,
+            updatedAt: new Date()
+          })
+          .where(eq(assignmentUsers.assignmentId, id))
+        console.log(`✅ Reset assignment statuses for assignment ${id}`)
+      } catch (error) {
+        console.warn(`⚠️ Failed to reset assignment statuses:`, error)
+      }
     }
 
     // Check existing users for this assignment

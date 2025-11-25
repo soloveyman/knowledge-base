@@ -78,13 +78,31 @@ export async function GET() {
           .orderBy(desc(testAttempts.completedAt))
       : []
 
-    // Group test attempts by testId and userId for O(1) lookup
+    // Group test attempts by testId and userId, keeping the best attempt (highest score)
     const attemptsByTestAndUser = new Map<string, typeof allTestAttempts[0]>()
     for (const attempt of allTestAttempts) {
       const key = `${attempt.testId}:${attempt.userId}`
-      // Keep only the latest attempt (already sorted by completedAt desc)
-      if (!attemptsByTestAndUser.has(key)) {
+      const existing = attemptsByTestAndUser.get(key)
+      
+      if (!existing) {
+        // First attempt for this test+user
         attemptsByTestAndUser.set(key, attempt)
+      } else {
+        // Compare scores - keep the best one
+        const existingScore = existing.score ?? 0
+        const currentScore = attempt.score ?? 0
+        
+        if (currentScore > existingScore) {
+          // Current attempt has better score
+          attemptsByTestAndUser.set(key, attempt)
+        } else if (currentScore === existingScore && attempt.completedAt && existing.completedAt) {
+          // If scores are equal, prefer the most recent one
+          const currentDate = new Date(attempt.completedAt).getTime()
+          const existingDate = new Date(existing.completedAt).getTime()
+          if (currentDate > existingDate) {
+            attemptsByTestAndUser.set(key, attempt)
+          }
+        }
       }
     }
 
