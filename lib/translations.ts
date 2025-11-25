@@ -408,6 +408,7 @@ export const translations = {
     chooseEmployeesToAssign: "Choose employees to assign this task to.",
     selectAll: "Select all",
     deselectAll: "Deselect all",
+    assignmentResultsReset: "Assignment results reset successfully",
     
     // Common UI Elements
     search: "Search",
@@ -1080,6 +1081,7 @@ export const translations = {
     clearAllQuestions: "Вы уверены, что хотите удалить все вопросы? Это действие нельзя отменить.",
     // selectAll: "Выбрать всё", // Already exists
     // deselectAll: "Отменить выбор", // Already exists
+    assignmentResultsReset: "Результаты назначения успешно сброшены",
     
     // Dashboard Metrics
     totalUsers: "Всего пользователей",

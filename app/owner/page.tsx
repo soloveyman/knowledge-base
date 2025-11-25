@@ -1637,6 +1637,28 @@ function OwnerPageInner() {
     router.push(url)
   }
 
+  const handleResetAssignment = async (id: string) => {
+    try {
+      const response = await fetch(`/api/assignments/${id}/reset`, {
+        method: 'POST',
+        cache: 'no-store'
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        toast.success(t('assignmentResultsReset') || 'Assignment results reset successfully')
+        // Reload assignments to reflect the reset
+        loadData(true, true).catch(console.error)
+      } else {
+        console.error('Failed to reset assignment:', result.message)
+        toast.error(result.message || 'Failed to reset assignment results')
+      }
+    } catch (error) {
+      console.error('Error resetting assignment:', error)
+      toast.error('Error resetting assignment results')
+    }
+  }
+
   // User handlers
   const handleDeleteUser = async (id: string) => {
     // Optimistically remove from state immediately for instant UI update
@@ -2068,6 +2090,7 @@ function OwnerPageInner() {
               onDeleteAssignment={handleDeleteAssignment}
               onViewAssignment={handleViewAssignment}
               onEditAssignment={handleEditAssignment}
+              onResetAssignment={handleResetAssignment}
               isLoading={isLoadingAssignments}
               hideEmptyState={(() => {
                 const hasTimestamp = searchParams.has('_t')

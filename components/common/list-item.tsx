@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { getStatusBadge, getRoleBadge, getCountBadge, getDifficultyBadge, getLocaleBadge } from "@/lib/badge-utils"
 import { useBadgeTranslation } from "@/lib/badge-translations"
 import { DeleteConfirmation } from "./delete-confirmation"
-import { X, Edit } from "lucide-react"
+import { X, Edit, RotateCcw } from "lucide-react"
 
 interface ListItemProps {
   title: string | null | undefined
@@ -19,8 +19,10 @@ interface ListItemProps {
   onClick?: () => void
   onDelete?: () => void
   onEdit?: () => void
+  onReset?: () => void
   showDeleteButton?: boolean
   showEditButton?: boolean
+  showResetButton?: boolean
   deleteDataLossWarning?: string
 }
 
@@ -32,8 +34,10 @@ export function ListItem({
   onClick, 
   onDelete, 
   onEdit,
+  onReset,
   showDeleteButton = true,
   showEditButton = false,
+  showResetButton = false,
   deleteDataLossWarning
 }: ListItemProps) {
   const translateBadge = useBadgeTranslation()
@@ -117,6 +121,20 @@ export function ListItem({
         )}
         </div>
         <div className="flex items-center space-x-1 shrink-0">
+          {showResetButton && onReset && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-muted-foreground hover:text-orange-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                onReset()
+              }}
+              title="Reset results"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
           {showEditButton && onEdit && (
           <Button 
             variant="ghost" 

@@ -27,6 +27,7 @@ interface ManagementPageProps {
     onClick?: () => void
     onDelete?: () => void
     onEdit?: () => void
+    onReset?: () => void
     deleteDataLossWarning?: string
   }>
   showEditButton?: boolean
@@ -80,7 +81,9 @@ export function ManagementPage({
                 onClick={item.onClick}
                 onDelete={item.onDelete}
                 onEdit={item.onEdit}
+                onReset={item.onReset}
                 showEditButton={showEditButton}
+                showResetButton={!!item.onReset}
                 deleteDataLossWarning={item.deleteDataLossWarning}
               />
             ))}

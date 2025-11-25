@@ -41,6 +41,7 @@ interface AssignmentsPageProps {
   onDeleteAssignment: (id: string) => void
   onViewAssignment: (id: string) => void
   onEditAssignment: (id: string) => void
+  onResetAssignment?: (id: string) => void
   isLoading?: boolean
   hideEmptyState?: boolean
 }
@@ -50,6 +51,7 @@ export function AssignmentsPage({
   onDeleteAssignment, 
   onViewAssignment,
   onEditAssignment,
+  onResetAssignment,
   isLoading = false,
   hideEmptyState = false
 }: AssignmentsPageProps) {
@@ -72,7 +74,8 @@ export function AssignmentsPage({
     ],
     onClick: () => onViewAssignment(assignment.id),
     onDelete: () => onDeleteAssignment(assignment.id),
-    onEdit: () => onEditAssignment(assignment.id)
+    onEdit: () => onEditAssignment(assignment.id),
+    onReset: onResetAssignment ? () => onResetAssignment(assignment.id) : undefined
   }))
 
   return (
