@@ -330,8 +330,16 @@ export default function TestPage() {
           // Normalize correct answer to letter format (A, B, C, D) or true/false
           let correctAnswerLetter: string | null = null
           
+          // Handle true/false questions FIRST (check both 'tf' and 'true_false' types)
+          // This must be checked before other checks to ensure proper normalization
+          if (question.type === 'tf' || question.type === 'true_false') {
+            const normalizedCorrect = normalizeTrueFalse(question.correct_answer)
+            if (normalizedCorrect) {
+              correctAnswerLetter = normalizedCorrect
+            }
+          }
           // If correct_answer is already a letter (A, B, C, D)
-          if (/^[A-Z]$/.test(question.correct_answer)) {
+          else if (/^[A-Z]$/.test(question.correct_answer)) {
             correctAnswerLetter = question.correct_answer.toUpperCase()
           } 
           // If correct_answer is a numeric index (1, 2, 3, 4) - 1-based
@@ -367,20 +375,13 @@ export default function TestPage() {
               correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
             }
           }
-          // Handle true/false questions
-          else if (question.type === 'tf') {
-            const normalizedCorrect = normalizeTrueFalse(question.correct_answer)
-            if (normalizedCorrect) {
-              correctAnswerLetter = normalizedCorrect
-            }
-          }
           
           // Compare normalized answers
           const userAnswerStr = Array.isArray(userAnswer) ? userAnswer[0] : userAnswer
           
-          // For true/false questions, normalize user answer too
+          // For true/false questions, normalize user answer too (check both 'tf' and 'true_false' types)
           let normalizedUserAnswer = userAnswerStr
-          if (question.type === 'tf' && userAnswerStr) {
+          if ((question.type === 'tf' || question.type === 'true_false') && userAnswerStr) {
             const normalized = normalizeTrueFalse(userAnswerStr)
             if (normalized) {
               normalizedUserAnswer = normalized
