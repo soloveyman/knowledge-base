@@ -258,6 +258,15 @@ export default function TestPage() {
 
       if (!response.ok) {
         console.error('Failed to save test attempt')
+      } else {
+        // Trigger assignments refresh for employee when returning to page
+        if (typeof window !== 'undefined') {
+          // Set a flag to refresh assignments when employee returns to their page
+          sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
+            timestamp: Date.now(),
+            trigger: 'test_completed'
+          }))
+        }
       }
     } catch (error) {
       console.error('Error saving test attempt:', error)

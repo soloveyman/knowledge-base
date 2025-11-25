@@ -10,7 +10,7 @@ export const BADGE_CONFIGS = {
   status: {
     active: { variant: "success" as const, label: "Active" },
     inactive: { variant: "secondary" as const, label: "Inactive" },
-    failed: { variant: "secondary" as const, label: "Failed" },
+    failed: { variant: "destructive" as const, label: "Failed" },
     pending: { variant: "warning" as const, label: "Pending" },
     completed: { variant: "success" as const, label: "Completed" },
     ready: { variant: "success" as const, label: "Ready" },

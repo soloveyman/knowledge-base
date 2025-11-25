@@ -262,6 +262,92 @@ function EmployeePageInner() {
     }
   }, [currentTab, loadTabData])
 
+  // Check for updates when page becomes visible or gains focus (e.g., returning from test page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && session?.user?.id) {
+        // Reload assignments when page becomes visible
+        loadAssignments(true).catch(console.error)
+      }
+    }
+
+    const handleFocus = () => {
+      if (session?.user?.id) {
+        // Reload assignments when window gains focus
+        loadAssignments(true).catch(console.error)
+      }
+    }
+
+    // Check sessionStorage for pending updates
+    const checkPendingUpdates = () => {
+      if (typeof window === 'undefined' || !session?.user?.id) return
+      
+      const pendingAssignments = sessionStorage.getItem('pendingAssignmentsRefresh')
+      const pendingTests = sessionStorage.getItem('pendingTestsRefresh')
+      
+      if (pendingAssignments) {
+        try {
+          const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
+          // Only use if timestamp is recent (within last 30 seconds)
+          if (Date.now() - storedTimestamp < 30000 && data && Array.isArray(data)) {
+            console.log('Employee: Using pre-fetched assignments from sessionStorage, count:', data.length)
+            const allAssignments: Assignment[] = data as Assignment[]
+            setAssignments(allAssignments)
+            
+            // Filter assignments for current user
+            const currentUserId = session?.user?.id
+            const filteredUserAssignments = allAssignments.filter((assignment: Assignment) => {
+              if (assignment.users && Array.isArray(assignment.users)) {
+                return assignment.users.some((au: AssignedUser) => au.userId === currentUserId)
+              }
+              return false
+            })
+            setUserAssignments(filteredUserAssignments)
+            
+            // Update localStorage
+            try {
+              localStorage.setItem('employee-assignments', JSON.stringify(allAssignments))
+              localStorage.setItem('employee-user-assignments', JSON.stringify(filteredUserAssignments))
+            } catch {
+              // Ignore localStorage errors
+            }
+            
+            // Clean up
+            sessionStorage.removeItem('pendingAssignmentsRefresh')
+          } else {
+            sessionStorage.removeItem('pendingAssignmentsRefresh')
+          }
+        } catch (error) {
+          console.error('Failed to parse pending assignments:', error)
+          sessionStorage.removeItem('pendingAssignmentsRefresh')
+        }
+      }
+      
+      if (pendingTests) {
+        // Tests were updated, reload assignments to get updated test data
+        loadAssignments(true).catch(console.error)
+        sessionStorage.removeItem('pendingTestsRefresh')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    checkPendingUpdates()
+    
+    // Also check periodically when page is visible
+    const intervalId = setInterval(() => {
+      if (!document.hidden && session?.user?.id) {
+        checkPendingUpdates()
+      }
+    }, 5000) // Check every 5 seconds
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      clearInterval(intervalId)
+    }
+  }, [session?.user?.id, loadAssignments])
+
   // Transform assignment data for display - MUST be before early returns
   const currentUserId = session?.user?.id
   const transformedAssignments = useMemo(() => userAssignments.map(assignment => {
@@ -679,12 +765,16 @@ function EmployeePageInner() {
                       .map((attempt) => {
                         const score = attempt.score ?? 0
                         const colorClass = score >= 70 ? 'text-green-600' : 'text-red-600'
+                        // Determine status based on score: failed if score < 70, completed otherwise
+                        const attemptStatus = (attempt.status === 'completed' && score !== null && score !== undefined)
+                          ? (score >= 70 ? 'completed' : 'failed')
+                          : (attempt.status === 'completed' ? 'completed' : 'failed')
                         return (
                           <div key={attempt.id} className="flex items-center justify-between px-5 py-3 border rounded-3xl hover:bg-accent transition-colors">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium">{t('testAttempt')}</h4>
-                                <StatusBadge status={attempt.status === 'completed' ? 'completed' : 'failed'} />
+                                <StatusBadge status={attemptStatus} />
                               </div>
                               <p className="text-sm text-muted-foreground">
                                 {attempt.completedAt && `${t('completed')}: ${formatDateShort(attempt.completedAt)}`}

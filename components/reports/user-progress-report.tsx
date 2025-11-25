@@ -271,8 +271,11 @@ export default function UserProgressReport({ users, assignments, modules = [], t
           
           if (apiResult.success && apiResult.data.attempts) {
             const attempts = apiResult.data.attempts
-            const completedAttempts = attempts.filter((a: any) => a.status === 'completed' && a.score !== null && a.score !== undefined)
+            // Include all attempts (completed and failed) for total count
             const totalAttempts = attempts.length
+            // Filter completed attempts with scores for statistics
+            const completedAttempts = attempts.filter((a: any) => a.status === 'completed' && a.score !== null && a.score !== undefined)
+            // Count passed (score >= 70) and failed (score < 70) attempts
             const passedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) >= 70).length
             const failedAttempts = completedAttempts.filter((a: any) => (a.score ?? 0) < 70).length
             const bestScore = completedAttempts.length > 0 
