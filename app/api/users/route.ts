@@ -8,6 +8,8 @@ import { strictRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate-limit
 import { normalizeEmail, isNotDisposableEmail, isValidEmailFormat } from '@/lib/email-validation'
 import { emailExists } from '@/lib/email-validation-server'
 import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
+import { createUserSchema } from '@/lib/schemas/users'
+import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -39,12 +41,7 @@ export async function GET() {
       }
     })
   } catch (error) {
-    console.error('Users API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to fetch users',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to fetch users', 500)
   }
 }
 
@@ -82,23 +79,21 @@ export async function POST(request: Request) {
       )
     }
     
-    const tenantDb = getTenantDb(session.user.businessId)
-    const tenantId = session.user.businessId
-    const body = await request.json()
-    const { name, job, email, password, role } = body
-
-    // Validate required fields
-    if (!name || !email || !password || !role) {
-      return NextResponse.json({
-        success: false,
-        message: 'Name, email, password, and role are required'
-      }, { status: 400 })
+    // Validate request body
+    const validation = await validateRequest(request, createUserSchema)
+    if (!validation.success) {
+      return validation.response
     }
 
+    const { name, job, email, password, role } = validation.data
+
+    const tenantDb = getTenantDb(session.user.businessId)
+    const tenantId = session.user.businessId
+
     // Normalize and validate email
-    const normalizedEmail = normalizeEmail(String(email))
+    const normalizedEmail = normalizeEmail(email)
     
-    // Validate email format
+    // Validate email format (double-check, schema already validates but this is extra safety)
     if (!isValidEmailFormat(normalizedEmail)) {
       return NextResponse.json({
         success: false,
@@ -148,7 +143,7 @@ export async function POST(request: Request) {
       job,
       email: normalizedEmail,
       password: hashedPassword,
-      role: role as 'owner' | 'manager' | 'employee',
+      role,
       businessId: tenantId,
     }).returning()
 
@@ -173,11 +168,6 @@ export async function POST(request: Request) {
       message: 'User created successfully. Verification email has been sent to the user.'
     })
   } catch (error) {
-    console.error('Create user API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to create user',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to create user', 500)
   }
 }

@@ -2,7 +2,7 @@
  * Utility functions for managing localStorage data
  */
 
-interface Document {
+export interface Document {
   id: string
   name?: string
   type?: string
@@ -130,7 +130,9 @@ export function saveDocumentsToLocalStorage(documents: Document[]): void {
  * Sync localStorage with database documents
  * Removes any localStorage documents that don't exist in the database
  */
-export function syncLocalStorageWithDatabase(databaseDocuments: Document[]): void {
+export function syncLocalStorageWithDatabase(
+  databaseDocuments: Array<{ id: string; [key: string]: unknown }>
+): void {
   try {
     const localDocuments = getDocumentsFromLocalStorage()
     const databaseIds = new Set(databaseDocuments.map(doc => doc.id))

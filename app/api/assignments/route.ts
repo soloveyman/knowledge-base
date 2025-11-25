@@ -3,6 +3,8 @@ import { db, assignments, documents, modules, assignmentUsers, testAttempts, use
 import { eq, and, desc, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { InferSelectModel } from 'drizzle-orm'
+import { createAssignmentSchema } from '@/lib/schemas/assignments'
+import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -120,12 +122,7 @@ export async function GET() {
       }
     })
   } catch (error) {
-    console.error('Assignments API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to fetch assignments',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to fetch assignments', 500)
   }
 }
 
@@ -144,8 +141,11 @@ export async function POST(request: Request) {
         message: 'Forbidden - you do not have permission to create assignments' 
       }, { status: 403 })
     }
-    const body = await request.json()
-    console.log('Create assignment request:', body)
+    // Validate request body
+    const validation = await validateRequest(request, createAssignmentSchema)
+    if (!validation.success) {
+      return validation.response
+    }
 
     const {
       moduleId: documentId, // Frontend sends documentId as moduleId
@@ -155,8 +155,9 @@ export async function POST(request: Request) {
       description,
       dueDate,
       status = 'pending',
-      assignedBy = session.user.id
-    } = body
+    } = validation.data
+
+    const assignedBy = session.user.id
 
     console.log('Parsed assignment data:', {
       documentId,
@@ -166,15 +167,6 @@ export async function POST(request: Request) {
       status,
       assignedBy
     })
-
-    // Validate required fields
-    if (!documentId || !assignedTo) {
-      console.log('Validation failed - missing required fields')
-      return NextResponse.json({
-        success: false,
-        message: 'Missing required fields: documentId and assignedTo are required'
-      }, { status: 400 })
-    }
 
     // Normalize assignedTo to array
     const userIds = Array.isArray(assignedTo) ? assignedTo : [assignedTo]
@@ -275,15 +267,7 @@ export async function POST(request: Request) {
     console.log(`Adding ${usersToAssign.length} users to assignment, skipping ${skippedCount} existing ones`)
 
     // Add users to the assignment
-    interface AssignmentUserRow {
-      id: string
-      assignmentId: string
-      userId: string
-      status: string
-      completedAt: Date | null
-      createdAt: Date | null
-      updatedAt: Date | null
-    }
+    type AssignmentUserRow = InferSelectModel<typeof assignmentUsers>
     
     const newAssignmentUsers: AssignmentUserRow[] = []
     for (const userId of usersToAssign) {
@@ -317,16 +301,6 @@ export async function POST(request: Request) {
       message: responseMessage
     })
   } catch (error) {
-    console.error('Create assignment API error:', error)
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace'
-    })
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to create assignment',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to create assignment', 500)
   }
 }

@@ -603,22 +603,7 @@ Preserve all original sections and tables, but improve their titles and content 
       warning: wasTruncated ? 'Content was truncated due to size limits' : undefined
     })
   } catch (error) {
-    console.error('Document enhancement API error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorStack = error instanceof Error ? error.stack : undefined
-    
-    console.error('Error details:', {
-      message: errorMessage,
-      stack: errorStack,
-      documentId
-    })
-    
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to enhance document',
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? errorStack : undefined
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to enhance document', 500)
   }
 }
 

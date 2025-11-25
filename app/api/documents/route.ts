@@ -3,6 +3,8 @@ import { db, documents, users, usage, documentImages } from '@/lib/db'
 import { desc, eq, and, or } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { uploadImageToSpaces } from '@/lib/storage/spaces'
+import { createDocumentSchema } from '@/lib/schemas/documents'
+import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
 
 /**
  * Get owner ID for usage counting - if user is owner, return their ID,
@@ -129,12 +131,7 @@ export async function GET() {
       }
     })
   } catch (error) {
-    console.error('Documents API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to fetch documents',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to fetch documents', 500)
   }
 }
 
@@ -153,76 +150,39 @@ export async function POST(request: Request) {
         message: 'Forbidden - you do not have permission to create documents' 
       }, { status: 403 })
     }
-    // Parse request body with error handling for large payloads
-    let body
-    try {
-      body = await request.json()
-    } catch (error) {
-      console.error('Failed to parse request body:', error)
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Request body too large. Maximum text content size is 4.5MB (images are stored separately).' 
-      }, { status: 413 })
+    // Validate request body
+    const validation = await validateRequest(request, createDocumentSchema)
+    if (!validation.success) {
+      return validation.response
     }
-    
-    const { title, originalFileName, fileType, fileUrl, fileSize, parsingLog } = body
-    let parsedContent = body.parsedContent // Use let to allow reassignment
+
+    const {
+      title,
+      originalFileName,
+      fileType,
+      fileUrl,
+      fileSize,
+      parsingLog,
+      parsedContent: validatedParsedContent,
+    } = validation.data
+
+    // Use validated parsedContent, but allow modification for image processing
+    let parsedContent = validatedParsedContent
 
     console.log('POST /api/documents - Saving document:', title)
     console.log('Document source:', originalFileName?.includes('Google') ? 'Google Drive' : 'Local upload')
     console.log('ParsedContent exists:', !!parsedContent)
-    console.log('ParsedContent sections:', parsedContent?.sections?.length || 0)
-    console.log('ParsedContent tables:', parsedContent?.tables?.length || 0)
-    console.log('ParsedContent images:', parsedContent?.images?.length || 0)
-    if (parsedContent?.images && parsedContent.images.length > 0) {
-      const totalImageSize = parsedContent.images.reduce((sum: number, img: any) => {
-        return sum + (img.data?.length || 0)
+    console.log('ParsedContent sections:', parsedContent.sections?.length || 0)
+    console.log('ParsedContent tables:', parsedContent.tables?.length || 0)
+    console.log('ParsedContent images:', parsedContent.images?.length || 0)
+    if (parsedContent.images && parsedContent.images.length > 0) {
+      const totalImageSize = parsedContent.images.reduce((sum: number, img) => {
+        return sum + (typeof img.data === 'string' ? img.data.length : 0)
       }, 0)
       console.log('Total images size (bytes):', totalImageSize)
       console.log('Total images size (MB):', (totalImageSize / 1024 / 1024).toFixed(2))
     }
-    console.log('ParsedContent metadata:', parsedContent?.metadata)
-    
-    // Calculate request body size for debugging
-    const requestBodySize = JSON.stringify(body).length
-    console.log('Request body size (bytes):', requestBodySize)
-    console.log('Request body size (MB):', (requestBodySize / 1024 / 1024).toFixed(2))
-
-    // Validate required fields
-    if (!title) {
-      return NextResponse.json({
-        success: false,
-        message: 'Title is required'
-      }, { status: 400 })
-    }
-
-    // Validate parsedContent exists and has required structure
-    if (!parsedContent) {
-      console.error('ERROR: parsedContent is null or undefined - document cannot be saved without content')
-      return NextResponse.json({
-        success: false,
-        message: 'Document content is missing. Please re-upload the file.'
-      }, { status: 400 })
-    }
-    
-    if (!parsedContent.sections || !Array.isArray(parsedContent.sections)) {
-      console.warn('Warning: parsedContent.sections is missing or not an array, creating empty sections array')
-      if (!parsedContent.sections) {
-        parsedContent.sections = []
-      }
-    }
-    
-    // Ensure images array exists
-    if (!parsedContent.images || !Array.isArray(parsedContent.images)) {
-      console.warn('Warning: parsedContent.images is missing or not an array, creating empty images array')
-      parsedContent.images = []
-    }
-    
-    // Ensure tables array exists
-    if (!parsedContent.tables || !Array.isArray(parsedContent.tables)) {
-      console.warn('Warning: parsedContent.tables is missing or not an array, creating empty tables array')
-      parsedContent.tables = []
-    }
+    console.log('ParsedContent metadata:', parsedContent.metadata)
 
     // Process images: upload ALL images to Spaces
     // All images MUST be uploaded to Spaces - base64 storage is disabled
@@ -277,7 +237,7 @@ export async function POST(request: Request) {
           filename: img.filename || 'image.png',
           base64Data,
           type: img.type || 'image/png',
-          position: (img as any).textPosition || img.position,
+          position: 'textPosition' in img ? (img.textPosition as number | undefined) : img.position,
           originalIndex: i
         })
       }

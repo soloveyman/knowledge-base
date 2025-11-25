@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db, tests, questions as questionsTable, users, usage } from '@/lib/db'
 import { eq, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createTestSchema, type QuestionInput } from '@/lib/schemas/tests'
+import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
 
 /**
  * Get owner ID for usage counting - if user is owner, return their ID,
@@ -283,18 +285,7 @@ export async function GET() {
       throw selectError
     }
   } catch (error) {
-    console.error('Tests API error:', error)
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorCause = (error as any)?.cause
-    const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
-    const fullErrorText = `${errorMessage} ${nestedMessage}`
-    console.error('Full tests API error:', fullErrorText)
-    
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to fetch tests',
-      error: fullErrorText || 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to fetch tests', 500)
   }
 }
 
@@ -313,53 +304,51 @@ export async function POST(request: Request) {
         message: 'Forbidden - you do not have permission to create tests' 
       }, { status: 403 })
     }
-    // Parse request body with error handling for large payloads
-    let body
-    try {
-      body = await request.json()
-    } catch (error) {
-      console.error('Failed to parse request body:', error)
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Request body too large. Maximum payload size is 4.5MB (Vercel limit).' 
-      }, { status: 413 })
+    // Validate request body
+    const validation = await validateRequest(request, createTestSchema)
+    if (!validation.success) {
+      return validation.response
     }
-    const { 
-      title, 
-      description, 
-      moduleId, 
-      questionIds, 
-      questions, // The actual question objects
+
+    const {
+      title,
+      description,
+      moduleId,
+      questionIds,
+      questions,
       type,
       difficulty,
       locale,
-      passingScore, 
-      timeLimit, 
-      maxAttempts, 
-      shuffleQuestions, 
-      showCorrectAnswers, 
-      status 
-    } = body
+      passingScore,
+      timeLimit,
+      maxAttempts,
+      shuffleQuestions,
+      showCorrectAnswers,
+      status,
+    } = validation.data
 
-    console.log('Creating test:', { 
-      title, 
-      description, 
-      moduleId, 
+    console.log('Creating test:', {
+      title,
+      description,
+      moduleId,
       questionIdsCount: questionIds?.length,
       questionsCount: questions?.length,
-      questions: questions
     })
 
-    // Validate required fields
-    if (!title || (!questionIds && !questions)) {
-      return NextResponse.json({
-        success: false,
-        message: 'Title and questions are required'
-      }, { status: 400 })
-    }
-
     let finalQuestionIds: string[] = questionIds || []
-    let savedQuestions: any[] = []
+    type SavedQuestion = {
+      id: string
+      title: string
+      content: string
+      type: string
+      options: string[] | null
+      correctAnswer: string | null
+      explanation: string | null
+      difficulty: string
+      moduleId: string | null
+      createdBy: string
+    }
+    let savedQuestions: SavedQuestion[] = []
 
     // If questions are provided, save them to database first
     if (questions && questions.length > 0) {
@@ -367,19 +356,7 @@ export async function POST(request: Request) {
         console.log('Saving questions to database...')
         console.log('Questions data:', JSON.stringify(questions, null, 2))
         
-        interface QuestionInput {
-          prompt?: string
-          title?: string
-          content?: string
-          type?: string
-          choices?: string[]
-          correct_answer?: string
-          correctAnswer?: string // Support both snake_case and camelCase
-          explanation?: string
-        }
-        
         const questionData = questions
-          .filter((q: unknown): q is QuestionInput => q !== null && typeof q === 'object')
           .map((q: QuestionInput, index: number) => {
             try {
               console.log(`Processing question ${index}:`, q)
@@ -407,7 +384,7 @@ export async function POST(request: Request) {
         console.log('Processed question data:', JSON.stringify(questionData, null, 2))
         
         savedQuestions = await db.insert(questionsTable).values(
-          questionData.map((q: typeof questionData[number]) => ({ ...q, createdBy: session.user.id }))
+          questionData.map((q) => ({ ...q, createdBy: session.user.id }))
         ).returning()
 
         finalQuestionIds = savedQuestions.map(q => q.id)
@@ -415,7 +392,7 @@ export async function POST(request: Request) {
       } catch (questionError) {
         console.error('Error saving questions:', questionError)
         const errorMessage = questionError instanceof Error ? questionError.message : String(questionError)
-        const errorCause = (questionError as any)?.cause
+        const errorCause = questionError instanceof Error && 'cause' in questionError ? questionError.cause : undefined
         const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
         const fullErrorText = `${errorMessage} ${nestedMessage}`
         console.error('Full question error:', fullErrorText)
@@ -453,12 +430,12 @@ export async function POST(request: Request) {
       // If insert fails due to missing columns, try without new columns
       // Drizzle errors can be deeply nested, so we need to check all levels
       const errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
-      let errorCause = (insertError as any)?.cause
+      let errorCause: unknown = insertError instanceof Error && 'cause' in insertError ? insertError.cause : undefined
       let nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
       
       // Check for nested causes (Drizzle can nest errors deeply)
       while (errorCause && typeof errorCause === 'object' && 'cause' in errorCause) {
-        const deeperCause = errorCause.cause
+        const deeperCause = (errorCause as { cause: unknown }).cause
         if (deeperCause instanceof Error) {
           nestedMessage += ' ' + deeperCause.message
           errorCause = deeperCause
@@ -616,17 +593,6 @@ export async function POST(request: Request) {
       message: 'Test saved successfully'
     })
   } catch (error) {
-    console.error('Create test API error:', error)
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorCause = (error as any)?.cause
-    const nestedMessage = errorCause instanceof Error ? errorCause.message : String(errorCause || '')
-    const fullErrorText = `${errorMessage} ${nestedMessage}`
-    console.error('Full test creation error:', fullErrorText)
-    
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to save test',
-      error: fullErrorText || 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to save test', 500)
   }
 }

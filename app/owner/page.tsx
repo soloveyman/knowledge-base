@@ -236,7 +236,7 @@ function OwnerPageInner() {
         localStorage.setItem('owner-documents', JSON.stringify(newDocuments))
         // Also sync to localStorage using the utility function for consistency
         // Cast to Document[] type to match the utility function signature
-        syncLocalStorageWithDatabase(newDocuments as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+        syncLocalStorageWithDatabase(newDocuments)
       } catch (error) {
         console.error('Error saving documents to localStorage:', error)
       }

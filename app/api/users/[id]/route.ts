@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db, users, testAttempts, assignmentUsers, progress, modules, questions, tests, assignments, userGroupMembers } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { updateUserSchema } from '@/lib/schemas/users'
+import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
 
 export async function GET(
   request: Request,
@@ -31,12 +33,7 @@ export async function GET(
       data: { user: user[0] }
     })
   } catch (error) {
-    console.error('Get user API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to get user',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to get user', 500)
   }
 }
 
@@ -46,7 +43,14 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
+    
+    // Validate request body
+    const validation = await validateRequest(request, updateUserSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
+    const body = validation.data
     
     console.log('PUT request for user ID:', id)
     console.log('Update data:', body)
@@ -60,17 +64,13 @@ export async function PUT(
         message: 'User not found'
       }, { status: 404 })
     }
-
-    // Valid role types
-    type UserRole = 'super-admin' | 'owner' | 'manager' | 'employee'
-    const validRoles: UserRole[] = ['super-admin', 'owner', 'manager', 'employee']
     
     // Prepare update data
     const updateData: {
       name?: string | null
       job?: string | null
       email?: string
-      role?: UserRole
+      role?: 'super-admin' | 'owner' | 'manager' | 'employee'
       password?: string
       updatedAt: Date
     } = {
@@ -80,17 +80,7 @@ export async function PUT(
     if (body.name !== undefined) updateData.name = body.name
     if (body.job !== undefined) updateData.job = body.job
     if (body.email !== undefined) updateData.email = body.email
-    // Validate role before adding to updateData
-    if (body.role !== undefined) {
-      if (validRoles.includes(body.role as UserRole)) {
-        updateData.role = body.role as UserRole
-      } else {
-        return NextResponse.json({
-          success: false,
-          message: `Invalid role. Must be one of: ${validRoles.join(', ')}`
-        }, { status: 400 })
-      }
-    }
+    if (body.role !== undefined) updateData.role = body.role
 
     // Only update password if provided
     if (body.password && body.password.trim()) {
@@ -110,12 +100,7 @@ export async function PUT(
       message: 'User updated successfully'
     })
   } catch (error) {
-    console.error('Update user API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to update user',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to update user', 500)
   }
 }
 
@@ -223,11 +208,6 @@ export async function DELETE(
       message: 'User deleted successfully'
     })
   } catch (error) {
-    console.error('Delete user API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to delete user',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to delete user', 500)
   }
 }

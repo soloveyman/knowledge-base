@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { generateTestSchema } from '@/lib/schemas/generate-test'
+import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
 
 // Route segment config
 export const maxDuration = 60 // 60 seconds for Grok API calls
@@ -7,18 +9,13 @@ export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   try {
-    // Parse request body with error handling for large payloads
-    let body
-    try {
-      body = await request.json()
-    } catch (error) {
-      console.error('Failed to parse request body:', error)
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Request body too large. Maximum payload size is 4.5MB (Vercel limit).' 
-      }, { status: 413 })
+    // Validate request body
+    const validation = await validateRequest(request, generateTestSchema)
+    if (!validation.success) {
+      return validation.response
     }
-    const { params, context } = body
+
+    const { params, context } = validation.data
     console.log('Generate test request:', { 
       params, 
       contextTextLength: context?.text?.length || 0,
@@ -199,7 +196,9 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
 
-    const grokData = await grokResponse.json()
+    const grokData = (await grokResponse.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+    }
     const content = grokData.choices?.[0]?.message?.content
 
     if (!content) {
@@ -246,11 +245,6 @@ export async function POST(request: Request) {
     })
 
   } catch (error) {
-    console.error('Test generation API error:', error)
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to generate test questions',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to generate test questions', 500)
   }
 }

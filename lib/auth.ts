@@ -75,7 +75,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null
           }
 
-          const dbUser = dbUsers[0] as { id: string; email: string; name: string | null; role: UserRole | null; password: string | null; businessId?: string | null; emailVerified: Date | null }
+          const dbUser = dbUsers[0]
           
           // Check if user has a password (some users might not have one if created via OAuth)
           if (!dbUser.password) {
@@ -168,10 +168,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 // Race condition - user was created between check and insert
                 const existingAfterRace = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
                 if (existingAfterRace.length > 0) {
-                  const dbUser = existingAfterRace[0] as unknown as { id: string; role: string; businessId?: string | null }
+                  const dbUser = existingAfterRace[0]
                   const u = user as { id?: string; role?: UserRole; businessId?: string }
                   u.id = dbUser.id
-                  u.role = (dbUser.role as string).toLowerCase() as UserRole
+                  u.role = (dbUser.role?.toLowerCase() ?? 'employee') as UserRole
                   u.businessId = (dbUser.businessId ?? dbUser.id)
                   return true
                 }
@@ -182,10 +182,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
           } else {
             console.log('[Auth] Existing user found:', existing[0].id)
-            const dbUser = existing[0] as unknown as { id: string; role: string; businessId?: string | null }
+            const dbUser = existing[0]
             const u = user as { id?: string; role?: UserRole; businessId?: string }
             u.id = dbUser.id
-            u.role = (dbUser.role as string).toLowerCase() as UserRole
+            u.role = (dbUser.role?.toLowerCase() ?? 'employee') as UserRole
             u.businessId = (dbUser.businessId ?? dbUser.id)
             
             console.log('[Auth] User object updated with existing DB data')
@@ -220,8 +220,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             try {
               const dbUsers = await db.select().from(users).where(eq(users.id, token.sub as string)).limit(1)
               if (dbUsers.length > 0) {
-                const dbUser = dbUsers[0] as { role: string | null; businessId?: string | null }
-                if (!token.role) token.role = ((dbUser.role ?? 'employee') as string).toLowerCase() as UserRole
+                const dbUser = dbUsers[0]
+                if (!token.role) token.role = (dbUser.role?.toLowerCase() ?? 'employee') as UserRole
                 if (!token.businessId) token.businessId = dbUser.businessId ?? (token.sub as string)
                 if (!token.businessName) token.businessName = 'Knowledge Base'
               }
