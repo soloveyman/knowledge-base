@@ -52,6 +52,28 @@ const ACCEPTED_FILE_TYPES = {
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB (images are stored separately in Spaces, only text content is counted)
 
+/**
+ * Extract file extension from filename or MIME type
+ * Returns 'docx', 'xlsx', or 'pdf' to match the schema enum
+ */
+function getFileType(fileName: string, mimeType?: string): 'docx' | 'xlsx' | 'pdf' | null {
+  // First, try to extract from filename (most reliable, especially for Cyrillic names)
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  if (extension === 'docx' || extension === 'xlsx' || extension === 'pdf') {
+    return extension
+  }
+  
+  // Fallback to MIME type mapping
+  if (mimeType) {
+    const mappedExt = ACCEPTED_FILE_TYPES[mimeType as keyof typeof ACCEPTED_FILE_TYPES]
+    if (mappedExt === '.docx') return 'docx'
+    if (mappedExt === '.xlsx') return 'xlsx'
+    if (mimeType === 'application/pdf') return 'pdf'
+  }
+  
+  return null
+}
+
 function DocImportPageInner() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -606,10 +628,15 @@ function DocImportPageInner() {
           }
           
           // Calculate size without images
+          const extractedFileType = getFileType(file.name, file.type)
+          if (!extractedFileType) {
+            throw new Error(`Unsupported file type for "${file.name}". Only DOCX, XLSX, and PDF files are supported.`)
+          }
+          
           const requestBodyWithoutImages = {
             title: file.name,
             originalFileName: file.name,
-            fileType: file.type.split('/')[1],
+            fileType: extractedFileType,
             fileUrl: file.fileUrl || null,
             fileSize: file.size,
             parsedContent: {
@@ -676,7 +703,7 @@ function DocImportPageInner() {
             requestBody = {
               title: file.name,
               originalFileName: file.name,
-              fileType: file.type.split('/')[1],
+              fileType: extractedFileType,
               fileUrl: file.fileUrl || null,
               fileSize: file.size,
               parsedContent: {
