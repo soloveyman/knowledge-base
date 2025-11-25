@@ -81,13 +81,21 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
   const loadOwnersData = async () => {
     try {
       const response = await fetch('/api/super-admin/subscriptions', { cache: 'no-store' });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const result = await response.json();
       
-      if (result.success) {
+      if (result.success && result.data) {
         setOwners(result.data.owners || []);
+      } else {
+        throw new Error(result.message || 'Failed to load owners data');
       }
     } catch (error) {
       console.error('Failed to load owners data:', error);
+      toast.error('Failed to refresh owners data. Please try again.');
     }
   };
 

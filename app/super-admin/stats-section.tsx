@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, Users, TrendingUp, Crown } from "lucide-react"
+import { DollarSign, Users, TrendingUp, Crown, AlertCircle } from "lucide-react"
 import { db, users, subscriptions, subscriptionPlans } from "@/lib/db"
 import { eq, sql } from "drizzle-orm"
 import type { SubscriptionStats } from "./super-admin-client"
@@ -120,9 +120,9 @@ async function fetchStats(): Promise<SubscriptionStats> {
 }
 
 export async function StatsSection() {
-  const stats = await fetchStats()
-
-  return (
+  try {
+    const stats = await fetchStats()
+    return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -170,6 +170,23 @@ export async function StatsSection() {
         </CardContent>
       </Card>
     </div>
-  )
+    )
+  } catch (error) {
+    console.error('Error fetching stats:', error)
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">Error</CardTitle>
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl sm:text-2xl font-bold text-destructive">Failed to load stats</div>
+            <p className="text-xs text-muted-foreground">Please refresh the page</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 }
 

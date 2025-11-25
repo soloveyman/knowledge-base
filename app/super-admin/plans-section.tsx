@@ -24,8 +24,12 @@ const fetchPlansCached = cache(async (): Promise<SubscriptionPlan[]> => {
 })
 
 export async function PlansSection() {
-  const plans = await fetchPlansCached()
-
-  return plans
+  try {
+    const plans = await fetchPlansCached()
+    return plans
+  } catch (error) {
+    console.error('Error fetching plans:', error)
+    return []
+  }
 }
 

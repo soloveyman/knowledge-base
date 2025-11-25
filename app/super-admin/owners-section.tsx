@@ -108,7 +108,7 @@ async function fetchOwners(): Promise<OwnerSubscription[]> {
           id: planData.id,
           name: planData.name,
           displayName: planData.displayName,
-          price: planData.price || 0,
+          price: typeof planData.price === 'number' ? planData.price : Number(planData.price) || 0,
           currency: planData.currency || 'USD',
         } : null,
         subscription: subscriptionData ? {
@@ -129,8 +129,12 @@ async function fetchOwners(): Promise<OwnerSubscription[]> {
 }
 
 export async function OwnersSection() {
-  const owners = await fetchOwners()
-
-  return owners
+  try {
+    const owners = await fetchOwners()
+    return owners
+  } catch (error) {
+    console.error('Error fetching owners:', error)
+    return []
+  }
 }
 

@@ -45,7 +45,12 @@ export default async function SuperAdminPage() {
   }
 
   // Fetch plans early (cached, static) - no Suspense needed
-  const plans = await PlansSection()
+  let plans: Awaited<ReturnType<typeof PlansSection>> = []
+  try {
+    plans = await PlansSection()
+  } catch (error) {
+    console.error('Error loading plans:', error)
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -76,12 +81,21 @@ export default async function SuperAdminPage() {
 
 // Separate component to fetch owners and pass to client
 async function OwnersWrapper({ initialPlans }: { initialPlans: Awaited<ReturnType<typeof PlansSection>> }) {
-  const owners = await OwnersSection()
-
-  return (
-    <SuperAdminClient 
-      initialOwners={owners}
-      initialPlans={initialPlans}
-    />
-  )
+  try {
+    const owners = await OwnersSection()
+    return (
+      <SuperAdminClient 
+        initialOwners={owners}
+        initialPlans={initialPlans}
+      />
+    )
+  } catch (error) {
+    console.error('Error loading owners:', error)
+    return (
+      <SuperAdminClient 
+        initialOwners={[]}
+        initialPlans={initialPlans}
+      />
+    )
+  }
 }
