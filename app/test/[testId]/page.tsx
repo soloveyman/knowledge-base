@@ -86,6 +86,7 @@ export default function TestPage() {
     // Load test data from API
     const loadTestData = async () => {
       try {
+        // Use cache: 'no-store' to always get fresh data, including updated answers
         const response = await fetch(`/api/tests/${testId}`, { cache: 'no-store' })
         const result = await response.json()
         
@@ -108,6 +109,9 @@ export default function TestPage() {
             if (q.type === 'multiple_choice') questionType = 'mcq'
             else if (q.type === 'true_false') questionType = 'tf'
             else if (q.type === 'text') questionType = 'complete'
+            
+            // Log loaded correct answers to verify updates are being loaded
+            console.log(`Loaded question ${q.id}: correctAnswer = "${q.correctAnswer}"`)
             
             return {
               id: q.id,

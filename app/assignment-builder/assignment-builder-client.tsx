@@ -252,7 +252,8 @@ export default function AssignmentBuilderClient({
             sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
               data: assignmentsResult.data.assignments,
               timestamp: Date.now(),
-              editedAssignmentId: editingAssignmentId // Mark this as an edit operation
+              editedAssignmentId: editingAssignmentId, // Mark this as an edit operation
+              trigger: 'assignment_updated' // Also mark for employees
             }))
           }
         } catch (error) {
@@ -305,7 +306,8 @@ export default function AssignmentBuilderClient({
           if (assignmentsResult.success && typeof window !== 'undefined') {
             sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
               data: assignmentsResult.data.assignments,
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              trigger: 'assignment_created' // Also mark for employees
             }))
           }
         } catch (error) {

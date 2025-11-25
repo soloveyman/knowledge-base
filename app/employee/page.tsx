@@ -124,7 +124,8 @@ function EmployeePageInner() {
   // Load assignments from API
   const loadAssignments = useCallback(async (preserveData = false) => {
     try {
-      const response = await fetch('/api/assignments', { cache: 'no-store' })
+      // Always use cache-busting to ensure fresh data, especially after edits
+      const response = await fetch(`/api/assignments?_t=${Date.now()}`, { cache: 'no-store' })
       const result = await response.json()
       
       if (result.success) {
@@ -287,9 +288,20 @@ function EmployeePageInner() {
       
       if (pendingAssignments) {
         try {
-          const { data, timestamp: storedTimestamp } = JSON.parse(pendingAssignments)
-          // Only use if timestamp is recent (within last 30 seconds)
-          if (Date.now() - storedTimestamp < 30000 && data && Array.isArray(data)) {
+          const parsed = JSON.parse(pendingAssignments)
+          const { data, timestamp: storedTimestamp, trigger } = parsed
+          
+          // Always reload from API if there's a trigger (assignment/test was updated/created)
+          // This ensures employees always get the latest data after edits
+          if (trigger) {
+            console.log(`Employee: ${trigger} detected, reloading assignments from API`)
+            loadAssignments(true).catch(console.error)
+            sessionStorage.removeItem('pendingAssignmentsRefresh')
+            return
+          }
+          
+          // Only use pre-fetched data if it's recent and has actual data
+          if (data && Array.isArray(data) && Date.now() - storedTimestamp < 30000) {
             console.log('Employee: Using pre-fetched assignments from sessionStorage, count:', data.length)
             const allAssignments: Assignment[] = data as Assignment[]
             setAssignments(allAssignments)
@@ -315,16 +327,22 @@ function EmployeePageInner() {
             // Clean up
             sessionStorage.removeItem('pendingAssignmentsRefresh')
           } else {
+            // Data is stale or missing, reload from API
+            console.log('Employee: Stale or missing assignment data, reloading from API')
+            loadAssignments(true).catch(console.error)
             sessionStorage.removeItem('pendingAssignmentsRefresh')
           }
         } catch (error) {
           console.error('Failed to parse pending assignments:', error)
+          // On error, force reload from API
+          loadAssignments(true).catch(console.error)
           sessionStorage.removeItem('pendingAssignmentsRefresh')
         }
       }
       
       if (pendingTests) {
         // Tests were updated, reload assignments to get updated test data
+        console.log('Employee: Test update detected, reloading assignments')
         loadAssignments(true).catch(console.error)
         sessionStorage.removeItem('pendingTestsRefresh')
       }

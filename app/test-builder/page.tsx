@@ -779,7 +779,16 @@ export default function TestBuilderPage() {
 
   const handleUpdateQuestionField = (questionId: string, field: keyof GeneratedQuestion, value: string | string[]) => {
     setGeneratedQuestions(prev => 
-      prev.map(q => q.id === questionId ? { ...q, [field]: value } : q)
+      prev.map(q => {
+        if (q.id === questionId) {
+          const updated = { ...q, [field]: value }
+          if (field === 'correct_answer') {
+            console.log(`Updated correct_answer for question ${questionId}: "${value}"`)
+          }
+          return updated
+        }
+        return q
+      })
     )
   }
 
@@ -863,7 +872,11 @@ export default function TestBuilderPage() {
             title: `${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'} - Test`,
             description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
             questionIds: generatedQuestions.map(q => q.id),
-            questions: generatedQuestions, // Send updated question data
+            questions: generatedQuestions.map(q => {
+              // Log correct answers being sent
+              console.log(`Saving question ${q.id} with correct_answer: "${q.correct_answer}"`)
+              return q
+            }), // Send updated question data
             type: testConfig.type,
             difficulty: testConfig.difficulty,
             locale: testConfig.locale,
@@ -899,6 +912,14 @@ export default function TestBuilderPage() {
               documents: documentsResult.data.documents,
               timestamp: Date.now(),
               editedTestId: editingTestId // Mark this as an edit operation
+            }))
+            
+            // Also set flag for employees to refresh assignments (since test was updated)
+            // This ensures employees see updated test data and reset results
+            sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
+              timestamp: Date.now(),
+              trigger: 'test_updated',
+              testId: editingTestId
             }))
           }
         } catch (error) {
@@ -964,6 +985,12 @@ export default function TestBuilderPage() {
               tests: testsResult.data.tests,
               documents: documentsResult.data.documents,
               timestamp: Date.now()
+            }))
+            
+            // Also set flag for employees to refresh assignments (since new test was created)
+            sessionStorage.setItem('pendingAssignmentsRefresh', JSON.stringify({
+              timestamp: Date.now(),
+              trigger: 'test_created'
             }))
           }
         } catch (error) {

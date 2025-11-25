@@ -300,6 +300,8 @@ export async function PUT(
             updatedAt: new Date()
           }
           
+          console.log(`Updating question ${q.id}: correctAnswer = "${finalCorrectAnswer}" (from "${correctAnswerValue}")`)
+          
           // Check if question exists (has id and it's a valid UUID)
           if (q.id && typeof q.id === 'string' && q.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
             // Update existing question
