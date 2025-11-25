@@ -43,7 +43,7 @@ function getPool(): Pool {
       ? (isVercel ? 3 : 5) // Production: very conservative
       : (isLocalhost ? 3 : (isVercel ? 5 : 10)) // Local: very conservative, others: more generous
     
-    pool = new Pool({
+    const newPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: maxConnections,
       idleTimeoutMillis: isLocalhost ? 5000 : 10000, // 5s for local, 10s for remote - more aggressive to free connections faster
@@ -73,19 +73,20 @@ function getPool(): Pool {
           log: (msg: string) => console.log('[DB Pool]', msg),
         }),
     });
+    pool = newPool;
 
     // Handle pool errors
-    pool.on('error', (err) => {
+    newPool.on('error', (err) => {
       console.error('Unexpected database pool error:', err);
       
       // Log pool state for "too many clients" errors
       if (err.message && err.message.includes('too many clients')) {
         console.error('⚠️ Database connection pool exhausted!', {
-          totalCount: pool.totalCount,
-          idleCount: pool.idleCount,
-          waitingCount: pool.waitingCount,
-          max: pool.options.max,
-          min: pool.options.min
+          totalCount: newPool.totalCount,
+          idleCount: newPool.idleCount,
+          waitingCount: newPool.waitingCount,
+          max: newPool.options.max,
+          min: newPool.options.min
         });
       }
     });
@@ -93,19 +94,19 @@ function getPool(): Pool {
     // Handle connection events for monitoring
     const shouldLog = process.env.DEBUG_DB === 'true' || process.env.NODE_ENV === 'production'
     if (shouldLog) {
-      pool.on('connect', (client) => {
+      newPool.on('connect', (client) => {
         console.log('[DB Pool] New client connected', {
-          totalCount: pool.totalCount,
-          idleCount: pool.idleCount,
-          waitingCount: pool.waitingCount
+          totalCount: newPool.totalCount,
+          idleCount: newPool.idleCount,
+          waitingCount: newPool.waitingCount
         });
       });
 
-      pool.on('remove', () => {
+      newPool.on('remove', () => {
         console.log('[DB Pool] Client removed', {
-          totalCount: pool.totalCount,
-          idleCount: pool.idleCount,
-          waitingCount: pool.waitingCount
+          totalCount: newPool.totalCount,
+          idleCount: newPool.idleCount,
+          waitingCount: newPool.waitingCount
         });
       });
       
@@ -113,11 +114,11 @@ function getPool(): Pool {
       if (process.env.NODE_ENV === 'production') {
         setInterval(() => {
           console.log('[DB Pool] State:', {
-            totalCount: pool.totalCount,
-            idleCount: pool.idleCount,
-            waitingCount: pool.waitingCount,
-            max: pool.options.max,
-            min: pool.options.min
+            totalCount: newPool.totalCount,
+            idleCount: newPool.idleCount,
+            waitingCount: newPool.waitingCount,
+            max: newPool.options.max,
+            min: newPool.options.min
           });
         }, 5 * 60 * 1000); // Every 5 minutes
       }

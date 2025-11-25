@@ -25,7 +25,7 @@ function getPool(): Pool {
       ? (isVercel ? 3 : 5) // Production: very conservative
       : (isLocalhost ? 3 : (isVercel ? 5 : 10)) // Local: very conservative, others: more generous
     
-    pool = new Pool({
+    const newPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: maxConnections,
       idleTimeoutMillis: isLocalhost ? 5000 : 10000, // 5s for local, 10s for remote - more aggressive to free connections faster
@@ -41,19 +41,20 @@ function getPool(): Pool {
           ? { rejectUnauthorized: false }
           : false,
     });
+    pool = newPool;
     
     // Handle pool errors
-    pool.on('error', (err) => {
+    newPool.on('error', (err) => {
       console.error('Unexpected database pool error (simple-connection):', err);
       
       // Log pool state for "too many clients" errors
       if (err.message && err.message.includes('too many clients')) {
         console.error('⚠️ Database connection pool exhausted (simple-connection)!', {
-          totalCount: pool.totalCount,
-          idleCount: pool.idleCount,
-          waitingCount: pool.waitingCount,
-          max: pool.options.max,
-          min: pool.options.min
+          totalCount: newPool.totalCount,
+          idleCount: newPool.idleCount,
+          waitingCount: newPool.waitingCount,
+          max: newPool.options.max,
+          min: newPool.options.min
         });
       }
     });
