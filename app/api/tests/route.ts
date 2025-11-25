@@ -359,38 +359,64 @@ export async function POST(request: Request) {
               const correctAnswerValue = q.correct_answer ?? q.correctAnswer ?? ''
               
               // Validate correct answer for multiple choice questions
+              // Indices start from 1 (A=1, B=2, C=3, D=4)
               let finalCorrectAnswer = correctAnswerValue
-              if (q.type === 'mcq' && q.choices && q.choices.length > 0) {
-                // If correct answer is a number string (index), validate it
-                if (/^\d+$/.test(correctAnswerValue)) {
-                  const index = parseInt(correctAnswerValue, 10)
-                  if (index < 0 || index >= q.choices.length) {
-                    console.warn(`Question ${index}: Invalid correct_answer index ${index}, using first option (0)`)
-                    finalCorrectAnswer = '0'
+              if ((q.type === 'mcq' || q.type === 'mcq_multi') && q.choices && q.choices.length > 0) {
+                // If correct answer is a letter (A, B, C, D), convert to 1-based index
+                if (/^[A-Z]$/.test(correctAnswerValue)) {
+                  const letterIndex = correctAnswerValue.charCodeAt(0) - 65 // A=0, B=1, C=2, D=3
+                  const oneBasedIndex = letterIndex + 1 // A=1, B=2, C=3, D=4
+                  if (oneBasedIndex >= 1 && oneBasedIndex <= q.choices.length) {
+                    finalCorrectAnswer = String(oneBasedIndex)
+                    console.log(`Question ${index}: Converted letter "${correctAnswerValue}" to index ${oneBasedIndex}`)
                   } else {
-                    finalCorrectAnswer = correctAnswerValue // Keep as string index
+                    console.warn(`Question ${index}: Invalid letter "${correctAnswerValue}", using first option (1)`)
+                    finalCorrectAnswer = '1'
                   }
-                } else if (correctAnswerValue && !/^[A-Z]$/.test(correctAnswerValue)) {
-                  // If it's not a letter (A-D), try to find it in choices
+                }
+                // If correct answer is a number string (index), validate it (1-based)
+                else if (/^\d+$/.test(correctAnswerValue)) {
+                  const index = parseInt(correctAnswerValue, 10)
+                  if (index < 1 || index > q.choices.length) {
+                    console.warn(`Question ${index}: Invalid correct_answer index ${index}, using first option (1)`)
+                    finalCorrectAnswer = '1'
+                  } else {
+                    finalCorrectAnswer = correctAnswerValue // Keep as string index (1-based)
+                  }
+                } else if (correctAnswerValue) {
+                  // If it's text, try to find it in choices
                   const choiceIndex = q.choices.findIndex(
                     choice => choice.trim().toLowerCase() === correctAnswerValue.trim().toLowerCase()
                   )
                   if (choiceIndex >= 0) {
-                    finalCorrectAnswer = String(choiceIndex)
-                    console.log(`Question ${index}: Converted text answer "${correctAnswerValue}" to index ${choiceIndex}`)
+                    const oneBasedIndex = choiceIndex + 1 // Convert 0-based to 1-based
+                    finalCorrectAnswer = String(oneBasedIndex)
+                    console.log(`Question ${index}: Converted text answer "${correctAnswerValue}" to index ${oneBasedIndex}`)
                   } else {
-                    console.warn(`Question ${index}: Could not find correct answer "${correctAnswerValue}" in choices, using first option (0)`)
-                    finalCorrectAnswer = '0'
+                    console.warn(`Question ${index}: Could not find correct answer "${correctAnswerValue}" in choices, using first option (1)`)
+                    finalCorrectAnswer = '1'
                   }
                 }
+              }
+              
+              // Convert frontend question types to database types
+              let dbType = 'multiple_choice' // default
+              if (q.type === 'mcq' || q.type === 'mcq_multi') {
+                dbType = 'multiple_choice'
+              } else if (q.type === 'tf') {
+                dbType = 'true_false'
+              } else if (q.type === 'complete' || q.type === 'cloze') {
+                dbType = 'text'
+              } else if (q.type === 'match' || q.type === 'order' || q.type === 'mixed') {
+                dbType = 'multiple_choice' // These complex types are stored as multiple_choice for now
+              } else if (q.type === 'multiple_choice' || q.type === 'true_false' || q.type === 'text') {
+                dbType = q.type // Already in database format
               }
               
               const processed = {
                 title: q.prompt || q.title || 'Untitled Question',
                 content: q.prompt || q.content || '',
-                type: q.type === 'mcq' ? 'multiple_choice' : 
-                      q.type === 'tf' ? 'true_false' : 
-                      q.type === 'complete' ? 'text' : 'multiple_choice',
+                type: dbType,
                 options: q.choices || null,
                 correctAnswer: finalCorrectAnswer,
                 explanation: q.explanation || '',

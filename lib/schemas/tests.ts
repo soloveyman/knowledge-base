@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Zod schemas for Tests API routes
  */
 
-export const questionTypeSchema = z.enum(['mcq', 'tf', 'complete', 'multiple_choice', 'true_false', 'text'])
+export const questionTypeSchema = z.enum(['mcq', 'mcq_multi', 'tf', 'complete', 'cloze', 'match', 'order', 'mixed', 'multiple_choice', 'true_false', 'text'])
 
 export const questionSchema = z.object({
   id: z.string().optional(),

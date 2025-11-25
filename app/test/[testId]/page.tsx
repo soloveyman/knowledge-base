@@ -204,11 +204,27 @@ export default function TestPage() {
         if (/^[A-Z]$/.test(question.correct_answer)) {
           correctAnswerLetter = question.correct_answer.toUpperCase()
         } 
-        // If correct_answer is a numeric index (0, 1, 2, 3)
+        // If correct_answer is a numeric index (1, 2, 3, 4) - 1-based
+        // Also handle legacy 0-based indices (0, 1, 2, 3) for backward compatibility
         else if (/^\d+$/.test(question.correct_answer)) {
           const index = parseInt(question.correct_answer, 10)
-          if (question.choices && index >= 0 && index < question.choices.length) {
-            correctAnswerLetter = String.fromCharCode(65 + index)
+          if (question.choices) {
+            let zeroBasedIndex: number
+            // Handle 1-based indices (1, 2, 3, 4) - new format
+            if (index >= 1 && index <= question.choices.length) {
+              zeroBasedIndex = index - 1
+            }
+            // Handle legacy 0-based indices (0, 1, 2, 3) - old format for backward compatibility
+            else if (index === 0 && question.choices.length > 0) {
+              zeroBasedIndex = 0
+            }
+            else {
+              zeroBasedIndex = -1 // Invalid
+            }
+            
+            if (zeroBasedIndex >= 0 && zeroBasedIndex < question.choices.length) {
+              correctAnswerLetter = String.fromCharCode(65 + zeroBasedIndex)
+            }
           }
         }
         // If correct_answer matches one of the choice texts, find its index
