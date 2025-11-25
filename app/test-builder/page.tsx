@@ -913,11 +913,11 @@ export default function TestBuilderPage() {
           body: JSON.stringify({
             title: `${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'} - Test`,
             description: `Test generated from ${selectedDocument.title || selectedDocument.originalFileName || 'Untitled Document'}`,
-            moduleId: selectedDocument.id,
+            moduleId: null, // Documents are not modules
             questions: generatedQuestions, // Send the actual question objects
-            type: testConfig.type,
-            difficulty: testConfig.difficulty,
-            locale: testConfig.locale,
+            type: testConfig.type || null,
+            difficulty: testConfig.difficulty || null,
+            locale: testConfig.locale && testConfig.locale.length === 2 ? testConfig.locale : null,
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
@@ -930,7 +930,18 @@ export default function TestBuilderPage() {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ message: 'Failed to create test', error: 'Unknown error' }))
           console.error('Test creation error:', errorData)
-          throw new Error(errorData.message || errorData.error || 'Failed to create test')
+          // Log detailed validation errors if available
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            console.error('Validation errors:', errorData.errors.map((err: { path: string[]; message: string }) => 
+              `${err.path.join('.')}: ${err.message}`
+            ))
+          }
+          const errorMessage = errorData.errors && Array.isArray(errorData.errors)
+            ? errorData.errors.map((err: { path: string[]; message: string }) => 
+                `${err.path.join('.')}: ${err.message}`
+              ).join(', ')
+            : (errorData.message || errorData.error || 'Failed to create test')
+          throw new Error(errorMessage)
         }
 
         toast.success(`Test saved successfully! ${generatedQuestions.length} questions saved.`)
