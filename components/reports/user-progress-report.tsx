@@ -840,8 +840,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                   const choices = question.choices || question.options || []
                                                   
                                                   // Handle text/complete questions
-                                                  if (question.type === 'complete' || question.type === 'text' || question.type === 'text') {
-                                                    const normalizedUser = userAnswer.toLowerCase().trim()
+                                                  if (question.type === 'complete' || question.type === 'text') {
+                                                    // For text questions, userAnswer should be a string
+                                                    const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                      ? userAnswerValue.join(' ').trim() 
+                                                      : (typeof userAnswerValue === 'string' ? userAnswerValue.trim() : '')
+                                                    const normalizedUser = userAnswerStr.toLowerCase()
                                                     const normalizedCorrect = correctAnswer.toLowerCase().trim()
                                                     return normalizedUser === normalizedCorrect
                                                   }
@@ -867,23 +871,35 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                           letter = String.fromCharCode(65 + zeroBasedIndex)
                                                         }
                                                       }
+                                                      // If it matches one of the choice texts
+                                                      else if (choices.length > 0) {
+                                                        const choiceIndex = choices.findIndex(
+                                                          (choice: string) => choice.trim().toLowerCase() === part.trim().toLowerCase()
+                                                        )
+                                                        if (choiceIndex >= 0) {
+                                                          letter = String.fromCharCode(65 + choiceIndex)
+                                                        }
+                                                      }
                                                       
                                                       if (letter) {
                                                         correctAnswerLetters.push(letter)
                                                       }
                                                     }
                                                     
-                                                    // Get user answers
-                                                    const userAnswerParts = userAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
-                                                    const userAnswerLetters = userAnswerParts.map(a => a.toUpperCase())
+                                                    // Get user answers - handle both array and string formats
+                                                    const userAnswers = Array.isArray(userAnswerValue)
+                                                      ? userAnswerValue.map(a => a.toUpperCase())
+                                                      : (userAnswer 
+                                                          ? userAnswer.split(/[,;\s]+/).filter(p => p.length > 0).map(a => a.toUpperCase())
+                                                          : [])
                                                     
                                                     // Check if all correct answers are selected and no incorrect ones
                                                     const correctAnswersSet = new Set(correctAnswerLetters)
-                                                    const userAnswersSet = new Set(userAnswerLetters)
+                                                    const userAnswersSet = new Set(userAnswers)
                                                     
                                                     const allCorrectSelected = correctAnswerLetters.every(letter => userAnswersSet.has(letter))
-                                                    const noIncorrectSelected = userAnswerLetters.every(letter => correctAnswersSet.has(letter))
-                                                    const sameCount = correctAnswerLetters.length === userAnswerLetters.length
+                                                    const noIncorrectSelected = userAnswers.every(letter => correctAnswersSet.has(letter))
+                                                    const sameCount = correctAnswerLetters.length === userAnswers.length
                                                     
                                                     return allCorrectSelected && noIncorrectSelected && sameCount
                                                   }
@@ -919,22 +935,34 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                     }
                                                   }
                                                   // Handle true/false questions
-                                                  else if (question.type === 'tf' || question.type === 'true_false') {
+                                                  if (question.type === 'tf' || question.type === 'true_false') {
                                                     const normalizedCorrect = correctAnswer.trim().toLowerCase()
                                                     if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
-                                                      correctAnswerLetter = normalizedCorrect
+                                                      // For true/false, userAnswer should be a string "true" or "false"
+                                                      const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                        ? userAnswerValue[0] 
+                                                        : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
+                                                      const normalizedUser = userAnswerStr.trim().toLowerCase()
+                                                      return normalizedUser === normalizedCorrect
                                                     }
                                                   }
                                                   
-                                                  // Compare normalized answers
+                                                  // Compare normalized answers for single choice questions
                                                   if (correctAnswerLetter) {
-                                                    const normalizedUser = userAnswer.toUpperCase()
+                                                    // For single choice, userAnswer should be a single value (string or first element of array)
+                                                    const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                      ? userAnswerValue[0] 
+                                                      : (typeof userAnswerValue === 'string' ? userAnswerValue : '')
+                                                    const normalizedUser = userAnswerStr.toUpperCase().trim()
                                                     return normalizedUser === correctAnswerLetter.toUpperCase()
                                                   }
                                                   
                                                   // Fallback: direct string comparison
+                                                  const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                    ? userAnswerValue.join(' ') 
+                                                    : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
                                                   const normalize = (val: string) => val.toLowerCase().trim()
-                                                  return normalize(correctAnswer) === normalize(userAnswer)
+                                                  return normalize(correctAnswer) === normalize(userAnswerStr)
                                                 })()
                                               : null // Unknown if no correct answer available
                                             
