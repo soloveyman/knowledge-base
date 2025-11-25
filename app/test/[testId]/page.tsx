@@ -386,19 +386,18 @@ export default function TestPage() {
       }
     })
 
-    // Calculate percentage based on questions with correct answers defined
-    // If no questions have correct answers, use total questions as fallback
-    const totalQuestions = totalQuestionsWithAnswers > 0 ? totalQuestionsWithAnswers : testData.questions.length
-    const percentage = totalQuestions > 0 
-      ? Math.round((correctAnswers / totalQuestions) * 100)
+    // Calculate percentage based ONLY on questions with correct answers defined
+    // Always use totalQuestionsWithAnswers (questions that can be scored)
+    const percentage = totalQuestionsWithAnswers > 0 
+      ? Math.round((correctAnswers / totalQuestionsWithAnswers) * 100)
       : 0
     
     console.log('Score calculation:', {
       correctAnswers,
       totalQuestionsWithAnswers,
-      totalQuestions,
       allQuestions: testData.questions.length,
-      percentage
+      percentage,
+      formula: `${correctAnswers} / ${totalQuestionsWithAnswers} * 100 = ${percentage}%`
     })
     
     setScore(percentage)
