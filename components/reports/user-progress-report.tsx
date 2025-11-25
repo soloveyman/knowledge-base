@@ -832,6 +832,14 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                               ? (() => {
                                                   const correctAnswer = question.correctAnswer
                                                   const userAnswerValue: string | string[] = answer
+                                                  
+                                                  // Debug logging
+                                                  console.log(`Checking answer for question ${questionId}:`, {
+                                                    questionType: question.type,
+                                                    correctAnswer,
+                                                    userAnswer: userAnswerValue,
+                                                    choices: question.choices || question.options
+                                                  })
                                                   const userAnswer = typeof userAnswerValue === 'string' 
                                                     ? userAnswerValue.trim() 
                                                     : (Array.isArray(userAnswerValue) 
@@ -945,13 +953,25 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                   }
                                                   // Handle true/false questions
                                                   if (question.type === 'tf' || question.type === 'true_false') {
-                                                    const normalizedCorrect = correctAnswer.trim().toLowerCase()
+                                                    // Normalize correct answer (can be "true"/"false" or Russian "правда"/"ложь")
+                                                    const normalizeTrueFalse = (val: string): string => {
+                                                      const normalized = val.trim().toLowerCase()
+                                                      if (normalized === 'true' || normalized === 'правда' || normalized === 'верно' || normalized === 'да') {
+                                                        return 'true'
+                                                      }
+                                                      if (normalized === 'false' || normalized === 'ложь' || normalized === 'неверно' || normalized === 'нет') {
+                                                        return 'false'
+                                                      }
+                                                      return normalized
+                                                    }
+                                                    
+                                                    const normalizedCorrect = normalizeTrueFalse(correctAnswer)
                                                     if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
-                                                      // For true/false, userAnswer should be a string "true" or "false"
+                                                      // For true/false, userAnswer should be a string "true" or "false" (or Russian equivalent)
                                                       const userAnswerStr = Array.isArray(userAnswerValue) 
                                                         ? userAnswerValue[0] 
                                                         : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
-                                                      const normalizedUser = userAnswerStr.trim().toLowerCase()
+                                                      const normalizedUser = normalizeTrueFalse(userAnswerStr)
                                                       return normalizedUser === normalizedCorrect
                                                     }
                                                   }
@@ -971,9 +991,17 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                     ? userAnswerValue.join(' ') 
                                                     : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
                                                   const normalize = (val: string) => val.toLowerCase().trim()
-                                                  return normalize(correctAnswer) === normalize(userAnswerStr)
+                                                  const result = normalize(correctAnswer) === normalize(userAnswerStr)
+                                                  console.log(`Fallback comparison for question ${questionId}:`, {
+                                                    normalizedCorrect: normalize(correctAnswer),
+                                                    normalizedUser: normalize(userAnswerStr),
+                                                    result
+                                                  })
+                                                  return result
                                                 })()
                                               : null // Unknown if no correct answer available
+                                            
+                                            console.log(`Final isCorrect for question ${questionId}:`, isCorrect)
                                             
                                             // Determine color based on correctness
                                             const answerColorClass = isCorrect === true
