@@ -377,14 +377,27 @@ export default function TestBuilderPage() {
             options?: string[]
             correctAnswer?: string
             explanation?: string
-          }) => ({
-            id: q.id,
-            type: q.type || 'mcq',
-            prompt: q.content || q.title || 'Question',
-            choices: q.options || ['A', 'B', 'C', 'D'],
-            correct_answer: q.correctAnswer || 'A',
-            explanation: q.explanation || 'No explanation provided'
-          }))
+          }) => {
+            // Preserve the correct answer from database, don't use default
+            // If correctAnswer is empty/null, it means the question wasn't properly saved
+            const correctAnswer = q.correctAnswer || ''
+            
+            console.log('Loading question:', {
+              id: q.id,
+              correctAnswer: q.correctAnswer,
+              type: q.type,
+              options: q.options
+            })
+            
+            return {
+              id: q.id,
+              type: q.type || 'mcq',
+              prompt: q.content || q.title || 'Question',
+              choices: q.options || ['A', 'B', 'C', 'D'],
+              correct_answer: correctAnswer, // Don't use default - preserve what's in DB
+              explanation: q.explanation || 'No explanation provided'
+            }
+          })
           setGeneratedQuestions(transformedQuestions)
           setOriginalQuestionCount(transformedQuestions.length)
         } else {

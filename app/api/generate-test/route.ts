@@ -229,11 +229,23 @@ export async function POST(request: Request) {
       explanation?: string
     }
     
-    // Add unique IDs to questions
-    const questionsWithIds = generatedQuestions.map((q: GeneratedQuestionItem, index: number) => ({
-      ...q,
-      id: q.id || `q_${Date.now()}_${index}`
-    }))
+    // Add unique IDs to questions and log correct answers
+    const questionsWithIds = generatedQuestions.map((q: GeneratedQuestionItem, index: number) => {
+      const questionWithId = {
+        ...q,
+        id: q.id || `q_${Date.now()}_${index}`
+      }
+      
+      // Log correct answer for debugging
+      console.log(`Question ${index} from Grok:`, {
+        type: questionWithId.type,
+        correct_answer: questionWithId.correct_answer,
+        choices: questionWithId.choices,
+        explanation: questionWithId.explanation?.substring(0, 50) + '...'
+      })
+      
+      return questionWithId
+    })
 
     return NextResponse.json({
       success: true,

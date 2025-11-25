@@ -350,6 +350,38 @@ export async function POST(request: Request) {
           .map((q: QuestionInput, index: number) => {
             try {
               console.log(`Processing question ${index}:`, q)
+              console.log(`Question ${index} correct_answer:`, q.correct_answer, 'correctAnswer:', q.correctAnswer)
+              
+              // Get correct answer - prioritize correct_answer over correctAnswer
+              const correctAnswerValue = q.correct_answer ?? q.correctAnswer ?? ''
+              
+              // Validate correct answer for multiple choice questions
+              let finalCorrectAnswer = correctAnswerValue
+              if (q.type === 'mcq' && q.choices && q.choices.length > 0) {
+                // If correct answer is a number string (index), validate it
+                if (/^\d+$/.test(correctAnswerValue)) {
+                  const index = parseInt(correctAnswerValue, 10)
+                  if (index < 0 || index >= q.choices.length) {
+                    console.warn(`Question ${index}: Invalid correct_answer index ${index}, using first option (0)`)
+                    finalCorrectAnswer = '0'
+                  } else {
+                    finalCorrectAnswer = correctAnswerValue // Keep as string index
+                  }
+                } else if (correctAnswerValue && !/^[A-Z]$/.test(correctAnswerValue)) {
+                  // If it's not a letter (A-D), try to find it in choices
+                  const choiceIndex = q.choices.findIndex(
+                    choice => choice.trim().toLowerCase() === correctAnswerValue.trim().toLowerCase()
+                  )
+                  if (choiceIndex >= 0) {
+                    finalCorrectAnswer = String(choiceIndex)
+                    console.log(`Question ${index}: Converted text answer "${correctAnswerValue}" to index ${choiceIndex}`)
+                  } else {
+                    console.warn(`Question ${index}: Could not find correct answer "${correctAnswerValue}" in choices, using first option (0)`)
+                    finalCorrectAnswer = '0'
+                  }
+                }
+              }
+              
               const processed = {
                 title: q.prompt || q.title || 'Untitled Question',
                 content: q.prompt || q.content || '',
@@ -357,13 +389,13 @@ export async function POST(request: Request) {
                       q.type === 'tf' ? 'true_false' : 
                       q.type === 'complete' ? 'text' : 'multiple_choice',
                 options: q.choices || null,
-                correctAnswer: q.correct_answer || q.correctAnswer || '',
+                correctAnswer: finalCorrectAnswer,
                 explanation: q.explanation || '',
                 difficulty: 'medium',
                 moduleId: null, // Documents are not modules, so set to null
                 createdBy: session.user.id
               }
-              console.log(`Processed question ${index}:`, processed)
+              console.log(`Processed question ${index} - correctAnswer:`, processed.correctAnswer)
               return processed
             } catch (mapError) {
               console.error(`Error processing question ${index}:`, mapError)
