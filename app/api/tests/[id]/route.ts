@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, tests, questions, assignments, assignmentUsers, testAttempts, users } from '@/lib/db'
+import { db, tests, questions, assignments, assignmentUsers, testAttempts, progress, users } from '@/lib/db'
 import { eq, and, inArray } from 'drizzle-orm'
 import { auth, hasPermission } from '@/lib/auth'
 
@@ -438,6 +438,27 @@ export async function DELETE(
         assignmentCount: relatedAssignments.length,
         assignments: relatedAssignments
       }, { status: 400 })
+    }
+    
+    // Delete related records first (they reference the test via foreign key)
+    // This must be done before deleting the test to avoid foreign key constraint violation
+    
+    // Delete test attempts
+    try {
+      await db.delete(testAttempts).where(eq(testAttempts.testId, id))
+      console.log(`✅ Deleted test attempts for test ${id}`)
+    } catch (error) {
+      console.warn(`⚠️ Failed to delete test attempts (may not exist):`, error)
+      // Continue with deletion - test attempts might not exist or might be deleted via cascade
+    }
+    
+    // Delete progress records
+    try {
+      await db.delete(progress).where(eq(progress.testId, id))
+      console.log(`✅ Deleted progress records for test ${id}`)
+    } catch (error) {
+      console.warn(`⚠️ Failed to delete progress records (may not exist):`, error)
+      // Continue with deletion - progress records might not exist
     }
     
     // Delete associated questions first (only if they are valid UUIDs)
