@@ -200,6 +200,18 @@ export default function TestPage() {
   const handleSubmitTest = useCallback(async () => {
     if (!testData) return
 
+    // Helper function to normalize true/false values (English and Russian)
+    const normalizeTrueFalse = (val: string): string | null => {
+      const normalized = val.trim().toLowerCase()
+      // English
+      if (normalized === 'true') return 'true'
+      if (normalized === 'false') return 'false'
+      // Russian
+      if (normalized === 'правда' || normalized === 'верно' || normalized === 'да') return 'true'
+      if (normalized === 'ложь' || normalized === 'неверно' || normalized === 'нет') return 'false'
+      return null
+    }
+
     let correctAnswers = 0
     let totalQuestionsWithAnswers = 0 // Count only questions with correct_answer defined
     
@@ -357,21 +369,31 @@ export default function TestPage() {
           }
           // Handle true/false questions
           else if (question.type === 'tf') {
-            // Normalize true/false values
-            const normalizedCorrect = question.correct_answer.trim().toLowerCase()
-            if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
+            const normalizedCorrect = normalizeTrueFalse(question.correct_answer)
+            if (normalizedCorrect) {
               correctAnswerLetter = normalizedCorrect
             }
           }
           
           // Compare normalized answers
           const userAnswerStr = Array.isArray(userAnswer) ? userAnswer[0] : userAnswer
-          if (correctAnswerLetter && userAnswerStr && userAnswerStr.toLowerCase() === correctAnswerLetter.toLowerCase()) {
+          
+          // For true/false questions, normalize user answer too
+          let normalizedUserAnswer = userAnswerStr
+          if (question.type === 'tf' && userAnswerStr) {
+            const normalized = normalizeTrueFalse(userAnswerStr)
+            if (normalized) {
+              normalizedUserAnswer = normalized
+            }
+          }
+          
+          if (correctAnswerLetter && normalizedUserAnswer && normalizedUserAnswer.toLowerCase() === correctAnswerLetter.toLowerCase()) {
             isCorrect = true
             correctAnswers++
           } else {
             console.log(`Question ${index + 1} (${question.id}): Single-choice answer incorrect`, {
               userAnswer: userAnswerStr,
+              normalizedUserAnswer,
               correctAnswerLetter,
               questionType: question.type,
               correctAnswer: question.correct_answer,
