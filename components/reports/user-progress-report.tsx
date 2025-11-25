@@ -572,7 +572,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
   }
 
   // Format answer for display with translations
-  const formatAnswer = (answer: any): string => {
+  type AnswerValue = string | number | boolean | null | undefined | AnswerValue[] | Record<string, AnswerValue>
+  const formatAnswer = (answer: AnswerValue): string => {
     // Handle null/undefined
     if (answer === null || answer === undefined) {
       return '-'

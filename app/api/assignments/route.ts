@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db, assignments, documents, modules, assignmentUsers, testAttempts, users } from '@/lib/db'
-import { eq, and, desc, inArray } from 'drizzle-orm'
+import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { InferSelectModel } from 'drizzle-orm'
 import { createAssignmentSchema } from '@/lib/schemas/assignments'
@@ -218,7 +218,7 @@ export async function POST(request: Request) {
     if (testId) {
       whereConditions.push(eq(assignments.testId, testId))
     } else {
-      whereConditions.push(eq(assignments.testId, null as unknown as string))
+      whereConditions.push(isNull(assignments.testId))
     }
     const existingAssignments = await db.select().from(assignments)
       .where(and(...whereConditions))

@@ -558,7 +558,7 @@ function OwnerPageInner() {
                   parsedContent: doc.parsedContent || null
                 }))
                 setDocumentsWithLog(transformedDocs)
-                syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                syncLocalStorageWithDatabase(transformedDocs)
                 sessionStorage.removeItem('pendingDocumentsRefresh')
                 if (!preserveData) {
                   setIsLoadingDocuments(false)
@@ -880,7 +880,7 @@ function OwnerPageInner() {
                           parsedContent: doc.parsedContent || null
                         }))
                         setDocumentsWithLog(transformedDocs)
-                        syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                        syncLocalStorageWithDatabase(transformedDocs)
                         sessionStorage.removeItem('pendingDocumentsRefresh')
                         lastLoadedTabRef.current = tab
                         isLoadingRef.current = false
@@ -1085,7 +1085,7 @@ function OwnerPageInner() {
                     setDocumentsWithLog(transformedDocs)
                     // Ensure localStorage is synced immediately
                     // Cast to Document[] type to match the utility function signature
-                    syncLocalStorageWithDatabase(transformedDocs as unknown as Array<{ id: string; name?: string; type?: string; [key: string]: unknown }>)
+                    syncLocalStorageWithDatabase(transformedDocs)
                     lastLoadedTabRef.current = tab
                   }
                   setIsLoadingDocuments(false)

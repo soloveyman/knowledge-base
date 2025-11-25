@@ -131,7 +131,7 @@ export function saveDocumentsToLocalStorage(documents: Document[]): void {
  * Removes any localStorage documents that don't exist in the database
  */
 export function syncLocalStorageWithDatabase(
-  databaseDocuments: Array<{ id: string; [key: string]: unknown }>
+  databaseDocuments: ReadonlyArray<{ id: string; [key: string]: unknown }>
 ): void {
   try {
     const localDocuments = getDocumentsFromLocalStorage()

@@ -4,6 +4,8 @@ import { eq, inArray, or } from "drizzle-orm"
 import { getTenantDb } from "@/lib/db/tenant"
 import { redirect } from "next/navigation"
 import AssignmentBuilderClient from "./assignment-builder-client"
+import type { TestEntity, UserEntity, DocumentEntity } from "@/types/api"
+import type { SavedTest, UserDisplay, DocumentDisplay } from "@/types/api"
 
 interface AssignmentBuilderPageProps {
   searchParams: Promise<{ edit?: string; returnTo?: string }>
@@ -167,7 +169,7 @@ export default async function AssignmentBuilderPage({ searchParams }: Assignment
   } : null
 
   // Transform tests to match SavedTest interface
-  const testsData = testsResult.success ? testsResult.data.tests.map((test: any) => {
+  const testsData: SavedTest[] = testsResult.success ? testsResult.data.tests.map((test: TestEntity) => {
     const questionIds = Array.isArray(test.questionIds) ? test.questionIds : []
     return {
       id: test.id,
@@ -183,18 +185,18 @@ export default async function AssignmentBuilderPage({ searchParams }: Assignment
     }
   }) : []
   
-  // Transform users to match User interface (add department if missing)
-  const usersData = usersResult.success ? usersResult.data.users.map((user: any) => ({
+  // Transform users to match User interface
+  const usersData: UserDisplay[] = usersResult.success ? usersResult.data.users.map((user: UserEntity) => ({
     id: user.id,
     name: user.name || '',
     email: user.email || '',
     role: user.role || 'employee',
     job: user.job || '',
-    department: user.department || '' // Add department field
+    // Note: department field doesn't exist in schema, but interface allows it as optional
   })) : []
   
   // Transform documents to match Document interface (convert null to undefined)
-  const documentsData = documentsResult.success ? documentsResult.data.documents.map((doc: any) => ({
+  const documentsData: DocumentDisplay[] = documentsResult.success ? documentsResult.data.documents.map((doc: DocumentEntity) => ({
     id: doc.id,
     originalFileName: doc.originalFileName ?? undefined,
     title: doc.title || '',
