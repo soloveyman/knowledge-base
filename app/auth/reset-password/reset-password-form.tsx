@@ -104,7 +104,7 @@ function ResetPasswordFormInner() {
       const data = await res.json().catch(() => ({}))
       
       if (!res.ok) {
-        toast.error(data.error || 'Failed to reset password', {
+        toast.error(data.error || t('errorOccurred'), {
           duration: 5000
         })
         setIsLoading(false)
@@ -113,7 +113,7 @@ function ResetPasswordFormInner() {
 
       setSuccess(true)
       setIsLoading(false)
-      toast.success(t('passwordResetSuccess') || 'Password reset successfully!', {
+      toast.success(t('passwordResetSuccess'), {
         duration: 3000
       })
       

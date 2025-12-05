@@ -76,8 +76,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Preconnect to external domains for faster resource loading */}
-        <link rel="preconnect" href="https://api.x.ai" />
+        <link rel="preconnect" href="https://api.x.ai" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://api.x.ai" />
+        {/* Preconnect to DigitalOcean Spaces for image loading */}
+        <link rel="preconnect" href="https://uppstaff.ams3.digitaloceanspaces.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://uppstaff.ams3.digitaloceanspaces.com" />
+        <link rel="preconnect" href="https://uppstaff.ams3.cdn.digitaloceanspaces.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://uppstaff.ams3.cdn.digitaloceanspaces.com" />
         {/* Font preloading is handled automatically by next/font */}
         <script
           dangerouslySetInnerHTML={{

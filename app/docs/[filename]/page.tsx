@@ -593,8 +593,8 @@ export default function DocumentViewer() {
             title: d.title
           })))
           
-          toast.error('Document not found', {
-            description: 'The requested document could not be found',
+          toast.error(t('documentNotFoundTitle'), {
+            description: t('documentNotFound'),
             duration: 5000
           })
           
@@ -623,8 +623,8 @@ export default function DocumentViewer() {
       } else {
         console.error('Failed to load documents:', result.message)
         
-        toast.error('Failed to load document', {
-          description: result.message || 'An error occurred while loading the document',
+        toast.error(t('failedToLoadDocument'), {
+          description: result.message || t('errorLoadingDocument'),
           duration: 5000
         })
         
@@ -653,8 +653,8 @@ export default function DocumentViewer() {
     } catch (error) {
       console.error('Error loading document:', error)
       
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load document'
-      toast.error('Error loading document', {
+      const errorMessage = error instanceof Error ? error.message : t('failedToLoadDocument')
+      toast.error(t('errorLoadingDocument'), {
         description: errorMessage,
         duration: 5000
       })

@@ -33,7 +33,7 @@ export function ForgotPasswordForm() {
       const data = await res.json().catch(() => ({}))
       
       if (!res.ok) {
-        toast.error(data.error || 'Failed to send reset link', {
+        toast.error(data.error || t('errorOccurred'), {
           duration: 5000
         })
         setIsLoading(false)
@@ -42,7 +42,7 @@ export function ForgotPasswordForm() {
 
       setSuccess(true)
       setIsLoading(false)
-      toast.success(t('resetLinkSent') || 'Reset link sent to your email', {
+      toast.success(t('resetLinkSent'), {
         duration: 5000
       })
     } catch (error) {

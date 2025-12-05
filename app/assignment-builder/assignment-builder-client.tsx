@@ -200,7 +200,7 @@ export default function AssignmentBuilderClient({
   const handleCreateAssignment = async () => {
     // Basic validation - check required fields
     if (!assignmentConfig.name.trim() || !assignmentConfig.documentId || assignmentConfig.selectedUsers.length === 0) {
-      toast.error("Please fill in all required fields", {
+      toast.error(t('pleaseFillAllRequiredFields'), {
         duration: 5000
       })
       return

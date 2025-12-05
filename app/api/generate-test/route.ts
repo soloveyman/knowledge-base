@@ -125,8 +125,11 @@ export async function POST(request: Request) {
             - CRITICAL: Generate questions of type "${grokParams?.type || 'mcq'}" ONLY:
               * If type is "mcq": Generate ONLY multiple choice questions (single answer) with exactly 4 choices each. Use correct_answer as a single index: "1", "2", "3", or "4"
               * If type is "mcq_multi": Generate ONLY multiple choice questions (multiple answers allowed) with exactly 4 choices each. Use correct_answer as comma-separated indices: "1,2", "1,3,4", "2,3", etc. (at least 2 correct answers required)
-              * If type is "tf": Generate ONLY true/false questions
-              * If type is "complete": Generate ONLY fill-in-the-blank questions (text completion)
+              * If type is "tf": Generate ONLY true/false questions. Use correct_answer as "true" or "false"
+              * If type is "complete": Generate ONLY fill-in-the-blank questions (text completion). Use correct_answer as the exact text answer (case-insensitive matching will be used)
+              * If type is "cloze": Generate ONLY cloze test questions (multiple blanks in text). Use correct_answer as comma-separated answers: "answer1,answer2,answer3" or as a single text if all blanks have the same answer
+              * If type is "match": Generate ONLY matching questions (match items from two lists). Provide choices as pairs to match. Use correct_answer as comma-separated indices in order: "1,2,3,4" (order matters)
+              * If type is "order": Generate ONLY ordering questions (arrange items in correct order). Provide choices as items to order. Use correct_answer as comma-separated indices in correct order: "1,2,3,4" (order matters)
               * If type is "mixed": Generate a MIX of question types (multiple choice, true/false, and fill-in-the-blank)
               * DO NOT mix question types unless type is "mixed" - all questions must be of the specified type
             - Provide clear explanations for answers
@@ -138,10 +141,10 @@ export async function POST(request: Request) {
             [
               {
                 "id": "unique_id",
-                "type": "mcq|tf|complete",
+                "type": "mcq|mcq_multi|tf|complete|cloze|match|order",
                 "prompt": "Question text",
-                "choices": ["option1", "option2", "option3", "option4"], // Required for mcq/mcq_multi, omit for tf/complete
-                "correct_answer": "1|2|3|4|1,2|1,3|2,3|1,2,3|true|false|answer_text", // CRITICAL: Use 1-based indices (1, 2, 3, 4). For mcq_multi use comma-separated: "1,2" or "1,3,4". For mcq use single: "1" or "2". NOT 0-based (0, 1, 2, 3)
+                "choices": ["option1", "option2", "option3", "option4"], // Required for mcq/mcq_multi/match/order, omit for tf/complete/cloze
+                "correct_answer": "1|2|3|4|1,2|1,3|2,3|1,2,3|true|false|answer_text|answer1,answer2", // CRITICAL: Use 1-based indices (1, 2, 3, 4). For mcq_multi/match/order use comma-separated: "1,2" or "1,3,4". For mcq use single: "1" or "2". For complete/cloze use text. For tf use "true" or "false". NOT 0-based (0, 1, 2, 3)
                 "explanation": "Why this answer is correct"
               }
             ]`

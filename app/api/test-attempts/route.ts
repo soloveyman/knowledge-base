@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { db, testAttempts, assignments, assignmentUsers } from '@/lib/db'
+import { db, testAttempts, assignments, assignmentUsers, tests } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { submitTestAttemptSchema } from '@/lib/schemas/test-attempts'
 import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
+import { validateTestAnswers } from '@/lib/test-validation'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,13 +23,65 @@ export async function POST(request: NextRequest) {
       return validation.response
     }
 
-    const { testId, assignmentId, answers, timeSpent, score } = validation.data
+    const { testId, assignmentId, answers, timeSpent } = validation.data
 
-    // Use score from client (already calculated client-side)
-    // Score is validated to be 0-100 in the schema
-    const finalScore: number | null = score ?? null
+    // Load test to check maxAttempts and get passingScore
+    const testResult = await db
+      .select({
+        id: tests.id,
+        maxAttempts: tests.maxAttempts,
+        passingScore: tests.passingScore,
+        timeLimit: tests.timeLimit,
+      })
+      .from(tests)
+      .where(eq(tests.id, testId))
+      .limit(1)
 
-    // Insert test attempt
+    if (testResult.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Test not found' },
+        { status: 404 }
+      )
+    }
+
+    const test = testResult[0]
+    const maxAttempts = test.maxAttempts ?? 1
+    const passingScore = test.passingScore ?? 70
+
+    // Check maxAttempts limit
+    const existingAttempts = await db
+      .select()
+      .from(testAttempts)
+      .where(and(
+        eq(testAttempts.testId, testId),
+        eq(testAttempts.userId, session.user.id),
+        eq(testAttempts.status, 'completed')
+      ))
+
+    if (existingAttempts.length >= maxAttempts) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: `Maximum attempts (${maxAttempts}) exceeded for this test` 
+        },
+        { status: 403 }
+      )
+    }
+
+    // Validate timeSpent if timeLimit is set
+    if (test.timeLimit && timeSpent) {
+      const timeLimitSeconds = test.timeLimit * 60
+      if (timeSpent > timeLimitSeconds) {
+        // Log suspicious activity but don't block (might be network delay)
+        console.warn(`User ${session.user.id} exceeded time limit for test ${testId}: ${timeSpent}s > ${timeLimitSeconds}s`)
+      }
+    }
+
+    // Server-side validation of answers
+    const validationResult = await validateTestAnswers(testId, answers || {})
+    const finalScore = validationResult.score
+
+    // Insert test attempt with server-calculated score
     const result = await db.insert(testAttempts).values({
       testId: testId,
       userId: session.user.id,
@@ -59,10 +112,10 @@ export async function POST(request: NextRequest) {
       // Find the best score (highest)
       const bestScore = allUserAttempts.length > 0
         ? Math.max(...allUserAttempts.map(a => a.score ?? 0))
-        : finalScore ?? 0
+        : finalScore
       
-      // Determine status based on best score (failed if under 70%, completed if 70% or higher)
-      const assignmentStatus = bestScore >= 70 ? 'completed' : 'failed'
+      // Determine status based on best score using test.passingScore
+      const assignmentStatus = bestScore >= passingScore ? 'completed' : 'failed'
       
       // Update the assignment_user status for this user
       // Note: testScore is stored in testAttempts, not assignmentUsers
@@ -83,7 +136,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        testAttempt: result[0]
+        testAttempt: result[0],
+        score: finalScore,
+        passingScore,
+        passed: finalScore >= passingScore
       }
     })
   } catch (error) {

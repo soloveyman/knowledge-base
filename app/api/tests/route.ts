@@ -361,7 +361,31 @@ export async function POST(request: Request) {
               // Validate correct answer for multiple choice questions
               // Indices start from 1 (A=1, B=2, C=3, D=4)
               let finalCorrectAnswer = correctAnswerValue
-              if ((q.type === 'mcq' || q.type === 'mcq_multi') && q.choices && q.choices.length > 0) {
+              // Handle match and order types - preserve comma-separated answers as-is
+              if ((q.type === 'match' || q.type === 'order') && correctAnswerValue) {
+                // For match and order, correct_answer should be comma-separated indices like "1,2,3,4"
+                // Validate that all indices are valid
+                const parts = correctAnswerValue.split(/[,;\s]+/).filter(p => p.length > 0)
+                const validParts: string[] = []
+                for (const part of parts) {
+                  if (/^\d+$/.test(part)) {
+                    const index = parseInt(part, 10)
+                    if (q.choices && index >= 1 && index <= q.choices.length) {
+                      validParts.push(part)
+                    }
+                  } else if (/^[A-Z]$/i.test(part)) {
+                    // Convert letter to index
+                    const letterIndex = part.toUpperCase().charCodeAt(0) - 65
+                    const oneBasedIndex = letterIndex + 1
+                    if (q.choices && oneBasedIndex >= 1 && oneBasedIndex <= q.choices.length) {
+                      validParts.push(String(oneBasedIndex))
+                    }
+                  }
+                }
+                if (validParts.length > 0) {
+                  finalCorrectAnswer = validParts.join(',')
+                }
+              } else if ((q.type === 'mcq' || q.type === 'mcq_multi') && q.choices && q.choices.length > 0) {
                 // If correct answer is a letter (A, B, C, D), convert to 1-based index
                 if (/^[A-Z]$/.test(correctAnswerValue)) {
                   const letterIndex = correctAnswerValue.charCodeAt(0) - 65 // A=0, B=1, C=2, D=3
@@ -413,6 +437,9 @@ export async function POST(request: Request) {
                 dbType = q.type // Already in database format
               }
               
+              // Save original question type in tags for proper restoration
+              const tags = q.type ? { originalType: q.type } : null
+              
               const processed = {
                 title: q.prompt || q.title || 'Untitled Question',
                 content: q.prompt || q.content || '',
@@ -421,6 +448,7 @@ export async function POST(request: Request) {
                 correctAnswer: finalCorrectAnswer,
                 explanation: q.explanation || '',
                 difficulty: 'medium',
+                tags: tags,
                 moduleId: null, // Documents are not modules, so set to null
                 createdBy: session.user.id
               }

@@ -375,12 +375,15 @@ function EmployeePageInner() {
     // Get the actual test score from the user assignment data
     const testScore = userAssignment?.testScore
     
-    // If there's a test score, check if it's below 70% to mark as failed
+    // Get passingScore from assignment (set by API) or default to 70
+    const passingScore = (assignment as any).testPassingScore ?? 70
+    
+    // If there's a test score, check if it's below passingScore to mark as failed
     let userStatus = userAssignment?.status || assignment.status || 'pending'
     if (testScore !== undefined && testScore !== null) {
-      if (testScore < 70) {
+      if (testScore < passingScore) {
         userStatus = 'failed'
-      } else if (testScore >= 70 && userStatus === 'completed') {
+      } else if (testScore >= passingScore && userStatus === 'completed') {
         userStatus = 'completed'
       }
     }

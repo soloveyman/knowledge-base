@@ -1255,7 +1255,7 @@ function ManagerPageInner() {
   const handleEnhanceDocument = async (id: string) => {
     if (isEnhancementDisabled) {
       toast.error(
-        `Enhancement limit reached (${limits?.enhancements.current}/${limits?.enhancements.max}). Please upgrade your plan to continue.`,
+        t('enhancementLimitReached').replace('{current}', String(limits?.enhancements.current || 0)).replace('{max}', String(limits?.enhancements.max || 0)),
         { duration: 5000 }
       )
       return
@@ -1263,7 +1263,7 @@ function ManagerPageInner() {
 
     try {
       setEnhancingDocId(id)
-      toast.loading('Enhancing document with Grok API...', { id: 'enhance' })
+      toast.loading(t('enhancingDocument'), { id: 'enhance' })
       
       const response = await fetch(`/api/documents/${id}/enhance`, {
         method: 'POST',
@@ -1278,12 +1278,12 @@ function ManagerPageInner() {
           loadData(false)
         } else {
           console.error('Failed to enhance document:', result.message)
-          toast.error(result.message || 'Failed to enhance document', { id: 'enhance' })
+          toast.error(result.message || t('failedToEnhanceDocument'), { id: 'enhance' })
         }
       })
     } catch (error) {
       console.error('Error enhancing document:', error)
-      toast.error('Error enhancing document', { id: 'enhance' })
+      toast.error(t('errorEnhancingDocument'), { id: 'enhance' })
     } finally {
       setEnhancingDocId(null)
     }
@@ -1325,7 +1325,7 @@ function ManagerPageInner() {
           return
         }
         
-        let errorMessage = 'Failed to delete document'
+        let errorMessage = t('failedToDeleteDocument')
         try {
           const errorResult = await response.json()
           errorMessage = errorResult.message || errorMessage
@@ -1339,7 +1339,7 @@ function ManagerPageInner() {
           setDocumentsWithLog(previousDocuments)
         })
         console.error('Failed to delete document:', errorMessage)
-        toast.error(errorMessage)
+        toast.error(errorMessage || t('failedToDeleteDocument'))
         deletingDocumentsRef.current.delete(id)
         return
       }
@@ -1355,16 +1355,16 @@ function ManagerPageInner() {
           setDocumentsWithLog(previousDocuments)
         })
         console.error('Failed to delete document:', result.message)
-        toast.error(result.message || 'Failed to delete document')
+        toast.error(result.message || t('failedToDeleteDocument'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       startTransition(() => {
         setDocumentsWithLog(previousDocuments)
       })
-      const errorMessage = error instanceof Error ? error.message : 'Error deleting document'
+      const errorMessage = error instanceof Error ? error.message : t('errorDeletingDocument')
       console.error('Error deleting document:', error)
-      toast.error(errorMessage)
+      toast.error(errorMessage || t('errorDeletingDocument'))
     } finally {
       deletingDocumentsRef.current.delete(id)
     }
@@ -1426,13 +1426,13 @@ function ManagerPageInner() {
         // Revert on error - restore previous state
         setSavedTestsWithLog(previousTests)
         console.error('Failed to delete test:', result.message)
-        toast.error(result.message || 'Failed to delete test')
+        toast.error(result.message || t('failedToDeleteTest'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       setSavedTestsWithLog(previousTests)
       console.error('Error deleting test:', error)
-      toast.error('Error deleting test')
+      toast.error(t('errorDeletingTest'))
     }
   }
 
@@ -1469,13 +1469,13 @@ function ManagerPageInner() {
         // Revert on error - restore previous state
         setSavedAssignmentsWithLog(previousAssignments)
         console.error('Failed to delete assignment:', result.message)
-        toast.error(result.message || 'Failed to delete assignment')
+        toast.error(result.message || t('failedToDeleteAssignment'))
       }
     } catch (error) {
       // Revert on error - restore previous state
       setSavedAssignmentsWithLog(previousAssignments)
       console.error('Error deleting assignment:', error)
-      toast.error('Error deleting assignment')
+      toast.error(t('errorDeletingAssignment'))
     }
   }
 
@@ -1501,16 +1501,16 @@ function ManagerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success(t('assignmentResultsReset') || 'Assignment results reset successfully')
+        toast.success(t('assignmentResultsResetSuccessfully'))
         // Reload assignments to reflect the reset
         loadData(true, true).catch(console.error)
       } else {
         console.error('Failed to reset assignment:', result.message)
-        toast.error(result.message || 'Failed to reset assignment results')
+        toast.error(result.message || t('failedToResetAssignmentResults'))
       }
     } catch (error) {
       console.error('Error resetting assignment:', error)
-      toast.error('Error resetting assignment results')
+      toast.error(t('errorResettingAssignmentResults'))
     }
   }
 
@@ -1583,12 +1583,12 @@ function ManagerPageInner() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total employees</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('totalEmployees')}</CardTitle>
                   <span className="text-2xl">👥</span>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{savedUsers.length}</div>
-                  <p className="text-xs text-muted-foreground">Team members in the system</p>
+                  <p className="text-xs text-muted-foreground">{t('teamMembersInSystem')}</p>
                 </CardContent>
               </Card>
               
@@ -1789,7 +1789,7 @@ function ManagerPageInner() {
                                   handleEnhanceDocument(doc.id)
                                 }}
                                 disabled={isEnhancementDisabled || enhancingDocId === doc.id}
-                                title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
+                                title={isEnhancementDisabled ? t('enhancementLimitReachedTitle') : t('enhanceWithGrokApi')}
                               >
                               {enhancingDocId === doc.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1854,7 +1854,7 @@ function ManagerPageInner() {
                   const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
                   return {
                     id: Number(fullUser?.id || user.userId || user.id || 0),
-                    name: fullUser?.name || 'Unknown User',
+                    name: fullUser?.name || t('unknownUser'),
                     email: fullUser?.email || '',
                     role: fullUser?.role || 'employee',
                     department: fullUser?.job || ''
@@ -1871,12 +1871,12 @@ function ManagerPageInner() {
                     name: document.name,
                     type: document.type,
                     uploadedAt: document.uploadedAt
-                  } : { id: 0, name: 'Document Not Found', type: 'UNKNOWN', uploadedAt: a.createdAt },
+                  } : { id: 0, name: t('documentNotFound'), type: 'UNKNOWN', uploadedAt: a.createdAt },
                   test: test ? {
                     id: test.id,
                     title: test.title,
                     questionCount: test.questionCount || 0
-                  } : a.testId ? { id: a.testId, title: 'Test Not Found', questionCount: 0 } : { id: '', title: 'No Test', questionCount: 0 },
+                  } : a.testId ? { id: a.testId, title: t('testNotFound'), questionCount: 0 } : { id: '', title: t('noTest'), questionCount: 0 },
                   assignedUsers: assignedUsers,
                   dueDate: a.dueDate || '',
                   createdAt: a.createdAt,

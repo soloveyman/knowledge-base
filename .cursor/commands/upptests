@@ -1,0 +1,13 @@
+Generate tests for the Uppstaff project.
+
+Scope:
+{{input}}
+
+Requirements:
+- For E2E: use Playwright, focus on main user flows (login, module assignment, test passing, billing).
+- For domain logic: propose isolated tests for lib/** functions.
+- Cover success, failure, and edge cases.
+
+Output:
+- Playwright test file skeleton(s).
+- If relevant, additional unit-like test examples for critical functions.

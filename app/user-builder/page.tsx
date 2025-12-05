@@ -136,7 +136,7 @@ export default function UserBuilderPage() {
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text()
         console.error('Non-JSON response:', text.substring(0, 200))
-        toast.error('Server returned an invalid response. Please try again.', {
+        toast.error(t('serverInvalidResponse'), {
           duration: 5000
         })
         return
@@ -152,13 +152,13 @@ export default function UserBuilderPage() {
         validation.setValue('password', '') // New password field
         validation.setValue('role', user.role || 'employee')
       } else {
-        toast.error('Failed to load user data', {
+        toast.error(t('failedToLoadUserData'), {
           duration: 5000
         })
       }
     } catch (error) {
       console.error('Error loading user for editing:', error)
-      toast.error('Failed to load user for editing', {
+      toast.error(t('failedToLoadUserForEditing'), {
         duration: 5000
       })
     }

@@ -105,10 +105,10 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.error('Request timeout:', error);
-        toast.error('Request timed out. Please check your connection and try again.');
+        toast.error(t('requestTimedOut'));
       } else {
         console.error('Failed to load owners data:', error);
-        toast.error('Failed to refresh owners data. Please try again.');
+        toast.error(t('failedToRefreshData'));
       }
     }
   };
@@ -116,7 +116,7 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
   const handleChangePlan = async (ownerId: string, planId: string) => {
     try {
       setChangingPlan(ownerId);
-      toast.loading('Changing subscription plan...', { id: 'change-plan' });
+      toast.loading(t('changingSubscriptionPlan'), { id: 'change-plan' });
       
       const response = await fetch('/api/super-admin/subscriptions', {
         method: 'POST',
@@ -136,11 +136,11 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
         // Reload owners data to reflect the change
         loadOwnersData();
       } else {
-        toast.error(result.message || 'Failed to change plan', { id: 'change-plan' });
+        toast.error(result.message || t('failedToChangePlan'), { id: 'change-plan' });
       }
     } catch (error) {
       console.error('Error changing plan:', error);
-      toast.error('Error changing plan', { id: 'change-plan' });
+      toast.error(t('errorChangingPlan'), { id: 'change-plan' });
     } finally {
       setChangingPlan(null);
     }

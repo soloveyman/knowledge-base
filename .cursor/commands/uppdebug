@@ -1,0 +1,10 @@
+You are debugging an issue in the Uppstaff project.
+
+Bug description / symptoms:
+{{input}}
+
+Do:
+1. List 3–5 hypotheses of what might be wrong (based on stack: Next 15, React 19, Drizzle, Auth.js, Stripe, S3, Redis).
+2. For each hypothesis, explain how to confirm or rule it out.
+3. Propose concrete code changes or logging to fix / investigate.
+4. If relevant, mention how this could affect multi-tenancy, roles, or billing logic.

@@ -72,12 +72,23 @@ function getImageDisplayText(alt: string, src: string): string {
     return alt.trim()
   }
   
-  // Try to extract filename from src path
-  if (src && !src.startsWith('data:')) {
-    const pathMatch = src.match(/([^/\\]+\.(png|jpg|jpeg|gif|webp|svg))$/i)
-    if (pathMatch) {
-      return pathMatch[1]
+  // Try to extract filename from src URL or path
+  if (src) {
+    try {
+      // Extract filename from URL path (handles query params)
+      const urlMatch = src.match(/([^/\\?]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico))(?:\?|$)/i)
+      if (urlMatch) {
+        return urlMatch[1]
+      }
+      // Extract last part of path (even without extension)
+      const pathMatch = src.match(/([^/\\?]+)(?:\?|$)/)
+      if (pathMatch && pathMatch[1].length < 30 && pathMatch[1] !== 'images' && pathMatch[1] !== 'documents') {
+        return pathMatch[1]
+      }
+    } catch (e) {
+      // Ignore URL parsing errors
     }
+    
     // If it's a relative path, extract the last part
     if (src.includes('/') || src.includes('\\')) {
       const parts = src.split(/[/\\]/)
@@ -504,12 +515,28 @@ function DocumentContent({ content }: { content: string }) {
           // Validate and filter out invalid image sources
           // 1. Empty data URLs (data:image/png;base64,)
           if (srcString.startsWith('data:') && (srcString.endsWith(',') || srcString.split(',').length === 1 || srcString.split(',')[1]?.trim().length === 0)) {
-            // Show alt text instead of broken image - compact version
+            // Show compact error message instead of broken image
             const displayText = getImageDisplayText(alt || '', srcString)
-            const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
+            const shortText = displayText.length > 25 
+              ? displayText.substring(0, 22) + '...' 
+              : displayText || 'Изображение'
             return (
-              <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
-                {shortText || 'Изображение недоступно'}
+              <div className="my-2 inline-flex items-center gap-1.5 px-2 py-1 border border-dashed border-muted-foreground/30 rounded-md text-[11px] text-muted-foreground bg-muted/20 max-w-full">
+                <svg 
+                  className="w-3 h-3 flex-shrink-0" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                  />
+                </svg>
+                <span className="truncate">{shortText}</span>
               </div>
             )
           }
@@ -518,12 +545,28 @@ function DocumentContent({ content }: { content: string }) {
           if (!srcString.startsWith('data:') && !srcString.startsWith('http://') && !srcString.startsWith('https://') && !srcString.startsWith('/')) {
             // Check if it looks like a file path (contains slashes but not a valid URL)
             if (srcString.includes('/') || srcString.includes('\\')) {
-              // Show alt text instead of broken image - compact version
+              // Show compact error message instead of broken image
               const displayText = getImageDisplayText(alt || '', srcString)
-              const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
+              const shortText = displayText.length > 25 
+                ? displayText.substring(0, 22) + '...' 
+                : displayText || 'Изображение'
               return (
-                <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
-                  {shortText || 'Изображение недоступно'}
+                <div className="my-2 inline-flex items-center gap-1.5 px-2 py-1 border border-dashed border-muted-foreground/30 rounded-md text-[11px] text-muted-foreground bg-muted/20 max-w-full">
+                  <svg 
+                    className="w-3 h-3 flex-shrink-0" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                    />
+                  </svg>
+                  <span className="truncate">{shortText}</span>
                 </div>
               )
             }
@@ -541,13 +584,29 @@ function DocumentContent({ content }: { content: string }) {
           const isDataUrl = srcString.startsWith('data:')
           const isExternal = srcString.startsWith('http://') || srcString.startsWith('https://')
           
-          // Final validation: if it's not a data URL or external URL, show alt text
+          // Final validation: if it's not a data URL or external URL, show compact error message
           if (!isDataUrl && !isExternal) {
             const displayText = getImageDisplayText(alt || '', srcString)
-            const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
+            const shortText = displayText.length > 25 
+              ? displayText.substring(0, 22) + '...' 
+              : displayText || 'Изображение'
             return (
-              <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
-                {shortText || 'Изображение недоступно'}
+              <div className="my-2 inline-flex items-center gap-1.5 px-2 py-1 border border-dashed border-muted-foreground/30 rounded-md text-[11px] text-muted-foreground bg-muted/20 max-w-full">
+                <svg 
+                  className="w-3 h-3 flex-shrink-0" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                  />
+                </svg>
+                <span className="truncate">{shortText}</span>
               </div>
             )
           }
@@ -1192,13 +1251,31 @@ function ImageWithPlaceholder({
     }
   }, [src, width, height])
 
-  // Show alt text if image failed to load - compact version
+  // Show compact error message if image failed to load
   if (hasError) {
     const displayText = getImageDisplayText(alt || '', src)
-    const shortText = displayText.length > 50 ? displayText.substring(0, 47) + '...' : displayText
+    // Limit to 25 characters max for very compact display
+    const shortText = displayText.length > 25 
+      ? displayText.substring(0, 22) + '...' 
+      : displayText || 'Изображение'
+    
     return (
-      <div className="my-2 px-2 py-1 inline-block border border-dashed border-border rounded text-xs text-muted-foreground bg-muted/30">
-        {shortText || 'Изображение недоступно'}
+      <div className="my-2 inline-flex items-center gap-1.5 px-2 py-1 border border-dashed border-muted-foreground/30 rounded-md text-[11px] text-muted-foreground bg-muted/20 max-w-full">
+        <svg 
+          className="w-3 h-3 flex-shrink-0" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+          />
+        </svg>
+        <span className="truncate">{shortText}</span>
       </div>
     )
   }

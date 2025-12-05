@@ -14,7 +14,8 @@ export const submitTestAttemptSchema = z.object({
   assignmentId: z.string().uuid('assignmentId must be a valid UUID').optional().nullable(),
   answers: z.record(z.string(), z.unknown()), // questionId -> answer
   timeSpent: z.number().int().min(0).optional(), // in seconds (can be 0)
-  score: z.number().int().min(0).max(100).optional().nullable(), // Optional score if calculated client-side
+  // Score is now calculated server-side, but kept optional for backward compatibility
+  score: z.number().int().min(0).max(100).optional().nullable(),
 })
 
 export type StartTestAttemptInput = z.infer<typeof startTestAttemptSchema>

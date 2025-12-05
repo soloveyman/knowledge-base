@@ -1,0 +1,17 @@
+Create or update a Next.js 15 App Router server action or API route for Uppstaff.
+
+Task:
+{{input}}
+
+Requirements:
+- Use TypeScript.
+- Validate input with Zod.
+- Perform DB operations with Drizzle.
+- Enforce multi-tenancy via businessId and proper role checks (SUPER_ADMIN, OWNER, MANAGER, EMPLOYEE).
+- Handle errors with structured responses (e.g. { error: string }).
+
+Output:
+1. Zod schema.
+2. Drizzle query function in lib/db or similar.
+3. Server action or API handler integrating both.
+4. Short explanation of how to call it from a client component.

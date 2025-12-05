@@ -130,7 +130,7 @@ export function SignInForm() {
       })
       
       if (result?.error) {
-        toast.error(result.error || 'Google sign-in failed', {
+        toast.error(result.error || t('googleSignInFailed'), {
           duration: 5000
         })
         setIsGoogleLoading(false)
@@ -155,7 +155,7 @@ export function SignInForm() {
         setIsGoogleLoading(false)
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to sign in with Google', {
+      toast.error(error instanceof Error ? error.message : t('failedToSignInWithGoogle'), {
         duration: 5000
       })
       setIsGoogleLoading(false)
@@ -168,7 +168,7 @@ export function SignInForm() {
     // Honeypot check - if filled, it's likely a bot
     if (honeypot) {
       console.warn("Bot detected: honeypot field was filled")
-      toast.error("Invalid request", {
+      toast.error(t('invalidRequest'), {
         duration: 5000
       })
       setIsLoading(false)
@@ -261,7 +261,7 @@ export function SignInForm() {
       
       if (!emailCheckData.exists) {
         // Email doesn't exist - suggest registration
-        toast.error('Email not found. Would you like to create an account?', {
+        toast.error(t('emailNotFound'), {
           duration: 6000,
           action: {
             label: 'Create Account',
@@ -275,7 +275,7 @@ export function SignInForm() {
 
       // Check if user has a password (OAuth users don't have passwords)
       if (emailCheckData.hasPassword === false) {
-        toast.error('This account was registered with Google. Please use "Sign in with Google" button to continue.', {
+        toast.error(t('accountRegisteredWithGoogle'), {
           duration: 6000
         })
         setIsLoading(false)
@@ -286,7 +286,7 @@ export function SignInForm() {
       const result = await signIn("credentials", { email: normalizedEmail, password, redirect: false })
       if (result?.error) {
         // Email exists but password is wrong
-        toast.error('Incorrect password. Please try again or use "Forgot Password"', {
+        toast.error(t('incorrectPassword'), {
           duration: 5000
         })
         setHasFailedAttempt(true) // Show forgot password link after failed attempt

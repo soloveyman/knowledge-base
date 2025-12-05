@@ -993,7 +993,7 @@ export default function SubscriptionManager({
                             }
                             
                             if (!isStripeEnabled) {
-                              toast.error('Payment processing is not available. Please check server configuration or contact support.')
+                              toast.error(t('paymentProcessingNotAvailable'))
                               console.error('[Subscription] Stripe not enabled. Check /api/test-env endpoint for details.')
                               return
                             }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db, assignments, documents, modules, assignmentUsers, testAttempts, users } from '@/lib/db'
+import { db, assignments, documents, modules, assignmentUsers, testAttempts, users, tests } from '@/lib/db'
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { InferSelectModel } from 'drizzle-orm'
@@ -65,6 +65,25 @@ export async function GET() {
     const testIds = [...new Set(assignmentsWithTests.map(a => a.testId!))]
     const userIds = [...new Set(allAssignmentUsers.map(au => au.userId))]
     
+    // Load tests to get passingScore for each test
+    const testsMap = new Map<string, { passingScore: number | null }>()
+    if (testIds.length > 0) {
+      for (const testId of testIds) {
+        const testResult = await db
+          .select({
+            id: tests.id,
+            passingScore: tests.passingScore,
+          })
+          .from(tests)
+          .where(eq(tests.id, testId))
+          .limit(1)
+        
+        if (testResult.length > 0) {
+          testsMap.set(testId, { passingScore: testResult[0].passingScore })
+        }
+      }
+    }
+    
     const allTestAttempts = testIds.length > 0 && userIds.length > 0
       ? await db
           .select()
@@ -110,6 +129,10 @@ export async function GET() {
     const assignmentsWithUsers = assignmentsData.map((assignment) => {
       const users = usersByAssignment.get(assignment.id) || []
       
+      // Get passingScore for this test if it exists
+      const testInfo = assignment.testId ? testsMap.get(assignment.testId) : null
+      const passingScore = testInfo?.passingScore ?? 70 // Default to 70 if not found
+      
       const usersWithScores = users.map((user) => {
         if (assignment.testId) {
           const key = `${assignment.testId}:${user.userId}`
@@ -125,7 +148,11 @@ export async function GET() {
         return user
       })
       
-      return { ...assignment, users: usersWithScores }
+      return { 
+        ...assignment, 
+        users: usersWithScores,
+        testPassingScore: passingScore // Include passingScore in assignment
+      }
     })
 
     return NextResponse.json({

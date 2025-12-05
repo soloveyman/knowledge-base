@@ -159,7 +159,7 @@ function DocImportPageInner() {
       // Validate file type
       if (!Object.keys(ACCEPTED_FILE_TYPES).includes(file.type)) {
         console.warn('[handleFiles] Unsupported file type:', file.type)
-        toast.error(`File type ${file.type} is not supported`, {
+        toast.error(t('fileTypeNotSupported').replace('{type}', file.type), {
           description: 'Please upload DOCX or XLSX files only',
           duration: 5000
         })
@@ -169,7 +169,7 @@ function DocImportPageInner() {
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
         console.warn('[handleFiles] File too large:', file.size, 'max:', MAX_FILE_SIZE)
-        toast.error(`File ${file.name} is too large`, {
+        toast.error(t('fileTooLarge').replace('{name}', file.name), {
           description: `Maximum size is ${formatFileSize(MAX_FILE_SIZE)}`,
           duration: 5000
         })
@@ -447,17 +447,17 @@ function DocImportPageInner() {
       
       // More specific error messages
       if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        toast.error('Authorization failed', {
+        toast.error(t('authorizationFailed'), {
           description: 'Please try selecting the file again. Your access token may have expired.',
           duration: 6000
         })
       } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-        toast.error('Access denied', {
+        toast.error(t('accessDenied'), {
           description: 'You may not have permission to access this file. Make sure you are signed in with the correct Google account.',
           duration: 6000
         })
       } else if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
-        toast.error('File not found', {
+        toast.error(t('fileNotFound'), {
           description: 'The file may have been deleted or moved. Please try selecting it again.',
           duration: 6000
         })
@@ -508,27 +508,27 @@ function DocImportPageInner() {
           errorMessage.includes('not configured') || 
           errorMessage.includes('environment variables') ||
           errorMessage.includes('Google OAuth not configured')) {
-        toast.error('Google Drive не настроен', {
+        toast.error(t('googleDriveNotConfigured'), {
           description: 'Проверьте настройки GOOGLE_CLIENT_ID в .env.local',
           duration: 6000
         })
       } else if (errorMessage.includes('idpiframe_initialization_failed') ||
                  errorMessage.includes('OAuth initialization failed')) {
-        toast.error('Ошибка инициализации OAuth', {
+        toast.error(t('oauthInitializationError'), {
           description: 'Убедитесь, что ваш Google аккаунт добавлен как тестовый пользователь в OAuth Consent Screen в Google Cloud Console',
           duration: 8000
         })
       } else if (errorMessage.includes('access_denied') || 
                  errorMessage.includes('Access blocked') ||
                  errorMessage.includes('не прошло проверку')) {
-        toast.error('Доступ заблокирован', {
+        toast.error(t('accessBlocked'), {
           description: 'Приложение в режиме тестирования. Добавьте ваш email в Test users в Google Cloud Console или опубликуйте приложение. См. GOOGLE_OAUTH_TESTING_MODE_FIX.md',
           duration: 10000
         })
       } else if (errorMessage.includes('not loaded') || 
                  errorMessage.includes('API is not loaded') ||
                  errorMessage.includes('Failed to load')) {
-        toast.error('Не удалось загрузить Google Picker', {
+        toast.error(t('failedToLoadGooglePicker'), {
           description: 'Проверьте подключение к интернету и попробуйте снова',
           duration: 6000
         })
@@ -559,7 +559,7 @@ function DocImportPageInner() {
     
     if (readyFiles.length === 0) {
       console.warn('No ready files to save')
-      toast.error('No files ready to save', {
+      toast.error(t('noFilesReadyToSave'), {
         description: 'Please wait for files to finish processing',
         duration: 5000
       })

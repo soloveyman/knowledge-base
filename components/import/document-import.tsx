@@ -51,7 +51,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
     ]
     
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Unsupported file type', {
+      toast.error(t('unsupportedFileType'), {
         description: 'Please upload a DOCX or XLSX file',
         duration: 5000
       })
@@ -60,7 +60,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
 
     // Validate file size (20MB limit - images are stored separately in Spaces, only text content is counted)
     if (file.size > 20 * 1024 * 1024) {
-      toast.error('File too large', {
+      toast.error(t('fileTooLarge').replace('{name}', file.name), {
         description: 'File size must be less than 20MB',
         duration: 5000
       })

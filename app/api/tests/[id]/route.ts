@@ -293,7 +293,31 @@ export async function PUT(
           // Validate correct answer for multiple choice questions
           // Indices start from 1 (A=1, B=2, C=3, D=4)
           let finalCorrectAnswer = correctAnswerValue
-          if ((validatedQuestion.type === 'mcq' || validatedQuestion.type === 'mcq_multi') && validatedQuestion.choices && validatedQuestion.choices.length > 0) {
+          // Handle match and order types - preserve comma-separated answers as-is
+          if ((validatedQuestion.type === 'match' || validatedQuestion.type === 'order') && correctAnswerValue) {
+            // For match and order, correct_answer should be comma-separated indices like "1,2,3,4"
+            // Validate that all indices are valid
+            const parts = correctAnswerValue.split(/[,;\s]+/).filter(p => p.length > 0)
+            const validParts: string[] = []
+            for (const part of parts) {
+              if (/^\d+$/.test(part)) {
+                const index = parseInt(part, 10)
+                if (validatedQuestion.choices && index >= 1 && index <= validatedQuestion.choices.length) {
+                  validParts.push(part)
+                }
+              } else if (/^[A-Z]$/i.test(part)) {
+                // Convert letter to index
+                const letterIndex = part.toUpperCase().charCodeAt(0) - 65
+                const oneBasedIndex = letterIndex + 1
+                if (validatedQuestion.choices && oneBasedIndex >= 1 && oneBasedIndex <= validatedQuestion.choices.length) {
+                  validParts.push(String(oneBasedIndex))
+                }
+              }
+            }
+            if (validParts.length > 0) {
+              finalCorrectAnswer = validParts.join(',')
+            }
+          } else if ((validatedQuestion.type === 'mcq' || validatedQuestion.type === 'mcq_multi') && validatedQuestion.choices && validatedQuestion.choices.length > 0) {
             // If correct answer is a letter (A, B, C, D), convert to 1-based index
             if (/^[A-Z]$/.test(correctAnswerValue)) {
               const letterIndex = correctAnswerValue.charCodeAt(0) - 65 // A=0, B=1, C=2, D=3
@@ -345,6 +369,9 @@ export async function PUT(
             dbType = validatedQuestion.type // Already in database format
           }
           
+          // Save original question type in tags for proper restoration
+          const tags = validatedQuestion.type ? { originalType: validatedQuestion.type } : null
+          
           // Prepare question update data
           const questionUpdateData = {
             title: validatedQuestion.prompt || validatedQuestion.title || 'Untitled Question',
@@ -353,6 +380,7 @@ export async function PUT(
             options: validatedQuestion.choices || null,
             correctAnswer: finalCorrectAnswer,
             explanation: validatedQuestion.explanation || '',
+            tags: tags,
             updatedAt: new Date()
           }
           

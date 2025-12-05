@@ -135,7 +135,7 @@ export default function TestGenerator({
 
   const generateQuestions = async () => {
     if (params.sectionIds.length === 0) {
-      toast.error('Please select at least one section to generate questions from', {
+      toast.error(t('pleaseSelectAtLeastOneSection'), {
         duration: 5000
       })
       return
@@ -189,7 +189,7 @@ export default function TestGenerator({
       }
 
     } catch (err) {
-      toast.error('Failed to generate questions. Please try again.', {
+      toast.error(t('failedToGenerateQuestions'), {
         duration: 5000
       })
       setIsGenerating(false)

@@ -1,0 +1,19 @@
+Design and implement a UI component for Uppstaff using:
+- React 19
+- shadcn/ui
+- Tailwind CSS 4
+- lucide-react
+- next-themes for theme compatibility
+
+Feature:
+{{input}}
+
+Requirements:
+- Follow existing design: use shadcn/ui components where possible.
+- Keep business logic outside the component; accept data and callbacks via props.
+- Use a client component only if necessary (`"use client"` at the top).
+- Make the component reusable and typed with TypeScript.
+
+Output:
+- Component code.
+- Example usage snippet.

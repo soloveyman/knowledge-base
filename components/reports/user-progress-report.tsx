@@ -429,15 +429,22 @@ export default function UserProgressReport({ users, assignments, modules = [], t
         const result = await response.json()
         
         if (result.success && result.data.questions) {
-          questionsByTest[testId] = result.data.questions.map((q: any) => ({
-            id: q.id,
-            content: q.content || q.title || '',
-            title: q.title || q.content || '',
-            type: q.type,
-            correctAnswer: q.correctAnswer || q.correct_answer || null,
-            options: q.options || null,
-            choices: q.options || q.choices || null
-          }))
+          questionsByTest[testId] = result.data.questions.map((q: any) => {
+            // Drizzle maps snake_case DB columns to camelCase schema fields
+            // But we need to handle both formats for compatibility
+            const questionOptions = q.options || q.choices || null
+            const correctAnswer = q.correctAnswer || q.correct_answer || null
+            
+            return {
+              id: q.id,
+              content: q.content || q.title || '',
+              title: q.title || q.content || '',
+              type: q.type || 'multiple_choice',
+              correctAnswer: correctAnswer,
+              options: questionOptions,
+              choices: questionOptions // Alias for compatibility
+            }
+          })
         }
       } catch (error) {
         console.error(`Error loading questions for test ${testId}:`, error)
@@ -821,206 +828,238 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                       </AccordionTrigger>
                                       <AccordionContent value={accordionValue} className="pt-2 [&>div]:px-0">
                                         <div className="bg-muted/50 rounded-lg p-3 space-y-2.5">
-                                          {Object.entries(bestAttempt.answers).map(([questionId, answer], answerIndex) => {
-                                            // Find question text by questionId
+                                          {(() => {
                                             const questions = assignment.testId ? testQuestions[assignment.testId] || [] : []
-                                            const question = questions.find(q => q.id === questionId)
-                                            const questionText = question?.content || question?.title || `Ответ #${answerIndex + 1}`
                                             
-                                            // Check if answer is correct
-                                            const isCorrect = question?.correctAnswer 
-                                              ? (() => {
-                                                  const correctAnswer = question.correctAnswer
-                                                  const userAnswerValue: string | string[] = answer
-                                                  
-                                                  // Debug logging
-                                                  console.log(`Checking answer for question ${questionId}:`, {
-                                                    questionType: question.type,
-                                                    correctAnswer,
-                                                    userAnswer: userAnswerValue,
-                                                    choices: question.choices || question.options
-                                                  })
-                                                  const userAnswer = typeof userAnswerValue === 'string' 
-                                                    ? userAnswerValue.trim() 
-                                                    : (Array.isArray(userAnswerValue) 
-                                                        ? userAnswerValue.join(',') 
-                                                        : String(userAnswerValue))
-                                                  const choices = question.choices || question.options || []
-                                                  
-                                                  // Handle text/complete questions
-                                                  if (question.type === 'complete' || question.type === 'text') {
-                                                    // Normalize text for comparison: case-insensitive, collapse whitespace
-                                                    // toLowerCase() works correctly with Cyrillic characters
-                                                    const normalizeText = (text: string): string => {
-                                                      return text
-                                                        .toLowerCase() // Works correctly with Cyrillic (а, б, в, etc.)
-                                                        .trim()
-                                                        .replace(/\s+/g, ' ') // Collapse multiple spaces to single space
-                                                    }
-                                                    
-                                                    // For text questions, userAnswer should be a string
-                                                    const userAnswerStr = Array.isArray(userAnswerValue) 
-                                                      ? userAnswerValue.join(' ').trim() 
-                                                      : (typeof userAnswerValue === 'string' ? userAnswerValue.trim() : '')
-                                                    const normalizedUser = normalizeText(userAnswerStr)
-                                                    const normalizedCorrect = normalizeText(correctAnswer || '')
-                                                    return normalizedUser === normalizedCorrect
-                                                  }
-                                                  
-                                                  // Handle multiple choice with multiple answers (mcq_multi)
-                                                  if (question.type === 'mcq_multi' || /[,;]/.test(correctAnswer)) {
-                                                    // Parse correct answers (comma/space separated: "1,2,3" or "A,B,C")
-                                                    const correctAnswerParts = correctAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
-                                                    const correctAnswerLetters: string[] = []
-                                                    
-                                                    for (const part of correctAnswerParts) {
-                                                      let letter: string | null = null
-                                                      
-                                                      // If it's already a letter (A, B, C, D)
-                                                      if (/^[A-Z]$/i.test(part)) {
-                                                        letter = part.toUpperCase()
-                                                      }
-                                                      // If it's a numeric index (1, 2, 3, 4) - 1-based
-                                                      else if (/^\d+$/.test(part) && choices.length > 0) {
-                                                        const index = parseInt(part, 10)
-                                                        if (index >= 1 && index <= choices.length) {
-                                                          const zeroBasedIndex = index - 1
-                                                          letter = String.fromCharCode(65 + zeroBasedIndex)
-                                                        }
-                                                      }
-                                                      // If it matches one of the choice texts
-                                                      else if (choices.length > 0) {
-                                                        const choiceIndex = choices.findIndex(
-                                                          (choice: string) => choice.trim().toLowerCase() === part.trim().toLowerCase()
-                                                        )
-                                                        if (choiceIndex >= 0) {
-                                                          letter = String.fromCharCode(65 + choiceIndex)
-                                                        }
-                                                      }
-                                                      
-                                                      if (letter) {
-                                                        correctAnswerLetters.push(letter)
-                                                      }
-                                                    }
-                                                    
-                                                    // Get user answers - handle both array and string formats
-                                                    const userAnswers = Array.isArray(userAnswerValue)
-                                                      ? userAnswerValue.map(a => a.toUpperCase())
-                                                      : (userAnswer 
-                                                          ? userAnswer.split(/[,;\s]+/).filter(p => p.length > 0).map(a => a.toUpperCase())
-                                                          : [])
-                                                    
-                                                    // Check if all correct answers are selected and no incorrect ones
-                                                    const correctAnswersSet = new Set(correctAnswerLetters)
-                                                    const userAnswersSet = new Set(userAnswers)
-                                                    
-                                                    const allCorrectSelected = correctAnswerLetters.every(letter => userAnswersSet.has(letter))
-                                                    const noIncorrectSelected = userAnswers.every(letter => correctAnswersSet.has(letter))
-                                                    const sameCount = correctAnswerLetters.length === userAnswers.length
-                                                    
-                                                    return allCorrectSelected && noIncorrectSelected && sameCount
-                                                  }
-                                                  
-                                                  // Handle single choice multiple choice and true/false
-                                                  // Normalize correct answer to letter format (A, B, C, D) or true/false
-                                                  let correctAnswerLetter: string | null = null
-                                                  
-                                                  // If correct_answer is already a letter (A, B, C, D)
-                                                  if (/^[A-Z]$/i.test(correctAnswer)) {
-                                                    correctAnswerLetter = correctAnswer.toUpperCase()
-                                                  } 
-                                                  // If correct_answer is a numeric index (1, 2, 3, 4) - 1-based
-                                                  else if (/^\d+$/.test(correctAnswer) && choices.length > 0) {
-                                                    const index = parseInt(correctAnswer, 10)
-                                                    // Handle 1-based indices (1, 2, 3, 4) - new format
+                                            // Helper function to check if answer is correct (same logic as before)
+                                            const checkAnswerCorrectness = (questionId: string, answer: string | string[]): boolean | null => {
+                                              const question = questions.find(q => q.id === questionId)
+                                              if (!question?.correctAnswer) return null
+                                              
+                                              const correctAnswer = question.correctAnswer
+                                              const userAnswerValue: string | string[] = answer
+                                              const userAnswer = typeof userAnswerValue === 'string' 
+                                                ? userAnswerValue.trim() 
+                                                : (Array.isArray(userAnswerValue) 
+                                                    ? userAnswerValue.join(',') 
+                                                    : String(userAnswerValue))
+                                              const choices = question.choices || question.options || []
+                                              
+                                              // Handle text/complete questions
+                                              if (question.type === 'complete' || question.type === 'text') {
+                                                const normalizeText = (text: string): string => {
+                                                  return text.toLowerCase().trim().replace(/\s+/g, ' ')
+                                                }
+                                                const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                  ? userAnswerValue.join(' ').trim() 
+                                                  : (typeof userAnswerValue === 'string' ? userAnswerValue.trim() : '')
+                                                const normalizedUser = normalizeText(userAnswerStr)
+                                                const normalizedCorrect = normalizeText(correctAnswer || '')
+                                                return normalizedUser === normalizedCorrect
+                                              }
+                                              
+                                              // Handle multiple choice with multiple answers (mcq_multi)
+                                              if (question.type === 'mcq_multi' || /[,;]/.test(correctAnswer)) {
+                                                const correctAnswerParts = correctAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
+                                                const correctAnswerLetters: string[] = []
+                                                
+                                                for (const part of correctAnswerParts) {
+                                                  let letter: string | null = null
+                                                  if (/^[A-Z]$/i.test(part)) {
+                                                    letter = part.toUpperCase()
+                                                  } else if (/^\d+$/.test(part) && choices.length > 0) {
+                                                    const index = parseInt(part, 10)
                                                     if (index >= 1 && index <= choices.length) {
-                                                      const zeroBasedIndex = index - 1
-                                                      correctAnswerLetter = String.fromCharCode(65 + zeroBasedIndex)
+                                                      letter = String.fromCharCode(65 + index - 1)
                                                     }
-                                                    // Handle legacy 0-based indices (0, 1, 2, 3) - old format for backward compatibility
-                                                    else if (index === 0 && choices.length > 0) {
-                                                      correctAnswerLetter = String.fromCharCode(65 + 0)
-                                                    }
-                                                  }
-                                                  // If correct_answer matches one of the choice texts, find its index
-                                                  else if (choices.length > 0 && correctAnswer) {
+                                                  } else if (choices.length > 0) {
                                                     const choiceIndex = choices.findIndex(
-                                                      (choice: string) => choice.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+                                                      (choice: string) => choice.trim().toLowerCase() === part.trim().toLowerCase()
                                                     )
                                                     if (choiceIndex >= 0) {
-                                                      correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+                                                      letter = String.fromCharCode(65 + choiceIndex)
                                                     }
                                                   }
-                                                  // Handle true/false questions
-                                                  if (question.type === 'tf' || question.type === 'true_false') {
-                                                    // Normalize correct answer (can be "true"/"false" or Russian "правда"/"ложь")
-                                                    const normalizeTrueFalse = (val: string): string => {
-                                                      const normalized = val.trim().toLowerCase()
-                                                      if (normalized === 'true' || normalized === 'правда' || normalized === 'верно' || normalized === 'да') {
-                                                        return 'true'
-                                                      }
-                                                      if (normalized === 'false' || normalized === 'ложь' || normalized === 'неверно' || normalized === 'нет') {
-                                                        return 'false'
-                                                      }
-                                                      return normalized
-                                                    }
-                                                    
-                                                    const normalizedCorrect = normalizeTrueFalse(correctAnswer)
-                                                    if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
-                                                      // For true/false, userAnswer should be a string "true" or "false" (or Russian equivalent)
-                                                      const userAnswerStr = Array.isArray(userAnswerValue) 
-                                                        ? userAnswerValue[0] 
-                                                        : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
-                                                      const normalizedUser = normalizeTrueFalse(userAnswerStr)
-                                                      return normalizedUser === normalizedCorrect
-                                                    }
+                                                  if (letter) correctAnswerLetters.push(letter)
+                                                }
+                                                
+                                                const userAnswers = Array.isArray(userAnswerValue)
+                                                  ? userAnswerValue.map(a => a.toUpperCase())
+                                                  : (userAnswer ? userAnswer.split(/[,;\s]+/).filter(p => p.length > 0).map(a => a.toUpperCase()) : [])
+                                                
+                                                const correctAnswersSet = new Set(correctAnswerLetters)
+                                                const userAnswersSet = new Set(userAnswers)
+                                                const allCorrectSelected = correctAnswerLetters.every(letter => userAnswersSet.has(letter))
+                                                const noIncorrectSelected = userAnswers.every(letter => correctAnswersSet.has(letter))
+                                                const sameCount = correctAnswerLetters.length === userAnswers.length
+                                                
+                                                return allCorrectSelected && noIncorrectSelected && sameCount
+                                              }
+                                              
+                                              // Handle single choice multiple choice and true/false
+                                              let correctAnswerLetter: string | null = null
+                                              
+                                              if (/^[A-Z]$/i.test(correctAnswer)) {
+                                                correctAnswerLetter = correctAnswer.toUpperCase()
+                                              } else if (/^\d+$/.test(correctAnswer) && choices.length > 0) {
+                                                const index = parseInt(correctAnswer, 10)
+                                                if (index >= 1 && index <= choices.length) {
+                                                  correctAnswerLetter = String.fromCharCode(65 + index - 1)
+                                                } else if (index === 0 && choices.length > 0) {
+                                                  correctAnswerLetter = String.fromCharCode(65 + 0)
+                                                }
+                                              } else if (choices.length > 0 && correctAnswer) {
+                                                const choiceIndex = choices.findIndex(
+                                                  (choice: string) => choice.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+                                                )
+                                                if (choiceIndex >= 0) {
+                                                  correctAnswerLetter = String.fromCharCode(65 + choiceIndex)
+                                                }
+                                              }
+                                              
+                                              // Handle true/false questions
+                                              if (question.type === 'tf' || question.type === 'true_false') {
+                                                const normalizeTrueFalse = (val: string): string => {
+                                                  const normalized = val.trim().toLowerCase()
+                                                  if (normalized === 'true' || normalized === 'правда' || normalized === 'верно' || normalized === 'да') {
+                                                    return 'true'
                                                   }
-                                                  
-                                                  // Compare normalized answers for single choice questions
-                                                  if (correctAnswerLetter) {
-                                                    // For single choice, userAnswer should be a single value (string or first element of array)
-                                                    const userAnswerStr = Array.isArray(userAnswerValue) 
-                                                      ? userAnswerValue[0] 
-                                                      : (typeof userAnswerValue === 'string' ? userAnswerValue : '')
-                                                    const normalizedUser = userAnswerStr.toUpperCase().trim()
-                                                    return normalizedUser === correctAnswerLetter.toUpperCase()
+                                                  if (normalized === 'false' || normalized === 'ложь' || normalized === 'неверно' || normalized === 'нет') {
+                                                    return 'false'
                                                   }
-                                                  
-                                                  // Fallback: direct string comparison
+                                                  return normalized
+                                                }
+                                                
+                                                const normalizedCorrect = normalizeTrueFalse(correctAnswer)
+                                                if (normalizedCorrect === 'true' || normalizedCorrect === 'false') {
                                                   const userAnswerStr = Array.isArray(userAnswerValue) 
-                                                    ? userAnswerValue.join(' ') 
+                                                    ? userAnswerValue[0] 
                                                     : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
-                                                  const normalize = (val: string) => val.toLowerCase().trim()
-                                                  const result = normalize(correctAnswer) === normalize(userAnswerStr)
-                                                  console.log(`Fallback comparison for question ${questionId}:`, {
-                                                    normalizedCorrect: normalize(correctAnswer),
-                                                    normalizedUser: normalize(userAnswerStr),
-                                                    result
-                                                  })
-                                                  return result
-                                                })()
-                                              : null // Unknown if no correct answer available
+                                                  const normalizedUser = normalizeTrueFalse(userAnswerStr)
+                                                  return normalizedUser === normalizedCorrect
+                                                }
+                                              }
+                                              
+                                              // Compare normalized answers for single choice questions
+                                              if (correctAnswerLetter) {
+                                                const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                  ? userAnswerValue[0] 
+                                                  : (typeof userAnswerValue === 'string' ? userAnswerValue : '')
+                                                const normalizedUser = userAnswerStr.toUpperCase().trim()
+                                                return normalizedUser === correctAnswerLetter.toUpperCase()
+                                              }
+                                              
+                                              // Fallback: direct string comparison
+                                              const userAnswerStr = Array.isArray(userAnswerValue) 
+                                                ? userAnswerValue.join(' ') 
+                                                : (typeof userAnswerValue === 'string' ? userAnswerValue : String(userAnswerValue))
+                                              const normalize = (val: string) => val.toLowerCase().trim()
+                                              return normalize(correctAnswer) === normalize(userAnswerStr)
+                                            }
                                             
-                                            console.log(`Final isCorrect for question ${questionId}:`, isCorrect)
+                                            // Filter to show only incorrect answers
+                                            const incorrectAnswers = Object.entries(bestAttempt.answers)
+                                              .map(([questionId, answer]) => {
+                                                const question = questions.find(q => q.id === questionId)
+                                                const questionText = question?.content || question?.title || `Вопрос #${questionId.slice(0, 8)}`
+                                                const isCorrect = checkAnswerCorrectness(questionId, answer)
+                                                
+                                                return {
+                                                  questionId,
+                                                  answer,
+                                                  questionText,
+                                                  question,
+                                                  isCorrect
+                                                }
+                                              })
+                                              .filter(item => item.isCorrect === false) // Show only incorrect answers
                                             
-                                            // Determine color based on correctness
-                                            const answerColorClass = isCorrect === true
-                                              ? 'text-green-600 dark:text-green-400 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30'
-                                              : isCorrect === false
-                                              ? 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30'
-                                              : 'text-muted-foreground border-primary/30 bg-background/50'
+                                            // Show message if no incorrect answers
+                                            if (incorrectAnswers.length === 0) {
+                                              return (
+                                                <div className="text-sm text-muted-foreground text-center py-2">
+                                                  {t('noIncorrectAnswers') || 'Все ответы правильные'}
+                                                </div>
+                                              )
+                                            }
                                             
-                                            return (
+                                            // Display all incorrect answers
+                                            return incorrectAnswers.map(({ questionId, answer, questionText, question }) => (
                                               <div key={questionId} className="text-sm">
                                                 <div className="font-medium text-foreground mb-1.5">
                                                   {questionText}:
                                                 </div>
-                                                <div className={`pl-3 border-l-2 rounded-r py-1.5 px-2 ${answerColorClass}`}>
-                                                  {formatAnswer(answer)}
+                                                <div className="pl-3 border-l-2 rounded-r py-1.5 px-2 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30">
+                                                  <div className="mb-1">
+                                                    <span className="font-medium">{t('userAnswer') || 'Ответ сотрудника'}:</span> {formatAnswer(answer)}
+                                                  </div>
+                                                  {question?.correctAnswer && (() => {
+                                                    // Format correct answer for display
+                                                    // For MCQ questions, convert indices/letters to readable format
+                                                    let formattedCorrectAnswer = question.correctAnswer
+                                                    
+                                                    if (question.choices && question.choices.length > 0) {
+                                                      // If correctAnswer is a letter (A, B, C, D)
+                                                      if (/^[A-Z]$/i.test(question.correctAnswer)) {
+                                                        const letterIndex = question.correctAnswer.toUpperCase().charCodeAt(0) - 65
+                                                        if (letterIndex >= 0 && letterIndex < question.choices.length) {
+                                                          formattedCorrectAnswer = `${question.correctAnswer}: ${question.choices[letterIndex]}`
+                                                        }
+                                                      }
+                                                      // If correctAnswer is a numeric index (1, 2, 3, 4) - 1-based
+                                                      else if (/^\d+$/.test(question.correctAnswer)) {
+                                                        const index = parseInt(question.correctAnswer, 10)
+                                                        if (index >= 1 && index <= question.choices.length) {
+                                                          const letter = String.fromCharCode(65 + index - 1)
+                                                          formattedCorrectAnswer = `${letter}: ${question.choices[index - 1]}`
+                                                        }
+                                                      }
+                                                      // If correctAnswer is multiple (comma-separated)
+                                                      else if (/[,;]/.test(question.correctAnswer)) {
+                                                        const parts = question.correctAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
+                                                        const formattedParts = parts.map(part => {
+                                                          if (!question.choices) return part
+                                                          if (/^[A-Z]$/i.test(part)) {
+                                                            const letterIndex = part.toUpperCase().charCodeAt(0) - 65
+                                                            if (letterIndex >= 0 && letterIndex < question.choices.length) {
+                                                              return `${part}: ${question.choices[letterIndex]}`
+                                                            }
+                                                          } else if (/^\d+$/.test(part)) {
+                                                            const index = parseInt(part, 10)
+                                                            if (index >= 1 && index <= question.choices.length) {
+                                                              const letter = String.fromCharCode(65 + index - 1)
+                                                              return `${letter}: ${question.choices[index - 1]}`
+                                                            }
+                                                          }
+                                                          return part
+                                                        })
+                                                        formattedCorrectAnswer = formattedParts.join(', ')
+                                                      }
+                                                      // If correctAnswer matches one of the choice texts
+                                                      else {
+                                                        const correctAnswer = question.correctAnswer
+                                                        if (correctAnswer) {
+                                                          const choiceIndex = question.choices.findIndex(
+                                                            (choice: string) => choice.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+                                                          )
+                                                          if (choiceIndex >= 0) {
+                                                            const letter = String.fromCharCode(65 + choiceIndex)
+                                                            formattedCorrectAnswer = `${letter}: ${question.choices[choiceIndex]}`
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    
+                                                    return (
+                                                      <div className="text-green-600 dark:text-green-400">
+                                                        <span className="font-medium">{t('correctAnswer') || 'Правильный ответ'}:</span> {formattedCorrectAnswer}
+                                                      </div>
+                                                    )
+                                                  })()}
                                                 </div>
                                               </div>
-                                            )
-                                          })}
+                                            ))
+                                          })()}
                                         </div>
                                       </AccordionContent>
                                     </AccordionItem>

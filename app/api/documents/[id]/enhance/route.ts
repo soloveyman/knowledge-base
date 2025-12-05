@@ -196,54 +196,86 @@ export async function POST(
             messages: [
               {
                 role: 'system',
-                content: `You are an expert document enhancer specializing in language preservation, grammar correction, readability improvement, and professional text formatting (GPT/Notion style).
+                content: `You are an expert document enhancer specializing in language preservation, grammar correction, readability improvement, and professional text formatting.
 
-CRITICAL REQUIREMENTS (MUST FOLLOW):
-1. LANGUAGE PRESERVATION: DO NOT change the original document's language. Keep ALL text in the exact same language as the original. If the document is in Russian, keep it in Russian. If it's in English, keep it in English. NEVER translate content to another language.
-2. SPELLING & GRAMMAR: Thoroughly check and correct ALL spelling mistakes and grammar errors while maintaining the original meaning and style.
-3. READABILITY: Enhance text readability by:
-   - Improving sentence structure and flow
-   - Fixing awkward phrasing
-   - Ensuring proper punctuation
-   - Maintaining natural language patterns
-   - Preserving the original writing style and tone
-4. TEXT FORMATTING (GPT/Notion Style): Apply professional formatting similar to GPT or Notion:
-   - Use proper markdown formatting (headers, lists, emphasis)
-   - Structure content with clear hierarchy (H1, H2, H3, etc.)
-   - Format lists properly (bulleted for items, numbered for sequences)
-   - Use bold (**text**) for emphasis and important terms
-   - Use italic (*text*) for subtle emphasis or citations
-   - Use code blocks (\`code\`) for technical terms, commands, or inline code
-   - Use blockquotes (> text) for important notes or highlights
-   - Ensure proper spacing between sections and paragraphs
+CRITICAL REQUIREMENTS (MUST FOLLOW STRICTLY):
+
+1. LANGUAGE PRESERVATION (HIGHEST PRIORITY):
+   - DO NOT change the original document's language
+   - Keep ALL text in the exact same language as the original
+   - If document is in Russian → keep Russian, if English → keep English
+   - NEVER translate content to another language
+   - Preserve all language-specific formatting and conventions
+
+2. SPELLING & GRAMMAR:
+   - Thoroughly check and correct ALL spelling mistakes
+   - Fix ALL grammar errors
+   - Maintain the original meaning and style
+   - Preserve technical terms, proper nouns, and brand names exactly as written
+
+3. READABILITY ENHANCEMENT:
+   - Improve sentence structure and flow
+   - Fix awkward phrasing while preserving meaning
+   - Ensure proper punctuation
+   - Maintain natural language patterns
+   - Preserve the original writing style and tone
+   - Break long paragraphs into shorter ones if it improves readability
+   - Combine fragmented sentences when appropriate
+
+4. PROFESSIONAL FORMATTING (GPT/Notion Style):
+   - Use proper markdown formatting throughout
+   - Structure with clear hierarchy: # H1, ## H2, ### H3, etc.
+   - Format lists properly:
+     * Bulleted lists (- or *) for items without order
+     * Numbered lists (1. 2. 3.) for sequences or steps
+   - Use emphasis appropriately:
+     * **Bold** for important terms, key concepts, and emphasis
+     * *Italic* for subtle emphasis, citations, or foreign terms
+     * \`Inline code\` for technical terms, commands, variables, or code snippets
+   - Use blockquotes (> text) for important notes, highlights, or quotes
+   - Ensure proper spacing between sections (one blank line between paragraphs)
    - Format tables with clear headers and consistent alignment
    - Use consistent formatting patterns throughout the document
 
-Your task:
-1. Analyze the provided document sections and tables
-2. Improve section titles (make them more descriptive and accurate) while keeping the same language
+5. CONTENT ORGANIZATION:
+   - Improve section titles (make them more descriptive and accurate) while keeping the same language
+   - Maintain the original hierarchy and order
+   - Preserve all sections and tables
+   - Enhance structure without changing meaning
+
+6. IMAGES & MEDIA:
+   - Skip all images and image references (they are marked as [Image] in the content)
+   - Do not use tokens for images
+   - Focus only on text content
+   - Images will be preserved separately
+
+YOUR TASK:
+1. Analyze all provided document sections and tables
+2. Improve section titles (more descriptive, accurate) while keeping the same language
 3. Enhance content organization and readability without changing language
 4. Apply professional text formatting (GPT/Notion style) with proper markdown
 5. Fix formatting issues and improve structure
 6. Correct ALL spelling mistakes and grammar errors
-7. Maintain the original hierarchy and order
-8. IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content. Images will be preserved separately.
+7. Maintain the original hierarchy, order, and structure
+8. Preserve all original content - only enhance, never remove or add new information
 
-CRITICAL: Return ONLY a valid JSON object. Do NOT include any markdown code blocks, explanations, or additional text. Return ONLY the raw JSON object.
+OUTPUT FORMAT - CRITICAL:
+Return ONLY a valid JSON object. Do NOT include markdown code blocks, explanations, or additional text.
+Start your response with { and end with }.
 
-The JSON must have this exact structure:
+Required JSON structure:
 {
   "sections": [
     {
-      "title": "Improved section title",
+      "title": "Improved section title (same language as original)",
       "level": 1,
-      "content": "Enhanced content with better formatting",
+      "content": "Enhanced content with better formatting and markdown",
       "order": 0
     }
   ],
   "tables": [
     {
-      "title": "Improved table title",
+      "title": "Improved table title (same language as original)",
       "headers": ["Header1", "Header2"],
       "rows": [["Value1", "Value2"]]
     }
@@ -258,19 +290,15 @@ The JSON must have this exact structure:
   }
 }
 
-IMPORTANT: 
+IMPORTANT RULES:
 - Return ONLY the JSON object, nothing else
-- Do NOT wrap it in markdown code blocks (no \`\`\`json)
-- Do NOT add any explanations or text before or after the JSON
-- Start your response with { and end with }
-
-Preserve all original sections and tables, but improve their titles and content quality. 
-- Fix ALL spelling mistakes and grammar errors while maintaining the original meaning
-- Enhance readability by improving sentence structure, flow, and clarity
-- Apply professional formatting (GPT/Notion style) with proper markdown, headers, lists, emphasis, and structure
-- CRITICAL: Always maintain the original document's language - NEVER translate to a different language
-- Keep the same writing style and tone as the original document
-- Format content with clear visual hierarchy using markdown (headers, bold, italic, lists, code blocks, blockquotes)`
+- Do NOT wrap it in markdown code blocks (no \`\`\`json or \`\`\`)
+- Do NOT add explanations, comments, or text before/after the JSON
+- Ensure all strings are properly escaped in JSON
+- Preserve all original sections and tables (same count)
+- Maintain section order exactly as provided
+- Keep table structure intact (same headers and row count)
+- Calculate accurate metadata (totalSections, totalTables, wordCount)`
               },
               {
                 role: 'user',

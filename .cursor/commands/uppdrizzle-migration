@@ -1,0 +1,12 @@
+You are designing a Drizzle ORM schema update and migration for Uppstaff.
+
+Change needed:
+{{input}}
+
+Steps:
+1. Update or add TypeScript schema definition for the table(s).
+2. Propose a Drizzle migration script (for Drizzle Kit).
+3. Mention potential data migration steps (backfilling, defaults).
+4. Note any indices or constraints important for performance and multi-tenancy (businessId).
+
+Output in code blocks ready to paste.

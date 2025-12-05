@@ -35,17 +35,14 @@ export async function GET() {
 
     const assignmentsData = tenantAssignments.map(r => r.assignment)
 
-    // Get all assignment_users for these assignments
-    const allAssignmentUsers = await Promise.all(
-      assignmentsData.map(async (assignment) => {
-        const aus = await db
+    // Get all assignment_users for these assignments - batch query instead of N queries
+    const assignmentIds = assignmentsData.map(a => a.id)
+    const flatAssignmentUsers = assignmentIds.length > 0
+      ? await db
           .select()
           .from(assignmentUsers)
-          .where(eq(assignmentUsers.assignmentId, assignment.id))
-        return aus
-      })
-    )
-    const flatAssignmentUsers = allAssignmentUsers.flat()
+          .where(inArray(assignmentUsers.assignmentId, assignmentIds))
+      : []
 
     // Get all test attempts for employees
     const employeeUserIds = employeeUsers.map(u => u.id)

@@ -381,21 +381,48 @@ export default function TestBuilderPage() {
             options?: string[]
             correctAnswer?: string
             explanation?: string
+            tags?: any
           }) => {
+            // Restore original question type from tags if available
+            const tags = q.tags || {}
+            const originalType = tags.originalType
+            
+            // Determine question type: use originalType if available, otherwise convert from DB type
+            let questionType: string
+            if (originalType) {
+              questionType = originalType
+            } else {
+              // Convert database type to frontend type
+              const correctAnswer = q.correctAnswer || ''
+              const hasMultipleAnswers = /[,;]/.test(correctAnswer) || /^[A-Z,;]+$/.test(correctAnswer.trim())
+              
+              if (q.type === 'multiple_choice') {
+                questionType = hasMultipleAnswers ? 'mcq_multi' : 'mcq'
+              } else if (q.type === 'true_false') {
+                questionType = 'tf'
+              } else if (q.type === 'text') {
+                questionType = 'complete'
+              } else {
+                questionType = q.type || 'mcq'
+              }
+            }
+            
             // Preserve the correct answer from database, don't use default
             // If correctAnswer is empty/null, it means the question wasn't properly saved
             const correctAnswer = q.correctAnswer || ''
             
             console.log('Loading question:', {
               id: q.id,
+              originalType: originalType,
+              dbType: q.type,
+              questionType: questionType,
               correctAnswer: q.correctAnswer,
-              type: q.type,
               options: q.options
             })
             
             return {
               id: q.id,
-              type: q.type || 'mcq',
+              type: questionType,
               prompt: q.content || q.title || 'Question',
               choices: q.options || ['A', 'B', 'C', 'D'],
               correct_answer: correctAnswer, // Don't use default - preserve what's in DB
@@ -739,8 +766,8 @@ export default function TestBuilderPage() {
       
       // Показать toast для ошибок конфигурации API
       if (errorMessage.includes('GROK_API_KEY') || errorMessage.includes('not set') || errorMessage.includes('environment variables')) {
-        toast.error('API не настроен', {
-          description: 'Проверьте настройки GROK_API_KEY в .env.local',
+        toast.error(t('apiNotConfigured'), {
+          description: t('checkGrokApiKey'),
           duration: 6000
         })
       } else {

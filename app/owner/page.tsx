@@ -1412,7 +1412,7 @@ function OwnerPageInner() {
   const handleEnhanceDocument = async (id: string) => {
     if (isEnhancementDisabled) {
       toast.error(
-        `Enhancement limit reached (${limits?.enhancements.current}/${limits?.enhancements.max}). Please upgrade your plan to continue.`,
+        t('enhancementLimitReached').replace('{current}', String(limits?.enhancements.current || 0)).replace('{max}', String(limits?.enhancements.max || 0)),
         { duration: 5000 }
       )
       return
@@ -1429,7 +1429,7 @@ function OwnerPageInner() {
       
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error')
-        let errorMessage = 'Failed to enhance document'
+        let errorMessage = t('failedToEnhanceDocument')
         try {
           const errorJson = JSON.parse(errorText)
           errorMessage = errorJson.message || errorMessage
@@ -1437,7 +1437,7 @@ function OwnerPageInner() {
           errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`
         }
         console.error('Failed to enhance document:', errorMessage)
-        toast.error(errorMessage, { id: 'enhance' })
+        toast.error(errorMessage || t('failedToEnhanceDocument'), { id: 'enhance' })
         return
       }
       
@@ -1496,7 +1496,7 @@ function OwnerPageInner() {
           return
         }
         
-        let errorMessage = 'Failed to delete document'
+        let errorMessage = t('failedToDeleteDocument')
         try {
           const errorResult = await response.json()
           errorMessage = errorResult.message || errorMessage
@@ -1527,7 +1527,7 @@ function OwnerPageInner() {
     } catch (error) {
       // Revert on error - restore previous state
       setDocumentsWithLog(previousDocuments)
-      const errorMessage = error instanceof Error ? error.message : 'Error deleting document'
+      const errorMessage = error instanceof Error ? error.message : t('errorDeletingDocument')
       console.error('Error deleting document:', error)
       toast.error(errorMessage || t('errorDeletingDocument'))
     } finally {
@@ -1646,16 +1646,16 @@ function OwnerPageInner() {
       const result = await response.json()
       
       if (result.success) {
-        toast.success(t('assignmentResultsReset') || 'Assignment results reset successfully')
+        toast.success(t('assignmentResultsResetSuccessfully'))
         // Reload assignments to reflect the reset
         loadData(true, true).catch(console.error)
       } else {
         console.error('Failed to reset assignment:', result.message)
-        toast.error(result.message || 'Failed to reset assignment results')
+        toast.error(result.message || t('failedToResetAssignmentResults'))
       }
     } catch (error) {
       console.error('Error resetting assignment:', error)
-      toast.error('Error resetting assignment results')
+      toast.error(t('errorResettingAssignmentResults'))
     }
   }
 
@@ -1986,7 +1986,7 @@ function OwnerPageInner() {
                                   handleEnhanceDocument(doc.id)
                                 }}
                                 disabled={isEnhancementDisabled || enhancingDocId === doc.id}
-                                title={isEnhancementDisabled ? "Enhancement limit reached" : "Enhance with Grok API"}
+                                title={isEnhancementDisabled ? t('enhancementLimitReachedTitle') : t('enhanceWithGrokApi')}
                               >
                               {enhancingDocId === doc.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2057,7 +2057,7 @@ function OwnerPageInner() {
                   const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
                   return {
                     id: Number(fullUser?.id || user.userId || user.id || 0),
-                    name: fullUser?.name || 'Unknown User',
+                    name: fullUser?.name || t('unknownUser'),
                     email: fullUser?.email || '',
                     role: fullUser?.role || 'employee',
                     department: fullUser?.job || ''
@@ -2074,12 +2074,12 @@ function OwnerPageInner() {
                     name: document.name,
                     type: document.type,
                     uploadedAt: document.uploadedAt
-                  } : { id: 0, name: 'Document Not Found', type: 'UNKNOWN', uploadedAt: a.createdAt },
+                  } : { id: 0, name: t('documentNotFound'), type: 'UNKNOWN', uploadedAt: a.createdAt },
                   test: test ? {
                     id: test.id,
                     title: test.title,
                     questionCount: test.questionCount || 0
-                  } : a.testId ? { id: a.testId, title: 'Test Not Found', questionCount: 0 } : { id: '', title: 'No Test', questionCount: 0 },
+                  } : a.testId ? { id: a.testId, title: t('testNotFound'), questionCount: 0 } : { id: '', title: t('noTest'), questionCount: 0 },
                   assignedUsers: assignedUsers,
                   dueDate: a.dueDate || '',
                   createdAt: a.createdAt,

@@ -54,6 +54,7 @@ interface TestData {
   sourceDocument: string
   createdAt: string
   createdBy: string
+  passingScore?: number // Passing score for this test (defaults to 70 if not set)
 }
 
 export default function TestPage() {
@@ -103,20 +104,35 @@ export default function TestPage() {
             options?: string[] | null
             correctAnswer?: string | null
             explanation?: string | null
+            tags?: any
           }) => {
-            // Convert database type to frontend type
-            // Check if question has multiple correct answers (comma-separated indices or letters)
-            let questionType = 'mcq'
-            const correctAnswer = q.correctAnswer || ''
-            const hasMultipleAnswers = /[,;]/.test(correctAnswer) || /^[A-Z,;]+$/.test(correctAnswer.trim())
+            // Restore original question type from tags if available
+            let questionType: string
+            const tags = q.tags || {}
+            const originalType = tags.originalType
             
-            if (q.type === 'multiple_choice') {
-              questionType = hasMultipleAnswers ? 'mcq_multi' : 'mcq'
-            } else if (q.type === 'true_false') questionType = 'tf'
-            else if (q.type === 'text') questionType = 'complete'
+            if (originalType) {
+              // Use original type if available
+              questionType = originalType
+            } else {
+              // Fallback to conversion from database type
+              // Check if question has multiple correct answers (comma-separated indices or letters)
+              const correctAnswer = q.correctAnswer || ''
+              const hasMultipleAnswers = /[,;]/.test(correctAnswer) || /^[A-Z,;]+$/.test(correctAnswer.trim())
+              
+              if (q.type === 'multiple_choice') {
+                questionType = hasMultipleAnswers ? 'mcq_multi' : 'mcq'
+              } else if (q.type === 'true_false') {
+                questionType = 'tf'
+              } else if (q.type === 'text') {
+                questionType = 'complete'
+              } else {
+                questionType = 'mcq' // default fallback
+              }
+            }
             
             // Log loaded correct answers to verify updates are being loaded
-            console.log(`Loaded question ${q.id}: correctAnswer = "${q.correctAnswer}"`)
+            console.log(`Loaded question ${q.id}: type="${questionType}", correctAnswer = "${q.correctAnswer}"`)
             
             return {
               id: q.id,
@@ -138,7 +154,8 @@ export default function TestPage() {
             questions: transformedQuestions,
             sourceDocument: test.moduleId || 'Unknown',
             createdAt: test.createdAt,
-            createdBy: test.createdBy || 'Unknown'
+            createdBy: test.createdBy || 'Unknown',
+            passingScore: test.passingScore ?? 70 // Use test's passingScore or default to 70
           })
         }
       } catch (error) {
@@ -156,9 +173,10 @@ export default function TestPage() {
       const currentAnswer = prev[questionId]
       const question = testData?.questions.find(q => q.id === questionId)
       const isMultiChoice = question?.type === 'mcq_multi'
+      const isMatch = question?.type === 'match'
       
-      if (isMultiChoice) {
-        // For multiple choice, toggle the answer
+      // For multiple choice (multiple answers) and matching, toggle the answer
+      if (isMultiChoice || isMatch) {
         const currentAnswers = Array.isArray(currentAnswer) ? currentAnswer : (currentAnswer ? [currentAnswer] : [])
         const newAnswers = currentAnswers.includes(answer)
           ? currentAnswers.filter(a => a !== answer) // Remove if already selected
@@ -234,8 +252,8 @@ export default function TestPage() {
       
       let isCorrect = false
       
-      // Handle text/complete questions differently
-      if (question.type === 'complete' || question.type === 'text') {
+      // Handle text/complete/cloze questions differently
+      if (question.type === 'complete' || question.type === 'text' || question.type === 'cloze') {
         // For text questions, compare answers case-insensitively after trimming and normalizing whitespace
         // toLowerCase() works correctly with Cyrillic characters
         const normalizeText = (text: string): string => {
@@ -323,6 +341,100 @@ export default function TestPage() {
               noIncorrectSelected,
               sameCount
             })
+          }
+        }
+        // Handle matching questions (similar to mcq_multi but order matters)
+        else if (question.type === 'match') {
+          // For matching, correct answer is comma-separated pairs or ordered list
+          const correctAnswerStr = question.correct_answer.trim()
+          const correctAnswerParts = correctAnswerStr.split(/[,;\s]+/).filter(p => p.length > 0)
+          
+          // Convert correct answers to letters
+          const correctAnswerLetters: string[] = []
+          for (const part of correctAnswerParts) {
+            let letter: string | null = null
+            
+            if (/^[A-Z]$/i.test(part)) {
+              letter = part.toUpperCase()
+            } else if (/^\d+$/.test(part)) {
+              const index = parseInt(part, 10)
+              if (question.choices && index >= 1 && index <= question.choices.length) {
+                const zeroBasedIndex = index - 1
+                letter = String.fromCharCode(65 + zeroBasedIndex)
+              }
+            } else if (question.choices) {
+              const choiceIndex = question.choices.findIndex(
+                choice => choice.trim().toLowerCase() === part.trim().toLowerCase()
+              )
+              if (choiceIndex >= 0) {
+                letter = String.fromCharCode(65 + choiceIndex)
+              }
+            }
+            
+            if (letter) {
+              correctAnswerLetters.push(letter)
+            }
+          }
+          
+          // Get user answers
+          const userAnswers = Array.isArray(userAnswer) 
+            ? userAnswer.map(a => a.toUpperCase())
+            : (userAnswer ? [userAnswer.toUpperCase()] : [])
+          
+          // For matching, order matters - check if sequences match
+          const correctSequence = correctAnswerLetters.join(',')
+          const userSequence = userAnswers.join(',')
+          
+          if (correctSequence === userSequence && correctAnswerLetters.length === userAnswers.length) {
+            isCorrect = true
+            correctAnswers++
+          }
+        }
+        // Handle ordering questions (order matters)
+        else if (question.type === 'order') {
+          // For ordering, correct answer is comma-separated ordered list
+          const correctAnswerStr = question.correct_answer.trim()
+          const correctAnswerParts = correctAnswerStr.split(/[,;\s]+/).filter(p => p.length > 0)
+          
+          // Convert correct answers to letters
+          const correctAnswerLetters: string[] = []
+          for (const part of correctAnswerParts) {
+            let letter: string | null = null
+            
+            if (/^[A-Z]$/i.test(part)) {
+              letter = part.toUpperCase()
+            } else if (/^\d+$/.test(part)) {
+              const index = parseInt(part, 10)
+              if (question.choices && index >= 1 && index <= question.choices.length) {
+                const zeroBasedIndex = index - 1
+                letter = String.fromCharCode(65 + zeroBasedIndex)
+              }
+            } else if (question.choices) {
+              const choiceIndex = question.choices.findIndex(
+                choice => choice.trim().toLowerCase() === part.trim().toLowerCase()
+              )
+              if (choiceIndex >= 0) {
+                letter = String.fromCharCode(65 + choiceIndex)
+              }
+            }
+            
+            if (letter) {
+              correctAnswerLetters.push(letter)
+            }
+          }
+          
+          // Get user answers
+          const userAnswers = Array.isArray(userAnswer) 
+            ? userAnswer.map(a => a.toUpperCase())
+            : (userAnswer ? [userAnswer.toUpperCase()] : [])
+          
+          // For ordering, exact sequence match is required
+          const correctSequence = correctAnswerLetters.join(',')
+          const userSequence = userAnswers.join(',')
+          
+          if (correctSequence === userSequence && correctAnswerLetters.length === userAnswers.length) {
+            isCorrect = true
+            correctAnswers++
           }
         }
         // Handle single choice multiple choice and true/false
@@ -423,11 +535,12 @@ export default function TestPage() {
       formula: `${correctAnswers} / ${totalQuestionsWithAnswers} * 100 = ${percentage}%`
     })
     
+    // Show results immediately (client-side preview)
     setScore(percentage)
     setCorrectAnswersCount(correctAnswers)
     setShowResults(true)
 
-    // Save test attempt to database
+    // Save test attempt to database (server will validate and calculate score)
     try {
       const response = await fetch('/api/test-attempts', {
         method: 'POST',
@@ -437,15 +550,26 @@ export default function TestPage() {
         body: JSON.stringify({
           testId: testId,
           answers: answers,
-          score: percentage,
+          // Don't send score - server will calculate it
           timeSpent: (15 * 60) - timeLeft, // Calculate time spent
-          status: 'completed'
         })
       })
 
       if (!response.ok) {
-        console.error('Failed to save test attempt')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Failed to save test attempt:', errorData.message || 'Unknown error')
+        
+        // If max attempts exceeded, show error to user
+        if (response.status === 403) {
+          alert(errorData.message || 'Maximum attempts exceeded for this test')
+        }
       } else {
+        const result = await response.json()
+        // Update score with server-calculated value (in case of discrepancies)
+        if (result.data?.score !== undefined) {
+          setScore(result.data.score)
+        }
+        
         // Trigger assignments refresh for employee when returning to page
         if (typeof window !== 'undefined') {
           // Set a flag to refresh assignments when employee returns to their page
@@ -569,18 +693,20 @@ export default function TestPage() {
           <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl text-center justify-center">
-                {score >= 70 ? t('congratulations') : t('testCompleted')}
+                {score >= (testData.passingScore ?? 70) ? t('congratulations') : t('testCompleted')}
               </CardTitle>
               <CardDescription>
                 {testData.title}
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
-              <div className={`text-6xl font-bold ${score >= 70 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-6xl font-bold ${score >= (testData.passingScore ?? 70) ? 'text-green-600' : 'text-red-600'}`}>
                 {score}%
               </div>
               <div className="text-lg text-muted-foreground">
-                {score >= 70 ? t('youPassedTheTest') : t('youNeedToScore70PercentOrHigherToPass')}
+                {score >= (testData.passingScore ?? 70) 
+                  ? t('youPassedTheTest') 
+                  : t('youNeedToScore70PercentOrHigherToPass').replace('70', String(testData.passingScore ?? 70))}
               </div>
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                 <div className="bg-muted p-4 rounded-3xl">
@@ -783,6 +909,115 @@ export default function TestPage() {
                   placeholder={t('enterYourAnswer') || 'Enter your answer here...'}
                   className="min-h-[120px] resize-none"
                 />
+              </div>
+            )}
+
+            {/* Cloze test questions (similar to complete but with multiple blanks) */}
+            {currentQ.type === 'cloze' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  {t('yourAnswer') || 'Your Answer'}
+                </label>
+                <Textarea
+                  value={answers[currentQ.id] || ''}
+                  onChange={(e) => handleTextAnswerChange(currentQ.id, e.target.value)}
+                  placeholder={t('enterYourAnswer') || 'Enter your answer here...'}
+                  className="min-h-[120px] resize-none"
+                />
+              </div>
+            )}
+
+            {/* Matching questions */}
+            {currentQ.type === 'match' && currentQ.choices && currentQ.choices.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {t('matching') || 'Match the items on the left with the items on the right'}
+                </p>
+                <div className="space-y-3">
+                  {currentQ.choices.map((choice, index) => {
+                    const letter = String.fromCharCode(65 + index)
+                    const currentAnswer = answers[currentQ.id]
+                    const selectedAnswers = Array.isArray(currentAnswer) ? currentAnswer : (currentAnswer ? [currentAnswer] : [])
+                    const isSelected = selectedAnswers.includes(letter)
+                    
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handleAnswerSelect(currentQ.id, letter)}
+                        className={`w-full p-4 text-left border rounded-3xl transition-colors ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 text-primary-700 dark:text-primary-300'
+                            : 'border-border hover:border-accent hover:bg-accent'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center text-sm font-medium shrink-0 ${
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border'
+                          }`}>
+                            {isSelected ? '✓' : letter}
+                          </div>
+                          <span className="flex-1 break-word leading-relaxed">{choice}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Ordering questions */}
+            {currentQ.type === 'order' && currentQ.choices && currentQ.choices.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {t('ordering') || 'Arrange the items in the correct order'}
+                </p>
+                <div className="space-y-3">
+                  {currentQ.choices.map((choice, index) => {
+                    const letter = String.fromCharCode(65 + index)
+                    const currentAnswer = answers[currentQ.id]
+                    const selectedAnswers = Array.isArray(currentAnswer) ? currentAnswer : (currentAnswer ? [currentAnswer] : [])
+                    const orderIndex = selectedAnswers.indexOf(letter)
+                    const isInOrder = orderIndex >= 0
+                    
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center space-x-3 p-4 border rounded-3xl"
+                      >
+                        <div className="w-8 h-8 rounded border-2 flex items-center justify-center text-sm font-medium shrink-0 border-border">
+                          {isInOrder ? orderIndex + 1 : '?'}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const currentAnswers = Array.isArray(currentAnswer) ? currentAnswer : []
+                            if (currentAnswers.includes(letter)) {
+                              // Remove from order
+                              setAnswers(prev => ({
+                                ...prev,
+                                [currentQ.id]: currentAnswers.filter(a => a !== letter)
+                              }))
+                            } else {
+                              // Add to end of order
+                              setAnswers(prev => ({
+                                ...prev,
+                                [currentQ.id]: [...currentAnswers, letter]
+                              }))
+                            }
+                          }}
+                          className={`flex-1 p-2 text-left border rounded-lg transition-colors ${
+                            isInOrder
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-accent'
+                          }`}
+                        >
+                          <span className="break-word leading-relaxed">{choice}</span>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
 
