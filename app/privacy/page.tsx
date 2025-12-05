@@ -1,15 +1,38 @@
-"use client"
+import { headers } from "next/headers"
+import { translations } from "@/lib/translations"
+import type { Metadata } from "next"
 
-import { useTranslation } from "@/lib/translation-context"
-
-export default function PrivacyPage() {
-  const { t, language } = useTranslation()
-
-  // Format date based on current language
-  const formatDate = (date: Date) => {
-    const locale = language === 'ru' ? 'ru-RU' : 'en-US'
-    return date.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })
+// Detect language from Accept-Language header for server-side rendering
+function detectLanguage(acceptLanguage: string): 'en' | 'ru' {
+  // Check for Russian/CIS language codes
+  if (/ru|uk|be|kk/i.test(acceptLanguage)) {
+    return 'ru'
   }
+  
+  return 'en'
+}
+
+// Format date based on current language
+function formatDate(date: Date, locale: string): string {
+  return date.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | Uppstaff",
+  description: "Privacy Policy for Uppstaff - AI Training & Knowledge Platform. Learn how we collect, use, and protect your information.",
+  robots: {
+    index: true,
+    follow: true,
+  },
+}
+
+export default async function PrivacyPage() {
+  const headersList = await headers()
+  const acceptLanguage = headersList.get('accept-language') || ''
+  const lang = detectLanguage(acceptLanguage)
+  const t = translations[lang]
+  
+  const locale = lang === 'ru' ? 'ru-RU' : 'en-US'
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-4xl">
@@ -17,7 +40,7 @@ export default function PrivacyPage() {
       
       <div className="prose prose-lg dark:prose-invert max-w-none">
         <p className="text-muted-foreground mb-6">
-          <strong>{t("privacyLastUpdated")}</strong> {formatDate(new Date())}
+          <strong>{t("privacyLastUpdated")}</strong> {formatDate(new Date(), locale)}
         </p>
 
         <section className="mb-8">
@@ -124,3 +147,6 @@ export default function PrivacyPage() {
   )
 }
 
+// Allow static generation where possible, but support dynamic language detection
+export const dynamic = 'auto'
+export const revalidate = 3600 // Revalidate every hour

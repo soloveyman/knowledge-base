@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { headers } from "next/headers"
 import { translations } from "@/lib/translations"
+import type { Metadata } from "next"
 
 // Detect language from Accept-Language header for server-side rendering
 function detectLanguage(acceptLanguage: string): 'en' | 'ru' {
@@ -10,6 +11,20 @@ function detectLanguage(acceptLanguage: string): 'en' | 'ru' {
   }
   
   return 'en'
+}
+
+export const metadata: Metadata = {
+  title: "Uppstaff | AI Training & Knowledge Platform",
+  description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time — fast, transparent, and secure.",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "Uppstaff | AI Training & Knowledge Platform",
+    description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time.",
+    type: "website",
+  },
 }
 
 export default async function Home() {
