@@ -466,7 +466,7 @@ export default function SubscriptionManager({
     // Map plan descriptions to translation keys
     const descriptionMap: Record<string, string> = {
       '14-day free trial to explore all features': t('freeTrialDescription'),
-      '7 days of full access': t('freeTrialDescription'),
+      '14 days of full access': t('freeTrialDescription'),
       'Small teams, startups': t('starterDescription'),
       'For small teams and startups': t('starterDescription'),
       'Growing companies, medium-sized teams': t('proDescription'),

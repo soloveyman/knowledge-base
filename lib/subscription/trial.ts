@@ -59,7 +59,7 @@ export async function getOrCreateTrialPlan() {
     const [updated] = await db
       .update(subscriptionPlans)
       .set({
-        description: '7 days of full access',
+        description: '14 days of full access',
         maxUsers: 5,
         maxImportsPerMonth: 10,
         maxGenerationsPerMonth: 20,
@@ -84,7 +84,7 @@ export async function getOrCreateTrialPlan() {
     .values({
       name: TRIAL_CONFIG.PLAN_NAME,
       displayName: 'Free Trial',
-      description: '7 days of full access',
+      description: '14 days of full access',
       price: 0, // Free
       currency: 'USD',
       interval: 'month',

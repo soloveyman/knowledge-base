@@ -37,6 +37,7 @@
     "stripe:webhook": ".\\bin\\stripe.exe listen --forward-to localhost:3000/api/stripe/webhook",
     "setup:env": "tsx scripts/setup-env.ts",
     "setup:trial": "tsx scripts/setup-trial-plan.ts",
+    "update:trial": "tsx scripts/update-trial-description.ts",
     "setup:starter": "tsx scripts/setup-starter-plan.ts",
     "setup:pro": "tsx scripts/setup-pro-plan.ts",
     "setup:annual": "tsx scripts/setup-annual-plans.ts",

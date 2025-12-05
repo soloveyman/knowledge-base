@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { subscriptions, subscriptionPlans, usage, users, payments } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { getTenantDb } from '@/lib/db/tenant'
-import { assignFreeTrialToOwner } from './trial'
+import { assignFreeTrialToOwner, isTrialPlan, isTrialExpired } from './trial'
 
 /**
  * Check if user has reached a usage limit
@@ -81,6 +81,19 @@ export async function checkUsageLimit(
         current: 0,
         max: null,
         message: 'Subscription is not active'
+      }
+    }
+
+    // Check if trial has expired (for trial plans only)
+    if (isTrialPlan(plan.name)) {
+      const trialEndDate = subscription.currentPeriodEnd
+      if (trialEndDate && isTrialExpired(trialEndDate)) {
+        return {
+          allowed: false,
+          current: 0,
+          max: null,
+          message: 'Your 14-day free trial has expired. Please upgrade your plan to continue.'
+        }
       }
     }
 
