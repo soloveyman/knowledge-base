@@ -30,7 +30,12 @@ export default async function PrivacyPage() {
   const headersList = await headers()
   const acceptLanguage = headersList.get('accept-language') || ''
   const lang = detectLanguage(acceptLanguage)
-  const t = translations[lang]
+  const translationsForLang = translations[lang]
+  
+  // Create a translation function similar to useTranslation hook
+  const t = (key: keyof typeof translationsForLang): string => {
+    return translationsForLang[key] || translations.en[key as keyof typeof translations.en] || key
+  }
   
   const locale = lang === 'ru' ? 'ru-RU' : 'en-US'
 
