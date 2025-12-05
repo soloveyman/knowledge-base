@@ -14,7 +14,7 @@ interface ListItemProps {
   metadata?: string[]
   badges?: Array<{
     label: string
-    variant?: "default" | "secondary" | "outline" | "destructive"
+    variant?: "default" | "secondary" | "outline" | "destructive" | "success" | "warning" | "info"
   }>
   onClick?: () => void
   onDelete?: () => void
@@ -92,10 +92,17 @@ export function ListItem({
                   // Remove emojis from badge label
                   const cleanedLabel = badgeLabel.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim()
                   
+                  // Map custom variants to Badge component variants
+                  const badgeVariant = config.variant === 'success' || config.variant === 'warning' || config.variant === 'info' 
+                    ? config.variant 
+                    : (config.variant === 'default' || config.variant === 'secondary' || config.variant === 'destructive' || config.variant === 'outline'
+                      ? config.variant 
+                      : 'outline')
+                  
                   return (
                     <Badge 
                       key={index}
-                      variant={config.variant || "outline"} 
+                      variant={badgeVariant as "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"} 
                       className="text-xs"
                     >
                       {cleanedLabel}

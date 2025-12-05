@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { uploadImageToSpaces } from '@/lib/storage/spaces'
 import { createDocumentSchema } from '@/lib/schemas/documents'
 import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 /**
  * Get owner ID for usage counting - if user is owner, return their ID,

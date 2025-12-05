@@ -3,10 +3,7 @@ import { headers } from "next/headers"
 import { translations } from "@/lib/translations"
 
 // Detect language from Accept-Language header for server-side rendering
-function detectLanguage(): 'en' | 'ru' {
-  const headersList = headers()
-  const acceptLanguage = headersList.get('accept-language') || ''
-  
+function detectLanguage(acceptLanguage: string): 'en' | 'ru' {
   // Check for Russian/CIS language codes
   if (/ru|uk|be|kk/i.test(acceptLanguage)) {
     return 'ru'
@@ -15,8 +12,10 @@ function detectLanguage(): 'en' | 'ru' {
   return 'en'
 }
 
-export default function Home() {
-  const lang = detectLanguage()
+export default async function Home() {
+  const headersList = await headers()
+  const acceptLanguage = headersList.get('accept-language') || ''
+  const lang = detectLanguage(acceptLanguage)
   const t = translations[lang]
 
   return (

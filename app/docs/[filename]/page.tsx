@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useNavigateBack } from "@/lib/redirect-utils"
 import { DocumentRenderer } from "@/components/common/document-renderer"
 import { DocumentLoadingSkeleton } from "@/components/common/loading-skeleton"
+import { useTranslation } from "@/lib/translation-context"
 
 interface UserWithRole {
   name?: string | null
@@ -78,6 +79,7 @@ export default function DocumentViewer() {
   const params = useParams()
   const filenameOrId = params.filename as string
   const navigateBack = useNavigateBack()
+  const { t } = useTranslation()
 
   const [documentData, setDocumentData] = useState<DocumentData | null>(null)
   const [loading, setLoading] = useState(true)
