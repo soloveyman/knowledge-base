@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db, tests, questions, assignments, assignmentUsers, testAttempts, progress, users } from '@/lib/db'
 import { eq, and, inArray } from 'drizzle-orm'
 import { auth, hasPermission } from '@/lib/auth'
+import { handleApiError } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: Request,
@@ -14,7 +16,7 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const checkDependencies = searchParams.get('checkDependencies') === 'true'
     
-    console.log('GET request for test ID:', id, 'checkDependencies:', checkDependencies)
+    logger.log('GET request for test ID:', id, 'checkDependencies:', checkDependencies)
 
     // Find test by ID - handle missing columns gracefully
     let testData
@@ -43,7 +45,7 @@ export async function GET(
         .from(tests)
         .where(eq(tests.id, id))
         .limit(1)
-      console.log('Test query result:', test.length, 'tests found')
+      logger.log('Test query result:', test.length, 'tests found')
       
       if (test.length === 0) {
         return NextResponse.json({
@@ -63,7 +65,7 @@ export async function GET(
       if (fullErrorText.includes('column "type" does not exist') || 
           fullErrorText.includes('column "difficulty" does not exist') ||
           fullErrorText.includes('column "locale" does not exist')) {
-        console.log('New columns not found, using fallback query')
+        logger.log('New columns not found, using fallback query')
         const test = await db
           .select({
             id: tests.id,
@@ -115,24 +117,24 @@ export async function GET(
       })
     }
     
-    console.log('Test data:', testData)
-    console.log('Question IDs:', testData.questionIds)
+    logger.log('Test data:', testData)
+    logger.log('Question IDs:', testData.questionIds)
     
     // If we have question IDs, fetch the actual questions
     const questionsArray = []
     if (testData.questionIds && Array.isArray(testData.questionIds) && testData.questionIds.length > 0) {
-      console.log('Processing question IDs:', testData.questionIds.length)
+      logger.log('Processing question IDs:', testData.questionIds.length)
       // Filter out non-UUID question IDs (like "q1", "q2" from mock data)
       const validQuestionIds = testData.questionIds.filter((qId: string) => 
         typeof qId === 'string' && 
         qId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
       )
-      console.log('Valid question IDs:', validQuestionIds)
+      logger.log('Valid question IDs:', validQuestionIds)
       
       if (validQuestionIds.length > 0) {
         // Fetch questions one by one (Drizzle limitation with IN clause)
         for (const questionId of validQuestionIds) {
-          console.log('Fetching question:', questionId)
+          logger.log('Fetching question:', questionId)
           const questionResult = await db.select().from(questions).where(eq(questions.id, questionId)).limit(1)
           if (questionResult.length > 0) {
             questionsArray.push(questionResult[0])
@@ -141,7 +143,7 @@ export async function GET(
       }
     }
 
-    console.log('Returning test data with', questionsArray.length, 'questions')
+    logger.log('Returning test data with', questionsArray.length, 'questions')
     return NextResponse.json({
       success: true,
       data: { 
@@ -150,39 +152,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Get test API error:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    const errorName = error instanceof Error ? error.name : typeof error;
-    
-    // Check for "too many clients" error
-    const isTooManyClients = errorMessage.includes('too many clients') || 
-                            (error instanceof Error && (error as any).cause?.message?.includes('too many clients'));
-    
-    console.error('Get test API error details:', {
-      message: errorMessage,
-      stack: errorStack,
-      name: errorName,
-      cause: error instanceof Error ? (error as any).cause : undefined,
-      testId: id,
-      isTooManyClients
-    });
-    
-    // Return more specific error for connection pool exhaustion
-    if (isTooManyClients) {
-      return NextResponse.json({
-        success: false,
-        message: 'Database connection limit reached. Please try again in a moment.',
-        error: 'DATABASE_CONNECTION_LIMIT',
-        retryAfter: 5
-      }, { status: 503 });
-    }
-    
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to get test',
-      error: errorMessage
-    }, { status: 500 })
+    return handleApiError(error, 'Failed to get test', 500)
   }
 }
 
@@ -207,8 +177,8 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
     
-    console.log('PUT request for test ID:', id)
-    console.log('Update data:', body)
+    logger.log('PUT request for test ID:', id)
+    logger.log('Update data:', body)
 
     // Check if test exists and user has access
     const userRole = session.user.role
@@ -279,7 +249,7 @@ export async function PUT(
     const updatedQuestionIds: string[] = []
     if (body.questions && Array.isArray(body.questions) && body.questions.length > 0) {
       try {
-        console.log('Updating questions for test:', id)
+        logger.log('Updating questions for test:', id)
         const { questionSchema } = await import('@/lib/schemas/tests')
         
         // Process and update each question
@@ -324,7 +294,7 @@ export async function PUT(
               const oneBasedIndex = letterIndex + 1 // A=1, B=2, C=3, D=4
               if (oneBasedIndex >= 1 && oneBasedIndex <= validatedQuestion.choices.length) {
                 finalCorrectAnswer = String(oneBasedIndex)
-                console.log(`Question ${q.id}: Converted letter "${correctAnswerValue}" to index ${oneBasedIndex}`)
+                logger.log(`Question ${q.id}: Converted letter "${correctAnswerValue}" to index ${oneBasedIndex}`)
               } else {
                 console.warn(`Question ${q.id}: Invalid letter "${correctAnswerValue}", using first option (1)`)
                 finalCorrectAnswer = '1'
@@ -347,7 +317,7 @@ export async function PUT(
               if (choiceIndex >= 0) {
                 const oneBasedIndex = choiceIndex + 1 // Convert 0-based to 1-based
                 finalCorrectAnswer = String(oneBasedIndex)
-                console.log(`Question ${q.id}: Converted text answer "${correctAnswerValue}" to index ${oneBasedIndex}`)
+                logger.log(`Question ${q.id}: Converted text answer "${correctAnswerValue}" to index ${oneBasedIndex}`)
               } else {
                 console.warn(`Question ${q.id}: Could not find correct answer "${correctAnswerValue}" in choices, using first option (1)`)
                 finalCorrectAnswer = '1'

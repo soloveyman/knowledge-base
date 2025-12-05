@@ -106,53 +106,87 @@ function formatPlanName(plan: string): string {
     .join(' ')
 }
 
+// Badge config result type
+export type BadgeConfig = {
+  variant: BadgeVariant
+  label: string
+}
+
 // Utility functions for creating badges
-export function getBadgeConfig(type: keyof typeof BADGE_CONFIGS, key: string) {
+export function getBadgeConfig(type: keyof typeof BADGE_CONFIGS, key: string): BadgeConfig {
   const config = BADGE_CONFIGS[type]
+  const normalizedKey = key.toLowerCase()
+  
+  // Special handling for count badges (they have function labels)
+  if (type === 'count') {
+    // This should not be called directly, use getCountBadge instead
+    return { variant: "outline" as const, label: key }
+  }
+  
   // For plan badges, format the label if not found in config
-  if (type === 'plan' && !config[key as keyof typeof config]) {
+  if (type === 'plan') {
+    const planConfig = config as typeof BADGE_CONFIGS.plan
+    const planKey = normalizedKey as keyof typeof planConfig
+    if (planKey in planConfig) {
+      const value = planConfig[planKey]
+      return {
+        variant: value.variant,
+        label: value.label
+      }
+    }
     return { variant: "outline" as const, label: formatPlanName(key) }
   }
-  return config[key as keyof typeof config] || { variant: "outline" as const, label: key }
+  
+  // For other badge types, try to find the key
+  const value = (config as Record<string, { variant: BadgeVariant; label: string }>)[normalizedKey]
+  if (value && 'variant' in value && 'label' in value) {
+    return {
+      variant: value.variant,
+      label: typeof value.label === 'string' ? value.label : key
+    }
+  }
+  
+  // Fallback
+  return { variant: "outline" as const, label: key }
 }
 
-export function getStatusBadge(status: string) {
-  return getBadgeConfig('status', status.toLowerCase())
+export function getStatusBadge(status: string): BadgeConfig {
+  return getBadgeConfig('status', status)
 }
 
-export function getRoleBadge(role: string) {
-  return getBadgeConfig('role', role.toLowerCase())
+export function getRoleBadge(role: string): BadgeConfig {
+  return getBadgeConfig('role', role)
 }
 
-export function getDocumentTypeBadge(type: string) {
-  return getBadgeConfig('documentType', type.toLowerCase())
+export function getDocumentTypeBadge(type: string): BadgeConfig {
+  return getBadgeConfig('documentType', type)
 }
 
-export function getTestTypeBadge(type: string) {
-  return getBadgeConfig('testType', type.toLowerCase())
+export function getTestTypeBadge(type: string): BadgeConfig {
+  return getBadgeConfig('testType', type)
 }
 
-export function getDifficultyBadge(difficulty: string) {
-  return getBadgeConfig('difficulty', difficulty.toLowerCase())
+export function getDifficultyBadge(difficulty: string): BadgeConfig {
+  return getBadgeConfig('difficulty', difficulty)
 }
 
-export function getLocaleBadge(locale: string) {
-  return getBadgeConfig('locale', locale.toLowerCase())
+export function getLocaleBadge(locale: string): BadgeConfig {
+  return getBadgeConfig('locale', locale)
 }
 
-export function getPlanBadge(plan: string) {
-  return getBadgeConfig('plan', plan.toLowerCase())
+export function getPlanBadge(plan: string): BadgeConfig {
+  return getBadgeConfig('plan', plan)
 }
 
-export function getInvoiceStatusBadge(status: string) {
-  return getBadgeConfig('invoiceStatus', status.toLowerCase())
+export function getInvoiceStatusBadge(status: string): BadgeConfig {
+  return getBadgeConfig('invoiceStatus', status)
 }
 
-export function getCountBadge(type: 'employees' | 'questions' | 'attempts', count: number) {
+export function getCountBadge(type: 'employees' | 'questions' | 'attempts', count: number): BadgeConfig {
   const config = BADGE_CONFIGS.count[type]
   return {
     variant: config.variant,
-    label: typeof config.label === 'function' ? config.label(count) : config.label
+    label: typeof config.label === 'function' ? config.label(count) : String(config.label)
   }
 }
 

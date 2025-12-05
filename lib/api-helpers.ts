@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { ZodSchema } from 'zod'
+import { auth } from './auth'
+import type { Session } from 'next-auth'
 
 /**
  * Standardized API response helpers
@@ -112,6 +114,35 @@ export function handleApiError(
     }
   }
 
+  // Check for "too many clients" error (database connection pool exhaustion)
+  const isTooManyClients = errorMessage.includes('too many clients') || 
+    (error instanceof Error && (error as any).cause?.message?.includes('too many clients')) ||
+    dbError?.includes('too many clients')
+
+  // Return specific error for connection pool exhaustion
+  if (isTooManyClients) {
+    console.error('API Error [503]: Database connection limit reached', {
+      message: errorMessage,
+      dbError,
+      stack: errorStack,
+    })
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Database connection limit reached. Please try again in a moment.',
+        error: 'DATABASE_CONNECTION_LIMIT',
+        retryAfter: 5,
+      },
+      { 
+        status: 503,
+        headers: {
+          'Retry-After': '5',
+        }
+      }
+    )
+  }
+
   // Log full error details server-side
   console.error(`API Error [${statusCode}]:`, {
     message: errorMessage,
@@ -149,5 +180,99 @@ export function successResponse<T>(
     },
     { status: statusCode }
   )
+}
+
+/**
+ * Require authentication - returns session or error response
+ */
+export async function requireAuth(): Promise<
+  | { success: true; session: Session }
+  | { success: false; response: NextResponse<ApiError> }
+> {
+  const session = await auth()
+  
+  if (!session?.user) {
+    return {
+      success: false,
+      response: NextResponse.json(
+        {
+          success: false,
+          message: 'Unauthorized. Please sign in.',
+        },
+        { status: 401 }
+      ),
+    }
+  }
+
+  return { success: true, session }
+}
+
+/**
+ * Require authentication with businessId (tenant) - returns session and businessId or error response
+ */
+export async function requireBusinessId(): Promise<
+  | { success: true; session: Session; businessId: string }
+  | { success: false; response: NextResponse<ApiError> }
+> {
+  const authResult = await requireAuth()
+  
+  if (!authResult.success) {
+    return authResult
+  }
+
+  const { session } = authResult
+  
+  if (!session.user.businessId) {
+    return {
+      success: false,
+      response: NextResponse.json(
+        {
+          success: false,
+          message: 'Unauthorized: missing tenant',
+        },
+        { status: 401 }
+      ),
+    }
+  }
+
+  return {
+    success: true,
+    session,
+    businessId: session.user.businessId,
+  }
+}
+
+/**
+ * Require specific role - returns session or error response
+ */
+export async function requireRole(
+  allowedRoles: Array<'super-admin' | 'owner' | 'manager' | 'employee'>
+): Promise<
+  | { success: true; session: Session }
+  | { success: false; response: NextResponse<ApiError> }
+> {
+  const authResult = await requireAuth()
+  
+  if (!authResult.success) {
+    return authResult
+  }
+
+  const { session } = authResult
+  const userRole = session.user.role
+
+  if (!userRole || !allowedRoles.includes(userRole)) {
+    return {
+      success: false,
+      response: NextResponse.json(
+        {
+          success: false,
+          message: `Forbidden - this action requires one of the following roles: ${allowedRoles.join(', ')}`,
+        },
+        { status: 403 }
+      ),
+    }
+  }
+
+  return { success: true, session }
 }
 

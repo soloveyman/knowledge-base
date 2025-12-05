@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import type { ParsedContent } from '@/lib/parsers'
 import { handleApiError } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
 
 /**
  * Get owner ID for usage counting - if user is owner, return their ID,
@@ -149,7 +150,7 @@ export async function POST(
     // This is especially important for very long base64 strings
     fullText = cleanContent(fullText)
     
-    console.log(`Content prepared for Grok: ${fullText.length} chars (images removed)`)
+    logger.log(`Content prepared for Grok: ${fullText.length} chars (images removed)`)
 
     // Estimate token count (rough approximation: 1 token ≈ 4 characters)
     // Grok models have different limits:
@@ -161,16 +162,16 @@ export async function POST(
     const maxTokensForGrok2 = 131072
     const safetyMargin = 0.8 // Use 80% of limit to be safe
     
-    console.log(`Document content size: ${fullText.length} chars, estimated tokens: ${estimatedTokens}`)
+    logger.log(`Document content size: ${fullText.length} chars, estimated tokens: ${estimatedTokens}`)
     
     // Truncate content if it's too large
     let contentToSend = fullText
     let wasTruncated = false
     if (estimatedTokens > maxTokensForGrok4 * safetyMargin) {
       const maxChars = Math.floor(maxTokensForGrok4 * safetyMargin * 4)
-      console.warn(`Content too large (${estimatedTokens} tokens), truncating to ${maxChars} chars`)
+      logger.warn(`Content too large (${estimatedTokens} tokens), truncating to ${maxChars} chars`)
       contentToSend = fullText.substring(0, maxChars) + '\n\n[... Content truncated due to size limits. Only the first part of the document will be enhanced ...]'
-      console.log(`Truncated content size: ${contentToSend.length} chars`)
+      logger.log(`Truncated content size: ${contentToSend.length} chars`)
       wasTruncated = true
     }
     
@@ -183,7 +184,7 @@ export async function POST(
     for (const model of models) {
       try {
         const startTime = Date.now()
-        console.log(`Attempting Grok API enhancement with model: ${model}`)
+        logger.log(`Attempting Grok API enhancement with model: ${model}`)
 
         grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
@@ -314,7 +315,7 @@ IMPORTANT RULES:
         console.log(`Grok API enhancement request to ${model} took ${duration}ms, status: ${grokResponse.status}`)
 
         if (grokResponse.ok) {
-          console.log(`Grok API enhancement success with model: ${model} (${duration}ms)`)
+          logger.log(`Grok API enhancement success with model: ${model} (${duration}ms)`)
           break
         } else {
           let errorText = 'Unknown error'
@@ -338,7 +339,7 @@ IMPORTANT RULES:
                                    errorText.includes('tokens')
           
           if (isTokenLimitError) {
-            console.warn(`Model ${model} token limit exceeded, trying next model...`)
+            logger.warn(`Model ${model} token limit exceeded, trying next model...`)
             lastError = `Token limit exceeded for ${model}: ${errorText.substring(0, 200)}`
           } else {
             lastError = `${grokResponse.status}: ${errorText.substring(0, 300)}`
@@ -477,7 +478,7 @@ IMPORTANT RULES:
       }
       
       // Log the extracted content for debugging (first 500 chars)
-      console.log('Extracted JSON content (first 500 chars):', jsonContent.substring(0, 500))
+      logger.log('Extracted JSON content (first 500 chars):', jsonContent.substring(0, 500))
       
       enhancedContent = JSON.parse(jsonContent)
       
@@ -604,7 +605,7 @@ IMPORTANT RULES:
             })
             .where(eq(usage.id, existingUsage[0].id))
           
-          console.log(`[Usage Update] Document enhancement by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. New enhancementsCount: ${(existingUsage[0].enhancementsCount || 0) + 1}`)
+          logger.log(`[Usage Update] Document enhancement by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. New enhancementsCount: ${(existingUsage[0].enhancementsCount || 0) + 1}`)
         } else {
           // Create new usage record
           await db.insert(usage).values({
@@ -615,7 +616,7 @@ IMPORTANT RULES:
             enhancementsCount: 1
           })
           
-          console.log(`[Usage Update] Document enhancement by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. Created new usage record with enhancementsCount: 1`)
+          logger.log(`[Usage Update] Document enhancement by ${session.user.role} (${session.user.id}) counted in owner's (${ownerId}) usage. Created new usage record with enhancementsCount: 1`)
         }
       }
     }
