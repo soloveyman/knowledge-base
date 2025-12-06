@@ -73,6 +73,11 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
   const [plans] = useState<SubscriptionPlan[]>(initialPlans);
   const [changingPlan, setChangingPlan] = useState<string | null>(null);
 
+  // Debug: Log initial owners
+  useEffect(() => {
+    console.log(`[Super Admin Client] Initial owners received: ${initialOwners.length}`, initialOwners);
+  }, [initialOwners]);
+
   // Clear search text when switching tabs
   useEffect(() => {
     setSearchText('');
@@ -159,8 +164,10 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
       : true; // No search filter for paid plans
     
     if (filterType === 'free-trial') {
+      // Show owners with free-trial plan OR owners without any plan/subscription
       const isFreeTrial = owner.plan?.name === 'free-trial';
-      return matchesProvider && isFreeTrial && matchesSearch;
+      const hasNoPlan = !owner.plan && !owner.subscription;
+      return matchesProvider && (isFreeTrial || hasNoPlan) && matchesSearch;
     } else if (filterType === 'manual') {
       const isManuallyChanged = owner.subscription?.changedManuallyAt !== null && owner.subscription?.changedManuallyAt !== undefined;
       return matchesProvider && isManuallyChanged && matchesSearch;
@@ -172,6 +179,9 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
     
     return false;
   });
+  
+  // Debug: Log filtering results
+  console.log(`[Super Admin Client] Total owners: ${owners.length}, Filtered: ${filteredOwners.length}, Filter type: ${filterType}, Provider: ${filterProvider}`);
 
   const getStatusIcon = (status: string | null) => {
     if (!status) return <AlertCircle className="h-4 w-4 text-muted-foreground" />;

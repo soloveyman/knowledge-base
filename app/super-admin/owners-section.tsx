@@ -8,6 +8,21 @@ export const revalidate = 30 // Revalidate every 30 seconds
 async function fetchOwners(): Promise<OwnerSubscription[]> {
   // Optimized: Get all owners with subscriptions and plans in one query instead of N+1
   // Using window functions to get latest subscription per owner
+  // First, get all owners to ensure we don't miss any
+  const allOwnersResult = await db.execute(sql`
+    SELECT 
+      u.id,
+      u.name,
+      u.email,
+      u.country
+    FROM users u
+    WHERE u.role = 'owner'
+  `)
+  
+  console.log(`[Super Admin] Found ${allOwnersResult.rows?.length || 0} owners in database`)
+  
+  // Then get subscriptions with plans using a subquery to get latest subscription per owner
+  // Use COALESCE to handle NULL values in ORDER BY for owners without subscriptions
   const ownersWithSubscriptionsResult = await db.execute(sql`
     SELECT 
       u.id,
@@ -24,15 +39,37 @@ async function fetchOwners(): Promise<OwnerSubscription[]> {
       sp.display_name as plan_display_name,
       sp.price as plan_price,
       sp.currency as plan_currency,
-      ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY s.created_at DESC NULLS LAST) as rn
+      CASE 
+        WHEN s.id IS NULL THEN 1
+        ELSE ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY s.created_at DESC)
+      END as rn
     FROM users u
     LEFT JOIN subscriptions s ON s.user_id = u.id
     LEFT JOIN subscription_plans sp ON s.plan_id = sp.id
     WHERE u.role = 'owner'
   `)
   
-  // Filter to get only the latest subscription per owner
-  const latestSubscriptions = (ownersWithSubscriptionsResult.rows || []).filter((row: any) => row.rn === 1)
+  console.log(`[Super Admin] Query returned ${ownersWithSubscriptionsResult.rows?.length || 0} rows`)
+  
+  // Filter to get only the latest subscription per owner (or owners without subscriptions)
+  // ROW_NUMBER() will be NULL for owners without subscriptions, or 1 for the latest subscription
+  const latestSubscriptions = (ownersWithSubscriptionsResult.rows || []).filter((row: any) => {
+    // Include rows where rn is 1 (latest subscription) or null/undefined (no subscription)
+    const rn = row.rn
+    const shouldInclude = rn === 1 || rn === null || rn === undefined || (typeof rn === 'number' && rn === 1)
+    if (!shouldInclude) {
+      console.log(`[Super Admin] Filtering out row for owner ${row.id}, rn=${rn}`)
+    }
+    return shouldInclude
+  })
+  
+  console.log(`[Super Admin] After filtering, ${latestSubscriptions.length} owners to process`)
+  
+  // If we have fewer owners than expected, log a warning
+  const expectedOwners = allOwnersResult.rows?.length || 0
+  if (latestSubscriptions.length < expectedOwners) {
+    console.warn(`[Super Admin] Warning: Expected ${expectedOwners} owners but got ${latestSubscriptions.length} after filtering`)
+  }
 
   // Get payments in one query (if table exists)
   let paymentsMap = new Map<string, { revenue: number; provider: 'stripe' | null }>()
@@ -122,9 +159,13 @@ async function fetchOwners(): Promise<OwnerSubscription[]> {
 export async function OwnersSection() {
   try {
     const owners = await fetchOwners()
+    console.log(`[Super Admin] OwnersSection returning ${owners.length} owners`)
     return owners
   } catch (error) {
-    console.error('Error fetching owners:', error)
+    console.error('[Super Admin] Error fetching owners:', error)
+    if (error instanceof Error) {
+      console.error('[Super Admin] Error stack:', error.stack)
+    }
     return []
   }
 }
