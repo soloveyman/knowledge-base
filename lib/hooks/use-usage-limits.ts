@@ -16,7 +16,8 @@ export function useUsageLimits() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!session?.user || session.user.role !== 'owner') {
+    // Allow both owners and managers to see usage limits (managers see owner's limits)
+    if (!session?.user || (session.user.role !== 'owner' && session.user.role !== 'manager')) {
       setLimits(null)
       setLoading(false)
       return

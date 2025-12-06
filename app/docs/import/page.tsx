@@ -534,13 +534,14 @@ function DocImportPageInner() {
         })
       } else if (errorMessage.includes('Authorization cancelled')) {
         // Не показывать ошибку, если пользователь отменил авторизацию
-        return
+        // Состояние загрузки будет сброшено в finally
       } else {
         toast.error(errorMessage, {
           duration: 5000
         })
       }
-      
+    } finally {
+      // Всегда сбрасываем состояние загрузки, даже если пикер был закрыт без выбора файла
       setIsGooglePickerLoading(false)
     }
   }

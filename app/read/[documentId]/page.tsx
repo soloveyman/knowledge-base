@@ -598,7 +598,7 @@ export default function DocumentReaderPage() {
             </CardHeader>
             <CardContent className="p-4 sm:p-6 lg:p-8 overflow-visible">
               {documentData.type === 'PDF' ? (
-                <div className="w-full h-[500px] sm:h-[600px] lg:h-screen border border-border rounded-3xl overflow-hidden">
+                <div className="w-full h-[500px] sm:h-[600px] lg:h-[calc(100vh-12rem)] border border-border rounded-3xl overflow-hidden">
                   <iframe 
                     src={`/api/documents/${encodeURIComponent(documentData.name)}`}
                     className="w-full h-full"

@@ -278,15 +278,46 @@ export function useGooglePicker() {
           builder = builder.setDeveloperKey(currentConfig.apiKey)
         }
 
+        // Создать промис для отслеживания закрытия пикера
+        let pickerResolve: (() => void) | null = null
+        let pickerReject: ((error: Error) => void) | null = null
+        
+        const pickerPromise = new Promise<void>((resolve, reject) => {
+          pickerResolve = resolve
+          pickerReject = reject
+        })
+        
         const picker = builder.setCallback((data: any) => {
-          if (data[window.google!.picker.Response.ACTION] === window.google!.picker.Action.PICKED) {
+          const action = data[window.google!.picker.Response.ACTION]
+          
+          if (action === window.google!.picker.Action.PICKED) {
             const file = data[window.google!.picker.Response.DOCUMENTS][0]
             onFilePicked(file, accessToken)
+            if (pickerResolve) pickerResolve()
+          } else if (action === window.google!.picker.Action.CANCEL) {
+            // Пользователь закрыл пикер без выбора файла
+            console.log('Google Picker cancelled by user')
+            if (pickerResolve) pickerResolve()
+          } else {
+            // Другие действия (например, OUT_OF_SCOPE)
+            console.log('Google Picker action:', action)
+            if (pickerResolve) pickerResolve()
           }
         }).build()
         
         console.log('Picker created, showing...')
         picker.setVisible(true)
+        
+        // Дождаться закрытия пикера (с таймаутом на случай, если callback не вызовется)
+        await Promise.race([
+          pickerPromise,
+          new Promise<void>((resolve) => {
+            setTimeout(() => {
+              console.log('Picker timeout - assuming closed')
+              resolve()
+            }, 30000) // 30 секунд таймаут
+          })
+        ])
       } catch (pickerError) {
         console.error('Picker creation error:', pickerError)
         throw new Error(`Failed to create Picker: ${pickerError instanceof Error ? pickerError.message : 'Unknown error'}`)

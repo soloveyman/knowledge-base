@@ -81,7 +81,14 @@ export default async function SuperAdminPage() {
 // Separate component to fetch owners and pass to client
 async function OwnersWrapper({ initialPlans }: { initialPlans: Awaited<ReturnType<typeof PlansSection>> }) {
   try {
-    const owners = await OwnersSection()
+    // Add timeout for mobile devices with slow connections
+    const ownersPromise = OwnersSection()
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), 20000) // 20 second timeout
+    )
+    
+    const owners = await Promise.race([ownersPromise, timeoutPromise])
+    
     return (
       <SuperAdminClient 
         initialOwners={owners}
@@ -90,6 +97,7 @@ async function OwnersWrapper({ initialPlans }: { initialPlans: Awaited<ReturnTyp
     )
   } catch (error) {
     console.error('Error loading owners:', error)
+    // Return empty state instead of crashing
     return (
       <SuperAdminClient 
         initialOwners={[]}

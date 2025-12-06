@@ -27,9 +27,32 @@ export async function GET() {
       .where(eq(subscriptionPlans.isActive, true))
       .orderBy(subscriptionPlans.price);
 
-    // Get current user's subscription (only owners can have subscriptions)
+    // Get current user's subscription (owners have subscriptions, managers see owner's subscription)
     let currentSubscription = null;
-    if (session.user.role === 'owner') {
+    let ownerId = session.user.id;
+    
+    // If user is manager/employee, find owner with same businessId
+    if (session.user.role !== 'owner' && session.user.businessId) {
+      const owner = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.role, 'owner'),
+            eq(users.businessId, session.user.businessId)
+          )
+        )
+        .limit(1);
+      
+      if (owner.length > 0) {
+        ownerId = owner[0].id;
+      } else {
+        // No owner found, return empty subscription
+        ownerId = '';
+      }
+    }
+    
+    if (ownerId && (session.user.role === 'owner' || session.user.role === 'manager')) {
       // Prioritize active subscriptions, then order by most recently updated
       const userSubscriptions = await db
         .select({
@@ -38,7 +61,7 @@ export async function GET() {
         })
         .from(subscriptions)
         .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
-        .where(eq(subscriptions.ownerId as any, session.user.id))
+        .where(eq(subscriptions.ownerId as any, ownerId))
         .orderBy(
           // Order by status: 'active' first, then others
           sql`CASE WHEN subscriptions.status = 'active' THEN 0 ELSE 1 END`,
@@ -80,20 +103,21 @@ export async function GET() {
           .limit(1);
         
         if (hasPayments.length === 0) {
-          // User hasn't paid, assign free trial (non-blocking)
-          try {
-            await assignFreeTrialToOwner(session.user.id);
-            // Re-fetch subscription after trial assignment
-            const trialSubscriptions = await db
-              .select({
-                subscription: subscriptions,
-                plan: subscriptionPlans,
-              })
-              .from(subscriptions)
-              .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
-              .where(eq(subscriptions.ownerId as any, session.user.id))
-              .orderBy(desc(subscriptions.createdAt))
-              .limit(1);
+          // User hasn't paid, assign free trial (non-blocking) - only for actual owner
+          if (session.user.role === 'owner') {
+            try {
+              await assignFreeTrialToOwner(ownerId);
+              // Re-fetch subscription after trial assignment
+              const trialSubscriptions = await db
+                .select({
+                  subscription: subscriptions,
+                  plan: subscriptionPlans,
+                })
+                .from(subscriptions)
+                .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+                .where(eq(subscriptions.ownerId as any, ownerId))
+                .orderBy(desc(subscriptions.createdAt))
+                .limit(1);
             
             if (trialSubscriptions.length > 0) {
               const sub = trialSubscriptions[0];
@@ -120,9 +144,10 @@ export async function GET() {
                 } : null,
               };
             }
-          } catch (error) {
-            // Don't fail the request if trial assignment fails
-            console.error('[Subscription API] Failed to assign free trial:', error);
+            } catch (error) {
+              // Don't fail the request if trial assignment fails
+              console.error('[Subscription API] Failed to assign free trial:', error);
+            }
           }
         }
       }
@@ -130,7 +155,7 @@ export async function GET() {
 
     // Get users count for owner (count users with same businessId)
     let usersCount = 0;
-    if (session.user.role === 'owner' && session.user.businessId) {
+    if (session.user.businessId) {
       const usersWithSameBusiness = await db
         .select({ count: sql<number>`count(*)` })
         .from(users)
@@ -139,7 +164,7 @@ export async function GET() {
       usersCount = Number(usersWithSameBusiness[0]?.count || 0);
     }
 
-    // Get usage data for current month
+    // Get usage data for current month - use ownerId for usage counting
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
@@ -148,7 +173,7 @@ export async function GET() {
       .from(usage)
       .where(
         and(
-          eq(usage.userId, session.user.id),
+          eq(usage.userId, ownerId),
           eq(usage.month, currentMonth)
         )
       )
@@ -168,9 +193,9 @@ export async function GET() {
       usersCount: usersCount,
     };
 
-    // Get payment history (only for owners)
+    // Get payment history (only for owners, managers don't see payment history)
     let paymentHistory: any[] = [];
-    if (session.user.role === 'owner') {
+    if (session.user.role === 'owner' && ownerId) {
       const userPayments = await db
         .select({
           payment: payments,
@@ -180,7 +205,7 @@ export async function GET() {
         .from(payments)
         .leftJoin(subscriptions, eq(payments.subscriptionId, subscriptions.id))
         .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
-        .where(eq(payments.ownerId, session.user.id))
+        .where(eq(payments.ownerId, ownerId))
         .orderBy(desc(payments.createdAt))
         .limit(50); // Limit to last 50 payments
 

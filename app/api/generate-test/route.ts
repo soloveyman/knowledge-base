@@ -256,17 +256,108 @@ export async function POST(request: Request) {
       explanation?: string
     }
     
-    // Add unique IDs to questions and convert 0-based indices to 1-based
+    // Add unique IDs to questions and validate/convert correct answers
     const questionsWithIds = generatedQuestions.map((q: GeneratedQuestionItem, index: number) => {
       let correctAnswer = q.correct_answer
+      const originalAnswer = correctAnswer
       
-      // Convert 0-based indices (0, 1, 2, 3) to 1-based (1, 2, 3, 4)
-      if (correctAnswer && /^\d+$/.test(correctAnswer)) {
-        const numericAnswer = parseInt(correctAnswer, 10)
-        // If it's a 0-based index (0-3), convert to 1-based (1-4)
-        if (numericAnswer >= 0 && numericAnswer <= 3 && q.choices && q.choices.length > numericAnswer) {
-          correctAnswer = String(numericAnswer + 1)
-          console.log(`Question ${index}: Converted 0-based index ${numericAnswer} to 1-based index ${correctAnswer}`)
+      // Validate and convert correct answer based on question type
+      if (correctAnswer && q.choices && q.choices.length > 0) {
+        // Handle multiple choice questions (mcq, mcq_multi)
+        if ((q.type === 'mcq' || q.type === 'mcq_multi') && q.choices) {
+          // If correct answer is a letter (A, B, C, D), convert to 1-based index
+          if (/^[A-Z]$/i.test(correctAnswer)) {
+            const letterIndex = correctAnswer.toUpperCase().charCodeAt(0) - 65 // A=0, B=1, C=2, D=3
+            const oneBasedIndex = letterIndex + 1 // A=1, B=2, C=3, D=4
+            if (oneBasedIndex >= 1 && oneBasedIndex <= q.choices.length) {
+              correctAnswer = String(oneBasedIndex)
+              console.log(`Question ${index}: Converted letter "${originalAnswer}" to 1-based index ${correctAnswer}`)
+            } else {
+              console.warn(`Question ${index}: Invalid letter "${originalAnswer}" (out of range), keeping original`)
+            }
+          }
+          // If correct answer is a number string (index), validate and convert if needed
+          else if (/^\d+$/.test(correctAnswer)) {
+            const numericAnswer = parseInt(correctAnswer, 10)
+            // If it's a 0-based index (0-3), convert to 1-based (1-4)
+            if (numericAnswer >= 0 && numericAnswer <= 3 && q.choices.length > numericAnswer) {
+              correctAnswer = String(numericAnswer + 1)
+              console.log(`Question ${index}: Converted 0-based index ${numericAnswer} to 1-based index ${correctAnswer}`)
+            }
+            // If it's already 1-based but out of range, validate
+            else if (numericAnswer < 1 || numericAnswer > q.choices.length) {
+              console.warn(`Question ${index}: Invalid index ${numericAnswer} (should be 1-${q.choices.length}), keeping original but may cause issues`)
+            }
+            // Otherwise keep as-is (already 1-based)
+          }
+          // If it's text, try to find it in choices
+          else if (correctAnswer && typeof correctAnswer === 'string' && correctAnswer.trim()) {
+            const trimmedAnswer = correctAnswer.trim()
+            const choiceIndex = q.choices.findIndex(
+              choice => choice.trim().toLowerCase() === trimmedAnswer.toLowerCase()
+            )
+            if (choiceIndex >= 0) {
+              const oneBasedIndex = choiceIndex + 1 // Convert 0-based to 1-based
+              correctAnswer = String(oneBasedIndex)
+              console.log(`Question ${index}: Converted text answer "${originalAnswer}" to 1-based index ${correctAnswer}`)
+            } else {
+              console.warn(`Question ${index}: Could not find correct answer "${originalAnswer}" in choices. Choices: ${q.choices.join(', ')}`)
+              // Try to match partial text
+              const partialMatch = q.choices.findIndex(
+                choice => {
+                  const trimmedChoice = choice.trim().toLowerCase()
+                  const trimmedAnswerLower = trimmedAnswer.toLowerCase()
+                  return trimmedChoice.includes(trimmedAnswerLower) || trimmedAnswerLower.includes(trimmedChoice)
+                }
+              )
+              if (partialMatch >= 0) {
+                const oneBasedIndex = partialMatch + 1
+                correctAnswer = String(oneBasedIndex)
+                console.log(`Question ${index}: Found partial match for "${originalAnswer}" -> index ${correctAnswer}`)
+              } else {
+                console.warn(`Question ${index}: No match found for "${originalAnswer}", keeping original (may cause validation issues)`)
+              }
+            }
+          }
+        }
+        // Handle match and order types - validate comma-separated indices
+        else if ((q.type === 'match' || q.type === 'order') && correctAnswer) {
+          const parts = correctAnswer.split(/[,;\s]+/).filter(p => p.length > 0)
+          const validParts: string[] = []
+          for (const part of parts) {
+            if (/^\d+$/.test(part)) {
+              const index = parseInt(part, 10)
+              // Convert 0-based to 1-based if needed
+              const finalIndex = (index >= 0 && index <= 3) ? index + 1 : index
+              if (finalIndex >= 1 && finalIndex <= q.choices.length) {
+                validParts.push(String(finalIndex))
+              }
+            } else if (/^[A-Z]$/i.test(part)) {
+              // Convert letter to index
+              const letterIndex = part.toUpperCase().charCodeAt(0) - 65
+              const oneBasedIndex = letterIndex + 1
+              if (oneBasedIndex >= 1 && oneBasedIndex <= q.choices.length) {
+                validParts.push(String(oneBasedIndex))
+              }
+            }
+          }
+          if (validParts.length > 0) {
+            correctAnswer = validParts.join(',')
+            console.log(`Question ${index}: Validated match/order answer "${originalAnswer}" -> "${correctAnswer}"`)
+          }
+        }
+      }
+      
+      // For true/false questions, normalize the answer
+      if (q.type === 'tf' || q.type === 'true_false') {
+        const normalized = correctAnswer?.trim().toLowerCase()
+        if (normalized === 'true' || normalized === 'верно' || normalized === 'да' || normalized === '1') {
+          correctAnswer = 'true'
+        } else if (normalized === 'false' || normalized === 'неверно' || normalized === 'нет' || normalized === '0') {
+          correctAnswer = 'false'
+        }
+        if (originalAnswer !== correctAnswer) {
+          console.log(`Question ${index}: Normalized true/false answer "${originalAnswer}" -> "${correctAnswer}"`)
         }
       }
       
@@ -279,7 +370,8 @@ export async function POST(request: Request) {
       // Log correct answer for debugging
       console.log(`Question ${index} from Grok:`, {
         type: questionWithId.type,
-        correct_answer: questionWithId.correct_answer,
+        original_answer: originalAnswer,
+        final_correct_answer: questionWithId.correct_answer,
         choices: questionWithId.choices,
         explanation: questionWithId.explanation?.substring(0, 50) + '...'
       })

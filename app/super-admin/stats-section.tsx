@@ -8,53 +8,65 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalidate every 60 seconds
 
 async function fetchStats(): Promise<SubscriptionStats> {
-  // Get all owners
-  const allOwners = await db.select()
-    .from(users)
-    .where(eq(users.role, 'owner'))
+  // Optimized: Get all data in fewer queries instead of N+1 queries
+  // Get all owners with their latest subscriptions in one query using window functions
+  const ownersWithSubscriptionsResult = await db.execute(sql`
+    SELECT 
+      u.id as owner_id,
+      s.status,
+      s.user_id,
+      ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY s.created_at DESC NULLS LAST) as rn
+    FROM users u
+    LEFT JOIN subscriptions s ON s.user_id = u.id
+    WHERE u.role = 'owner'
+  `)
+  
+  // Filter to get only the latest subscription per owner
+  const latestSubscriptions = (ownersWithSubscriptionsResult.rows || []).filter((row: any) => row.rn === 1)
 
-  // Get subscription and payment data for each owner (simplified for stats)
-  const ownersWithSubscriptions = await Promise.all(
-    allOwners.map(async (owner) => {
-      const ownerSubscriptions = await db.execute(sql`
-        SELECT s.id, s.status, s.user_id
-        FROM subscriptions s
-        WHERE s.user_id = ${owner.id}
-        ORDER BY s.created_at DESC
-        LIMIT 1
+  // Get payments in one query (if table exists)
+  let paymentsMap = new Map<string, number>()
+  try {
+    const paymentCheck = await db.execute(sql`SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_name = 'payments'
+    )`)
+    
+    if (paymentCheck.rows?.[0]?.exists) {
+      const payments = await db.execute(sql`
+        SELECT 
+          COALESCE(owner_id, user_id) as owner_id,
+          amount,
+          ROW_NUMBER() OVER (PARTITION BY COALESCE(owner_id, user_id) ORDER BY created_at DESC) as rn
+        FROM payments
       `)
-
-      let revenue = 0
       
-      try {
-        const paymentCheck = await db.execute(sql`SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'payments'
-        )`)
-        
-        if (paymentCheck.rows?.[0]?.exists) {
-          const latestPayment = await db.execute(sql`
-            SELECT amount FROM payments 
-            WHERE owner_id = ${owner.id} OR user_id = ${owner.id}
-            ORDER BY created_at DESC 
-            LIMIT 1
-          `)
-          if (latestPayment.rows && latestPayment.rows.length > 0) {
-            revenue = Number(latestPayment.rows[0].amount) || 0
+      // Filter to get only the latest payment per owner
+      const latestPayments = (payments.rows || []).filter((row: any) => row.rn === 1)
+      
+      if (latestPayments) {
+        latestPayments.forEach((row: any) => {
+          if (row.owner_id && row.amount) {
+            paymentsMap.set(row.owner_id, Number(row.amount) || 0)
           }
-        }
-      } catch {
-        // Payments table might not exist
+        })
       }
+    }
+  } catch {
+    // Payments table might not exist
+  }
 
-      const status = ownerSubscriptions.rows?.[0]?.status as string | undefined
+  // Process results
+  const ownersWithSubscriptions = latestSubscriptions.map((row: any) => {
+    const ownerId = row.owner_id || row.user_id
+    const status = row.status as string | undefined
+    const revenue = paymentsMap.get(ownerId) || 0
 
-      return {
-        status,
-        revenue,
-      }
-    })
-  )
+    return {
+      status,
+      revenue,
+    }
+  })
 
   // Calculate statistics
   const activeSubscriptions = ownersWithSubscriptions.filter(
@@ -121,7 +133,13 @@ async function fetchStats(): Promise<SubscriptionStats> {
 
 export async function StatsSection() {
   try {
-    const stats = await fetchStats()
+    // Add timeout for mobile devices with slow connections
+    const statsPromise = fetchStats()
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), 15000) // 15 second timeout
+    )
+    
+    const stats = await Promise.race([statsPromise, timeoutPromise])
     return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
       <Card>

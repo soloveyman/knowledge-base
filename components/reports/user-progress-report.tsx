@@ -998,7 +998,18 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                     // For MCQ questions, convert indices/letters to readable format
                                                     let formattedCorrectAnswer = question.correctAnswer
                                                     
-                                                    if (question.choices && question.choices.length > 0) {
+                                                    // Handle true/false questions - translate the answer
+                                                    if (question.type === 'tf' || question.type === 'true_false') {
+                                                      const normalized = formattedCorrectAnswer.trim().toLowerCase()
+                                                      if (normalized === 'true' || normalized === 'верно' || normalized === 'да') {
+                                                        formattedCorrectAnswer = t('true')
+                                                      } else if (normalized === 'false' || normalized === 'неверно' || normalized === 'нет') {
+                                                        formattedCorrectAnswer = t('false')
+                                                      } else {
+                                                        // Use formatAnswer for consistency
+                                                        formattedCorrectAnswer = formatAnswer(formattedCorrectAnswer)
+                                                      }
+                                                    } else if (question.choices && question.choices.length > 0) {
                                                       // If correctAnswer is a letter (A, B, C, D)
                                                       if (/^[A-Z]$/i.test(question.correctAnswer)) {
                                                         const letterIndex = question.correctAnswer.toUpperCase().charCodeAt(0) - 65
@@ -1048,6 +1059,9 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                           }
                                                         }
                                                       }
+                                                    } else {
+                                                      // For other question types, use formatAnswer to handle true/false strings
+                                                      formattedCorrectAnswer = formatAnswer(formattedCorrectAnswer)
                                                     }
                                                     
                                                     return (

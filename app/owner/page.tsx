@@ -622,71 +622,81 @@ function OwnerPageInner() {
         }
       } else if (tab === 'tests') {
         setIsLoadingTests(!preserveData)
-        // Tests need documents for sourceDocument lookup
-        // Use cache-busting if forceRefresh is true (e.g., returning from test-builder)
-        const fetchOpts = forceRefresh 
-          ? { cache: 'no-store' as RequestCache }
-          : { next: { revalidate: 30 } }
-        const [testsResponse, documentsResponse] = await Promise.all([
-          fetch('/api/tests', fetchOpts),
-          fetch('/api/documents', fetchOpts)
-        ])
-        
-        // Parse JSON in parallel
-        const [documentsResult, testsResult] = await Promise.all([
-          documentsResponse.json(),
-          testsResponse.json()
-        ])
-        
-        const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-        if (documentsResult.success && documentsResult.data.documents) {
-          documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
-            documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
-          })
-        }
-        if (testsResult.success) {
-          const transformedTests = (testsResult.data.tests as Array<{
-            id: string
-            title: string
-            type?: string | null
-            difficulty?: string | null
-            locale?: string | null
-            questionIds?: string[] | null
-            moduleId?: string | null
-            createdAt: string
-            createdBy: string
-          }>).map((test) => {
-            const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
-            let sourceDocument = 'Unknown'
-            if (test.moduleId) {
-              const doc = documentMap.get(test.moduleId)
-              if (doc) {
-                sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+        try {
+          // Tests need documents for sourceDocument lookup
+          // Use cache-busting if forceRefresh is true (e.g., returning from test-builder)
+          const fetchOpts = forceRefresh 
+            ? { cache: 'no-store' as RequestCache }
+            : { next: { revalidate: 30 } }
+          const [testsResponse, documentsResponse] = await Promise.all([
+            fetch('/api/tests', fetchOpts),
+            fetch('/api/documents', fetchOpts)
+          ])
+          
+          // Parse JSON in parallel
+          const [documentsResult, testsResult] = await Promise.all([
+            documentsResponse.json(),
+            testsResponse.json()
+          ])
+          
+          const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
+          if (documentsResult.success && documentsResult.data.documents) {
+            documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
+              documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
+            })
+          }
+          if (testsResult.success) {
+            const transformedTests = (testsResult.data.tests as Array<{
+              id: string
+              title: string
+              type?: string | null
+              difficulty?: string | null
+              locale?: string | null
+              questionIds?: string[] | null
+              moduleId?: string | null
+              createdAt: string
+              createdBy: string
+            }>).map((test) => {
+              const questionCount = Array.isArray(test.questionIds) ? test.questionIds.length : 0
+              let sourceDocument = 'Unknown'
+              if (test.moduleId) {
+                const doc = documentMap.get(test.moduleId)
+                if (doc) {
+                  sourceDocument = doc.originalFileName || doc.title || 'Unknown'
+                }
               }
-            }
-            return {
-              id: test.id,
-              title: test.title,
-              type: test.type || 'mcq',
-              difficulty: test.difficulty || 'medium',
-              locale: test.locale || 'en',
-              questionCount,
-              questions: [],
-              sourceDocument,
-              createdAt: test.createdAt,
-              createdBy: test.createdBy
-            }
-          })
-          setSavedTestsWithLog(transformedTests)
-          // Track when data was loaded for cache invalidation
-          sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
+              return {
+                id: test.id,
+                title: test.title,
+                type: test.type || 'mcq',
+                difficulty: test.difficulty || 'medium',
+                locale: test.locale || 'en',
+                questionCount,
+                questions: [],
+                sourceDocument,
+                createdAt: test.createdAt,
+                createdBy: test.createdBy
+              }
+            })
+            setSavedTestsWithLog(transformedTests)
+            // Track when data was loaded for cache invalidation
+            sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
+          } else {
+            // If API failed, set empty array to show empty state
+            setSavedTestsWithLog([])
+          }
+        } finally {
+          setIsLoadingTests(false)
         }
-        setIsLoadingTests(false)
       } else if (tab === 'assignments') {
         setIsLoadingAssignments(!preserveData)
-        // Assignments need all data for mapping
-        // Use forceRefresh to ensure fresh data when returning from assignment-builder
-        await loadData(preserveData, forceRefresh)
+        try {
+          // Assignments need all data for mapping
+          // Use forceRefresh to ensure fresh data when returning from assignment-builder
+          await loadData(preserveData, forceRefresh)
+        } finally {
+          setIsLoadingAssignments(false)
+        }
       } else if (tab === 'users') {
         // Check if returning from user-builder (has timestamp) - use cache-busting
         const hasTimestamp = searchParams.has('_t')
@@ -1849,7 +1859,7 @@ function OwnerPageInner() {
             </div>
 
             <UserProgressReport 
-              users={savedUsers} 
+              users={savedUsers.filter(u => u.role === 'employee')} 
               assignments={savedAssignments.map(a => ({
                 id: a.id,
                 title: a.title || `${a.moduleId.slice(0, 8)}`,
@@ -2051,18 +2061,20 @@ function OwnerPageInner() {
                 // Find the test that matches this assignment's testId
                 const test = a.testId ? savedTests.find(t => t.id === a.testId) : null
                 
-                // Map assigned users from the users array
-                const assignedUsers = (a.users || []).map(user => {
-                  // Find the full user details from savedUsers
-                  const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
-                  return {
-                    id: Number(fullUser?.id || user.userId || user.id || 0),
-                    name: fullUser?.name || t('unknownUser'),
-                    email: fullUser?.email || '',
-                    role: fullUser?.role || 'employee',
-                    department: fullUser?.job || ''
-                  }
-                })
+                // Map assigned users from the users array - exclude managers
+                const assignedUsers = (a.users || [])
+                  .map(user => {
+                    // Find the full user details from savedUsers
+                    const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
+                    return {
+                      id: Number(fullUser?.id || user.userId || user.id || 0),
+                      name: fullUser?.name || t('unknownUser'),
+                      email: fullUser?.email || '',
+                      role: fullUser?.role || 'employee',
+                      department: fullUser?.job || ''
+                    }
+                  })
+                  .filter(user => user.role === 'employee') // Exclude managers from assignments
                 
                 return {
                   id: a.id,

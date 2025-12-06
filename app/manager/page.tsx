@@ -619,15 +619,22 @@ function ManagerPageInner() {
               }
             })
             setSavedTestsWithLog(transformedTests)
+          } else {
+            // If API failed, set empty array to show empty state
+            setSavedTestsWithLog([])
           }
         } finally {
           setIsLoadingTests(false)
         }
       } else if (tab === 'assignments') {
         setIsLoadingAssignments(!preserveData)
-        // Assignments need all data for mapping
-        // Use forceRefresh to ensure fresh data when returning from assignment-builder
-        await loadData(preserveData, forceRefresh)
+        try {
+          // Assignments need all data for mapping
+          // Use forceRefresh to ensure fresh data when returning from assignment-builder
+          await loadData(preserveData, forceRefresh)
+        } finally {
+          setIsLoadingAssignments(false)
+        }
       } else if (tab === 'overview') {
         // Overview needs all data
         await loadData(preserveData)
@@ -1667,7 +1674,7 @@ function ManagerPageInner() {
 
             {(() => { console.log('Manager: Rendering UserProgressReport with:', savedUsers.length, 'users and', savedAssignments.length, 'assignments'); return null; })()}
             <UserProgressReport 
-              users={savedUsers} 
+              users={savedUsers.filter(u => u.role === 'employee')} 
               assignments={savedAssignments.map(a => ({
                 id: a.id,
                 title: a.title || `${a.moduleId.slice(0, 8)}`,
@@ -1848,18 +1855,20 @@ function ManagerPageInner() {
                 // Find the test that matches this assignment's testId
                 const test = a.testId ? savedTests.find(t => t.id === a.testId) : null
                 
-                // Map assigned users from the users array
-                const assignedUsers = (a.users || []).map((user: AssignedUser) => {
-                  // Find the full user details from savedUsers
-                  const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
-                  return {
-                    id: Number(fullUser?.id || user.userId || user.id || 0),
-                    name: fullUser?.name || t('unknownUser'),
-                    email: fullUser?.email || '',
-                    role: fullUser?.role || 'employee',
-                    department: fullUser?.job || ''
-                  }
-                })
+                // Map assigned users from the users array - exclude managers
+                const assignedUsers = (a.users || [])
+                  .map((user: AssignedUser) => {
+                    // Find the full user details from savedUsers
+                    const fullUser = savedUsers.find(u => u.id === (user.userId || user.id))
+                    return {
+                      id: Number(fullUser?.id || user.userId || user.id || 0),
+                      name: fullUser?.name || t('unknownUser'),
+                      email: fullUser?.email || '',
+                      role: fullUser?.role || 'employee',
+                      department: fullUser?.job || ''
+                    }
+                  })
+                  .filter(user => user.role === 'employee') // Exclude managers from assignments
                 
                 return {
                   id: a.id,
