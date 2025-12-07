@@ -804,6 +804,65 @@ export default function TestBuilderPage() {
   }
 
 
+  // Format correct answer for display in input field
+  const formatCorrectAnswerForDisplay = (question: GeneratedQuestion): string => {
+    if (!question.correct_answer) return ''
+    
+    const correctAnswer = question.correct_answer.trim()
+    
+    // For questions with choices (mcq, mcq_multi), show index format
+    if ((question.type === 'mcq' || question.type === 'mcq_multi') && question.choices && question.choices.length > 0) {
+      // If it's multiple answers (comma-separated)
+      if (correctAnswer.includes(',') || correctAnswer.includes(';')) {
+        const parts = correctAnswer.split(/[,;]/).map(p => p.trim()).filter(p => p.length > 0)
+        return parts.join(',')
+      }
+      // Single answer - return as is (should be 1-based index: 1, 2, 3, 4)
+      return correctAnswer
+    }
+    
+    // For other question types, return as is
+    return correctAnswer
+  }
+
+  // Get correct answer text for display (shows which choice is correct)
+  const getCorrectAnswerText = (question: GeneratedQuestion): string => {
+    if (!question.correct_answer || !question.choices || question.choices.length === 0) {
+      return ''
+    }
+    
+    const correctAnswer = question.correct_answer.trim()
+    const choices = question.choices // Store in variable for type safety
+    
+    // For questions with choices
+    if (question.type === 'mcq' || question.type === 'mcq_multi') {
+      // If it's multiple answers (comma-separated)
+      if (correctAnswer.includes(',') || correctAnswer.includes(';')) {
+        const parts = correctAnswer.split(/[,;]/).map(p => p.trim()).filter(p => p.length > 0)
+        const indices = parts.map(part => {
+          const index = parseInt(part, 10)
+          if (!isNaN(index) && index >= 1 && index <= choices.length) {
+            const letter = String.fromCharCode(65 + index - 1) // A, B, C, D
+            const choiceText = choices[index - 1]
+            return `${letter} (${index}): ${choiceText}`
+          }
+          return part
+        })
+        return indices.join('; ')
+      }
+      
+      // Single answer
+      const index = parseInt(correctAnswer, 10)
+      if (!isNaN(index) && index >= 1 && index <= choices.length) {
+        const letter = String.fromCharCode(65 + index - 1) // A, B, C, D
+        const choiceText = choices[index - 1]
+        return `${letter} (${index}): ${choiceText}`
+      }
+    }
+    
+    return ''
+  }
+
   const handleUpdateQuestionField = (questionId: string, field: keyof GeneratedQuestion, value: string | string[]) => {
     setGeneratedQuestions(prev => 
       prev.map(q => {
@@ -1446,11 +1505,40 @@ export default function TestBuilderPage() {
                           <div>
                             <Label>{t('correctAnswer')}</Label>
                             <Input
-                              value={question.correct_answer || ''}
-                              onChange={(e) => handleUpdateQuestionField(question.id, 'correct_answer', e.target.value)}
-                              placeholder={t('correctAnswerPlaceholder')}
+                              value={formatCorrectAnswerForDisplay(question)}
+                              onChange={(e) => {
+                                // For questions with choices, allow only numeric indices
+                                let value = e.target.value
+                                if ((question.type === 'mcq' || question.type === 'mcq_multi') && question.choices && question.choices.length > 0) {
+                                  // Allow numbers, commas, and semicolons for multiple choice
+                                  value = value.replace(/[^0-9,;]/g, '')
+                                }
+                                handleUpdateQuestionField(question.id, 'correct_answer', value)
+                              }}
+                              placeholder={
+                                (question.type === 'mcq' || question.type === 'mcq_multi') && question.choices && question.choices.length > 0
+                                  ? `Enter index (1-${question.choices.length}) or comma-separated for multiple (e.g., 1,2)`
+                                  : t('correctAnswerPlaceholder')
+                              }
                               className="w-full"
                             />
+                            {(question.type === 'mcq' || question.type === 'mcq_multi') && question.choices && question.choices.length > 0 && (
+                              <div className="mt-1">
+                                {getCorrectAnswerText(question) ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    <span className="font-medium">Correct answer:</span> {getCorrectAnswerText(question)}
+                                  </p>
+                                ) : question.correct_answer ? (
+                                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                                    ⚠️ Invalid index. Use 1-{question.choices.length} for single choice or comma-separated (e.g., 1,2) for multiple.
+                                  </p>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">
+                                    Enter the index of the correct answer (1-{question.choices.length})
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                           
                           <div>
