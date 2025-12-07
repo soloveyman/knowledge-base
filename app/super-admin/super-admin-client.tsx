@@ -68,7 +68,7 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
   const { t } = useTranslation();
   const [owners, setOwners] = useState<OwnerSubscription[]>(initialOwners);
   const [filterProvider, setFilterProvider] = useState<'all' | 'stripe'>('all');
-  const [filterType, setFilterType] = useState<'free-trial' | 'manual' | 'paid'>('free-trial');
+  const [filterType, setFilterType] = useState<'all' | 'free-trial' | 'manual' | 'paid'>('all');
   const [searchText, setSearchText] = useState<string>('');
   const [plans] = useState<SubscriptionPlan[]>(initialPlans);
   const [changingPlan, setChangingPlan] = useState<string | null>(null);
@@ -76,6 +76,9 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
   // Debug: Log initial owners
   useEffect(() => {
     console.log(`[Super Admin Client] Initial owners received: ${initialOwners.length}`, initialOwners);
+    if (initialOwners.length === 0) {
+      console.warn('[Super Admin Client] WARNING: No owners received from server!');
+    }
   }, [initialOwners]);
 
   // Clear search text when switching tabs
@@ -151,19 +154,22 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
     }
   };
 
-  // Filter owners: show free trial users, manually changed plans, or paid plans based on filterType
+  // Filter owners: show all, free trial users, manually changed plans, or paid plans based on filterType
   const filteredOwners = owners.filter(owner => {
     const matchesProvider = filterProvider === 'all' || owner.subscription?.provider === filterProvider;
     
-    // Text search filter (for free-trial and manual tabs)
-    const matchesSearch = (filterType === 'free-trial' || filterType === 'manual')
+    // Text search filter (for all, free-trial and manual tabs)
+    const matchesSearch = (filterType === 'all' || filterType === 'free-trial' || filterType === 'manual')
       ? (searchText.trim() === '' || 
           owner.name?.toLowerCase().includes(searchText.toLowerCase()) ||
           owner.email?.toLowerCase().includes(searchText.toLowerCase()) ||
           owner.country?.toLowerCase().includes(searchText.toLowerCase()))
       : true; // No search filter for paid plans
     
-    if (filterType === 'free-trial') {
+    if (filterType === 'all') {
+      // Show all owners
+      return matchesProvider && matchesSearch;
+    } else if (filterType === 'free-trial') {
       // Show owners with free-trial plan OR owners without any plan/subscription
       const isFreeTrial = owner.plan?.name === 'free-trial';
       const hasNoPlan = !owner.plan && !owner.subscription;
@@ -271,6 +277,16 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
                 {/* Filter Tabs */}
                 <div className="mb-4 flex flex-wrap gap-2">
                   <button
+                    onClick={() => setFilterType('all')}
+                    className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                      filterType === 'all'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    All Owners
+                  </button>
+                  <button
                     onClick={() => setFilterType('free-trial')}
                     className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                       filterType === 'free-trial'
@@ -302,8 +318,8 @@ export function SuperAdminClient({ initialOwners, initialPlans }: SuperAdminClie
                   </button>
                 </div>
 
-                {/* Search Filter - Only for free-trial and manual tabs */}
-                {(filterType === 'free-trial' || filterType === 'manual') && (
+                {/* Search Filter - For all, free-trial and manual tabs */}
+                {(filterType === 'all' || filterType === 'free-trial' || filterType === 'manual') && (
                   <div className="mb-4">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
