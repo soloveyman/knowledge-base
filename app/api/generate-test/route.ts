@@ -132,9 +132,26 @@ export async function POST(request: Request) {
               * If type is "order": Generate ONLY ordering questions (arrange items in correct order). Provide choices as items to order. Use correct_answer as comma-separated indices in correct order: "1,2,3,4" (order matters)
               * If type is "mixed": Generate a MIX of question types (multiple choice, true/false, and fill-in-the-blank)
               * DO NOT mix question types unless type is "mixed" - all questions must be of the specified type
-            - Provide clear explanations for answers
+            
+            - CRITICAL: CORRECT ANSWER VALIDATION:
+              * For MCQ questions: The correct_answer MUST be a 1-based index (1, 2, 3, or 4) that corresponds to the ACTUALLY CORRECT choice in the choices array
+              * BEFORE setting correct_answer, verify that the choice at that index is indeed the correct answer based on the content
+              * The correct answer must be factually accurate according to the provided content
+              * DO NOT randomly assign correct_answer - it must match the actual correct choice
+              * Example: If choices[0] (index 1) is correct, use "1". If choices[2] (index 3) is correct, use "3"
+              * For mcq_multi: Ensure ALL indices in correct_answer point to choices that are actually correct
+              * Double-check: correct_answer index must match the position of the correct choice in the choices array
+            
             - Difficulty level: ${grokParams?.difficulty || 'medium'}
+              * "easy": Questions should test basic recall and recognition. Use simple facts, definitions, and direct information from the text. Examples: "What is X?", "Which of the following is Y?", "True/False: Z is mentioned in the text"
+              * "medium": Questions should test comprehension and application. Require understanding relationships, making connections, applying concepts. Examples: "How does X relate to Y?", "What would happen if...?", "Which statement best explains...?", "What is the main purpose of...?"
+              * "hard": Questions should test analysis, synthesis, and evaluation. Require deep understanding, critical thinking, comparing concepts, drawing conclusions. Examples: "What are the implications of...?", "Compare and contrast X and Y", "What is the most significant factor in...?", "Evaluate the effectiveness of..."
+              * IMPORTANT: For "medium" difficulty, avoid trivial questions that only require simple recall. Questions must require understanding, not just memorization.
+            
+            - Provide clear explanations for answers that reference the source content
+            
             - CRITICAL LANGUAGE REQUIREMENT: Generate ALL questions in ${grokParams?.locale === 'ru' ? 'Russian (Русский)' : 'English'}. The document language is ${grokParams?.locale === 'ru' ? 'Russian' : 'English'}, so ALL questions, answers, choices, and explanations MUST be in ${grokParams?.locale === 'ru' ? 'Russian' : 'English'}. DO NOT translate or mix languages. Preserve the original document's language.
+            
             - IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content.
             
             Return ONLY a valid JSON array with this exact format:
@@ -144,7 +161,7 @@ export async function POST(request: Request) {
                 "type": "mcq|mcq_multi|tf|complete|cloze|match|order",
                 "prompt": "Question text",
                 "choices": ["option1", "option2", "option3", "option4"], // Required for mcq/mcq_multi/match/order, omit for tf/complete/cloze
-                "correct_answer": "1|2|3|4|1,2|1,3|2,3|1,2,3|true|false|answer_text|answer1,answer2", // CRITICAL: Use 1-based indices (1, 2, 3, 4). For mcq_multi/match/order use comma-separated: "1,2" or "1,3,4". For mcq use single: "1" or "2". For complete/cloze use text. For tf use "true" or "false". NOT 0-based (0, 1, 2, 3)
+                "correct_answer": "1|2|3|4|1,2|1,3|2,3|1,2,3|true|false|answer_text|answer1,answer2", // CRITICAL: Use 1-based indices (1, 2, 3, 4). The index MUST correspond to the ACTUALLY CORRECT choice. For mcq_multi/match/order use comma-separated: "1,2" or "1,3,4". For mcq use single: "1" or "2". For complete/cloze use text. For tf use "true" or "false". NOT 0-based (0, 1, 2, 3). VERIFY the correct answer before setting the index.
                 "explanation": "Why this answer is correct"
               }
             ]`
