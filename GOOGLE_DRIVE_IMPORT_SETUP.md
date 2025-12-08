@@ -17,7 +17,7 @@
    - Google Drive API (рекомендуется)
 
 2. **Настроить OAuth Consent Screen:**
-   - Добавить scope: `https://www.googleapis.com/auth/drive.readonly`
+   - Добавить scope: `https://www.googleapis.com/auth/drive.file`
 
 3. **Создать/проверить OAuth 2.0 Client ID:**
    - Authorized JavaScript origins: `http://localhost:3000`
@@ -77,7 +77,7 @@ NEXT_PUBLIC_GOOGLE_API_KEY="your-api-key"
 
 ### Ошибка "Failed to download file"
 - Проверить, что файл доступен выбранному Google аккаунту
-- Проверить, что scope `drive.readonly` добавлен в OAuth consent screen
+- Проверить, что scope `drive.file` добавлен в OAuth consent screen
 
 ### Picker не открывается на мобильных
 - Убедиться, что используется HTTPS в продакшене

@@ -207,7 +207,7 @@ export function useGooglePicker() {
       const accessToken = await new Promise<string>((resolve, reject) => {
         const tokenClient = window.google!.accounts!.oauth2.initTokenClient({
           client_id: currentConfig.clientId,
-          scope: 'https://www.googleapis.com/auth/drive.readonly',
+          scope: 'https://www.googleapis.com/auth/drive.file',
           callback: (response) => {
             if (response.error) {
               let errorMessage = 'Unknown error'

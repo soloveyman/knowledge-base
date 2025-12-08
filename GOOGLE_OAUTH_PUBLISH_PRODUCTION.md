@@ -114,12 +114,12 @@ export default function TermsPage() {
 Перейдите к **Step 2 - Scopes**
 
 Убедитесь, что добавлены необходимые scopes:
-- ✅ `https://www.googleapis.com/auth/drive.readonly` (для Google Drive)
+- ✅ `https://www.googleapis.com/auth/drive.file` (для Google Drive)
 - ✅ `openid`, `email`, `profile` (для OAuth входа, обычно добавляются автоматически)
 
 **Для публикации важно:**
 - Используйте только необходимые scopes
-- Scope `drive.readonly` является безопасным и обычно не требует проверки Google
+- Scope `drive.file` является нечувствительным (non-sensitive) и не требует проверки Google
 
 #### 3.4. Test Users (Step 3) - можно пропустить для публикации
 
@@ -150,10 +150,11 @@ export default function TermsPage() {
 
 Google покажет предупреждение о том, что приложение будет доступно всем пользователям.
 
-**Для scope `drive.readonly`:**
-- ✅ Обычно **не требуется проверка Google**
+**Для scope `drive.file`:**
+- ✅ **Не требуется проверка Google** (non-sensitive scope)
 - ✅ Приложение публикуется сразу
 - ✅ Доступно для всех пользователей Google
+- ✅ Не требуется ежегодная CASA сертификация
 
 **Для других scopes (если используются):**
 - ⚠️ Может потребоваться проверка Google (несколько дней)
@@ -209,8 +210,8 @@ Google покажет предупреждение о том, что прило�
 ### Проблема: Google требует проверку
 
 **Решение:**
-- Для `drive.readonly` проверка обычно не требуется
-- Если Google запросил проверку, заполните форму проверки
+- Для `drive.file` проверка не требуется (non-sensitive scope)
+- Если Google запросил проверку для других scopes, заполните форму проверки
 - Процесс может занять несколько дней
 - В это время приложение остается в режиме Testing
 
@@ -218,11 +219,11 @@ Google покажет предупреждение о том, что прило�
 
 ### Безопасные scopes (не требуют проверки)
 
-Следующие scopes обычно не требуют проверки Google:
+Следующие scopes не требуют проверки Google (non-sensitive):
 - `openid`
 - `email`
 - `profile`
-- `https://www.googleapis.com/auth/drive.readonly` (read-only доступ)
+- `https://www.googleapis.com/auth/drive.file` (доступ к файлам, выбранным пользователем)
 
 ### Scopes, требующие проверки
 

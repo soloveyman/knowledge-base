@@ -87,7 +87,7 @@ export default async function PrivacyPage() {
             <li>{t("privacySection3Item4")}</li>
           </ul>
           <p className="mb-4">
-            {t("privacySection3Scope")} <code className="bg-muted px-2 py-1 rounded">https://www.googleapis.com/auth/drive.readonly</code> {t("privacySection3ScopeDesc")}
+            {t("privacySection3Scope")} <code className="bg-muted px-2 py-1 rounded">https://www.googleapis.com/auth/drive.file</code> {t("privacySection3ScopeDesc")}
           </p>
         </section>
 

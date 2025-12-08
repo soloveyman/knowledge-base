@@ -15,7 +15,7 @@
 ### 2. Проверить OAuth Consent Screen ✅
 Перейти: https://console.cloud.google.com/apis/credentials/consent
 
-- [x] Проверить, что добавлен scope: `https://www.googleapis.com/auth/drive.readonly` ✅
+- [x] Проверить, что добавлен scope: `https://www.googleapis.com/auth/drive.file` ✅
 
 **Отлично! Scope добавлен.**
 
@@ -78,7 +78,7 @@ GOOGLE_CLIENT_SECRET="ваш-client-secret"
 2. Для localhost должен быть `http://` (не `https://`)
 
 ### Если ошибка "Access blocked":
-1. Проверить, что scope `drive.readonly` добавлен в OAuth Consent Screen
+1. Проверить, что scope `drive.file` добавлен в OAuth Consent Screen
 2. Если приложение в статусе "Testing" - добавить свой email в Test users
 
 ## 📝 Быстрая ссылка на настройки

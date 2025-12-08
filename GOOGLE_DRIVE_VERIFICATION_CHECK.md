@@ -60,7 +60,7 @@ NEXT_PUBLIC_GOOGLE_API_KEY="ваш-api-key" # опционально
 Перейти: https://console.cloud.google.com/apis/credentials/consent
 
 Проверить:
-- ✅ Scope `https://www.googleapis.com/auth/drive.readonly` добавлен
+- ✅ Scope `https://www.googleapis.com/auth/drive.file` добавлен
 - ✅ Authorized domains содержит `uppstaff.net` (для продакшена)
 
 #### OAuth 2.0 Client ID

@@ -3,7 +3,7 @@
 ## ✅ Выполнено:
 - [x] Google Picker API включен
 - [x] Google Drive API включен
-- [x] Scope `drive.readonly` добавлен в OAuth Consent Screen
+- [x] Scope `drive.file` добавлен в OAuth Consent Screen
 - [x] OAuth Client ID и Secret настроены
 
 ## 🔍 Финальная проверка OAuth Client ID
@@ -78,7 +78,7 @@ npm run dev
   - Без лишних слешей в конце
 
 ### Ошибка "Access blocked"
-- Проверить, что scope `drive.readonly` добавлен
+- Проверить, что scope `drive.file` добавлен
 - Если приложение в статусе "Testing" - добавить свой email в Test users:
   - https://console.cloud.google.com/apis/credentials/consent
   - Test users → Add Users → добавить email

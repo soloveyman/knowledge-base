@@ -127,7 +127,7 @@ export async function GET() {
 
     checks.recommendations.push(
       'Проверьте в Google Cloud Console:',
-      '1. OAuth Consent Screen → Scopes → должен быть https://www.googleapis.com/auth/drive.readonly',
+      '1. OAuth Consent Screen → Scopes → должен быть https://www.googleapis.com/auth/drive.file',
       '2. Credentials → OAuth 2.0 Client ID → Authorized JavaScript origins → должны быть: ' + checks.oauth.authorizedOrigins.join(', '),
       '3. Credentials → OAuth 2.0 Client ID → Authorized redirect URIs → должны быть: ' + checks.oauth.redirectUris.join(', '),
     )

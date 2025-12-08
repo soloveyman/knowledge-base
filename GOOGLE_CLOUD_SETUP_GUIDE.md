@@ -69,8 +69,8 @@
 
 4. **Добавить Scopes (Step 2 - Scopes):**
    - Нажмите **"Add or Remove Scopes"**
-   - В поиске введите: `drive.readonly`
-   - Найдите и отметьте: `https://www.googleapis.com/auth/drive.readonly`
+   - В поиске введите: `drive.file`
+   - Найдите и отметьте: `https://www.googleapis.com/auth/drive.file`
    - Нажмите **"Update"**
    - Нажмите **"Save and Continue"**
 
@@ -208,7 +208,7 @@ NEXT_PUBLIC_GOOGLE_API_KEY="ваш-api-key-здесь"
    - Должен быть `http://localhost:3000/api/auth/callback/google`
    - Если есть продакшен домен - добавьте его
 6. **Проверьте OAuth Consent Screen:**
-   - Убедитесь, что добавлен scope: `https://www.googleapis.com/auth/drive.readonly`
+   - Убедитесь, что добавлен scope: `https://www.googleapis.com/auth/drive.file`
    - Если нет - добавьте (см. Шаг 4, пункт 4)
 
 ## Частые проблемы
@@ -218,7 +218,7 @@ NEXT_PUBLIC_GOOGLE_API_KEY="ваш-api-key-здесь"
 - Убедитесь, что добавили `http://localhost:3000/api/auth/callback/google` (не `https` для localhost)
 
 ### "Access blocked: This app's request is invalid"
-- Проверьте OAuth Consent Screen - должно быть добавлено scope `drive.readonly`
+- Проверьте OAuth Consent Screen - должно быть добавлено scope `drive.file`
 - Если приложение в статусе "Testing", добавьте свой email в Test users
 
 ### "Failed to load Google API"

@@ -22,8 +22,8 @@
 3. Добавить scope для Google Drive:
    - На странице OAuth Consent Screen нажать **"EDIT APP"** (или перейти к Step 2 - Scopes)
    - Найти раздел **"Scopes"** или нажать **"ADD OR REMOVE SCOPES"**
-   - В поиске ввести: `drive.readonly`
-   - Отметить: `https://www.googleapis.com/auth/drive.readonly`
+   - В поиске ввести: `drive.file`
+   - Отметить: `https://www.googleapis.com/auth/drive.file`
    - Нажать **"UPDATE"** или **"SAVE"**
    - Нажать **"SAVE AND CONTINUE"**
 
@@ -106,6 +106,6 @@ NEXT_PUBLIC_GOOGLE_API_KEY="ваш-api-key-здесь"
 ## ❓ Проблемы?
 
 - **"redirect_uri_mismatch"**: Проверить точное совпадение redirect URI
-- **"Access blocked"**: Проверить, что scope `drive.readonly` добавлен и вы в Test users
+- **"Access blocked"**: Проверить, что scope `drive.file` добавлен и вы в Test users
 - **"Google OAuth not configured"**: Проверить `.env.local` и перезапустить dev server
 

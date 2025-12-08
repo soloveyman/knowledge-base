@@ -14,7 +14,7 @@
    - Найти: `Google Drive API` → Enable
 
 2. **Добавить scope** → [OAuth Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
-   - Edit App → Scopes → Add `https://www.googleapis.com/auth/drive.readonly`
+   - Edit App → Scopes → Add `https://www.googleapis.com/auth/drive.file`
 
 3. **Проверить/создать OAuth Client** → [Credentials](https://console.cloud.google.com/apis/credentials)
    - Проверить Authorized JavaScript origins: `http://localhost:3000`

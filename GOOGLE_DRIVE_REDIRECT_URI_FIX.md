@@ -81,7 +81,7 @@ http://localhost:3000/api/auth/callback/google
 
 2. **Проверьте OAuth Consent Screen:**
    - Откройте: https://console.cloud.google.com/apis/credentials/consent
-   - Убедитесь, что добавлен scope: `https://www.googleapis.com/auth/drive.readonly`
+   - Убедитесь, что добавлен scope: `https://www.googleapis.com/auth/drive.file`
    - Если приложение в статусе "Testing", добавьте email `uppstaffknowledge@gmail.com` в Test users
 
 3. **Проверьте переменные окружения в Vercel:**
