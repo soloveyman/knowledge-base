@@ -118,57 +118,319 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: `You are an expert test generator. Generate ${grokParams?.count || 5} high-quality questions based on the provided content. 
-            
-            Requirements:
-            - Questions should test understanding of the content
-            - CRITICAL: Generate questions of type "${grokParams?.type || 'mcq'}" ONLY:
-              * If type is "mcq": Generate ONLY multiple choice questions (single answer) with exactly 4 choices each. Use correct_answer as a single index: "1", "2", "3", or "4"
-              * If type is "mcq_multi": Generate ONLY multiple choice questions (multiple answers allowed) with exactly 4 choices each. Use correct_answer as comma-separated indices: "1,2", "1,3,4", "2,3", etc. (at least 2 correct answers required)
-              * If type is "tf": Generate ONLY true/false questions. Use correct_answer as "true" or "false"
-              * If type is "complete": Generate ONLY fill-in-the-blank questions (text completion). Use correct_answer as the exact text answer (case-insensitive matching will be used)
-              * If type is "cloze": Generate ONLY cloze test questions (multiple blanks in text). Use correct_answer as comma-separated answers: "answer1,answer2,answer3" or as a single text if all blanks have the same answer
-              * If type is "match": Generate ONLY matching questions (match items from two lists). Provide choices as pairs to match. Use correct_answer as comma-separated indices in order: "1,2,3,4" (order matters)
-              * If type is "order": Generate ONLY ordering questions (arrange items in correct order). Provide choices as items to order. Use correct_answer as comma-separated indices in correct order: "1,2,3,4" (order matters)
-              * If type is "mixed": Generate a MIX of question types (multiple choice, true/false, and fill-in-the-blank)
-              * DO NOT mix question types unless type is "mixed" - all questions must be of the specified type
-            
-            - CRITICAL: CORRECT ANSWER VALIDATION:
-              * For MCQ questions: The correct_answer MUST be a 1-based index (1, 2, 3, or 4) that corresponds to the ACTUALLY CORRECT choice in the choices array
-              * BEFORE setting correct_answer, verify that the choice at that index is indeed the correct answer based on the content
-              * The correct answer must be factually accurate according to the provided content
-              * DO NOT randomly assign correct_answer - it must match the actual correct choice
-              * Example: If choices[0] (index 1) is correct, use "1". If choices[2] (index 3) is correct, use "3"
-              * For mcq_multi: Ensure ALL indices in correct_answer point to choices that are actually correct
-              * Double-check: correct_answer index must match the position of the correct choice in the choices array
-            
-            - Difficulty level: ${grokParams?.difficulty || 'medium'}
-              * "easy": Questions should test basic recall and recognition. Use simple facts, definitions, and direct information from the text. Examples: "What is X?", "Which of the following is Y?", "True/False: Z is mentioned in the text"
-              * "medium": Questions should test comprehension and application. Require understanding relationships, making connections, applying concepts. Examples: "How does X relate to Y?", "What would happen if...?", "Which statement best explains...?", "What is the main purpose of...?"
-              * "hard": Questions should test analysis, synthesis, and evaluation. Require deep understanding, critical thinking, comparing concepts, drawing conclusions. Examples: "What are the implications of...?", "Compare and contrast X and Y", "What is the most significant factor in...?", "Evaluate the effectiveness of..."
-              * IMPORTANT: For "medium" difficulty, avoid trivial questions that only require simple recall. Questions must require understanding, not just memorization.
-            
-            - Provide clear explanations for answers that reference the source content
-            
-            - CRITICAL LANGUAGE REQUIREMENT: Generate ALL questions in ${grokParams?.locale === 'ru' ? 'Russian (Русский)' : 'English'}. The document language is ${grokParams?.locale === 'ru' ? 'Russian' : 'English'}, so ALL questions, answers, choices, and explanations MUST be in ${grokParams?.locale === 'ru' ? 'Russian' : 'English'}. DO NOT translate or mix languages. Preserve the original document's language.
-            
-            - IMPORTANT: Skip all images and image references. Do not use tokens for images. Focus only on text content.
-            
-            Return ONLY a valid JSON array with this exact format:
-            [
-              {
-                "id": "unique_id",
-                "type": "mcq|mcq_multi|tf|complete|cloze|match|order",
-                "prompt": "Question text",
-                "choices": ["option1", "option2", "option3", "option4"], // Required for mcq/mcq_multi/match/order, omit for tf/complete/cloze
-                "correct_answer": "1|2|3|4|1,2|1,3|2,3|1,2,3|true|false|answer_text|answer1,answer2", // CRITICAL: Use 1-based indices (1, 2, 3, 4). The index MUST correspond to the ACTUALLY CORRECT choice. For mcq_multi/match/order use comma-separated: "1,2" or "1,3,4". For mcq use single: "1" or "2". For complete/cloze use text. For tf use "true" or "false". NOT 0-based (0, 1, 2, 3). VERIFY the correct answer before setting the index.
-                "explanation": "Why this answer is correct"
-              }
-            ]`
+            content: `You are an expert assessment generator.  
+
+Your task is to create high-quality exam questions strictly based on the provided content.
+
+You MUST follow all rules below.  
+
+Output MUST be a valid JSON array and nothing else. No Markdown.
+
+=====================================================
+
+LANGUAGE RULE
+
+=====================================================
+
+Generate ALL text strictly in this language:
+
+→ ${grokParams?.locale === 'ru' ? 'Russian (Русский)' : 'English'}
+
+Do NOT mix languages.
+
+=====================================================
+
+QUESTION TYPE RULE
+
+=====================================================
+
+Generate questions ONLY of this type:
+
+→ "${grokParams?.type || 'mcq'}"
+
+Do NOT mix types unless type="mixed".
+
+Valid types:
+
+mcq, mcq_multi, tf, complete, cloze, match, order, mixed
+
+=====================================================
+
+DIFFICULTY RULE
+
+=====================================================
+
+Difficulty: ${grokParams?.difficulty || 'medium'}
+
+- easy → factual recall  
+
+- medium → comprehension, meaning, relationships, implications  
+
+- hard → analysis, evaluation, comparison  
+
+Medium & hard MUST NOT be trivial.  
+
+Each question must rely on real reasoning based on the text.
+
+=====================================================
+
+UNIQUENESS RULE
+
+=====================================================
+
+ALL questions must be:
+
+- unique in idea  
+
+- unique in phrasing  
+
+- testing DIFFERENT aspects of the content  
+
+- not duplicates or paraphrases of each other  
+
+=====================================================
+
+CRITICAL ANSWER VALIDATION RULE
+
+=====================================================
+
+Correct answer MUST BE EXACT and CONSISTENT:
+
+mcq → one 1-based index ("1"–"4")  
+
+mcq_multi → comma-separated indices ("1,3,4"), ≥2 correct  
+
+tf → "true" or "false" (English) / "верно" or "неверно" (Russian)  
+
+complete → exact text answer  
+
+cloze → comma-separated answers  
+
+match → order of correct pairings as indices ("3,1,4,2")  
+
+order → correct sequence indices ("2,3,1,4")  
+
+DO NOT guess.  
+
+Correct answer MUST match both the choices AND the explanation.  
+
+Explanation MUST reference the content.
+
+=====================================================
+
+STRICT OUTPUT FORMAT
+
+=====================================================
+
+[
+
+  {
+
+    "id": "string",
+
+    "type": "mcq|mcq_multi|tf|complete|cloze|match|order",
+
+    "prompt": "string",
+
+    "choices": ["string", "string", "string", "string"],  // Only for mcq, mcq_multi, match, order
+
+    "correct_answer": "string",
+
+    "explanation": "string"
+
+  }
+
+]
+
+Only JSON. No comments. No extra text.
+
+=====================================================
+
+FEW-SHOT EXAMPLES FOR ALL QUESTION TYPES
+
+(Examples DO NOT reflect content; structure only.)
+
+=====================================================
+
+--------------------------
+
+EXAMPLE: MCQ (Single Choice)
+
+--------------------------
+
+{
+
+  "id": "ex-mcq-1",
+
+  "type": "mcq",
+
+  "prompt": "What is the main purpose of the process described in the text?",
+
+  "choices": ["To store data", "To improve accuracy", "To remove duplicates", "To compress files"],
+
+  "correct_answer": "2",
+
+  "explanation": "The text directly states that improving accuracy is the primary goal."
+
+}
+
+--------------------------
+
+EXAMPLE: MCQ_MULTI (Multiple Correct)
+
+--------------------------
+
+{
+
+  "id": "ex-mcqmulti-1",
+
+  "type": "mcq_multi",
+
+  "prompt": "Which of the following factors contribute to the effectiveness of the method?",
+
+  "choices": ["Consistency", "Noise reduction", "Random errors", "Clear structure"],
+
+  "correct_answer": "1,2,4",
+
+  "explanation": "The text explains that consistency, reduced noise, and structured data all improve effectiveness."
+
+}
+
+--------------------------
+
+EXAMPLE: TRUE/FALSE (English)
+
+--------------------------
+
+{
+
+  "id": "ex-tf-1",
+
+  "type": "tf",
+
+  "prompt": "The process described in the text is mandatory in all scenarios.",
+
+  "correct_answer": "false",
+
+  "explanation": "The text clarifies that the process is optional and used only under certain conditions."
+
+}
+
+--------------------------
+
+EXAMPLE: TRUE/FALSE (Russian)
+
+--------------------------
+
+{
+
+  "id": "ex-tf-2",
+
+  "type": "tf",
+
+  "prompt": "Процесс, описанный в тексте, является обязательным во всех сценариях.",
+
+  "correct_answer": "неверно",
+
+  "explanation": "Текст уточняет, что процесс является необязательным и используется только при определенных условиях."
+
+}
+
+--------------------------
+
+EXAMPLE: COMPLETE (Fill-in-the-blank)
+
+--------------------------
+
+{
+
+  "id": "ex-complete-1",
+
+  "type": "complete",
+
+  "prompt": "The primary metric used to evaluate the system is ________.",
+
+  "correct_answer": "accuracy",
+
+  "explanation": "The text states that accuracy is the main evaluation metric."
+
+}
+
+--------------------------
+
+EXAMPLE: CLOZE (Multiple Blanks)
+
+--------------------------
+
+{
+
+  "id": "ex-cloze-1",
+
+  "type": "cloze",
+
+  "prompt": "The system relies on ________ and ________ to produce reliable results.",
+
+  "correct_answer": "consistency,validation",
+
+  "explanation": "Both consistency and validation are described as essential factors."
+
+}
+
+--------------------------
+
+EXAMPLE: MATCH (Pair Lists)
+
+--------------------------
+
+{
+
+  "id": "ex-match-1",
+
+  "type": "match",
+
+  "prompt": "Match each component to its purpose.",
+
+  "choices": ["Parser", "Validator", "Renderer", "Scheduler"],
+
+  "correct_answer": "2,3,1,4",
+
+  "explanation": "The mapping is provided directly in the text: Parser→3, Validator→1, Renderer→2, Scheduler→4."
+
+}
+
+--------------------------
+
+EXAMPLE: ORDER (Sequence)
+
+--------------------------
+
+{
+
+  "id": "ex-order-1",
+
+  "type": "order",
+
+  "prompt": "Arrange the steps of the workflow in the correct order.",
+
+  "choices": ["Analyze Data", "Collect Input", "Generate Output", "Validate Results"],
+
+  "correct_answer": "2,1,4,3",
+
+  "explanation": "The text specifies the workflow: input → analysis → validation → output."
+
+}
+
+=====================================================
+
+READY TO GENERATE
+
+=====================================================
+
+Now generate ${grokParams?.count || 5} questions strictly following all rules above, using the content below.`
           },
           {
             role: 'user',
-            content: `Generate questions based on this content (images are excluded to save tokens):\n\n${cleanedContextText || 'No content provided'}`
+            content: `Generate questions based on this content (images excluded):\n\n${cleanedContextText || 'No content provided'}`
           }
         ],
         temperature: 0.7,
@@ -368,9 +630,16 @@ export async function POST(request: Request) {
       // For true/false questions, normalize the answer
       if (q.type === 'tf' || q.type === 'true_false') {
         const normalized = correctAnswer?.trim().toLowerCase()
-        if (normalized === 'true' || normalized === 'верно' || normalized === 'да' || normalized === '1') {
+        // English variants
+        if (normalized === 'true' || normalized === '1') {
           correctAnswer = 'true'
-        } else if (normalized === 'false' || normalized === 'неверно' || normalized === 'нет' || normalized === '0') {
+        } else if (normalized === 'false' || normalized === '0') {
+          correctAnswer = 'false'
+        }
+        // Russian variants - convert to English for consistency
+        else if (normalized === 'верно' || normalized === 'да' || normalized === 'истина' || normalized === 'правда') {
+          correctAnswer = 'true'
+        } else if (normalized === 'неверно' || normalized === 'нет' || normalized === 'ложь' || normalized === 'неправда') {
           correctAnswer = 'false'
         }
         if (originalAnswer !== correctAnswer) {

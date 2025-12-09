@@ -221,12 +221,12 @@ export default function TestPage() {
     // Helper function to normalize true/false values (English and Russian)
     const normalizeTrueFalse = (val: string): string | null => {
       const normalized = val.trim().toLowerCase()
-      // English
-      if (normalized === 'true') return 'true'
-      if (normalized === 'false') return 'false'
-      // Russian
-      if (normalized === 'правда' || normalized === 'верно' || normalized === 'да') return 'true'
-      if (normalized === 'ложь' || normalized === 'неверно' || normalized === 'нет') return 'false'
+      // English variants
+      if (normalized === 'true' || normalized === '1') return 'true'
+      if (normalized === 'false' || normalized === '0') return 'false'
+      // Russian variants
+      if (normalized === 'верно' || normalized === 'да' || normalized === 'истина' || normalized === 'правда') return 'true'
+      if (normalized === 'неверно' || normalized === 'нет' || normalized === 'ложь' || normalized === 'неправда') return 'false'
       return null
     }
 

@@ -921,10 +921,18 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                               if (question.type === 'tf' || question.type === 'true_false') {
                                                 const normalizeTrueFalse = (val: string): string => {
                                                   const normalized = val.trim().toLowerCase()
-                                                  if (normalized === 'true' || normalized === 'правда' || normalized === 'верно' || normalized === 'да') {
+                                                  // English variants
+                                                  if (normalized === 'true' || normalized === '1') {
                                                     return 'true'
                                                   }
-                                                  if (normalized === 'false' || normalized === 'ложь' || normalized === 'неверно' || normalized === 'нет') {
+                                                  if (normalized === 'false' || normalized === '0') {
+                                                    return 'false'
+                                                  }
+                                                  // Russian variants
+                                                  if (normalized === 'верно' || normalized === 'да' || normalized === 'истина' || normalized === 'правда') {
+                                                    return 'true'
+                                                  }
+                                                  if (normalized === 'неверно' || normalized === 'нет' || normalized === 'ложь' || normalized === 'неправда') {
                                                     return 'false'
                                                   }
                                                   return normalized
