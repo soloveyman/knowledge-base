@@ -783,13 +783,14 @@ Now generate ${grokParams?.count || 5} questions strictly following all rules ab
           if (currentAnswerIndex !== extractedAnswerIndex) {
             console.log(`Question ${index}: CORRECTING answer based on explanation!`)
             console.log(`  Current correct_answer: ${correctAnswer} (index ${currentAnswerIndex})`)
-            console.log(`  Explanation mentions: ${q.choices[extractedAnswerIndex - 1]} (index ${extractedAnswerIndex})`)
+            const mentionedChoice = q.choices && q.choices.length >= extractedAnswerIndex ? q.choices[extractedAnswerIndex - 1] : 'N/A'
+            console.log(`  Explanation mentions: ${mentionedChoice} (index ${extractedAnswerIndex})`)
             console.log(`  Explanation text: "${q.explanation.substring(0, 100)}..."`)
             
             // Update correct answer to match what's in explanation
-            if (q.type === 'mcq_multi' && correctAnswer && correctAnswer.includes(',')) {
+            if (q.type === 'mcq_multi' && correctAnswer && correctAnswer.includes(',') && q.choices && q.choices.length > 0) {
               // For multiple choice, keep existing answers but ensure extracted one is included
-              const existingIndices = correctAnswer.split(/[,;]/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= q.choices.length)
+              const existingIndices = correctAnswer.split(/[,;]/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= q.choices!.length)
               if (!existingIndices.includes(extractedAnswerIndex)) {
                 existingIndices.push(extractedAnswerIndex)
                 correctAnswer = existingIndices.sort((a, b) => a - b).join(',')
