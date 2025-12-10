@@ -700,11 +700,11 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                 className="hover:no-underline relative md:items-center [&>svg]:absolute [&>svg]:top-4 [&>svg]:right-4 md:[&>svg]:static md:[&>svg]:top-auto md:[&>svg]:right-auto md:[&>svg]:mt-0"
               >
                 <div className="flex flex-col md:flex-row md:items-center w-full gap-3">
-                  <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1">
-                    <div className="flex items-center justify-between md:justify-start gap-3">
-                      <div className="text-left">
-                        <div className="font-medium">{progress.user.name}</div>
-                        <div className="text-sm text-muted-foreground">{progress.user.job}</div>
+                  <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
+                    <div className="flex items-center justify-between md:justify-start gap-3 min-w-0">
+                      <div className="text-left min-w-0 flex-1">
+                        <div className="font-medium break-words">{progress.user.name}</div>
+                        <div className="text-sm text-muted-foreground break-words">{progress.user.job}</div>
                       </div>
                     </div>
                     <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 text-sm">
@@ -763,13 +763,13 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                       return (
                       <div key={assignment.id} className="p-4 border rounded-3xl bg-card">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-medium">{actualTitle}</h4>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <h4 className="font-medium break-words">{actualTitle}</h4>
                               {getStatusIcon(actualStatus)}
                               {getStatusBadge(actualStatus)}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">
+                            <p className="text-sm text-muted-foreground mb-2 break-words">
                               {actualDescription}
                               {stats && stats.totalAttempts > 0 && (
                                 <span className="ml-2 text-blue-600 font-medium">
@@ -781,7 +781,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                               {assignment.testId && (
                                 <div className="flex items-center gap-1">
                                   <Target className="h-4 w-4" />
-                                  <span>Test: {(() => {
+                                  <span className="break-words">Test: {(() => {
                                     const test = tests.find((t: Test) => t.id === assignment.testId)
                                     return test?.title || assignment.testId.slice(0, 8)
                                   })()}</span>
@@ -811,7 +811,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                         className="py-2 hover:no-underline [&>svg]:shrink-0"
                                       >
                                         <div className="flex items-center justify-between w-full pr-4">
-                                          <div className="text-sm font-medium text-foreground">
+                                          <div className="text-sm font-medium text-foreground break-words">
                                             Ответы сотрудника (лучшая попытка):
                                           </div>
                                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -994,12 +994,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                             // Display all incorrect answers
                                             return incorrectAnswers.map(({ questionId, answer, questionText, question }) => (
                                               <div key={questionId} className="text-sm">
-                                                <div className="font-medium text-foreground mb-1.5">
+                                                <div className="font-medium text-foreground mb-1.5 break-words">
                                                   {questionText}:
                                                 </div>
-                                                <div className="pl-3 border-l-2 rounded-r py-1.5 px-2 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30">
-                                                  <div className="mb-1">
-                                                    <span className="font-medium">{t('userAnswer') || 'Ответ сотрудника'}:</span> {formatAnswer(answer)}
+                                                <div className="pl-3 border-l-2 rounded-r py-1.5 px-2 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 break-words">
+                                                  <div className="mb-1 break-words">
+                                                    <span className="font-medium">{t('userAnswer') || 'Ответ сотрудника'}:</span> <span className="break-words">{formatAnswer(answer)}</span>
                                                   </div>
                                                   {question?.correctAnswer && (() => {
                                                     // Format correct answer for display
@@ -1073,8 +1073,8 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                     }
                                                     
                                                     return (
-                                                      <div className="text-green-600 dark:text-green-400">
-                                                        <span className="font-medium">{t('correctAnswer') || 'Правильный ответ'}:</span> {formattedCorrectAnswer}
+                                                      <div className="text-green-600 dark:text-green-400 break-words">
+                                                        <span className="font-medium">{t('correctAnswer') || 'Правильный ответ'}:</span> <span className="break-words">{formattedCorrectAnswer}</span>
                                                       </div>
                                                     )
                                                   })()}

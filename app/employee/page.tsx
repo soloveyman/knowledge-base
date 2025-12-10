@@ -792,12 +792,12 @@ function EmployeePageInner() {
                           : (attempt.status === 'completed' ? 'completed' : 'failed')
                         return (
                           <div key={attempt.id} className="flex items-center justify-between px-5 py-3 border rounded-3xl hover:bg-accent transition-colors">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-medium">{t('testAttempt')}</h4>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <h4 className="font-medium break-words">{t('testAttempt')}</h4>
                                 <StatusBadge status={attemptStatus} />
                               </div>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-sm text-muted-foreground break-words">
                                 {attempt.completedAt && `${t('completed')}: ${formatDateShort(attempt.completedAt)}`}
                               </p>
                             </div>

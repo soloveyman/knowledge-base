@@ -729,7 +729,6 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
       
       if (jsonData.length > 0) {
-        text += `\n## ${sheetName}\n\n`
         const rows = jsonData as string[][]
         
         // Try to map images to cells (simplified: assign to first sheet if multiple)
@@ -776,32 +775,28 @@ export async function parseXlsx(buffer: ArrayBuffer, options: {
           }
         }
         
-        // Add text content from rows (optimized: use array join instead of string concatenation)
-        const textParts: string[] = []
-        let currentTextLength = text.length
-        for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-          const row = rows[rowIdx]
-          const rowText = row.map(cell => String(cell).trim()).filter(cell => cell).join(' ')
-          if (rowText) {
-            textParts.push(rowText)
-            currentTextLength += rowText.length
-            
+        // Only add text content if there are images to insert
+        // XLSX files should primarily use tables, not text content
+        if (images.length > 0) {
+          const textParts: string[] = []
+          let currentTextLength = text.length
+          for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
             // Check if any images should be inserted at this row position
-            for (const img of images) {
-              if (img.rowIndex === rowIdx && img.sheetName === sheetName) {
-                // Insert image placeholder in text at this position
+            const rowImages = images.filter(img => img.rowIndex === rowIdx && img.sheetName === sheetName)
+            if (rowImages.length > 0) {
+              for (const img of rowImages) {
                 const placeholder = img.placeholder || `[IMG_${imageCounter++}]`
-                textParts.push(`\n${placeholder}\n`)
+                textParts.push(`${placeholder}\n`)
                 img.position = currentTextLength
-                currentTextLength += placeholder.length + 2 // +2 for newlines
+                currentTextLength += placeholder.length + 1 // +1 for newline
                 console.log(`📸 Inserted image placeholder ${placeholder} at row ${rowIdx} in sheet "${sheetName}"`)
               }
             }
-            textParts.push('\n')
-            currentTextLength += 1
+          }
+          if (textParts.length > 0) {
+            text += textParts.join('')
           }
         }
-        text += textParts.join('')
       }
     })
     
@@ -1181,13 +1176,14 @@ function parseTextToStructuredContent(text: string, fileName: string): ParsedCon
     }
   }
   
-  // Add the last section
-  if (currentSection) {
+  // Add the last section (only if it has content)
+  if (currentSection && currentSection.content.trim().length > 0) {
     sections.push(currentSection)
   }
   
-  // If no sections were found, create a single section with all content
-  if (sections.length === 0) {
+  // If no sections were found and there's actual content, create a single section
+  // Skip creating section for empty text (e.g., XLSX files without images - tables are handled separately)
+  if (sections.length === 0 && finalText.trim().length > 0) {
     sections.push({
       title: fileName.replace(/\.[^/.]+$/, ''), // Remove file extension
       level: 1,

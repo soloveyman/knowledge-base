@@ -1459,7 +1459,7 @@ export default function TestBuilderPage() {
                             <Textarea
                               value={question.prompt}
                               onChange={(e) => handleUpdateQuestionField(question.id, 'prompt', e.target.value)}
-                              className="w-full"
+                              className="w-full break-words"
                               rows={3}
                             />
                           </div>
@@ -1486,7 +1486,7 @@ export default function TestBuilderPage() {
                                     <Input
                                       value={choice}
                                       onChange={(e) => handleUpdateChoice(question.id, choiceIndex, e.target.value)}
-                                      className="flex-1 min-w-0"
+                                      className="flex-1 min-w-0 break-words"
                                     />
                                     <Button
                                       variant="ghost"
@@ -1520,7 +1520,7 @@ export default function TestBuilderPage() {
                                   ? `Enter index (1-${question.choices.length}) or comma-separated for multiple (e.g., 1,2)`
                                   : t('correctAnswerPlaceholder')
                               }
-                              className="w-full"
+                              className="w-full break-words"
                             />
                             {(question.type === 'mcq' || question.type === 'mcq_multi') && question.choices && question.choices.length > 0 && (
                               <div className="mt-1">
@@ -1546,7 +1546,7 @@ export default function TestBuilderPage() {
                             <Textarea
                               value={question.explanation || ''}
                               onChange={(e) => handleUpdateQuestionField(question.id, 'explanation', e.target.value)}
-                              className="w-full"
+                              className="w-full break-words"
                               rows={2}
                               placeholder={t('explanationPlaceholder')}
                             />

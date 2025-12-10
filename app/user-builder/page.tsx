@@ -165,12 +165,54 @@ export default function UserBuilderPage() {
   }
 
   const handleCreateUser = async () => {
+    // Prevent double submission
+    if (isCreating) {
+      return
+    }
+
+    // Check if session is ready
+    if (status !== 'authenticated' || !session) {
+      toast.error('Please wait while we verify your session...', { duration: 3000 })
+      return
+    }
+
+    // Check if businessId is available (required for tenant isolation)
+    if (!session.user?.businessId) {
+      toast.error('Session error: missing tenant information. Please try refreshing the page.', { duration: 5000 })
+      console.error('Session missing businessId:', { session: session?.user, status })
+      return
+    }
+
     // Check usage limit for new users (not for editing)
     if (!isEditMode && isUserLimitDisabled) {
       toast.error(
         `User limit reached (${limits?.users.current}/${limits?.users.max}). Please upgrade your plan to continue.`,
         { duration: 5000 }
       )
+      return
+    }
+
+    // For new users, check if email validation is still in progress
+    if (!isEditMode && emailValidation.isChecking) {
+      toast.error('Please wait for email validation to complete...', { duration: 3000 })
+      return
+    }
+
+    // For new users, check if email is available
+    if (!isEditMode && emailValidation.isAvailable === false) {
+      toast.error('This email is already registered. Please use a different email address.', { duration: 5000 })
+      return
+    }
+
+    // For new users, check if there's an email validation error
+    if (!isEditMode && emailValidation.error) {
+      toast.error(emailValidation.error, { duration: 5000 })
+      return
+    }
+
+    // Check if email is disposable (for new users)
+    if (!isEditMode && isDisposableEmail(userConfig.email)) {
+      toast.error('Disposable/temporary email addresses are not allowed. Please use a real email address.', { duration: 5000 })
       return
     }
 
@@ -271,7 +313,23 @@ export default function UserBuilderPage() {
       await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create user'
+      console.error('Error creating/updating user:', err)
+      
+      let errorMessage = 'Failed to create user'
+      
+      if (err instanceof Error) {
+        errorMessage = err.message
+        
+        // Provide more user-friendly error messages for common issues
+        if (err.message.includes('fetch') || err.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.'
+        } else if (err.message.includes('Unauthorized') || err.message.includes('missing tenant')) {
+          errorMessage = 'Session expired. Please refresh the page and try again.'
+        } else if (err.message.includes('rate limit') || err.message.includes('Too many')) {
+          errorMessage = 'Too many attempts. Please wait a moment and try again.'
+        }
+      }
+      
       toast.error(errorMessage, {
         duration: 5000
       })
@@ -339,19 +397,14 @@ export default function UserBuilderPage() {
                     {isEditMode ? t('updateUserDetailsAndRole') : t('createNewUserAccount')}
                   </CardDescription>
                 </div>
-                <div 
-                  onClick={(e) => {
-                    if (!isEditMode && isUserLimitDisabled && !isCreating) {
+                <div className="w-full sm:w-auto">
+                  <Button 
+                    onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
                       handleCreateUser()
-                    }
-                  }}
-                  className={!isEditMode && isUserLimitDisabled && !isCreating ? "w-full sm:w-auto cursor-pointer" : "w-full sm:w-auto"}
-                >
-                  <Button 
-                    onClick={handleCreateUser}
-                    disabled={isCreating || (!isEditMode && isUserLimitDisabled)}
+                    }}
+                    disabled={isCreating || status !== 'authenticated' || !session || (!isEditMode && isUserLimitDisabled)}
                     className="w-full sm:w-auto"
                   >
                   {isCreating ? (

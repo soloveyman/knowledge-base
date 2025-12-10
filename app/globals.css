@@ -720,6 +720,19 @@
     @apply border-border outline-ring/50;
   }
   
+  /* Ensure text wraps properly on mobile */
+  body {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Basic text elements should wrap on mobile */
+  p, label, td, th {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+  
   html {
     width: 100%;
     max-width: 100vw;

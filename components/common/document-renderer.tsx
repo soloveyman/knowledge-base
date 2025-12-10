@@ -45,11 +45,11 @@ export function DocumentRenderer({ content, tables, className = '' }: DocumentRe
     })())
   
   return (
-    <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
-      <div className="document-content space-y-6">
+    <div className={`prose prose-slate dark:prose-invert max-w-none w-full ${className}`}>
+      <div className="document-content space-y-6 w-full">
         {hasActualContent && <DocumentContent content={content} />}
         {tables && tables.length > 0 && (
-          <div className={hasActualContent ? "mt-10 space-y-10" : "space-y-10"}>
+          <div className={hasActualContent ? "mt-10 space-y-10 w-full" : "space-y-10 w-full"}>
             {tables.map((table, idx) => (
               <TableRenderer key={idx} table={table} />
             ))}
@@ -238,26 +238,27 @@ function DocumentContent({ content }: { content: string }) {
   }
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[
-        rehypeRaw,
-        preserveImageSrc,
-        [
-          rehypeSanitize,
-          {
-            tagNames: ['img', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'hr'],
-            attributes: {
-              img: ['src', 'alt', 'width', 'height', 'className', 'data-original-src', 'class', 'style', 'loading'],
-              div: ['align', 'className'],
-              a: ['href', 'target', 'rel', 'className'],
+    <div className="w-full overflow-x-hidden">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[
+          rehypeRaw,
+          preserveImageSrc,
+          [
+            rehypeSanitize,
+            {
+              tagNames: ['img', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'hr'],
+              attributes: {
+                img: ['src', 'alt', 'width', 'height', 'className', 'data-original-src', 'class', 'style', 'loading'],
+                div: ['align', 'className'],
+                a: ['href', 'target', 'rel', 'className'],
+              },
+              protocols: {
+                src: ['http', 'https', 'data'],
+              },
             },
-            protocols: {
-              src: ['http', 'https', 'data'],
-            },
-          },
-        ],
-      ]}
+          ],
+        ]}
       components={{
         h1: ({ children }) => {
           // Filter out undefined/null children
@@ -458,12 +459,12 @@ function DocumentContent({ content }: { content: string }) {
           )
         },
         pre: ({ children }) => (
-          <pre className="bg-muted p-4 rounded-lg overflow-x-auto my-4 border border-border">
+          <pre className="bg-muted p-4 rounded-lg overflow-x-auto overflow-y-visible my-4 border border-border w-full max-w-full">
             {children}
           </pre>
         ),
         table: ({ children }) => (
-          <div className="overflow-x-auto my-6 rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+          <div className="overflow-x-auto overflow-y-visible my-6 rounded-lg border border-border -mx-4 sm:mx-0 w-[calc(100%+2rem)] sm:w-full [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
             <table className="min-w-full divide-y divide-border bg-background text-xs border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
               {children}
             </table>
@@ -717,6 +718,7 @@ function DocumentContent({ content }: { content: string }) {
     >
       {processedMarkdown}
     </ReactMarkdown>
+    </div>
   )
 }
 
@@ -847,7 +849,7 @@ function TableRenderer({ table }: {
           <span>Таблица</span>
         </h3>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border -mx-4 sm:mx-0 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
+      <div className="overflow-x-auto overflow-y-visible rounded-lg border border-border -mx-4 sm:mx-0 w-[calc(100%+2rem)] sm:w-full [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded">
         <table className="w-full divide-y divide-border bg-background border-collapse [&_th]:text-left [&_td]:text-left [&_th]:align-top [&_td]:align-top">
           {hasHeaders && (
             <thead className="bg-muted/50">

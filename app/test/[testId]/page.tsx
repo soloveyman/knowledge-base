@@ -692,10 +692,10 @@ export default function TestPage() {
         <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-6 pb-4 md:py-8">
           <Card className="w-full max-w-4xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-center justify-center">
+              <CardTitle className="text-2xl text-center justify-center break-words">
                 {score >= (testData.passingScore ?? 70) ? t('congratulations') : t('testCompleted')}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="break-words">
                 {testData.title}
               </CardDescription>
             </CardHeader>
@@ -703,7 +703,7 @@ export default function TestPage() {
               <div className={`text-6xl font-bold ${score >= (testData.passingScore ?? 70) ? 'text-green-600' : 'text-red-600'}`}>
                 {score}%
               </div>
-              <div className="text-lg text-muted-foreground">
+              <div className="text-lg text-muted-foreground break-words">
                 {score >= (testData.passingScore ?? 70) 
                   ? t('youPassedTheTest') 
                   : t('youNeedToScore70PercentOrHigherToPass').replace('70', String(testData.passingScore ?? 70))}
