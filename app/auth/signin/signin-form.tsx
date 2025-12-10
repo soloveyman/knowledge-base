@@ -39,7 +39,7 @@ export function SignInForm() {
   const formErrorId = useId()
   
   // Email validation hook (only for registration)
-  const emailValidation = useEmailValidation(email, 500, !isRegister)
+  const emailValidation = useEmailValidation(email, 500, !isRegister, t)
   
   // Focus management for errors
   useFocusOnError(fieldErrors, formErrorId)
@@ -58,6 +58,7 @@ export function SignInForm() {
   // Extract specific properties from emailValidation to avoid infinite loop
   const emailValidationError = emailValidation.error
   const emailValidationIsAvailable = emailValidation.isAvailable
+  const emailValidationIsChecking = emailValidation.isChecking
   
   useEffect(() => {
     if (!isRegister) return
@@ -71,9 +72,10 @@ export function SignInForm() {
         errors.email = emailError
       } else if (isDisposableEmail(email)) {
         errors.email = 'Disposable/temporary email addresses are not allowed. Please use a real email address.'
-      } else if (emailValidationError) {
+      } else if (!emailValidationIsChecking && emailValidationError) {
+        // Only show validation error if we're not currently checking
         errors.email = emailValidationError
-      } else if (emailValidationIsAvailable === false) {
+      } else if (!emailValidationIsChecking && emailValidationIsAvailable === false) {
         errors.email = 'This email is already registered'
       }
     }
@@ -117,7 +119,7 @@ export function SignInForm() {
       // No changes, return previous to avoid re-render
       return prev
     })
-  }, [email, password, name, touched, isRegister, emailValidationError, emailValidationIsAvailable])
+  }, [email, password, name, touched, isRegister, emailValidationError, emailValidationIsAvailable, emailValidationIsChecking])
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
@@ -427,7 +429,7 @@ export function SignInForm() {
               )}
               {isRegister && touched.email && !fieldErrors.email && emailValidation.isAvailable === true && (
                 <p id="email-success" className="text-xs text-green-600" role="status" aria-live="polite">
-                  Email is available
+                  {t('emailIsAvailable')}
                 </p>
               )}
             </div>

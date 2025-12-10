@@ -541,7 +541,14 @@ Now generate ${grokParams?.count || 5} questions strictly following all rules ab
       const originalAnswer = correctAnswer
       
       // Validate and convert correct answer based on question type
-      if (correctAnswer && q.choices && q.choices.length > 0) {
+      // For complete and cloze types, preserve text answers as-is
+      if (q.type === 'complete' || q.type === 'cloze') {
+        // For text-based questions, keep the answer as-is (trimmed)
+        if (correctAnswer && typeof correctAnswer === 'string') {
+          correctAnswer = correctAnswer.trim()
+          console.log(`Question ${index}: Preserved text answer for ${q.type}: "${correctAnswer}"`)
+        }
+      } else if (correctAnswer && q.choices && q.choices.length > 0) {
         // Handle multiple choice questions (mcq, mcq_multi)
         if ((q.type === 'mcq' || q.type === 'mcq_multi') && q.choices) {
           // If correct answer is a letter (A, B, C, D), convert to 1-based index

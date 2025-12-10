@@ -361,8 +361,19 @@ export async function POST(request: Request) {
               // Validate correct answer for multiple choice questions
               // Indices start from 1 (A=1, B=2, C=3, D=4)
               let finalCorrectAnswer = correctAnswerValue
+              
+              // Handle complete and cloze types - preserve text answers as-is
+              if (q.type === 'complete' || q.type === 'cloze') {
+                // For text-based questions, keep the answer as-is (trimmed)
+                if (correctAnswerValue && typeof correctAnswerValue === 'string') {
+                  finalCorrectAnswer = correctAnswerValue.trim()
+                  console.log(`Question ${index}: Preserved text answer for ${q.type}: "${finalCorrectAnswer}"`)
+                } else {
+                  console.warn(`Question ${index}: Empty or invalid correct_answer for ${q.type} question`)
+                }
+              }
               // Handle match and order types - preserve comma-separated answers as-is
-              if ((q.type === 'match' || q.type === 'order') && correctAnswerValue) {
+              else if ((q.type === 'match' || q.type === 'order') && correctAnswerValue) {
                 // For match and order, correct_answer should be comma-separated indices like "1,2,3,4"
                 // Validate that all indices are valid
                 const parts = correctAnswerValue.split(/[,;\s]+/).filter(p => p.length > 0)

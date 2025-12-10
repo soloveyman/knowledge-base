@@ -98,7 +98,7 @@ export default function UserBuilderPage() {
   const { values, errors, touched, setValue, setFieldTouched, clearFieldError, validateAll, validateField } = validation
   
   // Email validation hook (only for new users, not editing)
-  const emailValidation = useEmailValidation(values.email, 500, isEditMode)
+  const emailValidation = useEmailValidation(values.email, 500, isEditMode, t)
   
   // Sync validation values with userConfig for backwards compatibility
   const userConfig: UserConfig = {
@@ -451,7 +451,7 @@ export default function UserBuilderPage() {
                         )}
                       </div>
                       {!isEditMode && touched.email && !errors.email && !isDisposableEmail(userConfig.email) && emailValidation.isAvailable === true && (
-                        <p className="text-xs text-green-600 mt-1">Email is available</p>
+                        <p className="text-xs text-green-600 mt-1">{t('emailIsAvailable')}</p>
                       )}
                     </>
                   </FormField>

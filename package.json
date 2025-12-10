@@ -25,6 +25,7 @@
     "db:check-connections": "tsx scripts/check-db-connections.ts",
     "db:kill-idle": "tsx scripts/check-db-connections.ts --kill-idle",
     "db:add-test-columns": "tsx scripts/add-test-columns.ts",
+    "db:fix-question-answers": "tsx scripts/fix-question-answers.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",

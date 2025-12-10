@@ -14,9 +14,10 @@ export const runtime = 'nodejs'
  * GET /api/auth/check-email?email=user@example.com
  */
 export async function GET(request: Request) {
+  let email: string | null = null
   try {
     const { searchParams } = new URL(request.url)
-    const email = searchParams.get('email')
+    email = searchParams.get('email')
 
     if (!email) {
       return NextResponse.json(
@@ -72,8 +73,22 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('Check email error:', error)
+    
+    // Log more details for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      email: email || 'unknown'
+    })
+    
     return NextResponse.json(
-      { available: false, error: 'Failed to check email availability' },
+      { 
+        available: false, 
+        error: 'Failed to check email availability. Please try again later.' 
+      },
       { status: 500 }
     )
   }
