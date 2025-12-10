@@ -212,9 +212,19 @@ order → correct sequence indices ("2,3,1,4")
 
 DO NOT guess.  
 
-Correct answer MUST match both the choices AND the explanation.  
+CRITICAL: Correct answer MUST match the explanation!
 
-Explanation MUST reference the content.
+For MCQ questions:
+1. First, write the explanation that mentions the correct choice by name/text
+2. Then, set correct_answer to the index (1-based) of the choice mentioned in explanation
+3. If explanation says "Option X is correct because...", then correct_answer MUST be the index of Option X
+4. Verify: The choice text at index [correct_answer] MUST be mentioned or clearly referenced in explanation
+
+Example:
+If choices are ["Apple", "Banana", "Cherry", "Date"] and explanation says "Banana is correct because it contains potassium", 
+then correct_answer MUST be "2" (Banana is at index 2, 1-based).
+
+Explanation MUST reference the content AND mention which specific choice is correct.
 
 =====================================================
 
@@ -535,6 +545,113 @@ Now generate ${grokParams?.count || 5} questions strictly following all rules ab
       explanation?: string
     }
     
+    /**
+     * Helper function to normalize text for comparison (removes punctuation, extra spaces, converts to lowercase)
+     */
+    const normalizeText = (text: string): string => {
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^\p{L}\p{N}\s]/gu, '') // Remove punctuation, keep letters, numbers, spaces
+        .replace(/\s+/g, ' ') // Collapse multiple spaces
+        .trim()
+    }
+    
+    /**
+     * Extract correct answer from explanation by finding which choice text is mentioned
+     * This fixes cases where AI sets wrong correct_answer but explanation mentions correct choice
+     */
+    const extractCorrectAnswerFromExplanation = (
+      explanation: string | undefined,
+      choices: string[] | undefined
+    ): number | null => {
+      if (!explanation || !choices || choices.length === 0) {
+        return null
+      }
+      
+      const normalizedExplanation = normalizeText(explanation)
+      
+      // Try to find which choice is mentioned in the explanation
+      // We'll score each choice based on how well it matches
+      let bestMatch: { index: number; score: number; matchType: string } | null = null
+      
+      for (let i = 0; i < choices.length; i++) {
+        const choice = choices[i]
+        if (!choice || choice.trim().length === 0) continue
+        
+        const normalizedChoice = normalizeText(choice)
+        
+        // Skip very short normalized choices (less than 3 characters after normalization)
+        if (normalizedChoice.length < 3) continue
+        
+        let score = 0
+        let matchedWords = 0
+        let matchType = 'none'
+        
+        // Strategy 1: Exact full match (highest priority)
+        if (normalizedExplanation.includes(normalizedChoice)) {
+          score += normalizedChoice.length * 5 // Very high score for full match
+          matchedWords = normalizedChoice.split(/\s+/).length
+          matchType = 'full'
+        } else {
+          // Strategy 2: Extract key words from choice (words longer than 2 characters for Russian/Cyrillic)
+          const choiceWords = normalizedChoice
+            .split(/\s+/)
+            .filter(word => word.length >= 2) // Reduced to 2 for better Russian support
+          
+          // Calculate score: how many key words from choice appear in explanation
+          for (const word of choiceWords) {
+            // Exact word match gives higher score
+            if (normalizedExplanation.includes(word)) {
+              // Longer words are more significant
+              score += word.length * 2
+              matchedWords++
+            }
+          }
+          
+          // Strategy 3: Check for partial matches (substrings of key words)
+          // This helps with cases where words are slightly different
+          if (matchedWords < choiceWords.length * 0.6) { // Less than 60% word match
+            for (const word of choiceWords) {
+              if (word.length >= 4) { // Only check longer words for partial matches
+                // Check if explanation contains a significant part of the word
+                for (let len = word.length - 1; len >= Math.min(4, word.length * 0.7); len--) {
+                  const substring = word.substring(0, len)
+                  if (normalizedExplanation.includes(substring)) {
+                    score += len * 0.5 // Lower score for partial match
+                    if (matchedWords === 0) matchedWords = 1
+                    matchType = 'partial'
+                    break
+                  }
+                }
+              }
+            }
+          }
+          
+          if (matchedWords > 0) {
+            matchType = matchedWords >= choiceWords.length * 0.6 ? 'words' : 'partial'
+          }
+        }
+        
+        // Require at least 2 words or 1 full match for reliability
+        const minWordsRequired = normalizedChoice.split(/\s+/).length <= 2 ? 1 : 2
+        if (matchedWords >= minWordsRequired && (!bestMatch || score > bestMatch.score)) {
+          bestMatch = { index: i, score, matchType }
+        }
+      }
+      
+      // Only return if we found a strong match
+      // Lower threshold for shorter explanations or when we have a full match
+      const threshold = bestMatch?.matchType === 'full' ? 15 : 20
+      if (bestMatch && bestMatch.score > threshold) {
+        console.log(`  Extracted answer from explanation: choice ${bestMatch.index + 1} (${choices[bestMatch.index]}) with score ${bestMatch.score} (${bestMatch.matchType} match)`)
+        return bestMatch.index + 1 // Return 1-based index
+      }
+      
+      return null
+    }
+    
     // Add unique IDs to questions and validate/convert correct answers
     const questionsWithIds = generatedQuestions.map((q: GeneratedQuestionItem, index: number) => {
       let correctAnswer = q.correct_answer
@@ -651,6 +768,43 @@ Now generate ${grokParams?.count || 5} questions strictly following all rules ab
         }
         if (originalAnswer !== correctAnswer) {
           console.log(`Question ${index}: Normalized true/false answer "${originalAnswer}" -> "${correctAnswer}"`)
+        }
+      }
+      
+      // CRITICAL FIX: Check if correct_answer matches the explanation
+      // If explanation mentions a different choice, update correct_answer to match explanation
+      if ((q.type === 'mcq' || q.type === 'mcq_multi') && q.choices && q.choices.length > 0 && q.explanation) {
+        const extractedAnswerIndex = extractCorrectAnswerFromExplanation(q.explanation, q.choices)
+        
+        if (extractedAnswerIndex !== null) {
+          const currentAnswerIndex = correctAnswer ? parseInt(correctAnswer, 10) : null
+          
+          // If extracted answer differs from current answer, update it
+          if (currentAnswerIndex !== extractedAnswerIndex) {
+            console.log(`Question ${index}: CORRECTING answer based on explanation!`)
+            console.log(`  Current correct_answer: ${correctAnswer} (index ${currentAnswerIndex})`)
+            console.log(`  Explanation mentions: ${q.choices[extractedAnswerIndex - 1]} (index ${extractedAnswerIndex})`)
+            console.log(`  Explanation text: "${q.explanation.substring(0, 100)}..."`)
+            
+            // Update correct answer to match what's in explanation
+            if (q.type === 'mcq_multi' && correctAnswer && correctAnswer.includes(',')) {
+              // For multiple choice, keep existing answers but ensure extracted one is included
+              const existingIndices = correctAnswer.split(/[,;]/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= q.choices.length)
+              if (!existingIndices.includes(extractedAnswerIndex)) {
+                existingIndices.push(extractedAnswerIndex)
+                correctAnswer = existingIndices.sort((a, b) => a - b).join(',')
+                console.log(`  Updated to include extracted answer: ${correctAnswer}`)
+              }
+            } else {
+              // For single choice, replace with extracted answer
+              correctAnswer = String(extractedAnswerIndex)
+              console.log(`  Updated correct_answer: ${correctAnswer}`)
+            }
+          } else {
+            console.log(`Question ${index}: Answer matches explanation ✓`)
+          }
+        } else {
+          console.log(`Question ${index}: Could not extract answer from explanation, keeping original`)
         }
       }
       
