@@ -994,12 +994,12 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                             // Display all incorrect answers
                                             return incorrectAnswers.map(({ questionId, answer, questionText, question }) => (
                                               <div key={questionId} className="text-sm">
-                                                <div className="font-medium text-foreground mb-1.5 break-words">
+                                                <div className="font-medium text-foreground mb-1.5 break-words" translate="no">
                                                   {questionText}:
                                                 </div>
                                                 <div className="pl-3 border-l-2 rounded-r py-1.5 px-2 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 break-words">
                                                   <div className="mb-1 break-words">
-                                                    <span className="font-medium">{t('userAnswer') || 'Ответ сотрудника'}:</span> <span className="break-words">{formatAnswer(answer)}</span>
+                                                    <span className="font-medium">{t('userAnswer') || 'Ответ сотрудника'}:</span> <span className="break-words" translate="no">{formatAnswer(answer)}</span>
                                                   </div>
                                                   {question?.correctAnswer && (() => {
                                                     // Format correct answer for display
@@ -1074,7 +1074,7 @@ export default function UserProgressReport({ users, assignments, modules = [], t
                                                     
                                                     return (
                                                       <div className="text-green-600 dark:text-green-400 break-words">
-                                                        <span className="font-medium">{t('correctAnswer') || 'Правильный ответ'}:</span> <span className="break-words">{formattedCorrectAnswer}</span>
+                                                        <span className="font-medium">{t('correctAnswer') || 'Правильный ответ'}:</span> <span className="break-words" translate="no">{formattedCorrectAnswer}</span>
                                                       </div>
                                                     )
                                                   })()}

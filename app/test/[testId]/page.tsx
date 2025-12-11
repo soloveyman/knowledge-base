@@ -793,6 +793,7 @@ export default function TestPage() {
               dangerouslySetInnerHTML={{ 
                 __html: renderFormattedText(currentQ.prompt || '') 
               }}
+              translate="no"
             />
 
             {/* Multiple choice questions (single answer) */}
@@ -821,7 +822,7 @@ export default function TestPage() {
                         }`}>
                           {letter}
                         </div>
-                        <span className="flex-1 break-word leading-relaxed">{choice}</span>
+                        <span className="flex-1 break-word leading-relaxed" translate="no">{choice}</span>
                       </div>
                     </button>
                   )
@@ -856,7 +857,7 @@ export default function TestPage() {
                         }`}>
                           {isSelected ? '✓' : ''}
                         </div>
-                        <span className="flex-1 break-word leading-relaxed">{choice}</span>
+                        <span className="flex-1 break-word leading-relaxed" translate="no">{choice}</span>
                       </div>
                     </button>
                   )
@@ -889,7 +890,7 @@ export default function TestPage() {
                         }`}>
                           {index === 0 ? 'T' : 'F'}
                         </div>
-                        <span className="flex-1 break-word leading-relaxed">{option}</span>
+                        <span className="flex-1 break-word leading-relaxed" translate="no">{option}</span>
                       </div>
                     </button>
                   )
@@ -908,6 +909,7 @@ export default function TestPage() {
                   onChange={(e) => handleTextAnswerChange(currentQ.id, e.target.value)}
                   placeholder={t('enterYourAnswer') || 'Enter your answer here...'}
                   className="min-h-[120px] resize-none"
+                  translate="no"
                 />
               </div>
             )}
@@ -923,6 +925,7 @@ export default function TestPage() {
                   onChange={(e) => handleTextAnswerChange(currentQ.id, e.target.value)}
                   placeholder={t('enterYourAnswer') || 'Enter your answer here...'}
                   className="min-h-[120px] resize-none"
+                  translate="no"
                 />
               </div>
             )}
@@ -958,7 +961,7 @@ export default function TestPage() {
                           }`}>
                             {isSelected ? '✓' : letter}
                           </div>
-                          <span className="flex-1 break-word leading-relaxed">{choice}</span>
+                          <span className="flex-1 break-word leading-relaxed" translate="no">{choice}</span>
                         </div>
                       </button>
                     )
@@ -1012,7 +1015,7 @@ export default function TestPage() {
                               : 'border-border hover:border-accent'
                           }`}
                         >
-                          <span className="break-word leading-relaxed">{choice}</span>
+                          <span className="break-word leading-relaxed" translate="no">{choice}</span>
                         </button>
                       </div>
                     )
