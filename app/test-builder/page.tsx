@@ -175,6 +175,17 @@ export default function TestBuilderPage() {
     }
   }, [selectedDocument])
 
+  // Sync locale with document language when document changes
+  useEffect(() => {
+    if (selectedDocument) {
+      const documentLocale = getDocumentLanguage(selectedDocument)
+      if (values.locale !== documentLocale) {
+        console.log('Syncing locale with document language:', documentLocale, 'current:', values.locale)
+        setValue('locale', documentLocale)
+      }
+    }
+  }, [selectedDocument, values.locale, setValue])
+
   // Ensure document is selected when documentId is set and document exists in list
   useEffect(() => {
     if (values.documentId && documents.length > 0 && !selectedDocument) {
@@ -272,11 +283,15 @@ export default function TestBuilderPage() {
                 }
               })
               
+              // Use document language if available, otherwise use saved locale
+              const documentLocale = getDocumentLanguage(documentToSet)
+              const localeToUse = documentLocale || loadedConfig.locale
+              
               // Set form values first
               setValue('count', loadedConfig.count)
               setValue('type', loadedConfig.type)
               setValue('difficulty', loadedConfig.difficulty)
-              setValue('locale', loadedConfig.locale)
+              setValue('locale', localeToUse) // Use document language if available
               setValue('documentId', String(documentToSet.id))
               
               // Set selected document - use setTimeout to ensure document is in list
@@ -947,6 +962,9 @@ export default function TestBuilderPage() {
     setIsSaving(true)
 
     try {
+      // Always use document language for saving (not user-selected locale)
+      const documentLocale = getDocumentLanguage(selectedDocument)
+      
       if (isEditMode && editingTestId) {
         // Update existing test - include updated question data
         const response = await fetch(`/api/tests/${editingTestId}`, {
@@ -965,7 +983,7 @@ export default function TestBuilderPage() {
             }), // Send updated question data
             type: testConfig.type,
             difficulty: testConfig.difficulty,
-            locale: testConfig.locale,
+            locale: documentLocale, // Use document language, not user-selected locale
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
@@ -1013,6 +1031,9 @@ export default function TestBuilderPage() {
         }
       } else {
         // Create new test
+        // Always use document language for saving (not user-selected locale)
+        const documentLocale = getDocumentLanguage(selectedDocument)
+        
         const response = await fetch('/api/tests', {
           method: 'POST',
           headers: {
@@ -1025,7 +1046,7 @@ export default function TestBuilderPage() {
             questions: generatedQuestions, // Send the actual question objects
             type: testConfig.type || null,
             difficulty: testConfig.difficulty || null,
-            locale: testConfig.locale && testConfig.locale.length === 2 ? testConfig.locale : null,
+            locale: documentLocale, // Use document language, not user-selected locale
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
