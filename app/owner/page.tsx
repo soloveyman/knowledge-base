@@ -450,7 +450,7 @@ function OwnerPageInner() {
       }
 
       // Process tests (use document map instead of individual fetches)
-      if (testsResult.success) {
+      if (testsResult.success && testsResult.data?.tests && Array.isArray(testsResult.data.tests)) {
         // Transform tests to match the expected format (no async needed now)
         const transformedTests = (testsResult.data.tests as Array<{
           id: string
@@ -491,6 +491,13 @@ function OwnerPageInner() {
         setSavedTestsWithLog(transformedTests)
         // Track when data was loaded for cache invalidation
         sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
+      } else {
+        // If API failed or returned invalid data, log warning but don't clear existing data
+        console.warn('Owner: Tests API returned invalid data in loadData:', { success: testsResult.success, hasData: !!testsResult.data, hasTests: !!testsResult.data?.tests, isArray: Array.isArray(testsResult.data?.tests) })
+        // Only clear if we don't have existing data (to avoid clearing on error)
+        if (savedTests.length === 0) {
+          setSavedTestsWithLog([])
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -640,12 +647,12 @@ function OwnerPageInner() {
           ])
           
           const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-          if (documentsResult.success && documentsResult.data.documents) {
+          if (documentsResult.success && documentsResult.data?.documents) {
             documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
               documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
             })
           }
-          if (testsResult.success) {
+          if (testsResult.success && testsResult.data?.tests && Array.isArray(testsResult.data.tests)) {
             const transformedTests = (testsResult.data.tests as Array<{
               id: string
               title: string
@@ -682,8 +689,12 @@ function OwnerPageInner() {
             // Track when data was loaded for cache invalidation
             sessionStorage.setItem('ownerLastDataLoadTime', Date.now().toString())
           } else {
-            // If API failed, set empty array to show empty state
-            setSavedTestsWithLog([])
+            // If API failed or returned invalid data, log warning
+            console.warn('Owner: Tests API returned invalid data:', { success: testsResult.success, hasData: !!testsResult.data, hasTests: !!testsResult.data?.tests, isArray: Array.isArray(testsResult.data?.tests) })
+            // Only clear if we don't have existing data (to avoid clearing on error)
+            if (savedTests.length === 0) {
+              setSavedTestsWithLog([])
+            }
           }
         } finally {
           setIsLoadingTests(false)
@@ -1144,13 +1155,13 @@ function OwnerPageInner() {
               
               // Build document map for sourceDocument lookup
               const documentMap = new Map<string, { originalFileName?: string; title?: string }>()
-              if (documentsResult.success && documentsResult.data.documents) {
+              if (documentsResult.success && documentsResult.data?.documents) {
                 documentsResult.data.documents.forEach((doc: { id: string; originalFileName?: string; title: string }) => {
                   documentMap.set(doc.id, { originalFileName: doc.originalFileName, title: doc.title })
                 })
               }
               
-              if (testsResult.success) {
+              if (testsResult.success && testsResult.data?.tests && Array.isArray(testsResult.data.tests)) {
                 const transformedTests = (testsResult.data.tests as Array<{
                   id: string
                   title: string
@@ -1184,6 +1195,13 @@ function OwnerPageInner() {
                   }
                 })
                 setSavedTestsWithLog(transformedTests)
+                lastLoadedTabRef.current = tab
+              } else {
+                console.warn('Owner: Tests API returned invalid data in tab change handler:', { success: testsResult.success, hasData: !!testsResult.data, hasTests: !!testsResult.data?.tests, isArray: Array.isArray(testsResult.data?.tests) })
+                // Don't clear existing data on error, only if we have no data
+                if (savedTests.length === 0) {
+                  setSavedTestsWithLog([])
+                }
                 lastLoadedTabRef.current = tab
               }
               isLoadingRef.current = false

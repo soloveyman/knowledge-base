@@ -9,11 +9,16 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
   let state = null
   try {
     if (session && session.user) {
-      state = await getOnboardingState({
-        businessId: session.user.businessId,
-        userId: session.user.id,
-        role: session.user.role,
-      })
+      if (!session.user.businessId) {
+        console.warn('[Onboarding] Owner has no businessId, skipping onboarding check')
+      } else {
+        state = await getOnboardingState({
+          businessId: session.user.businessId,
+          userId: session.user.id,
+          role: session.user.role,
+        })
+        console.log('[Onboarding] Owner onboarding state:', { shouldShow: state?.shouldShow, currentStep: state?.currentStep, done: state?.done })
+      }
     }
   } catch (error) {
     // Silently fail onboarding - don't break the page if onboarding check fails

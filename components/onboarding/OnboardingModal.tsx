@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useTransition } from "react"
+import { useState, useMemo, useTransition, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,15 @@ export function OnboardingModal({ initialState }: OnboardingModalProps) {
   const [isPending, startTransition] = useTransition()
 
   const state = initialState
+
+  // Log onboarding state for debugging
+  useEffect(() => {
+    if (initialState) {
+      console.log('[OnboardingModal] Initial state:', { shouldShow: initialState.shouldShow, currentStep: initialState.currentStep, done: initialState.done })
+    } else {
+      console.log('[OnboardingModal] No initial state provided')
+    }
+  }, [initialState])
 
   const currentStep: OnboardingStep = state?.currentStep ?? 1
 

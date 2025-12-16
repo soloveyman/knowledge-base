@@ -9,6 +9,7 @@ import { registrationRateLimiter, getClientIp, checkRateLimit } from '@/lib/rate
 import { normalizeEmail, isNotDisposableEmail } from '@/lib/email-validation'
 import { emailExists } from '@/lib/email-validation-server'
 import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
+import { ensureOnboardingRow } from '@/lib/onboarding/getOnboardingState'
 
 const schema = z.object({
   email: z.string().email(),
@@ -88,10 +89,26 @@ export async function POST(req: Request) {
       country: 'US',
     }).returning()
     // Immediately set businessId = owner id (best-effort; ignore if column not present yet)
+    let finalBusinessId = created.id
     try {
       await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
+      finalBusinessId = created.id
     } catch {
       console.warn('Register: failed to set businessId, proceeding anyway')
+      // Try to get businessId from created user
+      const updated = await db.select({ businessId: users.businessId }).from(users).where(eq(users.id, created.id)).limit(1)
+      if (updated[0]?.businessId) {
+        finalBusinessId = updated[0].businessId
+      }
+    }
+
+    // Create onboarding progress for new owner
+    try {
+      await ensureOnboardingRow(finalBusinessId, created.id)
+      console.log('[Register] Onboarding progress created for:', normalizedEmail, '(owner)')
+    } catch (error) {
+      console.error('[Register] Failed to create onboarding progress, proceeding anyway:', error)
+      // Don't fail registration if onboarding setup fails
     }
 
     // Note: Free trial will be assigned after email verification (see /api/auth/verify-email)

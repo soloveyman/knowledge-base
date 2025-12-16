@@ -88,6 +88,15 @@ async function getOrCreateUserFromCheckout(session: Stripe.Checkout.Session): Pr
 
     console.log('[Stripe Webhook] Created new user from guest checkout:', created.id, normalizedEmail);
 
+    // Create onboarding progress for new owner
+    try {
+      const { ensureOnboardingRow } = await import('@/lib/onboarding/getOnboardingState');
+      await ensureOnboardingRow(created.id, created.id);
+      console.log('[Stripe Webhook] Onboarding progress created for:', normalizedEmail, '(owner via Stripe checkout)');
+    } catch (error) {
+      console.error('[Stripe Webhook] Failed to create onboarding progress (non-fatal):', error);
+    }
+
     // Send welcome email with password (non-blocking)
     try {
       const baseUrl = getBaseUrl();

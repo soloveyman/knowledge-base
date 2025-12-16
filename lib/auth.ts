@@ -143,6 +143,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               
               await db.update(users).set({ businessId: created.id }).where(eq(users.id, created.id))
               
+              // Create onboarding progress for new owner
+              try {
+                const { ensureOnboardingRow } = await import('@/lib/onboarding/getOnboardingState')
+                await ensureOnboardingRow(created.id, created.id)
+                console.log('[Auth] Onboarding progress created for:', normalizedEmail, '(owner via Google OAuth)')
+              } catch (error) {
+                console.error('[Auth] Failed to create onboarding progress (non-fatal):', error)
+              }
+              
               // Assign free trial to new owner (non-blocking)
               const { assignFreeTrialToOwner } = await import('@/lib/subscription/trial')
               try {
