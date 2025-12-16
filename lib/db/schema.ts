@@ -293,6 +293,17 @@ export const usage = pgTable('usage', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// ===== ONBOARDING =====
+export const onboardingProgress = pgTable('onboarding_progress', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  dismissedAt: timestamp('dismissed_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // ===== RELATIONS =====
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -503,6 +514,14 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 export const usageRelations = relations(usage, ({ one }) => ({
   user: one(users, {
     fields: [usage.userId],
+    references: [users.id],
+  }),
+}));
+
+// Onboarding progress relations
+export const onboardingProgressRelations = relations(onboardingProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [onboardingProgress.userId],
     references: [users.id],
   }),
 }));
