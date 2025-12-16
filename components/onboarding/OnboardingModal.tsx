@@ -185,28 +185,26 @@ export function OnboardingModal({ initialState }: OnboardingModalProps) {
           )}
         </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={handlePrimary} disabled={isPending}>
-              {step.primaryLabel}
-            </Button>
-            {'secondaryHref' in step && step.secondaryHref && step.secondaryLabel && (
-              <Button
-                variant="outline"
-                onClick={handleSecondary}
-                disabled={isPending}
-              >
-                {step.secondaryLabel}
-              </Button>
-            )}
-          </div>
+        <DialogFooter className="gap-3 sm:gap-3">
           <Button
-            variant="ghost"
+            variant="outline"
             type="button"
             onClick={handleRemindLater}
             disabled={isPending}
           >
             {t("onboardingRemindLater")}
+          </Button>
+          {'secondaryHref' in step && step.secondaryHref && step.secondaryLabel && (
+            <Button
+              variant="outline"
+              onClick={handleSecondary}
+              disabled={isPending}
+            >
+              {step.secondaryLabel}
+            </Button>
+          )}
+          <Button onClick={handlePrimary} disabled={isPending}>
+            {step.primaryLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
