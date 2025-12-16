@@ -203,7 +203,7 @@ export function OnboardingModal({ initialState }: OnboardingModalProps) {
               {step.secondaryLabel}
             </Button>
           )}
-          <Button onClick={handlePrimary} disabled={isPending}>
+          <Button variant="default" className="border-0" onClick={handlePrimary} disabled={isPending}>
             {step.primaryLabel}
           </Button>
         </DialogFooter>
