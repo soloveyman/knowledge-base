@@ -24,6 +24,13 @@ export function OnboardingModal({ initialState }: OnboardingModalProps) {
 
   const state = initialState
 
+  // Sync open state with initialState.shouldShow
+  useEffect(() => {
+    if (initialState?.shouldShow !== undefined) {
+      setOpen(initialState.shouldShow)
+    }
+  }, [initialState?.shouldShow])
+
   // Log onboarding state for debugging
   useEffect(() => {
     if (initialState) {
@@ -113,13 +120,31 @@ export function OnboardingModal({ initialState }: OnboardingModalProps) {
 
   const handleRemindLater = () => {
     startTransition(async () => {
-      await dismissOnboarding()
-      setOpen(false)
+      try {
+        const result = await dismissOnboarding()
+        if (result.ok) {
+          setOpen(false)
+        } else {
+          console.error('[OnboardingModal] Failed to dismiss onboarding:', result.error)
+          // Still close the modal even if dismiss fails
+          setOpen(false)
+        }
+      } catch (error) {
+        console.error('[OnboardingModal] Error dismissing onboarding:', error)
+        // Still close the modal even if dismiss fails
+        setOpen(false)
+      }
     })
   }
 
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen)
+    // If user closes the modal manually (not via "Remind Later"), don't dismiss onboarding
+    // They can reopen it by refreshing or it will show again on next page load if shouldShow is true
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("onboardingTitle")}</DialogTitle>
