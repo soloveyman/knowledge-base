@@ -91,38 +91,38 @@ export async function getOnboardingState(input: {
     }
   }
 
-  const [{ members = 0 }] =
-    (await db
-      .select({ members: sql<number>`count(*)` })
-      .from(users)
-      .where(
-        and(
-          eq(users.businessId, businessId),
-          sql`${users.id} != ${userId}`,
-          sql`${users.role} IN ('manager', 'employee')`,
-        ),
-      )) ?? []
+  const membersResult = await db
+    .select({ members: sql<number>`count(*)` })
+    .from(users)
+    .where(
+      and(
+        eq(users.businessId, businessId),
+        sql`${users.id} != ${userId}`,
+        sql`${users.role} IN ('manager', 'employee')`,
+      ),
+    )
+  const members = membersResult[0]?.members ?? 0
 
-  const [{ documents: documentsCount = 0 }] =
-    (await db
-      .select({ documents: sql<number>`count(distinct ${documents.id})` })
-      .from(documents)
-      .innerJoin(users, eq(documents.uploadedBy, users.id))
-      .where(eq(users.businessId, businessId))) ?? []
+  const documentsResult = await db
+    .select({ documents: sql<number>`count(distinct ${documents.id})` })
+    .from(documents)
+    .innerJoin(users, eq(documents.uploadedBy, users.id))
+    .where(eq(users.businessId, businessId))
+  const documentsCount = documentsResult[0]?.documents ?? 0
 
-  const [{ tests: testsCount = 0 }] =
-    (await db
-      .select({ tests: sql<number>`count(distinct ${tests.id})` })
-      .from(tests)
-      .innerJoin(users, eq(tests.createdBy, users.id))
-      .where(eq(users.businessId, businessId))) ?? []
+  const testsResult = await db
+    .select({ tests: sql<number>`count(distinct ${tests.id})` })
+    .from(tests)
+    .innerJoin(users, eq(tests.createdBy, users.id))
+    .where(eq(users.businessId, businessId))
+  const testsCount = testsResult[0]?.tests ?? 0
 
-  const [{ assignments: assignmentsCount = 0 }] =
-    (await db
-      .select({ assignments: sql<number>`count(distinct ${assignments.id})` })
-      .from(assignments)
-      .innerJoin(users, eq(assignments.assignedBy, users.id))
-      .where(eq(users.businessId, businessId))) ?? []
+  const assignmentsResult = await db
+    .select({ assignments: sql<number>`count(distinct ${assignments.id})` })
+    .from(assignments)
+    .innerJoin(users, eq(assignments.assignedBy, users.id))
+    .where(eq(users.businessId, businessId))
+  const assignmentsCount = assignmentsResult[0]?.assignments ?? 0
 
   const done: OnboardingState['done'] = {
     1: members >= 1,
