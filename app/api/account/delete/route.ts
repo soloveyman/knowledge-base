@@ -22,6 +22,7 @@ import {
   moduleVersions,
   modules,
   documentImages,
+  onboardingProgress,
 } from '@/lib/db'
 import { deleteImageFromSpaces } from '@/lib/storage/spaces'
 import { eq, inArray } from 'drizzle-orm'
@@ -217,7 +218,11 @@ export async function POST() {
       console.log('[Delete Account] Deleted modules')
     }
 
-    // 14. Delete password reset tokens (optional - table may not exist)
+    // 14. Delete onboarding progress
+    await db.delete(onboardingProgress).where(inArray(onboardingProgress.userId, userIds))
+    console.log('[Delete Account] Deleted onboarding progress')
+
+    // 15. Delete password reset tokens (optional - table may not exist)
     try {
       await db.delete(passwordResetTokens).where(inArray(passwordResetTokens.userId, userIds))
       console.log('[Delete Account] Deleted password reset tokens')
@@ -226,15 +231,15 @@ export async function POST() {
       console.log('[Delete Account] Skipped password reset tokens (table may not exist)')
     }
 
-    // 15. Delete sessions
+    // 16. Delete sessions
     await db.delete(sessions).where(inArray(sessions.userId, userIds))
     console.log('[Delete Account] Deleted sessions')
 
-    // 16. Delete accounts (OAuth accounts)
+    // 17. Delete accounts (OAuth accounts)
     await db.delete(accounts).where(inArray(accounts.userId, userIds))
     console.log('[Delete Account] Deleted accounts')
 
-    // 17. Finally, delete all users with the same businessId
+    // 18. Finally, delete all users with the same businessId
     await db.delete(users).where(inArray(users.id, userIds))
     console.log('[Delete Account] Deleted users')
 
