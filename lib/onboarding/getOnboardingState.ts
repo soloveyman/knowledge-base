@@ -19,6 +19,8 @@ export type OnboardingState = {
 const ALLOWED_ROLES: UserRole[] = ['owner', 'manager', 'super-admin']
 
 export async function ensureOnboardingRow(businessId: string, userId: string) {
+  console.log('[ensureOnboardingRow] Checking for existing row:', { businessId, userId })
+  
   const existing = await db
     .select()
     .from(onboardingProgress)
@@ -26,28 +28,58 @@ export async function ensureOnboardingRow(businessId: string, userId: string) {
     .limit(1)
 
   if (existing.length > 0) {
+    console.log('[ensureOnboardingRow] Found existing row:', { 
+      id: existing[0].id, 
+      dismissedAt: existing[0].dismissedAt, 
+      completedAt: existing[0].completedAt 
+    })
     return existing[0]
   }
 
-  const [created] = await db
-    .insert(onboardingProgress)
-    .values({ businessId, userId })
-    .onConflictDoNothing({
-      target: [onboardingProgress.businessId, onboardingProgress.userId],
-    })
-    .returning()
+  console.log('[ensureOnboardingRow] No existing row, creating new one')
+  try {
+    const [created] = await db
+      .insert(onboardingProgress)
+      .values({ businessId, userId })
+      .returning()
 
-  if (created) {
-    return created
+    if (created) {
+      console.log('[ensureOnboardingRow] Created new row:', { id: created.id })
+      return created
+    }
+  } catch (error) {
+    // If insert fails (e.g., due to race condition or constraint), try to fetch existing row
+    console.warn('[ensureOnboardingRow] Insert failed, checking for existing row:', error)
+    const [row] = await db
+      .select()
+      .from(onboardingProgress)
+      .where(and(eq(onboardingProgress.businessId, businessId), eq(onboardingProgress.userId, userId)))
+      .limit(1)
+
+    if (row) {
+      console.log('[ensureOnboardingRow] Found existing row after failed insert:', { id: row.id })
+      return row
+    }
+    
+    // If still no row, re-throw the error
+    throw error
   }
 
+  // This should not be reached, but just in case
+  console.warn('[ensureOnboardingRow] Insert returned nothing, fetching row')
   const [row] = await db
     .select()
     .from(onboardingProgress)
     .where(and(eq(onboardingProgress.businessId, businessId), eq(onboardingProgress.userId, userId)))
     .limit(1)
 
-  return row
+  if (row) {
+    console.log('[ensureOnboardingRow] Fetched row after insert:', { id: row.id })
+  } else {
+    console.warn('[ensureOnboardingRow] No row found after insert attempt!')
+  }
+
+  return row || undefined
 }
 
 export async function getOnboardingState(input: {
@@ -57,7 +89,10 @@ export async function getOnboardingState(input: {
 }): Promise<OnboardingState> {
   const { businessId, userId, role } = input
 
+  console.log('[getOnboardingState] Input:', { businessId, userId, role })
+
   if (!ALLOWED_ROLES.includes(role)) {
+    console.log('[getOnboardingState] Role not allowed:', role)
     return {
       shouldShow: false,
       currentStep: 1,
@@ -66,8 +101,14 @@ export async function getOnboardingState(input: {
   }
 
   const row = await ensureOnboardingRow(businessId, userId)
+  console.log('[getOnboardingState] Onboarding row:', { 
+    exists: !!row, 
+    completedAt: row?.completedAt, 
+    dismissedAt: row?.dismissedAt 
+  })
 
   if (!row) {
+    console.log('[getOnboardingState] No onboarding row found, returning shouldShow: false')
     return {
       shouldShow: false,
       currentStep: 1,
@@ -76,6 +117,7 @@ export async function getOnboardingState(input: {
   }
 
   if (row.completedAt) {
+    console.log('[getOnboardingState] Onboarding already completed')
     return {
       shouldShow: false,
       currentStep: 4,
@@ -84,6 +126,7 @@ export async function getOnboardingState(input: {
   }
 
   if (row.dismissedAt) {
+    console.log('[getOnboardingState] Onboarding was dismissed')
     return {
       shouldShow: false,
       currentStep: 1,
@@ -141,12 +184,23 @@ export async function getOnboardingState(input: {
 
   const allDone = done[1] && done[2] && done[3] && done[4]
 
+  console.log('[getOnboardingState] Progress check:', {
+    done,
+    allDone,
+    members,
+    documentsCount,
+    testsCount,
+    assignmentsCount,
+    firstIncomplete,
+  })
+
   if (allDone && !row.completedAt) {
     await db
       .update(onboardingProgress)
       .set({ completedAt: sql`now()`, updatedAt: sql`now()` })
       .where(and(eq(onboardingProgress.businessId, businessId), eq(onboardingProgress.userId, userId)))
 
+    console.log('[getOnboardingState] Marked onboarding as completed')
     return {
       shouldShow: false,
       currentStep: 4,
@@ -160,9 +214,14 @@ export async function getOnboardingState(input: {
     }
   }
 
+  const shouldShow = !allDone
+  const currentStep = (firstIncomplete ? Number(firstIncomplete) : 4) as OnboardingStep
+
+  console.log('[getOnboardingState] Final state:', { shouldShow, currentStep, done })
+
   return {
-    shouldShow: !allDone,
-    currentStep: (firstIncomplete ? Number(firstIncomplete) : 4) as OnboardingStep,
+    shouldShow,
+    currentStep,
     done,
     counts: {
       members,

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, json } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, boolean, json, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ===== AUTHENTICATION TABLES (Auth.js) =====
@@ -302,7 +302,9 @@ export const onboardingProgress = pgTable('onboarding_progress', {
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+  businessUserUnique: uniqueIndex('onboarding_progress_business_user_idx').on(table.businessId, table.userId),
+}));
 
 // ===== RELATIONS =====
 export const usersRelations = relations(users, ({ many }) => ({

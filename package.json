@@ -16,6 +16,7 @@
     "db:migrate:railway": "node scripts/migrate-railway.js",
     "db:migrate:spaces": "node scripts/apply-spaces-migration.js",
     "db:migrate:spaces:railway": "node scripts/apply-spaces-migration-railway.js",
+    "db:fix-onboarding-index": "node scripts/apply-onboarding-index.js",
     "db:sync:railway": "tsx scripts/sync-railway-db.ts",
     "stripe:set-railway": "powershell -ExecutionPolicy Bypass -File scripts/set-stripe-vars-railway.ps1",
     "db:studio": "drizzle-kit studio",
