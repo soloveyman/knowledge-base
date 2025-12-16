@@ -175,16 +175,9 @@ export default function TestBuilderPage() {
     }
   }, [selectedDocument])
 
-  // Sync locale with document language when document changes
-  useEffect(() => {
-    if (selectedDocument) {
-      const documentLocale = getDocumentLanguage(selectedDocument)
-      if (values.locale !== documentLocale) {
-        console.log('Syncing locale with document language:', documentLocale, 'current:', values.locale)
-        setValue('locale', documentLocale)
-      }
-    }
-  }, [selectedDocument, values.locale, setValue])
+  // When document changes, we no longer forcibly override user-selected locale.
+  // Auto-detection is used only as an initial suggestion when the user first selects a document
+  // (see handleDocumentSelect) and can be changed manually afterwards.
 
   // Ensure document is selected when documentId is set and document exists in list
   useEffect(() => {
@@ -574,6 +567,7 @@ export default function TestBuilderPage() {
     }
     
     // Auto-detect and set language from document - use getDocumentLanguage for consistency
+    // This is only an initial suggestion; user can change language later and we won't override it.
     const documentLocale = getDocumentLanguage(doc)
     setValue('locale', documentLocale)
     setFieldTouched('locale')
@@ -652,21 +646,12 @@ export default function TestBuilderPage() {
       return
     }
 
-    // Ensure locale matches document language - override user selection if needed
-    const documentLocale = getDocumentLanguage(selectedDocument)
-    if (testConfig.locale !== documentLocale) {
-      console.log(`Language mismatch detected. Document language: ${documentLocale}, Selected: ${testConfig.locale}. Using document language.`)
-      setValue('locale', documentLocale)
-      setFieldTouched('locale')
-    }
-
     setIsGenerating(true)
 
     try {
-      // Use document language for generation (not user-selected locale if it differs)
+      // Use user-selected locale for generation (document language is only a suggestion)
       const generationConfig = {
-        ...testConfig,
-        locale: documentLocale // Force use document language
+        ...testConfig
       }
 
       const requestData = {
@@ -962,9 +947,6 @@ export default function TestBuilderPage() {
     setIsSaving(true)
 
     try {
-      // Always use document language for saving (not user-selected locale)
-      const documentLocale = getDocumentLanguage(selectedDocument)
-      
       if (isEditMode && editingTestId) {
         // Update existing test - include updated question data
         const response = await fetch(`/api/tests/${editingTestId}`, {
@@ -983,7 +965,8 @@ export default function TestBuilderPage() {
             }), // Send updated question data
             type: testConfig.type,
             difficulty: testConfig.difficulty,
-            locale: documentLocale, // Use document language, not user-selected locale
+            // Respect user-selected locale when saving
+            locale: testConfig.locale,
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
@@ -1031,9 +1014,6 @@ export default function TestBuilderPage() {
         }
       } else {
         // Create new test
-        // Always use document language for saving (not user-selected locale)
-        const documentLocale = getDocumentLanguage(selectedDocument)
-        
         const response = await fetch('/api/tests', {
           method: 'POST',
           headers: {
@@ -1046,7 +1026,8 @@ export default function TestBuilderPage() {
             questions: generatedQuestions, // Send the actual question objects
             type: testConfig.type || null,
             difficulty: testConfig.difficulty || null,
-            locale: documentLocale, // Use document language, not user-selected locale
+            // Respect user-selected locale when saving
+            locale: testConfig.locale || null,
             passingScore: 70,
             timeLimit: 15,
             maxAttempts: 1,
