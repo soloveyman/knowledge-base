@@ -8,7 +8,7 @@ const ROLE_TAB_MAPPINGS = {
   },
   manager: {
     defaultTab: 'overview', 
-    tabs: ['overview', 'docs', 'tests', 'assignments']
+    tabs: ['overview', 'users', 'docs', 'tests', 'assignments']
   },
   owner: {
     defaultTab: 'overview',

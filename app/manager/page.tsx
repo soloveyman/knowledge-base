@@ -724,6 +724,9 @@ function ManagerPageInner() {
           } else if (defaultTab === 'overview') {
             console.log('Manager: Overview tab activated, loading data...')
             await loadTabData('overview', true, false)
+          } else if (defaultTab === 'users') {
+            console.log('Manager: Users tab activated, loading users...')
+            await loadTabData('users', true, false)
           }
         } finally {
           isLoadingRef.current = false
@@ -738,7 +741,8 @@ function ManagerPageInner() {
     // If no data, reload even if tab was loaded before
     const hasData = defaultTab === 'docs' ? documents.length > 0 :
                    defaultTab === 'tests' ? savedTests.length > 0 :
-                   defaultTab === 'assignments' ? savedAssignments.length > 0 : true
+                   defaultTab === 'assignments' ? savedAssignments.length > 0 :
+                   defaultTab === 'users' ? savedUsers.length > 0 : true
     
     if (!hasData) {
       console.log(`Manager: ${defaultTab} tab has no data, reloading...`)
@@ -754,6 +758,8 @@ function ManagerPageInner() {
             await loadTabData('assignments', true, false)
           } else if (defaultTab === 'overview') {
             await loadTabData('overview', true, false)
+          } else if (defaultTab === 'users') {
+            await loadTabData('users', true, false)
           }
         } finally {
           isLoadingRef.current = false
@@ -966,6 +972,10 @@ function ManagerPageInner() {
               }
               // If no sessionStorage data or it's stale, load from API
               await loadTabData('assignments', true, true) // forceRefresh = true
+              lastLoadedTabRef.current = tab
+            } else if (tab === 'users') {
+              // Reload users tab
+              await loadTabData('users', true, true) // forceRefresh = true
               lastLoadedTabRef.current = tab
             }
           } catch (error) {
@@ -1587,7 +1597,7 @@ function ManagerPageInner() {
 
         {/* Main Tabs */}
         <Tabs value={defaultTab} onValueChange={(value) => {
-          if (value && ['overview', 'docs', 'tests', 'assignments'].includes(value)) {
+          if (value && ['overview', 'users', 'docs', 'tests', 'assignments'].includes(value)) {
             // Only update if tab actually changed to prevent unnecessary router calls
             if (value !== defaultTab) {
               router.replace(`/manager?tab=${value}`, { scroll: false })

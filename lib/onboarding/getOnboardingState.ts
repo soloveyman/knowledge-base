@@ -91,6 +91,12 @@ export async function getOnboardingState(input: {
     }
   }
 
+  // For managers, count only employees (they shouldn't add other managers for onboarding)
+  // For owners, count both managers and employees
+  const roleFilter = role === 'manager' 
+    ? sql`${users.role} = 'employee'`
+    : sql`${users.role} IN ('manager', 'employee')`
+  
   const membersResult = await db
     .select({ members: sql<number>`count(*)` })
     .from(users)
@@ -98,7 +104,7 @@ export async function getOnboardingState(input: {
       and(
         eq(users.businessId, businessId),
         sql`${users.id} != ${userId}`,
-        sql`${users.role} IN ('manager', 'employee')`,
+        roleFilter,
       ),
     )
   const members = membersResult[0]?.members ?? 0

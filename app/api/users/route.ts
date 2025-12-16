@@ -10,6 +10,7 @@ import { emailExists } from '@/lib/email-validation-server'
 import { createEmailVerificationToken, sendVerificationEmail, getBaseUrl } from '@/lib/email-verification'
 import { createUserSchema } from '@/lib/schemas/users'
 import { validateRequest, handleApiError, successResponse } from '@/lib/api-helpers'
+import { ensureOnboardingRow } from '@/lib/onboarding/getOnboardingState'
 
 // Route segment config for performance
 export const dynamic = 'force-dynamic'
@@ -146,6 +147,17 @@ export async function POST(request: Request) {
       role,
       businessId: tenantId,
     }).returning()
+
+    // Create onboarding progress for managers and owners
+    if (role === 'manager' || role === 'owner') {
+      try {
+        await ensureOnboardingRow(tenantId, newUser[0].id)
+        console.log('[User Creation] Onboarding progress created for:', normalizedEmail, `(${role})`)
+      } catch (error) {
+        console.error('[User Creation] Failed to create onboarding progress, proceeding anyway:', error)
+        // Don't fail user creation if onboarding setup fails
+      }
+    }
 
     // Send email verification (non-blocking)
     try {
