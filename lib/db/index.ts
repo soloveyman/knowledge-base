@@ -5,6 +5,7 @@ import * as schema from './schema';
 // Lazy initialization to avoid errors during build time
 let pool: Pool | null = null;
 let dbInstance: ReturnType<typeof drizzle> | null = null;
+let shutdownRegistered = false;
 
 function getPool(): Pool {
   if (!pool) {
@@ -124,11 +125,16 @@ function getPool(): Pool {
       }
     }
 
-    // Graceful shutdown handler
-    if (typeof process !== 'undefined') {
+    // Graceful shutdown handler (only register once and guard against double end)
+    if (typeof process !== 'undefined' && !shutdownRegistered) {
+      shutdownRegistered = true;
+
       const gracefulShutdown = async () => {
+        if (!pool) return;
         console.log('Closing database connection pool...');
-        await pool?.end();
+        const currentPool = pool;
+        pool = null;
+        await currentPool.end();
         console.log('Database connection pool closed');
       };
 
