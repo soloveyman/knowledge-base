@@ -572,7 +572,7 @@ export default function DocumentReaderPage() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={handleBack}>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleBack}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

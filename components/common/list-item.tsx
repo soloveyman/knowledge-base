@@ -127,8 +127,8 @@ export function ListItem({
           {showEditButton && onEdit && (
           <Button 
             variant="ghost" 
-            size="sm" 
-            className="text-muted-foreground hover:text-primary"
+            size="icon" 
+            className="rounded-full text-muted-foreground hover:text-primary"
             onClick={(e) => {
               e.stopPropagation()
               onEdit()
@@ -145,8 +145,8 @@ export function ListItem({
             trigger={
               <Button 
                 variant="ghost" 
-                size="sm" 
-                className="text-muted-foreground hover:text-destructive"
+                size="icon" 
+                className="rounded-full text-muted-foreground hover:text-destructive"
                 onClick={(e) => e.stopPropagation()}
               >
                 <X className="h-4 w-4" />

@@ -33,7 +33,7 @@ export function PageHeader({ title, icon, onClose, showCloseButton = true }: Pag
           </div>
           {showCloseButton && onClose && (
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={onClose}>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

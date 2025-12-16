@@ -389,7 +389,7 @@ export default function AssignmentBuilderClient({
               </h1>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={handleClose}>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleClose}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

@@ -1906,8 +1906,8 @@ function ManagerPageInner() {
                             >
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="text-muted-foreground hover:text-primary"
+                                size="icon"
+                                className="rounded-full text-muted-foreground hover:text-primary"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEnhanceDocument(doc.id)

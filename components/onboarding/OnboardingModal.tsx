@@ -188,7 +188,6 @@ export function OnboardingModal({ initialState }: OnboardingModalProps) {
         <DialogFooter className="gap-3 sm:gap-3">
           <Button
             variant="outline"
-            type="button"
             onClick={handleRemindLater}
             disabled={isPending}
           >

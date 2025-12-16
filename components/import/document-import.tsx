@@ -263,7 +263,7 @@ export default function DocumentImport({ onImportComplete }: DocumentImportProps
                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                    </p>
                  </div>
-                 <Button variant="ghost" size="sm" onClick={resetImport} className="text-muted-foreground hover:text-foreground">
+                 <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground" onClick={resetImport}>
                    <X className="h-4 w-4" />
                  </Button>
                </div>

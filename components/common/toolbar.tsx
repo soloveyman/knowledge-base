@@ -29,6 +29,7 @@ export function Toolbar({ actions, className }: ToolbarProps) {
           key={index}
           variant={action.variant || "ghost"}
           size="icon-sm"
+          className="rounded-full"
           onClick={action.onClick}
           disabled={action.disabled}
           title={action.tooltip}

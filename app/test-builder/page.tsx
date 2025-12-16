@@ -1148,7 +1148,7 @@ export default function TestBuilderPage() {
               </h1>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" onClick={handleClose}>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleClose}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -1492,9 +1492,9 @@ export default function TestBuilderPage() {
                                     />
                                     <Button
                                       variant="ghost"
-                                      size="sm"
+                                      size="icon"
                                       onClick={() => handleDeleteChoice(question.id, choiceIndex)}
-                                      className="shrink-0"
+                                      className="rounded-full shrink-0"
                                     >
                                       <X className="h-4 w-4" />
                                     </Button>
