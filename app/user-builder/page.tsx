@@ -306,9 +306,20 @@ export default function UserBuilderPage() {
           // Continue anyway - owner page will fetch on load
         }
       }
+
+      // Determine where to return after create/update.
+      // Prefer explicit returnTo query param, otherwise use role-based default.
+      const urlParams = new URLSearchParams(window.location.search)
+      const explicitReturnTo = urlParams.get('returnTo')
       
-      // Redirect to owner users tab - data is already fetched and stored
-      router.replace(`/owner?tab=users&_t=${Date.now()}`)
+      const fallbackReturnTo =
+        session.user.role === 'manager'
+          ? '/manager?tab=users'
+          : '/owner?tab=users'
+
+      const target = explicitReturnTo || fallbackReturnTo
+
+      router.replace(`${target}${target.includes('?') ? '&' : '?'}_t=${Date.now()}`)
       // Small delay to ensure navigation starts
       await new Promise(resolve => setTimeout(resolve, 50))
       router.refresh()
@@ -339,7 +350,17 @@ export default function UserBuilderPage() {
   }
 
   const handleClose = () => {
-    router.push(`/owner?tab=users&_t=${Date.now()}`)
+    // Use the same returnTo logic as after save
+    const urlParams = new URLSearchParams(window.location.search)
+    const explicitReturnTo = urlParams.get('returnTo')
+    const fallbackReturnTo =
+      session?.user?.role === 'manager'
+        ? '/manager?tab=users'
+        : '/owner?tab=users'
+
+    const target = explicitReturnTo || fallbackReturnTo
+
+    router.push(`${target}${target.includes('?') ? '&' : '?'}_t=${Date.now()}`)
     // Immediately refresh to ensure data reloads (no delay for instant updates)
     router.refresh()
     // Trigger location change event immediately to force data reload

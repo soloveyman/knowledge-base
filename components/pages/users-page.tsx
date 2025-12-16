@@ -26,6 +26,11 @@ interface UsersPageProps {
   onViewUser: (id: string) => void
   onEditUser: (id: string) => void
   hideEmptyState?: boolean
+  /**
+   * Optional flag to indicate that this page is used in manager dashboard.
+   * For managers we only show/manage employees, owners keep full team visibility.
+   */
+  isManagerView?: boolean
 }
 
 export function UsersPage({ 
@@ -33,7 +38,8 @@ export function UsersPage({
   onDeleteUser, 
   onViewUser,
   onEditUser,
-  hideEmptyState = false
+  hideEmptyState = false,
+  isManagerView = false,
 }: UsersPageProps) {
   const router = useRouter()
   const { t } = useTranslation()
@@ -52,7 +58,12 @@ export function UsersPage({
     router.push('/user-builder')
   }
 
-  const userItems = users.map((user) => ({
+  // Managers should only see/manage employees; owners see all non-owner users.
+  const visibleUsers = isManagerView 
+    ? users.filter((user) => user.role === 'employee')
+    : users
+
+  const userItems = visibleUsers.map((user) => ({
     id: user.id,
     title: user.name,
     subtitle: `${user.job} • ${user.email}`,

@@ -26,6 +26,15 @@ import dynamic from "next/dynamic"
 import { SkeletonCard, SkeletonList } from "@/components/ui/skeleton"
 
 // Lazy load heavy tab components to reduce initial bundle size
+const UsersPage = dynamic(() => import("@/components/pages/users-page").then(mod => ({ default: mod.UsersPage })), {
+  loading: () => (
+    <div className="space-y-4 py-8">
+      <SkeletonCard className="p-6" />
+      <SkeletonList count={3} />
+    </div>
+  ),
+  ssr: false
+})
 const TestsPage = dynamic(() => import("@/components/pages/tests-page").then(mod => ({ default: mod.TestsPage })), {
   loading: () => (
     <div className="space-y-4 py-8">
@@ -259,7 +268,7 @@ function ManagerPageInner() {
   // Get initial tab from URL parameter using useMemo to prevent re-renders
   const defaultTab = useMemo(() => {
     const tab = getTabFromUrl(searchParams)
-    return tab && ['overview', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
+    return tab && ['overview', 'users', 'docs', 'tests', 'assignments'].includes(tab) ? tab : "overview"
   }, [searchParams])
 
   // Restore tab from sessionStorage on mount if not in URL (only once on mount)
@@ -267,7 +276,7 @@ function ManagerPageInner() {
     const tabFromUrl = getTabFromUrl(searchParams)
     if (!tabFromUrl) {
       const previousTab = getPreviousTab('manager')
-      if (previousTab && previousTab !== 'overview' && ['overview', 'docs', 'tests', 'assignments'].includes(previousTab)) {
+      if (previousTab && previousTab !== 'overview' && ['overview', 'users', 'docs', 'tests', 'assignments'].includes(previousTab)) {
         // Update URL to include the restored tab (only if not already in URL)
         router.replace(`/manager?tab=${previousTab}`, { scroll: false })
       }
@@ -323,9 +332,19 @@ function ManagerPageInner() {
         documentsResponse.json()
       ])
 
-      // Process users
+      // Process users - managers should only work with employees
       if (usersResult.success) {
-        setSavedUsers(usersResult.data.users)
+        const employees = (usersResult.data.users as Array<{
+          id: string
+          name: string
+          job: string
+          email: string
+          role: string
+          createdAt: string
+          createdBy: string
+          status: string
+        }>).filter((u) => u.role === 'employee')
+        setSavedUsers(employees)
       }
 
       // Process assignments
@@ -638,6 +657,28 @@ function ManagerPageInner() {
       } else if (tab === 'overview') {
         // Overview needs all data
         await loadData(preserveData)
+      } else if (tab === 'users') {
+        // Reload only users for Users tab
+        const hasTimestamp = searchParams.has('_t')
+        const fetchOptions: RequestInit = hasTimestamp
+          ? { cache: 'no-store' }
+          : { next: { revalidate: 30 } }
+
+        const response = await fetch('/api/users', fetchOptions)
+        const result = await response.json()
+        if (result.success) {
+          const employees = (result.data.users as Array<{
+            id: string
+            name: string
+            job: string
+            email: string
+            role: string
+            createdAt: string
+            createdBy: string
+            status: string
+          }>).filter((u) => u.role === 'employee')
+          setSavedUsers(employees)
+        }
       }
     } catch (error) {
       console.error(`Error loading ${tab} tab data:`, error)
@@ -1171,7 +1212,7 @@ function ManagerPageInner() {
   // Only reload if we've been away for more than 30 seconds to avoid unnecessary refreshes
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
+      if (!document.hidden && defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
         const lastFocusTime = sessionStorage.getItem('managerLastFocusTime')
         const now = Date.now()
         // Only reload if away for more than 30 seconds
@@ -1201,7 +1242,7 @@ function ManagerPageInner() {
     }
 
     const handleFocus = () => {
-      if (defaultTab && ['docs', 'tests', 'assignments', 'overview'].includes(defaultTab)) {
+      if (defaultTab && ['docs', 'tests', 'assignments', 'overview', 'users'].includes(defaultTab)) {
         const lastFocusTime = sessionStorage.getItem('managerLastFocusTime')
         const now = Date.now()
         // Only reload if away for more than 30 seconds
@@ -1557,12 +1598,18 @@ function ManagerPageInner() {
           }
         }} className="space-y-3 md:space-y-6">
           <div className="tabs-scroll-container">
-            <TabsList className="grid w-full min-w-max grid-cols-4">
+            <TabsList className="grid w-full min-w-max grid-cols-5">
             <TabsTrigger 
               value="overview"
               onMouseEnter={() => router.prefetch('/manager?tab=overview')}
             >
               {t('overview')}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="users"
+              onMouseEnter={() => router.prefetch('/manager?tab=users')}
+            >
+              {t('users')}
             </TabsTrigger>
             <TabsTrigger 
               value="docs"
@@ -1700,6 +1747,51 @@ function ManagerPageInner() {
 
           </TabsContent>
 
+          <TabsContent value="users" className="space-y-3 md:space-y-6">
+            <UsersPage
+              users={savedUsers}
+              onDeleteUser={async (id: string) => {
+                const previousUsers = savedUsers
+                setSavedUsers(savedUsers.filter(u => u.id !== id))
+
+                try {
+                  const response = await fetch(`/api/users/${id}`, {
+                    method: 'DELETE',
+                    cache: 'no-store'
+                  })
+                  const result = await response.json()
+
+                  if (!result.success) {
+                    setSavedUsers(previousUsers)
+                    console.error('Manager: Failed to delete user:', result.message)
+                    toast.error(result.message || t('failedToDeleteUser'))
+                  } else {
+                    toast.success(t('userDeletedSuccessfully'))
+                  }
+                } catch (error) {
+                  setSavedUsers(previousUsers)
+                  console.error('Manager: Error deleting user:', error)
+                  toast.error(t('errorDeletingUser'))
+                }
+              }}
+              onViewUser={(id: string) => {
+                console.log('Manager: View user', id)
+              }}
+              onEditUser={(id: string) => {
+                const url = `/user-builder?edit=${id}&returnTo=/manager?tab=users`
+                router.prefetch(url)
+                startTransition(() => {
+                  router.push(url)
+                })
+              }}
+              hideEmptyState={(() => {
+                const hasTimestamp = searchParams.has('_t')
+                const tab = getTabFromUrl(searchParams)
+                return hasTimestamp && tab === 'users'
+              })()}
+              isManagerView
+            />
+          </TabsContent>
 
           <TabsContent value="docs" className="space-y-3 md:space-y-6">
             <Card>
