@@ -20,6 +20,20 @@ const oauthProviders = (
         GoogleProvider({
           clientId: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          // Explicitly enable secure OAuth flows
+          // NextAuth automatically uses 'state' parameter for CSRF protection
+          // This ensures Google recognizes we're using secure flows
+          authorization: {
+            params: {
+              // Use 'state' parameter (automatically handled by NextAuth)
+              // This protects against CSRF attacks and ensures secure OAuth flow
+              prompt: "consent",
+              access_type: "offline",
+              response_type: "code",
+            },
+          },
+          // Ensure we're using the secure authorization code flow
+          checks: ["state", "pkce"],
         })
       ]
     : []
@@ -50,6 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   trustHost: true, // Allow NextAuth to trust the host from request headers (important for Vercel)
   debug: process.env.NODE_ENV === 'development', // Enable debug in development to see redirect URIs
+  // PKCE (Proof Key for Code Exchange) is automatically enabled by NextAuth v5 for additional security
   providers: [
     ...oauthProviders,
     CredentialsProvider({
