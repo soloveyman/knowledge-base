@@ -3,8 +3,29 @@ import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 import { apiRateLimiter, getClientIp, checkRateLimit } from "@/lib/rate-limit"
 
+// Check if request is from a search engine bot
+function isSearchEngineBot(request: NextRequest): boolean {
+  const userAgent = request.headers.get('user-agent') || ''
+  const botPatterns = [
+    /googlebot/i,
+    /bingbot/i,
+    /slurp/i, // Yahoo
+    /duckduckbot/i,
+    /baiduspider/i,
+    /yandexbot/i,
+    /sogou/i,
+    /exabot/i,
+    /facebot/i,
+    /ia_archiver/i,
+  ]
+  return botPatterns.some(pattern => pattern.test(userAgent))
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  
+  // Don't redirect search engine bots - let them index pages
+  const isBot = isSearchEngineBot(request)
   
   // Apply rate limiting to API routes
   if (pathname.startsWith('/api/')) {
@@ -52,6 +73,11 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
   
   if (isPublicRoute) {
+    // Don't redirect search engine bots - let them index public pages
+    if (isBot) {
+      return NextResponse.next()
+    }
+    
     // If already authenticated, redirect to appropriate dashboard
     const token = await getToken({ 
       req: request,

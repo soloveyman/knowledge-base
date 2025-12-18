@@ -55,9 +55,20 @@ const graphikMono = localFont({
   preload: false, // Disable preload since this is the same file as graphik (already preloaded)
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://uppstaff.net'
+
 export const metadata: Metadata = {
   title: "Uppstaff | AI Training & Knowledge Platform",
   description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time — fast, transparent, and secure.",
+  metadataBase: new URL(baseUrl),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    url: baseUrl,
+    siteName: 'Uppstaff',
+    type: 'website',
+  },
 };
 
 export const viewport = {

@@ -17,12 +17,24 @@ function formatDate(date: Date, locale: string): string {
   return date.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://uppstaff.net'
+
 export const metadata: Metadata = {
   title: "Privacy Policy | Uppstaff",
   description: "Privacy Policy for Uppstaff - AI Training & Knowledge Platform. Learn how we collect, use, and protect your information.",
   robots: {
     index: true,
     follow: true,
+  },
+  alternates: {
+    canonical: '/privacy',
+  },
+  openGraph: {
+    title: "Privacy Policy | Uppstaff",
+    description: "Privacy Policy for Uppstaff - AI Training & Knowledge Platform. Learn how we collect, use, and protect your information.",
+    url: `${baseUrl}/privacy`,
+    siteName: 'Uppstaff',
+    type: "website",
   },
 }
 

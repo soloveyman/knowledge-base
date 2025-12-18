@@ -13,6 +13,8 @@ function detectLanguage(acceptLanguage: string): 'en' | 'ru' {
   return 'en'
 }
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://uppstaff.net'
+
 export const metadata: Metadata = {
   title: "Uppstaff | AI Training & Knowledge Platform",
   description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time — fast, transparent, and secure.",
@@ -20,9 +22,14 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: "Uppstaff | AI Training & Knowledge Platform",
     description: "Manage corporate learning in one place. Upload documents, generate AI-powered tests, assign training to teams, and track progress in real time.",
+    url: baseUrl,
+    siteName: 'Uppstaff',
     type: "website",
   },
 }
