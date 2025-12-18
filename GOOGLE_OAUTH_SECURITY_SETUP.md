@@ -47,42 +47,35 @@ NextAuth v5 автоматически использует PKCE для допо
 
 **Важно:** Это настройка в Google Cloud Console, а не в коде.
 
-#### Шаги для включения Cross-Account Protection:
+📖 **Подробная пошаговая инструкция:** См. [CROSS_ACCOUNT_PROTECTION_SETUP.md](./CROSS_ACCOUNT_PROTECTION_SETUP.md)
 
-1. **Откройте Google Cloud Console**
+#### Краткая инструкция:
+
+1. **Откройте OAuth Consent Screen**
    - Перейдите: https://console.cloud.google.com/apis/credentials/consent
-
-2. **Найдите раздел "OAuth consent screen"**
    - Выберите ваш проект
-   - Перейдите в раздел "OAuth consent screen"
 
-3. **Включите Cross-Account Protection**
-   - Найдите раздел "Cross-Account Protection" или "User Type"
-   - Убедитесь, что выбрано "External" (для публичных приложений)
-   - В разделе "Security" найдите опцию "Cross-Account Protection"
-   - Включите эту опцию
+2. **Проверьте тип приложения**
+   - Должно быть выбрано **"External"** (не "Internal")
+   - Cross-Account Protection доступен только для внешних приложений
 
-4. **Настройте домены**
-   - Убедитесь, что ваш домен `uppstaff.net` добавлен в "Authorized domains"
-   - Домены должны быть верифицированы
+3. **Найдите раздел "Security" или "Advanced settings"**
+   - Прокрутите страницу вниз
+   - Найдите опцию **"Cross-Account Protection"**
+   - Включите переключатель
 
-5. **Сохраните изменения**
+4. **Сохраните изменения**
    - Нажмите "Save and Continue"
-   - Изменения могут занять несколько минут для применения
+   - Изменения вступят в силу через несколько минут
 
-#### Альтернативный путь:
+#### Если опция не видна:
 
-Если опция "Cross-Account Protection" не видна напрямую:
+Cross-Account Protection может быть недоступен, если:
+- Приложение не верифицировано (отправьте на верификацию)
+- Домен не верифицирован (верифицируйте `uppstaff.net`)
+- Приложение в режиме "Internal" (измените на "External")
 
-1. Перейдите в **APIs & Services** → **OAuth consent screen**
-2. Убедитесь, что выбрано **"External"** (не "Internal")
-3. В разделе **"Scopes"** проверьте, что используются только необходимые scopes
-4. В разделе **"Test users"** (если приложение в режиме тестирования) добавьте тестовых пользователей
-5. Для публикации приложения:
-   - Заполните все обязательные поля
-   - Добавьте Privacy Policy URL
-   - Добавьте Terms of Service URL (если требуется)
-   - Отправьте на верификацию
+Подробнее см. [CROSS_ACCOUNT_PROTECTION_SETUP.md](./CROSS_ACCOUNT_PROTECTION_SETUP.md)
 
 ### 2. Проверка использования параметра `state`
 
