@@ -366,6 +366,17 @@ function EmployeePageInner() {
     }
   }, [session?.user?.id, loadAssignments])
 
+  // Calculate attempts count per testId
+  const attemptsCountByTestId = useMemo(() => {
+    const counts: Record<string, number> = {}
+    testAttempts.forEach(attempt => {
+      if (attempt.testId) {
+        counts[attempt.testId] = (counts[attempt.testId] || 0) + 1
+      }
+    })
+    return counts
+  }, [testAttempts])
+
   // Transform assignment data for display - MUST be before early returns
   const currentUserId = session?.user?.id
   const transformedAssignments = useMemo(() => userAssignments.map(assignment => {
@@ -398,6 +409,9 @@ function EmployeePageInner() {
       type = "document"
     }
     
+    // Get attempts count for this test
+    const attemptsCount = assignment.testId ? (attemptsCountByTestId[assignment.testId] || 0) : 0
+    
     return {
       id: assignment.id,
       title: assignment.title || `Assignment ${assignment.id.slice(0, 8)}`, // Use custom title or ID as fallback
@@ -407,11 +421,12 @@ function EmployeePageInner() {
       dueDate: assignment.dueDate ? new Date(assignment.dueDate).toISOString().split('T')[0] : t('noDueDate'),
       description: assignment.description || t('assignmentDescriptionDefault'), // Use actual description or default message
       estimatedTime: assignment.testId ? `15 ${t('minutes')}` : `30 ${t('minutes')}`,
-      score: testScore, // Use actual test score from database
+      score: testScore, // Use actual test score from database (best score)
       moduleId: assignment.moduleId,
-      testId: assignment.testId
+      testId: assignment.testId,
+      attemptsCount: attemptsCount // Total attempts count for this test
     }
-  }), [userAssignments, currentUserId, t])
+  }), [userAssignments, currentUserId, t, attemptsCountByTestId])
 
   // Note: Next.js loading.tsx will handle the initial loading state
   if (status === "loading" || !session) {
@@ -673,10 +688,16 @@ function EmployeePageInner() {
                               <Clock className="h-5 w-5" />
                               <span>{assignment.estimatedTime}</span>
                             </div>
-                            {assignment.score && (
+                            {assignment.score !== undefined && assignment.score !== null && (
                               <div className="flex items-center space-x-1">
                                 <BarChart3 className="h-5 w-5" />
                                 <span>{t('score')}: {assignment.score}%</span>
+                              </div>
+                            )}
+                            {assignment.testId && assignment.attemptsCount > 0 && (
+                              <div className="flex items-center space-x-1">
+                                <Target className="h-5 w-5" />
+                                <span>{assignment.attemptsCount} {assignment.attemptsCount === 1 ? t('attempt') : t('attempts')}</span>
                               </div>
                             )}
                           </div>
@@ -767,13 +788,16 @@ function EmployeePageInner() {
                               </div>
                               <p className="text-sm text-muted-foreground">
                                 {assignment.dueDate && `${t('due')}: ${assignment.dueDate}`}
+                                {assignment.testId && assignment.attemptsCount > 0 && (
+                                  <span className="ml-2">• {assignment.attemptsCount} {assignment.attemptsCount === 1 ? t('attempt') : t('attempts')}</span>
+                                )}
                               </p>
                             </div>
                             <div className="text-right">
                               <div className={`text-lg font-bold ${colorClass}`}>
                                 {score}%
                               </div>
-                              <div className="text-xs text-muted-foreground">{t('score')}</div>
+                              <div className="text-xs text-muted-foreground">{t('bestScore') || t('score')}</div>
                             </div>
                           </div>
                         )

@@ -558,11 +558,6 @@ export default function TestPage() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error('Failed to save test attempt:', errorData.message || 'Unknown error')
-        
-        // If max attempts exceeded, show error to user
-        if (response.status === 403) {
-          alert(errorData.message || 'Maximum attempts exceeded for this test')
-        }
       } else {
         const result = await response.json()
         // Update score with server-calculated value (in case of discrepancies)

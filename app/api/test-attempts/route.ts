@@ -25,11 +25,10 @@ export async function POST(request: NextRequest) {
 
     const { testId, assignmentId, answers, timeSpent } = validation.data
 
-    // Load test to check maxAttempts and get passingScore
+    // Load test to get passingScore and timeLimit
     const testResult = await db
       .select({
         id: tests.id,
-        maxAttempts: tests.maxAttempts,
         passingScore: tests.passingScore,
         timeLimit: tests.timeLimit,
       })
@@ -45,28 +44,9 @@ export async function POST(request: NextRequest) {
     }
 
     const test = testResult[0]
-    const maxAttempts = test.maxAttempts ?? 1
     const passingScore = test.passingScore ?? 70
 
-    // Check maxAttempts limit
-    const existingAttempts = await db
-      .select()
-      .from(testAttempts)
-      .where(and(
-        eq(testAttempts.testId, testId),
-        eq(testAttempts.userId, session.user.id),
-        eq(testAttempts.status, 'completed')
-      ))
-
-    if (existingAttempts.length >= maxAttempts) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: `Maximum attempts (${maxAttempts}) exceeded for this test` 
-        },
-        { status: 403 }
-      )
-    }
+    // No limit on attempts - employees can take tests unlimited times
 
     // Validate timeSpent if timeLimit is set
     if (test.timeLimit && timeSpent) {
